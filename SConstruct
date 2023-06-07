@@ -481,6 +481,7 @@ for pack in [
     ('yaml', ),
     ('zlib', ),
     ('zstd', 'Zstandard'),
+    ('qpl', 'iaa'),
 ]:
     name = pack[0]
     pretty = name
@@ -5077,6 +5078,9 @@ def doConfigure(myenv):
 
     if use_system_version_of_library("zstd"):
         conf.FindSysLibDep("zstd", ["libzstd" if conf.env.TargetOSIs('windows') else "zstd"])
+
+    if use_system_version_of_library("qpl") and conf.env.TargetOSIs('linux'):
+        conf.FindSysLibDep("qpl", ["qpl"])
 
     if use_system_version_of_library("stemmer"):
         conf.FindSysLibDep("stemmer", ["stemmer"])

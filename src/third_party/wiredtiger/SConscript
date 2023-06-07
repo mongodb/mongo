@@ -11,7 +11,7 @@ Import("releaseBuild")
 
 env = env.Clone()
 
-env.InjectThirdParty(libraries=['snappy', 'zlib', 'zstd'])
+env.InjectThirdParty(libraries=['snappy', 'zlib', 'zstd', 'iaa'])
 
 if endian == "big":
     env.Append(CPPDEFINES=[('WORDS_BIGENDIAN', 1)])
@@ -91,6 +91,10 @@ else:
 useZlib = True
 useSnappy = True
 useZstd = True
+
+useIaa = False
+if env.TargetOSIs('linux') and env.ToolchainIs('gcc', 'clang'):
+    useIaa = True
 
 version_file = 'cmake/configs/version.cmake'
 
@@ -214,6 +218,10 @@ if useZstd:
     env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_ZSTD'])
     wtsources.append("ext/compressors/zstd/zstd_compress.c")
 
+if useIaa:
+    env.Append(CPPDEFINES=['HAVE_BUILTIN_EXTENSION_IAA'])
+    wtsources.append("ext/compressors/iaa/iaa_compress.c")
+
 # Use hardware by default on all platforms if available.
 # If not available at runtime, we fall back to software in some cases.
 if (get_option("use-hardware-crc32") == "off"):
@@ -229,6 +237,7 @@ wtlib = env.Library(
     target="wiredtiger",
     source=wtsources,
     LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/third_party/shim_iaa' if useIaa else '',
         '$BUILD_DIR/third_party/shim_snappy',
         '$BUILD_DIR/third_party/shim_zlib',
         '$BUILD_DIR/third_party/shim_zstd',

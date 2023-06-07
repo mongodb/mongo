@@ -16,6 +16,7 @@ Import([
 ])
 
 snappySuffix = '-1.1.7'
+qplSuffix = '-1.1.0'
 icuSuffix = '-57.1'
 tomcryptSuffix = '-1.18.2'
 variantSuffix = '-1.4.0'
@@ -135,6 +136,17 @@ if not use_system_version_of_library('zlib'):
 if not use_system_version_of_library('zstd'):
     thirdPartyEnvironmentModifications['zstd'] = {
         'CPPPATH': ['#/src/third_party/zstandard/zstd/lib'],
+    }
+
+if not use_system_version_of_library('qpl'):
+    thirdPartyEnvironmentModifications['qpl'] = {
+        'CPPPATH': ['#/src/third_party/qpl' + qplSuffix + '/include'],
+    }
+
+if env.TargetOSIs('linux') and env.ToolchainIs('gcc', 'clang'):
+    # Be sure to add include of iaaCodec, whether qpl system version is used or not.
+    thirdPartyEnvironmentModifications['iaa'] = {
+        'CPPPATH': ['#/src/third_party/wiredtiger/ext/compressors/iaa/iaacodec/include'],
     }
 
 if not use_system_version_of_library('google-benchmark'):
@@ -275,7 +287,6 @@ def injectThirdParty(thisEnv, libraries=[], parts=[]):
         else:
             for part in parts:
                 thisEnv.PrependUnique({part: mods[part]})
-
 
 env.AddMethod(injectThirdParty, 'InjectThirdParty')
 
@@ -482,6 +493,31 @@ else:
     ])
 
 zstdEnv.ShimLibrary(name="zstd", )
+
+if env.TargetOSIs('linux') and env.ToolchainIs('gcc', 'clang'):
+    qplEnv = env.Clone()
+    if use_system_version_of_library("qpl"):
+        qplEnv = qplEnv.Clone(SYSLIBDEPS=[
+            env['LIBDEPS_QPL_SYSLIBDEP'],
+        ])
+    else:
+        qplEnv = qplEnv.Clone()
+        qplEnv.SConscript('qpl'+ qplSuffix + '/SConscript', exports={'env': qplEnv})
+        qplEnv = qplEnv.Clone(LIBDEPS_INTERFACE=[
+            'qpl' + qplSuffix + '/qpl',
+        ])
+
+    qplEnv.ShimLibrary(name="qpl")
+
+    iaaCodecEnv = env.Clone()
+    iaaCodecEnv.InjectThirdParty(libraries=['qpl'])
+    iaaCodecEnv.InjectThirdParty(libraries=['wiredtiger'])
+    iaaCodecEnv.SConscript('wiredtiger/ext/compressors/iaa/iaacodec/SConscript', exports={'env': iaaCodecEnv})
+    iaaCodecEnv = iaaCodecEnv.Clone(LIBDEPS_INTERFACE=[
+        'wiredtiger/ext/compressors/iaa/iaacodec/iaacodec',
+    ])
+
+    iaaCodecEnv.ShimLibrary(name="iaa")
 
 benchmarkEnv = env.Clone()
 if use_system_version_of_library("google-benchmark"):
