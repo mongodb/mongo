@@ -294,13 +294,13 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
         WT_CURSOR_BACKUP_CHECK_STOP(othercb);
 
     /* Special backup cursor to query incremental IDs. */
-    if (WT_STRING_MATCH("backup:query_id", uri, strlen("backup:query_id"))) {
+    if (WT_STRING_MATCH("backup:query_id", uri, strlen(uri))) {
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
         WT_ASSERT(session, othercb == NULL);
         if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
             WT_RET_MSG(session, EINVAL, "Incremental backup is not configured");
         F_SET(cb, WT_CURBACKUP_QUERYID);
-    } else if (WT_STRING_MATCH("backup:export", uri, strlen("backup:export")))
+    } else if (WT_STRING_MATCH("backup:export", uri, strlen(uri)))
         /* Special backup cursor for export operation. */
         F_SET(cb, WT_CURBACKUP_EXPORT);
 
