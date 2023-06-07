@@ -106,9 +106,37 @@ void UncommittedCatalogUpdates::_createCollection(OperationContext* opCtx,
     auto uuid = coll->uuid();
     _entries.push_back({action, coll, nss, uuid});
 
-    // TODO SERVER-77425: When the catalog visibility rollback handler is executing last we don't
-    // need this. We add a dummy rollback handler that captures a reference to the newly created
-    // collection. This ensures that other rollback handlers may access this memory.
+    // When we create a collection after a drop we skip registering the collection in the
+    // preCommitHook and register it during the same commit handler that we unregister the
+    // collection.
+    if (action == Entry::Action::kCreatedCollection) {
+        opCtx->recoveryUnit()->registerPreCommitHook([uuid](OperationContext* opCtx) {
+            auto uncommittedCatalogUpdates = UncommittedCatalogUpdates::get(opCtx);
+            auto [found, createdColl, newColl] = lookupCollection(opCtx, uuid);
+            if (!createdColl) {
+                return;
+            }
+
+            // Invariant that a collection is found.
+            invariant(createdColl.get(), uuid.toString());
+
+            // This will throw when registering a namespace which is already in use.
+            CollectionCatalog::write(opCtx, [&, coll = createdColl](CollectionCatalog& catalog) {
+                catalog.registerCollectionTwoPhase(opCtx, coll, /*ts=*/boost::none);
+            });
+
+            opCtx->recoveryUnit()->onRollback([uuid](OperationContext* opCtx) {
+                CollectionCatalog::write(opCtx, [&](CollectionCatalog& catalog) {
+                    catalog.deregisterCollection(
+                        opCtx, uuid, /*isDropPending=*/false, /*ts=*/boost::none);
+                });
+            });
+        });
+    }
+
+    // We hold a reference to prevent the collection from being deleted when `PublishCatalogUpdates`
+    // runs its rollback handler as that happens first. Other systems may have setup some rollback
+    // handler that need to interact with this collection.
     opCtx->recoveryUnit()->onRollback([coll](OperationContext*) {});
 }
 

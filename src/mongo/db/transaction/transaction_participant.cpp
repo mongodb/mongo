@@ -2344,7 +2344,7 @@ void TransactionParticipant::Participant::_abortTransactionOnSession(OperationCo
     if (o().txnResourceStash && opCtx->recoveryUnit()->getNoEvictionAfterRollback()) {
         o(lk).txnResourceStash->setNoEvictionAfterRollback();
     }
-    _resetTransactionStateAndUnlock(&lk, opCtx, nextState);
+    _resetTransactionStateAndUnlock(&lk, nextState);
 
     _resetRetryableWriteState();
 }
@@ -2878,7 +2878,7 @@ void TransactionParticipant::Participant::_setNewTxnNumberAndRetryCounter(
     o(lk).transactionMetricsObserver.resetSingleTransactionStats(txnNumberAndRetryCounter);
 
     // Reset the transactional state
-    _resetTransactionStateAndUnlock(&lk, opCtx, TransactionState::kNone);
+    _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
 
     invariant(!lk);
     if (isParentSessionId(_sessionId())) {
@@ -3269,7 +3269,7 @@ void TransactionParticipant::Participant::_resetRetryableWriteState() {
 }
 
 void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
-    stdx::unique_lock<Client>* lk, OperationContext* opCtx, TransactionState::StateFlag state) {
+    stdx::unique_lock<Client>* lk, TransactionState::StateFlag state) {
     invariant(lk && lk->owns_lock());
 
     // If we are transitioning to kNone, we are either starting a new transaction or aborting a
@@ -3297,12 +3297,6 @@ void TransactionParticipant::Participant::_resetTransactionStateAndUnlock(
     boost::optional<TxnResources> temporary;
     swap(o(*lk).txnResourceStash, temporary);
     lk->unlock();
-
-    // Make sure we have a valid OperationContext set in the RecoveryUnit when it is destroyed as it
-    // is passed to registered rollback handlers.
-    if (temporary && temporary->recoveryUnit()) {
-        temporary->recoveryUnit()->setOperationContext(opCtx);
-    }
     temporary = boost::none;
 }
 
@@ -3330,7 +3324,7 @@ void TransactionParticipant::Participant::invalidate(OperationContext* opCtx) {
         retryableWriteTxnParticipantCatalog.invalidate();
     }
 
-    _resetTransactionStateAndUnlock(&lk, opCtx, TransactionState::kNone);
+    _resetTransactionStateAndUnlock(&lk, TransactionState::kNone);
 }
 
 boost::optional<repl::OplogEntry> TransactionParticipant::Participant::checkStatementExecuted(

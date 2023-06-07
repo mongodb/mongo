@@ -45,6 +45,8 @@ const expireAfterSeconds = 1;
 donorPrimary.getDB(tenantDB)[collName].insertOne({name: "deleteMe", lastModifiedDate: new Date()});
 donorPrimary.getDB(tenantDB)[collName].createIndex({"lastModifiedDate": 1}, {expireAfterSeconds});
 
+const hangTTLCollectionCacheAfterRegisteringInfo =
+    configureFailPoint(recipientPrimary, "hangTTLCollectionCacheAfterRegisteringInfo");
 let hangTTLMonitorBetweenPasses =
     configureFailPoint(recipientPrimary, "hangTTLMonitorBetweenPasses");
 
@@ -63,10 +65,27 @@ assert.commandWorked(tenantMigrationTest.startMigration(migrationOpts));
 // Wait for a TTL pass to start on the Recipient and then block before continuing.
 hangTTLMonitorBetweenPasses.wait();
 
+// Wait until we've registered our TTL index in the cache, but block before committing
+// the collection in the catalog.
+hangTTLCollectionCacheAfterRegisteringInfo.wait();
+
 // Wait for TTL expiry.
 sleep(expireAfterSeconds * 1000);
 
 // Unblock the TTL pass on the recipient to let it clean up.
+hangTTLMonitorBetweenPasses.off();
+
+// Wait for a full TTL cycle to complete in order to ensure that the TTL cache entry for the
+// collection (which does not yet have an entry in the collection catalog) is not deregistered. We
+// skip the first pass because it's possible that we can turn off the failpoint and then re-enable
+// before the TTL machinery is actually unblocked.
+hangTTLMonitorBetweenPasses =
+    configureFailPoint(recipientPrimary, "hangTTLMonitorBetweenPasses", {}, {skip: 1});
+hangTTLMonitorBetweenPasses.wait();
+
+// Unblock TTL registration, thus allowing the collection to be registered in the catalog.
+hangTTLCollectionCacheAfterRegisteringInfo.off();
+
 hangTTLMonitorBetweenPasses.off();
 
 TenantMigrationTest.assertCommitted(tenantMigrationTest.waitForMigrationToComplete(migrationOpts));

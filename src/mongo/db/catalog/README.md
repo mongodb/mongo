@@ -365,30 +365,27 @@ cache of the [durable catalog](#durable-catalog) state. It provides the followin
  * Ensures `Collection` objects are in-sync with opened storage snapshots.
 
 ### Synchronization
-Catalog access is synchronized using [Multiversion concurrency control] where readers operate on 
-immutable catalog, collection and index instances. Writes use [copy-on-write][] to create newer 
-versions of the catalog, collection and index instances to be changed, contents are copied from the 
-previous latest version. Readers holding on to a catalog instance will thus not observe any writes 
-that happen after requesting an instance. If it is desired to observe writes while holding a catalog 
+Catalog access is synchronized using [read-copy-update][] where reads operate on an immutable
+instance and writes on a new instance with its contents copied from the previous immutable instance
+used for reads. Readers holding on to a catalog instance will thus not observe any writes that
+happen after requesting an instance. If it is desired to observe writes while holding a catalog
 instance then the reader must refresh it.
 
 Catalog writes are handled with the `CollectionCatalog::write(callback)` interface. It provides the
-necessary [copy-on-write][] abstractions. A writable catalog instance is created by making a
+necessary [read-copy-update][] abstractions. A writable catalog instance is created by making a
 shallow copy of the existing catalog. The actual write is implemented in the supplied callback which
 is allowed to throw. Execution of the write callbacks are serialized and may run on a different
-thread than the thread calling `CollectionCatalog::write`. Users should take care of not performing 
-any blocking operations in these callbacks as it would block all other DDL writes in the system.
+thread than the thread calling `CollectionCatalog::write`.
 
 To avoid a bottleneck in the case the catalog contains a large number of collections (being slow to
-copy), immutable data structures are used, concurrent writes are also batched together. Any thread 
-that enters `CollectionCatalog::write` while a catalog instance is being copied or while executing 
-write callbacks is enqueued. When the copy finishes, all enqueued write jobs are run on that catalog 
-instance by the copying thread.
+copy), concurrent writes are batched together. Any thread that enters `CollectionCatalog::write`
+while a catalog instance is being copied is enqueued. When the copy finishes, all enqueued write
+jobs are run on that catalog instance by the copying thread.
 
 ### Collection objects
 Objects of the `Collection` class provide access to a collection's properties between
 [DDL](#glossary) operations that modify these properties. Modifications are synchronized using
-[copy-on-write][]. Reads access immutable `Collection` instances. Writes, such as rename
+[read-copy-update][]. Reads access immutable `Collection` instances. Writes, such as rename
 collection, apply changes to a clone of the latest `Collection` instance and then atomically install
 the new `Collection` instance in the catalog. It is possible for operations that read at different
 points in time to use different `Collection` objects.
@@ -410,17 +407,16 @@ In addition `Collection` objects have shared ownership of:
    by the storage engine.
 
 A writable `Collection` may only be requested in an active [WriteUnitOfWork](#WriteUnitOfWork). The
-new `Collection` instance is installed in the catalog when the storage transaction commits as the 
-first `onCommit` [Changes](#Changes) that run. This means that it is not allowed to perform any 
-modification to catalog, collection or index instances in `onCommit` handlers. Such modifications 
-would break the immutability property of these instances for readers. If the storage transaction 
-rolls back then the writable `Collection` object is simply discarded and no change is ever made to 
-the catalog.
+new `Collection` instance is installed in the catalog when the storage transaction commits, but only
+after all other `onCommit` [Changes](#Changes) have run. This ensures `onCommit` operations can
+write to the writable `Collection` before it becomes visible to readers in the catalog. If the
+storage transaction rolls back then the writable `Collection` object is simply discarded and no
+change is ever made to the catalog.
 
 A writable `Collection` is a clone of the existing `Collection`, members are either deep or
 shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#index-catalog).
 
-The oplog `Collection` follows special rules, it does not use [copy-on-write][] or any other form
+The oplog `Collection` follows special rules, it does not use [read-copy-update][] or any other form
 of synchronization. Modifications operate directly on the instance installed in the catalog. It is
 not allowed to read concurrently with writes on the oplog `Collection`.
 
@@ -442,8 +438,6 @@ The `Collection` object is brought to existence in two ways:
       is not present in the `CollectionCatalog`, or the `Collection` is there, but incompatible with
       the snapshot. See [here](#catalog-changes-versioning-and-the-minimum-valid-snapshot) how a
       `Collection` is determined to be incompatible.
-   3. When we read at latest concurrently with a DDL operation that is also performing multikey 
-      changes.
 
 For (1) and (2.1) the `Collection` objects are stored as shared pointers in the `CollectionCatalog`
 and available to all operations running in the database. These `Collection` objects are released
@@ -457,9 +451,6 @@ that instantiated them. When the snapshot is abandoned, such as during query yie
 `Collection` objects are released. Multiple lookups from the `CollectionCatalog` will re-use the
 previously instantiated `Collection` instead of performing the instantiation at every lookup for the
 same operation.
-
-(2.3) is an edge case where neither latest or pending `Collection` match the opened snapshot due to
-concurrent multikey changes.
 
 Users of `Collection` instances have a few responsibilities to keep the object valid.
 1. Hold a collection-level lock.
@@ -959,7 +950,7 @@ ResourceType, as locking at this level is done in the storage engine itself for 
 ### Document Level Concurrency Control
 
 Each storage engine is responsible for locking at the document level.  The WiredTiger storage engine
-uses MVCC [multiversion concurrency control][] along with optimistic locking in order to provide
+uses MVCC (multiversion concurrency control) along with optimistic locking in order to provide
 concurrency guarantees.
 
 ## Two-Phase Locking
@@ -2407,5 +2398,4 @@ oplog.
   for removal).
 - `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
 
-[copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
-[Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control
+[read-copy-update]: https://en.wikipedia.org/wiki/Read-copy-update

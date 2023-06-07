@@ -139,8 +139,7 @@ public:
      * collection must be used to drop an index.
      */
     static bool isTwoPhaseCommitEntry(const Entry& entry) {
-        return (entry.action == Entry::Action::kCreatedCollection ||
-                entry.action == Entry::Action::kWritableCollection ||
+        return (entry.action == Entry::Action::kWritableCollection ||
                 entry.action == Entry::Action::kRenamedCollection ||
                 entry.action == Entry::Action::kDroppedCollection ||
                 entry.action == Entry::Action::kRecreatedCollection);
@@ -252,21 +251,6 @@ public:
         return _entries.empty();
     }
 
-    /**
-     * Flag to check of callbacks with the RecoveryUnit has been registered for this instance.
-     */
-    bool hasRegisteredWithRecoveryUnit() const {
-        return _callbacksRegisteredWithRecoveryUnit;
-    }
-
-    /**
-     * Mark that callbacks with the RecoveryUnit has been registered for this instance.
-     */
-    void markRegisteredWithRecoveryUnit() {
-        invariant(!_callbacksRegisteredWithRecoveryUnit);
-        _callbacksRegisteredWithRecoveryUnit = true;
-    }
-
     static UncommittedCatalogUpdates& get(OperationContext* opCtx);
 
 private:
@@ -285,8 +269,6 @@ private:
     std::vector<Entry> _entries;
 
     stdx::unordered_set<DatabaseName> _ignoreExternalViewChanges;
-
-    bool _callbacksRegisteredWithRecoveryUnit = false;
 };
 
 /**

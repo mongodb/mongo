@@ -598,6 +598,22 @@ public:
     };
 
     /**
+     * A SnapshotChange is an action that can be registered at anytime. When a WriteUnitOfWork
+     * begins, the openSnapshot() callback is called for any registered snapshot changes. Similarly,
+     * when the snapshot is abandoned, or the WriteUnitOfWork is committed or aborted, the
+     * closeSnapshot() callback is called.
+     *
+     * The same rules apply here that apply to the Change class.
+     */
+    class SnapshotChange {
+    public:
+        virtual ~SnapshotChange() {}
+
+        virtual void openSnapshot(OperationContext* opCtx) = 0;
+        virtual void closeSnapshot(OperationContext* opCtx) = 0;
+    };
+
+    /**
      * The commitUnitOfWork() method calls the commit() method of each registered change in order of
      * registration. The endUnitOfWork() method calls the rollback() method of each registered
      * Change in reverse order of registration. Either will unregister and delete the changes.
@@ -635,15 +651,21 @@ public:
 
     /**
      * Like registerChange() above but should only be used to make new state visible in the
-     * in-memory catalog. Change registered with this function will commit before the commit
-     * changes registered with registerChange and rollback will run after the rollback changes
-     * registered with registerChange. Only one change of this kind should be registered at a given
-     * time to ensure catalog updates are atomic, however multiple callbacks are allowed for testing
-     * purposes.
+     * in-memory catalog. Only one change of this kind may be registered at a given time to ensure
+     * catalog updates are atomic. Change registered with this function will commit after the commit
+     * changes registered with registerChange and rollback will run before the rollback changes
+     * registered with registerChange.
      *
-     * This separation ensures that regular Changes can observe changes to catalog visibility.
+     * This separation ensures that regular Changes that can modify state are run before the Change
+     * to install the new state in the in-memory catalog, after which there should be no further
+     * changes.
      */
     void registerChangeForCatalogVisibility(std::unique_ptr<Change> change);
+
+    /**
+     * Returns true if a change has been registered with registerChangeForCatalogVisibility() above.
+     */
+    bool hasRegisteredChangeForCatalogVisibility();
 
     /**
      * Registers a callback to be called if the current WriteUnitOfWork rolls back.
@@ -863,10 +885,12 @@ private:
 
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
-    Changes _changesForCatalogVisibility;
+    typedef std::vector<std::unique_ptr<SnapshotChange>> SnapshotChanges;
+    SnapshotChanges _snapshotChanges;
     // The Snapshot is always initialized by the RecoveryUnit constructor. We use an optional to
     // simplify destructing and re-constructing the Snapshot in-place.
     boost::optional<Snapshot> _snapshot;
+    std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
     OperationContext* _opCtx = nullptr;
     bool _readOnly = false;

@@ -85,6 +85,8 @@ public:
                             const DurableCatalogEntry& catalogEntry,
                             boost::optional<Timestamp> readTimestamp) final;
     bool isInitialized() const final;
+    bool isCommitted() const final;
+    void setCommitted(bool val) final;
 
     const NamespaceString& ns() const final {
         return _ns;
@@ -411,6 +413,8 @@ private:
         const bool _isCapped;
         const bool _needCappedLock;
 
+        AtomicWord<bool> _committed{true};
+
         // Tracks in-progress capped inserts to inform visibility for forward scans so that no
         // uncommitted records are skipped.
         CappedVisibilityObserver _cappedObserver;
@@ -436,6 +440,7 @@ private:
     NamespaceString _ns;
     RecordId _catalogId;
     UUID _uuid;
+    bool _cachedCommitted = true;
     std::shared_ptr<SharedState> _shared;
 
     // Collection metadata cached from the DurableCatalog. Is kept separate from the SharedState
