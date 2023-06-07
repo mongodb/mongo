@@ -135,7 +135,9 @@ public:
      */
     static ResourcePattern forExactSystemBucketsCollection(StringData dbName,
                                                            StringData collectionName) {
-        invariant(!collectionName.startsWith("system.buckets."));
+        uassert(ErrorCodes::InvalidNamespace,
+                "Invalid namespace '{}.system.buckets.{}'"_format(dbName, collectionName),
+                !collectionName.startsWith("system.buckets."));
         return ResourcePattern(
             MatchTypeEnum::kMatchExactSystemBucketResource,
             NamespaceString::createNamespaceStringForAuth(boost::none, dbName, collectionName));
