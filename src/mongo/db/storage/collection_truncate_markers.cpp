@@ -37,9 +37,30 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
 namespace mongo {
-
 // TODO SERVER-74250: Change to slowCollectionSamplingReads once 7.0 is released.
 MONGO_FAIL_POINT_DEFINE(slowOplogSamplingReads);
+
+namespace {
+
+// Strings for MarkerCreationMethods.
+static constexpr StringData kEmptyCollectionString = "emptyCollection"_sd;
+static constexpr StringData kScanningString = "scanning"_sd;
+static constexpr StringData kSamplingString = "sampling"_sd;
+}  // namespace
+
+StringData CollectionTruncateMarkers::toString(
+    CollectionTruncateMarkers::MarkersCreationMethod creationMethod) {
+    switch (creationMethod) {
+        case CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection:
+            return kEmptyCollectionString;
+        case CollectionTruncateMarkers::MarkersCreationMethod::Scanning:
+            return kScanningString;
+        case CollectionTruncateMarkers::MarkersCreationMethod::Sampling:
+            return kSamplingString;
+        default:
+            MONGO_UNREACHABLE;
+    }
+}
 
 boost::optional<CollectionTruncateMarkers::Marker>
 CollectionTruncateMarkers::peekOldestMarkerIfNeeded(OperationContext* opCtx) const {
@@ -328,30 +349,18 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
         MarkersCreationMethod::Sampling};
 }
 
-CollectionTruncateMarkers::InitialSetOfMarkers
-CollectionTruncateMarkers::createFromExistingRecordStore(
-    OperationContext* opCtx,
-    RecordStore* rs,
-    const NamespaceString& ns,
+CollectionTruncateMarkers::MarkersCreationMethod
+CollectionTruncateMarkers::computeMarkersCreationMethod(
+    int64_t numRecords,
+    int64_t dataSize,
     int64_t minBytesPerMarker,
-    std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
-    boost::optional<int64_t> numberOfMarkersToKeepLegacy) {
-
-    long long numRecords = rs->numRecords(opCtx);
-    long long dataSize = rs->dataSize(opCtx);
-
-    LOGV2(7393203,
-          "The size storer reports that the collection contains",
-          "numRecords"_attr = numRecords,
-          "dataSize"_attr = dataSize);
-
+    boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
     // Don't calculate markers if this is a new collection. This is to prevent standalones from
     // attempting to get a forward scanning cursor on an explicit create of the collection. These
     // values can be wrong. The assumption is that if they are both observed to be zero, there must
     // be very little data in the collection; the cost of being wrong is imperceptible.
     if (numRecords == 0 && dataSize == 0) {
-        return CollectionTruncateMarkers::InitialSetOfMarkers{
-            {}, 0, 0, Microseconds{0}, MarkersCreationMethod::EmptyCollection};
+        return MarkersCreationMethod::EmptyCollection;
     }
 
     // Only use sampling to estimate where to place the collection markers if the number of samples
@@ -361,29 +370,68 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
     // If the collection doesn't contain enough records to make sampling more efficient, then scan
     // the collection to determine where to put down markers.
     //
-    // Unless preserving legacy behavior, compute the number of markers which would be generated
-    // based on the estimated data size.
-    auto numMarkers = numberOfMarkersToKeepLegacy ? numberOfMarkersToKeepLegacy.get()
-                                                  : dataSize / minBytesPerMarker;
+    // Unless preserving legacy behavior of 'OplogTruncateMarkers', compute the number of markers
+    // which would be generated based on the estimated data size.
+    auto numMarkers = numberOfMarkersToKeepForOplog ? numberOfMarkersToKeepForOplog.get()
+                                                    : dataSize / minBytesPerMarker;
     if (numRecords <= 0 || dataSize <= 0 ||
         uint64_t(numRecords) <
             kMinSampleRatioForRandCursor * kRandomSamplesPerMarker * numMarkers) {
-        return CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx, rs, ns, minBytesPerMarker, std::move(getRecordIdAndWallTime));
+        return MarkersCreationMethod::Scanning;
     }
 
-    // Use the collection's average record size to estimate the number of records in each marker,
-    // and thus estimate the combined size of the records.
-    double avgRecordSize = double(dataSize) / double(numRecords);
-    double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
-    double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
+    return MarkersCreationMethod::Sampling;
+}
 
-    return CollectionTruncateMarkers::createMarkersBySampling(opCtx,
-                                                              rs,
-                                                              ns,
-                                                              (int64_t)estimatedRecordsPerMarker,
-                                                              (int64_t)estimatedBytesPerMarker,
-                                                              std::move(getRecordIdAndWallTime));
+CollectionTruncateMarkers::InitialSetOfMarkers
+CollectionTruncateMarkers::createFromExistingRecordStore(
+    OperationContext* opCtx,
+    RecordStore* rs,
+    const NamespaceString& ns,
+    int64_t minBytesPerMarker,
+    std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
+    boost::optional<int64_t> numberOfMarkersToKeepForOplog) {
+
+    long long numRecords = rs->numRecords(opCtx);
+    long long dataSize = rs->dataSize(opCtx);
+
+    LOGV2(7393203,
+          "The size storer reports that the collection contains",
+          "numRecords"_attr = numRecords,
+          "dataSize"_attr = dataSize);
+
+    auto creationMethod = CollectionTruncateMarkers::computeMarkersCreationMethod(
+        numRecords, dataSize, minBytesPerMarker, numberOfMarkersToKeepForOplog);
+
+    switch (creationMethod) {
+        case MarkersCreationMethod::EmptyCollection:
+            // Don't calculate markers if this is a new collection. This is to prevent standalones
+            // from attempting to get a forward scanning cursor on an explicit create of the
+            // collection. These values can be wrong. The assumption is that if they are both
+            // observed to be zero, there must be very little data in the collection; the cost of
+            // being wrong is imperceptible.
+            return CollectionTruncateMarkers::InitialSetOfMarkers{
+                {}, 0, 0, Microseconds{0}, MarkersCreationMethod::EmptyCollection};
+        case MarkersCreationMethod::Scanning:
+            return CollectionTruncateMarkers::createMarkersByScanning(
+                opCtx, rs, ns, minBytesPerMarker, std::move(getRecordIdAndWallTime));
+        default: {
+            // Use the collection's average record size to estimate the number of records in each
+            // marker,
+            // and thus estimate the combined size of the records.
+            double avgRecordSize = double(dataSize) / double(numRecords);
+            double estimatedRecordsPerMarker = std::ceil(minBytesPerMarker / avgRecordSize);
+            double estimatedBytesPerMarker = estimatedRecordsPerMarker * avgRecordSize;
+
+            return CollectionTruncateMarkers::createMarkersBySampling(
+                opCtx,
+                rs,
+                ns,
+                (int64_t)estimatedRecordsPerMarker,
+                (int64_t)estimatedBytesPerMarker,
+                std::move(getRecordIdAndWallTime));
+        }
+    }
 }
 
 void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterInsertOnCommit(
@@ -402,18 +450,8 @@ void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarkerAfterIns
          countInserted](OperationContext* opCtx, auto) {
             invariant(bytesInserted >= 0);
             invariant(recordId.isValid());
-
-            // By putting the highest marker modification first we can guarantee than in the
-            // event of a race condition between expiring a partial marker the metrics increase
-            // will happen after the marker has been created. This guarantees that the metrics
-            // will eventually be correct as long as the expiration criteria checks for the
-            // metrics and the highest marker expiration.
-            collectionMarkers->_updateHighestSeenRecordIdAndWallTime(recordId, wallTime);
-            collectionMarkers->_currentRecords.addAndFetch(countInserted);
-            int64_t newCurrentBytes = collectionMarkers->_currentBytes.addAndFetch(bytesInserted);
-            if (newCurrentBytes >= collectionMarkers->_minBytesPerMarker) {
-                collectionMarkers->createNewMarkerIfNeeded(opCtx, recordId, wallTime);
-            }
+            collectionMarkers->updateCurrentMarker(
+                opCtx, bytesInserted, recordId, wallTime, countInserted);
         });
 }
 
@@ -470,4 +508,25 @@ void CollectionTruncateMarkersWithPartialExpiration::_updateHighestSeenRecordIdA
         _lastHighestWallTime = wallTime;
     }
 }
+
+void CollectionTruncateMarkersWithPartialExpiration::updateCurrentMarker(
+    OperationContext* opCtx,
+    int64_t bytesAdded,
+    const RecordId& highestRecordId,
+    Date_t highestWallTime,
+    int64_t numRecordsAdded) {
+    // By putting the highest marker modification first we can guarantee than in the
+    // event of a race condition between expiring a partial marker the metrics increase
+    // will happen after the marker has been created. This guarantees that the metrics
+    // will eventually be correct as long as the expiration criteria checks for the
+    // metrics and the highest marker expiration.
+    _updateHighestSeenRecordIdAndWallTime(highestRecordId, highestWallTime);
+    _currentRecords.addAndFetch(numRecordsAdded);
+    int64_t newCurrentBytes = _currentBytes.addAndFetch(bytesAdded);
+    if (highestWallTime != Date_t() && highestRecordId.isValid() &&
+        newCurrentBytes >= _minBytesPerMarker) {
+        createNewMarkerIfNeeded(opCtx, highestRecordId, highestWallTime);
+    }
+}
+
 }  // namespace mongo

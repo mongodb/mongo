@@ -116,6 +116,9 @@ public:
 
     // The method used for creating the initial set of markers.
     enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
+
+    static StringData toString(MarkersCreationMethod creationMethod);
+
     // The initial set of markers to use when constructing the CollectionMarkers object.
     struct InitialSetOfMarkers {
         std::deque<Marker> markers;
@@ -132,19 +135,32 @@ public:
             : id(std::move(lastRecord)), wall(std::move(wallTime)) {}
     };
 
+    // Given the estimated collection 'dataSize' and 'numRecords', along with a target
+    // 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
+    // creation method), computes the appropriate creation method for the collection.
+    //
+    // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
+    // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
+    // reclaiming the oldest truncate markers.
+    static CollectionTruncateMarkers::MarkersCreationMethod computeMarkersCreationMethod(
+        int64_t numRecords,
+        int64_t dataSize,
+        int64_t minBytesPerMarker,
+        boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
+
     // Creates the initial set of markers. This will decide whether to perform a collection scan or
     // sampling based on the size of the collection.
     //
-    // 'numberOfMarkersToKeepLegacy' exists solely to maintain legacy behavior of
-    // 'OplogTruncateMarkers' previously known as 'OplogStones'. It serves as the maximum number of
-    // truncate markers to keep before reclaiming the oldest truncate markers.
+    // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
+    // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
+    // reclaiming the oldest truncate markers.
     static InitialSetOfMarkers createFromExistingRecordStore(
         OperationContext* opCtx,
         RecordStore* rs,
         const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
-        boost::optional<int64_t> numberOfMarkersToKeepLegacy = boost::none);
+        boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     // Creates the initial set of markers by fully scanning the collection. The set of markers
     // returned will have correct metrics.
@@ -168,21 +184,28 @@ public:
 
     void setMinBytesPerMarker(int64_t size);
 
+    static constexpr uint64_t kRandomSamplesPerMarker = 10;
+
     //
     // The following methods are public only for use in tests.
     //
 
-    size_t numMarkers() const {
+    size_t numMarkers_forTest() const {
         stdx::lock_guard<Latch> lk(_markersMutex);
         return _markers.size();
     }
 
-    int64_t currentBytes() const {
+    int64_t currentBytes_forTest() const {
         return _currentBytes.load();
     }
 
-    int64_t currentRecords() const {
+    int64_t currentRecords_forTest() const {
         return _currentRecords.load();
+    }
+
+    std::deque<Marker> getMarkers_forTest() const {
+        // Return a copy of the vector.
+        return _markers;
     }
 
 private:
@@ -196,8 +219,6 @@ private:
     // Method used to notify the implementation of a new marker being created. Implementations are
     // free to implement this however they see fit by overriding it. By default this is a no-op.
     virtual void _notifyNewMarkerCreation(){};
-
-    static constexpr uint64_t kRandomSamplesPerMarker = 10;
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
@@ -286,6 +307,10 @@ public:
                                                         Date_t wallTime,
                                                         int64_t countInserted) final;
 
+    std::pair<const RecordId&, const Date_t&> getPartialMarker_forTest() const {
+        return {_lastHighestRecordId, _lastHighestWallTime};
+    }
+
 private:
     // Highest marker seen during the lifetime of the class. Modifications must happen
     // while holding '_lastHighestRecordMutex'.
@@ -299,13 +324,19 @@ private:
         return false;
     }
 
+    // Updates the highest seen RecordId and wall time if they are above the current ones.
+    void _updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
+
 protected:
     std::pair<const RecordId&, const Date_t&> getPartialMarker() const {
         return {_lastHighestRecordId, _lastHighestWallTime};
     }
 
-    // Updates the highest seen RecordId and wall time if they are above the current ones.
-    void _updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
+    void updateCurrentMarker(OperationContext* opCtx,
+                             int64_t bytesAdded,
+                             const RecordId& highestRecordId,
+                             Date_t highestWallTime,
+                             int64_t numRecordsAdded);
 };
 
 }  // namespace mongo

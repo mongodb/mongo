@@ -569,7 +569,8 @@ env.Library(
     target='change_stream_pre_images_collection_manager',
     source=[
         'change_stream_pre_images_collection_manager.cpp',
-        'change_stream_pre_images_truncate_markers.cpp'
+        'change_stream_pre_images_truncate_manager.cpp',
+        'change_stream_pre_images_truncate_markers_per_nsUUID.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/change_stream_preimage',
@@ -594,10 +595,12 @@ env.CppUnitTest(
     target='change_stream_pre_images_manager_test',
     source=[
         'change_stream_pre_images_remover_test.cpp',
+        'change_stream_pre_images_truncate_manager_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
@@ -608,6 +611,7 @@ env.CppUnitTest(
         'change_stream_pre_images_collection_manager',
         'change_stream_serverless_helpers',
         'change_streams_cluster_parameter',
+        'shard_role',
     ],
 )
 

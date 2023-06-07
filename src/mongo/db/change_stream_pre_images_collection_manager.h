@@ -31,7 +31,8 @@
 
 #include <boost/optional/optional.hpp>
 
-#include "mongo/db/change_stream_pre_images_truncate_markers.h"
+#include "mongo/db/change_stream_pre_images_truncate_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"

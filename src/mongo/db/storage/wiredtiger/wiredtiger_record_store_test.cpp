@@ -397,45 +397,45 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CreateNewMarker) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
 
         // Inserting a record smaller than 'minBytesPerTruncateMarker' shouldn't create a new oplog
         // truncate marker.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 99), RecordId(1, 1));
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(99, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(99, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting another record such that their combined size exceeds
         // 'minBytesPerTruncateMarker' should cause a new truncate marker to be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 51), RecordId(1, 2));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one exceed 'minBytesPerTruncateMarker' shouldn't cause a new truncate marker to be
         // created because we've started filling a new truncate marker.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 3), 50), RecordId(1, 3));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a record such that the combined size of this record and the previously inserted
         // one is exactly equal to 'minBytesPerTruncateMarker' should cause a new truncate marker to
         // be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 4), 50), RecordId(1, 4));
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a single record that exceeds 'minBytesPerTruncateMarker' should cause a new
         // truncate marker to
         // be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 5), 101), RecordId(1, 5));
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -458,9 +458,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_UpdateRecord) {
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 50), RecordId(1, 2));
 
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Attempts to grow the records should fail.
@@ -507,9 +507,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_UpdateRecord) {
             rs->updateRecord(opCtx.get(), RecordId(1, 2), changed2.objdata(), changed2.objsize()));
         wuow.commit();
 
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -531,9 +531,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Truncate) {
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 50), RecordId(1, 2));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 3), 50), RecordId(1, 3));
 
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     {
@@ -548,9 +548,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Truncate) {
 
         ASSERT_EQ(0, rs->dataSize(opCtx.get()));
         ASSERT_EQ(0, rs->numRecords(opCtx.get()));
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -583,9 +583,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
         ASSERT_EQ(9, rs->numRecords(opCtx.get()));
         ASSERT_EQ(2600, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(3, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(300, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(300, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Make sure all are visible.
@@ -603,9 +603,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
         ASSERT_EQ(7, rs->numRecords(opCtx.get()));
         ASSERT_EQ(2350, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using an inclusive RecordId that refers to the 'lastRecord' of a full truncate
@@ -621,9 +621,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1950, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(3, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(750, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(3, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(750, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using a non-inclusive RecordId that exists inside the truncate marker currently
@@ -638,9 +638,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1400, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(200, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(200, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using a non-inclusive RecordId that refers to the 'lastRecord' of a full
@@ -656,9 +656,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(1200, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate data using a non-inclusive RecordId that exists inside a full truncate marker. The
@@ -673,9 +673,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
         ASSERT_EQ(1, rs->numRecords(opCtx.get()));
         ASSERT_EQ(400, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(400, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(400, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -703,9 +703,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(330, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Fail to truncate the truncate marker when cappedMaxSize is exceeded, but the persisted
@@ -719,9 +719,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(330, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate a truncate marker when cappedMaxSize is exceeded.
@@ -733,9 +733,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(230, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     {
@@ -747,9 +747,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(550, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(4U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Truncate multiple truncate markers if necessary.
@@ -761,9 +761,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(190, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // No-op if dataSize <= cappedMaxSize.
@@ -775,9 +775,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(190, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Don't truncate the last truncate marker before the truncate point, even if the truncate point
@@ -790,9 +790,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(4, rs->numRecords(opCtx.get()));
         ASSERT_EQ(500, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -802,9 +802,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(360, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // Don't truncate entire oplog.
@@ -817,9 +817,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(5, rs->numRecords(opCtx.get()));
         ASSERT_EQ(660, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(3U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -829,9 +829,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(2, rs->numRecords(opCtx.get()));
         ASSERT_EQ(300, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 
     // OK to truncate all truncate markers if there are records in the oplog that are before or at
@@ -844,9 +844,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(390, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(90, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -856,9 +856,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
         ASSERT_EQ(1, rs->numRecords(opCtx.get()));
         ASSERT_EQ(90, rs->dataSize(opCtx.get()));
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(90, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(90, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -876,33 +876,33 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_AscendingOrder) {
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
 
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 2), 50), RecordId(2, 2));
-        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(50, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a record that has a smaller RecordId than the previously inserted record should
         // be able to create a new truncate marker when no truncate markers already exist.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 1), 50), RecordId(2, 1));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
 
         // However, inserting a record that has a smaller RecordId than most recently created
         // truncate marker's last record shouldn't cause a new truncate marker to be created, even
         // if the size of the inserted record exceeds 'minBytesPerTruncateMarker'.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
-        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(100, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(1U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(1, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(100, oplogTruncateMarkers->currentBytes_forTest());
 
         // Inserting a record that has a larger RecordId than the most recently created truncate
         // marker's last record should then cause a new truncate marker to be created.
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 3), 50), RecordId(2, 3));
-        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords());
-        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes());
+        ASSERT_EQ(2U, oplogTruncateMarkers->numMarkers_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentRecords_forTest());
+        ASSERT_EQ(0, oplogTruncateMarkers->currentBytes_forTest());
     }
 }
 
@@ -910,8 +910,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_AscendingOrder) {
 // generated because the estimated 'dataSize' is smaller than the minimum size for a truncate
 // marker, tets that
 //  (1) The oplog is scanned
-//  (2) OplogTruncateMarkers::currentBytes() reflects the actual size of the oplog instead of the
-//  estimated size.
+//  (2) OplogTruncateMarkers::currentBytes_forTest() reflects the actual size of the oplog instead
+//  of the estimated size.
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScanning) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     auto wtHarnessHelper = dynamic_cast<WiredTigerHarnessHelper*>(harnessHelper.get());
@@ -945,12 +945,12 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
     ASSERT_FALSE(oplogTruncateMarkers->processedBySampling());
 
-    auto numMarkers = oplogTruncateMarkers->numMarkers();
+    auto numMarkers = oplogTruncateMarkers->numMarkers_forTest();
     ASSERT_EQ(numMarkers, 0U);
 
     // A forced scan over the RecordStore should force the 'currentBytes' to be accurate in the
     // truncate markers as well as the RecordStore's 'numRecords' and 'dataSize'.
-    ASSERT_EQ(oplogTruncateMarkers->currentBytes(), realNumRecords * realSizePerRecord);
+    ASSERT_EQ(oplogTruncateMarkers->currentBytes_forTest(), realNumRecords * realSizePerRecord);
     ASSERT_EQ(wtrs->dataSize(opCtx.get()), realNumRecords * realSizePerRecord);
     ASSERT_EQ(wtrs->numRecords(opCtx.get()), realNumRecords);
 }
@@ -993,16 +993,16 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
 
     // Confirm that sampling occurred and that some truncate markers were generated.
     ASSERT(oplogTruncateMarkers->processedBySampling());
-    auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers();
+    auto truncateMarkersBefore = oplogTruncateMarkers->numMarkers_forTest();
     ASSERT_GT(truncateMarkersBefore, 0U);
-    ASSERT_GT(oplogTruncateMarkers->currentBytes(), 0);
+    ASSERT_GT(oplogTruncateMarkers->currentBytes_forTest(), 0);
 
     {
         // Reclaiming should do nothing because the data size is still under the maximum.
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         wtHarnessHelper->advanceStableTimestamp(Timestamp(4, 0));
         wtrs->reclaimOplog(opCtx.get());
-        ASSERT_EQ(truncateMarkersBefore, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(truncateMarkersBefore, oplogTruncateMarkers->numMarkers_forTest());
 
         // Reduce the oplog size to ensure we create a truncate marker and truncate on the next
         // insert.
@@ -1016,7 +1016,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         // Ensure every truncate marker has been cleaned up except for the last one ending in 6.
         wtHarnessHelper->advanceStableTimestamp(Timestamp(6, 0));
         wtrs->reclaimOplog(opCtx.get());
-        ASSERT_EQ(1, oplogTruncateMarkers->numMarkers());
+        ASSERT_EQ(1, oplogTruncateMarkers->numMarkers_forTest());
 
         // The original oplog should have rolled over and the size and count should be accurate.
         ASSERT_EQ(1, wtrs->numRecords(opCtx.get()));

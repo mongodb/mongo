@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/util/concurrent_shared_values_map.h"
@@ -44,50 +45,6 @@
  * within a pre-images collection.
  */
 namespace mongo {
-
-class PreImagesTruncateMarkersPerNsUUID final
-    : public CollectionTruncateMarkersWithPartialExpiration {
-public:
-    PreImagesTruncateMarkersPerNsUUID(boost::optional<TenantId> tenantId,
-                                      std::deque<Marker> markers,
-                                      int64_t leftoverRecordsCount,
-                                      int64_t leftoverRecordsBytes,
-                                      int64_t minBytesPerMarker);
-
-    /**
-     * Creates an initial set of markers for pre-images from 'nsUUID'.
-     */
-    static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersScanning(
-        OperationContext* opCtx,
-        RecordStore* rs,
-        const UUID& nsUUID,
-        RecordId& highestSeenRecordId,
-        Date_t& highestSeenWallTime,
-        int64_t minBytesPerMarker);
-
-    static CollectionTruncateMarkers::RecordIdAndWallTime getRecordIdAndWallTime(
-        const Record& record);
-
-    /**
-     * Returns whether there are no more markers and no partial marker pending creation.
-     */
-    bool isEmpty() const {
-        return CollectionTruncateMarkers::isEmpty();
-    }
-
-private:
-    friend class PreImagesRemoverTest;
-
-    bool _hasExcessMarkers(OperationContext* opCtx) const override;
-
-    bool _hasPartialMarkerExpired(OperationContext* opCtx) const override;
-
-    /**
-     * When initialized, indicates this is a serverless environment.
-     */
-    boost::optional<TenantId> _tenantId;
-};
-
 /**
  * Manages the truncation of expired pre-images for pre-images collection(s). There is up to one
  * "system.config.preimages" pre-images collection per tenant.
@@ -150,25 +107,19 @@ public:
 
     using TenantTruncateMarkers =
         absl::flat_hash_map<UUID, std::shared_ptr<PreImagesTruncateMarkersPerNsUUID>, UUID::Hash>;
+
+private:
+    friend class PreImagesTruncateManagerTest;
+
+    void _registerAndInitialiseMarkersForTenant(OperationContext* opCtx,
+                                                boost::optional<TenantId> tenantId,
+                                                const CollectionPtr& preImagesCollectionPtr);
     /**
      * Similar to the 'TenantTruncateMarkers' type, but with an added wrapper which enables copy on
      * write semantics.
      */
     using TenantTruncateMarkersCopyOnWrite =
         ConcurrentSharedValuesMap<UUID, PreImagesTruncateMarkersPerNsUUID, UUID::Hash>;
-
-    static TenantTruncateMarkers createInitialTruncateMapScanning(
-        OperationContext* opCtx,
-        boost::optional<TenantId> tenantId,
-        const CollectionPtr& preImagesCollectionPtr);
-
-    static void initialisePreImagesCollectionTruncateMarkers(
-        OperationContext* opCtx,
-        boost::optional<TenantId> tenantId,
-        const CollectionPtr& preImagesCollectionPtr,
-        TenantTruncateMarkersCopyOnWrite& finalTruncateMap);
-
-private:
     using TenantMap =
         ConcurrentSharedValuesMap<boost::optional<TenantId>, TenantTruncateMarkersCopyOnWrite>;
     TenantMap _tenantMap;
