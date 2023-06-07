@@ -1861,7 +1861,9 @@ buildvariants:
 
   - name: linux-standalone.2022-11
     display_name: Linux Standalone 2022-11
-    cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    # TODO SERVER-74399 Reduce frequency back to baseline.
+    # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -3340,7 +3342,9 @@ buildvariants:
   - &linux-microbenchmarks-standalone-arm
     name: linux-microbenchmarks-standalone-arm.2023-01
     display_name: MicroBenchmarks Arm Standalone inMemory.2023-01
-    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    # TODO SERVER-74399 Reduce frequency back to baseline.
+    # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: &linux-microbench-cron "0 0 * * *"  # Everyday at 00:00
     modules: *modules
     expansions: &standalone-arm-expansions
       mongodb_setup_release: 2022-11
