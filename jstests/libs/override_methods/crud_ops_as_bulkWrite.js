@@ -9,6 +9,42 @@ let originalRunCommand = Mongo.prototype.runCommand;
 
 const commandsToBulkWriteOverride = new Set(["insert", "update", "delete", "findandmodify"]);
 
+const commandsToAlwaysFlushBulkWrite = new Set([
+    "aggregate",
+    "mapreduce",
+    "authenticate",
+    "logout",
+    "applyops",
+    "checkshardingindex",
+    "cleanuporphaned",
+    "cleanupreshardcollection",
+    "commitreshardcollection",
+    "movechunk",
+    "moveprimary",
+    "moverange",
+    "mergechunks",
+    "refinecollectionshardkey",
+    "split",
+    "splitvector",
+    "killallsessions",
+    "killallsessionsbypattern",
+    "dropconnections",
+    "filemd5",
+    "fsync",
+    "fsyncunlock",
+    "killop",
+    "setfeaturecompatibilityversion",
+    "shutdown",
+    "currentop",
+    "listdatabases",
+    "listcollections",
+    "committransaction",
+    "aborttransaction",
+    "preparetransaction",
+    "endsessions",
+    "killsessions"
+]);
+
 let numOpsPerResponse = [];
 let nsInfos = [];
 let bufferedOps = [];
@@ -24,6 +60,10 @@ function resetBulkWriteBatch() {
     letObj = null;
     bypassDocumentValidation = null;
     ordered = true;
+}
+
+function checkNamespaceStoredInBufferedOps(ns) {
+    return nsInfos.findIndex((element) => element.ns == ns) != -1;
 }
 
 function getLetFromCommand(cmdObj) {
@@ -369,10 +409,21 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
         numOpsPerResponse.push(numOps);
 
         return response;
+    } else if (commandsToAlwaysFlushBulkWrite.has(cmdName)) {
+        flushCurrentBulkWriteBatch.apply(this, [options]);
+    } else {
+        // Commands which are selectively allowed. If they are operating on a namespace which we
+        // have stored in our buffered ops then we will flush, if not then we allow the command to
+        // execute normally.
+        if (typeof cmdObj[cmdName] === 'string') {
+            // Should be the collection that the command is operating on, can make full namespace.
+            const ns = dbName + "." + cmdObj[cmdName];
+            if (checkNamespaceStoredInBufferedOps(ns)) {
+                flushCurrentBulkWriteBatch.apply(this, [options]);
+            }
+        }
+        // Otherwise is an always allowed command (like `isMaster`).
     }
-
-    // Flush current bulkWrite batch on non-CRUD command.
-    flushCurrentBulkWriteBatch.apply(this, [options]);
 
     // Not a bulkWrite supported CRUD op, execute the command unmodified.
     return originalRunCommand.apply(this, arguments);
