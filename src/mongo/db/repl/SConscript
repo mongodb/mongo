@@ -1401,6 +1401,7 @@ env.Library(
         'tenant_migration_recipient_entry_helpers.cpp',
     ],
     LIBDEPS=[
+        '$BUILD_DIR/mongo/db/keys_collection_util',
         '$BUILD_DIR/mongo/util/future_util',
         'repl_coordinator_interface',
         'repl_server_parameters',

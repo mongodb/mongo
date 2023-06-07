@@ -416,7 +416,8 @@ TEST_F(KeysManagerDirectTest, CacheExternalKeyBasic) {
     // Refresh immediately to prevent a refresh from discovering the inserted keys.
     keyManager()->refreshNow(operationContext());
 
-    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
+    externalKey1.setMigrationId(kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -453,7 +454,8 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
     ASSERT_OK(insertToConfigCollection(
         operationContext(), NamespaceString::kKeysCollectionNamespace, internalKey.toBSON()));
 
-    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1, kMigrationId1);
+    ExternalKeysCollectionDocument externalKey1(OID::gen(), 1);
+    externalKey1.setMigrationId(kMigrationId1);
     externalKey1.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
     ASSERT_OK(insertToConfigCollection(operationContext(),
@@ -471,7 +473,8 @@ TEST_F(KeysManagerDirectTest, WillNotCacheExternalKeyWhenMonitoringIsStopped) {
 
     keyManager()->stopMonitoring();
 
-    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1, kMigrationId2);
+    ExternalKeysCollectionDocument externalKey2(OID::gen(), 1);
+    externalKey2.setMigrationId(kMigrationId2);
     externalKey2.setKeysCollectionDocumentBase(
         {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(100, 0))});
 

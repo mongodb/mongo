@@ -48,6 +48,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/keys_collection_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/write_ops_exec.h"
@@ -2164,11 +2165,11 @@ void ShardMergeRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs
     auto cursor = _client->find(std::move(findRequest), _readPreference);
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
-        keyDocs.push_back(
-            tenant_migration_util::makeExternalClusterTimeKeyDoc(_migrationUuid, doc));
+        keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(doc, _migrationUuid));
     }
 
-    tenant_migration_util::storeExternalClusterTimeKeyDocs(std::move(keyDocs));
+    auto opCtx = cc().makeOperationContext();
+    keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx.get(), std::move(keyDocs));
 }
 
 bool ShardMergeRecipientService::Instance::_isCommitOrAbortState(WithLock) const {

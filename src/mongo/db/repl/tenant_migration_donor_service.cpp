@@ -41,6 +41,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/keys_collection_util.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
@@ -73,6 +74,7 @@ MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingAbortingIndexBuildsStat
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeLeavingDataSyncState);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationBeforeFetchingKeys);
+MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeStoringExternalClusterTimeKeyDocs);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorBeforeMarkingStateGarbageCollectable);
 MONGO_FAIL_POINT_DEFINE(pauseTenantMigrationDonorAfterMarkingStateGarbageCollectable);
@@ -1148,8 +1150,8 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                                const auto& data = dataStatus.getValue();
                                for (const BSONObj& doc : data.documents) {
                                    keyDocs->push_back(
-                                       tenant_migration_util::makeExternalClusterTimeKeyDoc(
-                                           _migrationUuid, doc.getOwned()));
+                                       keys_collection_util::makeExternalClusterTimeKeyDoc(
+                                           doc.getOwned(), _migrationUuid));
                                }
                                *fetchStatus = Status::OK();
 
@@ -1213,8 +1215,11 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                    .then([this, self = shared_from_this(), executor, token](auto keyDocs) {
                        checkForTokenInterrupt(token);
 
-                       return tenant_migration_util::storeExternalClusterTimeKeyDocs(
-                           std::move(keyDocs));
+                       auto opCtx = cc().makeOperationContext();
+                       pauseTenantMigrationDonorBeforeStoringExternalClusterTimeKeyDocs
+                           .pauseWhileSet(opCtx.get());
+                       return keys_collection_util::storeExternalClusterTimeKeyDocs(
+                           opCtx.get(), std::move(keyDocs));
                    })
                    .then([this, self = shared_from_this(), token](repl::OpTime lastKeyOpTime) {
                        pauseTenantMigrationDonorBeforeWaitingForKeysToReplicate.pauseWhileSet();

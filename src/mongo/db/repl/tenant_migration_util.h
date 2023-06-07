@@ -327,19 +327,6 @@ inline void protocolCheckRecipientForgetDecision(
     }
 }
 
-/*
- * Creates an ExternalKeysCollectionDocument representing an config.external_validation_keys
- * document from the given the admin.system.keys document BSONObj.
- */
-ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, BSONObj keyDoc);
-
-/*
- * For each given ExternalKeysCollectionDocument, inserts it if there is not an existing document in
- * config.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
- * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt.
- */
-repl::OpTime storeExternalClusterTimeKeyDocs(std::vector<ExternalKeysCollectionDocument> keyDocs);
-
 /**
  * Sets the "ttlExpiresAt" field for the external keys so they can be garbage collected by the ttl
  * monitor.

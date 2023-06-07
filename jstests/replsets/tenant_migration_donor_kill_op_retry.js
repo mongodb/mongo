@@ -44,7 +44,7 @@ function makeTenantId() {
     let fpNames = [
         "pauseTenantMigrationBeforeInsertingDonorStateDoc",
         "pauseTenantMigrationDonorWhileUpdatingStateDoc",
-        "pauseTenantMigrationBeforeStoringExternalClusterTimeKeyDocs"
+        "pauseTenantMigrationDonorBeforeStoringExternalClusterTimeKeyDocs"
     ];
     for (let fpName of fpNames) {
         jsTestLog("Setting failpoint \"" + fpName +
