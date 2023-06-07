@@ -1038,12 +1038,14 @@ NetworkInterfaceTL::ExhaustCommandState::ExhaustCommandState(
 auto NetworkInterfaceTL::ExhaustCommandState::make(NetworkInterfaceTL* interface,
                                                    RemoteCommandRequestOnAny request,
                                                    const TaskExecutor::CallbackHandle& cbHandle,
-                                                   RemoteCommandOnReplyFn&& onReply) {
+                                                   RemoteCommandOnReplyFn&& onReply,
+                                                   const BatonHandle& baton) {
     auto state = std::make_shared<ExhaustCommandState>(
         interface, std::move(request), cbHandle, std::move(onReply));
     auto [promise, future] = makePromiseFuture<void>();
     state->promise = std::move(promise);
     std::move(future)
+        .thenRunOn(makeGuaranteedExecutor(baton, interface->_reactor))
         .onError([state](Status error) {
             stdx::lock_guard<Latch> lk(state->stopwatchMutex);
             state->onReplyFn(RemoteCommandOnAnyResponse(
@@ -1172,7 +1174,7 @@ Status NetworkInterfaceTL::startExhaustCommand(const TaskExecutor::CallbackHandl
         return status;
     }
 
-    auto cmdState = ExhaustCommandState::make(this, request, cbHandle, std::move(onReply));
+    auto cmdState = ExhaustCommandState::make(this, request, cbHandle, std::move(onReply), baton);
     if (cmdState->requestOnAny.timeout != cmdState->requestOnAny.kNoTimeout) {
         cmdState->deadline = cmdState->stopwatch.start() + cmdState->requestOnAny.timeout;
     }
