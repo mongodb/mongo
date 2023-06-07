@@ -424,56 +424,11 @@ public:
 
 Rarely _collStatsSampler;
 
-class CmdCollStats final : public BasicCommandWithRequestParser<CmdCollStats> {
+class CmdCollStats final : public TypedCommand<CmdCollStats> {
 public:
     using Request = CollStatsCommand;
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const final {
-        const auto nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
-        auto as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(nss),
-                                                  ActionType::collStats)) {
-            return {ErrorCodes::Unauthorized, "unauthorized"};
-        }
-        return Status::OK();
-    }
-
-    bool supportsWriteConcern(const BSONObj&) const final {
-        return false;
-    }
-
-    bool runWithRequestParser(OperationContext* opCtx,
-                              const DatabaseName&,
-                              const BSONObj& cmdObj,
-                              const RequestParser& requestParser,
-                              BSONObjBuilder& result) final {
-        if (_collStatsSampler.tick())
-            LOGV2_WARNING(7024600,
-                          "The collStats command is deprecated. For more information, see "
-                          "https://dochub.mongodb.org/core/collStats-deprecated");
-
-        const auto& cmd = requestParser.request();
-        const auto& nss = cmd.getNamespace();
-
-        uassert(ErrorCodes::OperationFailed, "No collection name specified", !nss.coll().empty());
-
-        // We need to use the serialization context from the request when calling
-        // NamespaceStringUtil to build the reply
-        result.append(
-            "ns",
-            NamespaceStringUtil::serialize(
-                nss, SerializationContext::stateCommandReply(cmd.getSerializationContext())));
-
-        auto spec = StorageStatsSpec::parse(IDLParserContext("collStats"), cmdObj);
-        Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
-        if (!status.isOK() && (status.code() != ErrorCodes::NamespaceNotFound)) {
-            uassertStatusOK(status);  // throws
-        }
-
-        return true;
-    }
+    CmdCollStats() : TypedCommand(Request::kCommandName, Request::kCommandAlias) {}
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const final {
         return AllowedOnSecondary::kAlways;
@@ -491,27 +446,64 @@ public:
         return true;
     }
 
-    // Assume that appendCollectionStorageStats() gives us a valid response.
-    void validateResult(const BSONObj& resultObj) final {}
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        using MinimalInvocationBase::MinimalInvocationBase;
 
+    private:
+        bool supportsWriteConcern() const override {
+            return false;
+        }
+
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            auto as = AuthorizationSession::get(opCtx->getClient());
+            uassert(ErrorCodes::Unauthorized,
+                    "unauthorized",
+                    as->isAuthorizedForActionsOnResource(ResourcePattern::forExactNamespace(ns()),
+                                                         ActionType::collStats));
+        }
+
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
+
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
+            if (_collStatsSampler.tick())
+                LOGV2_WARNING(7024600,
+                              "The collStats command is deprecated. For more information, see "
+                              "https://dochub.mongodb.org/core/collStats-deprecated");
+
+            const auto nss = ns();
+            uassert(
+                ErrorCodes::OperationFailed, "No collection name specified", !nss.coll().empty());
+
+            auto result = reply->getBodyBuilder();
+            // We need to use the serialization context from the request when calling
+            // NamespaceStringUtil to build the reply.
+            auto serializationCtx =
+                SerializationContext::stateCommandReply(request().getSerializationContext());
+            result.append("ns", NamespaceStringUtil::serialize(nss, serializationCtx));
+
+            const auto& spec = request().getStorageStatsSpec();
+            Status status = appendCollectionStorageStats(opCtx, nss, spec, &result);
+            if (!status.isOK() && (status.code() != ErrorCodes::NamespaceNotFound)) {
+                uassertStatusOK(status);  // throws
+            }
+        }
+    };
 } cmdCollStats;
 
-class CollectionModCommand : public BasicCommandWithRequestParser<CollectionModCommand> {
+class CollectionModCommand : public TypedCommand<CollectionModCommand> {
 public:
     using Request = CollMod;
     using Reply = CollModReply;
 
-    CollectionModCommand() : BasicCommandWithRequestParser() {}
-
-    virtual const std::set<std::string>& apiVersions() const {
+    const std::set<std::string>& apiVersions() const {
         return kApiVersions1;
     }
 
     AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
         return AllowedOnSecondary::kNever;
-    }
-    virtual bool supportsWriteConcern(const BSONObj& cmd) const override {
-        return true;
     }
 
     bool allowedWithSecurityToken() const final {
@@ -529,71 +521,87 @@ public:
                "Example: { collMod: 'foo', index: {name: 'bar', expireAfterSeconds: 600} }\n";
     }
 
-    Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName& dbName,
-                                 const BSONObj& cmdObj) const override {
-        auto client = opCtx->getClient();
-        auto nss = parseNs(dbName, cmdObj);
-        return auth::checkAuthForCollMod(
-            client->getOperationContext(), AuthorizationSession::get(client), nss, cmdObj, false);
+    const AuthorizationContract* getAuthorizationContract() const final {
+        return &Request::kAuthorizationContract;
     }
 
-    bool runWithRequestParser(OperationContext* opCtx,
-                              const DatabaseName& dbName,
-                              const BSONObj& cmdObj,
-                              const RequestParser& requestParser,
-                              BSONObjBuilder& result) final {
-        const auto* cmd = &requestParser.request();
+    class Invocation final : public MinimalInvocationBase {
+    public:
+        using MinimalInvocationBase::MinimalInvocationBase;
+        bool supportsWriteConcern() const override {
+            return true;
+        }
 
-        // Targeting the underlying buckets collection directly would make the time-series
-        // Collection out of sync with the time-series view document. Additionally, we want to
-        // ultimately obscure/hide the underlying buckets collection from the user, so we're
-        // disallowing targetting it.
-        uassert(
-            ErrorCodes::InvalidNamespace,
-            "collMod on a time-series collection's underlying buckets collection is not supported.",
-            !cmd->getNamespace().isTimeseriesBucketsCollection());
+        NamespaceString ns() const final {
+            return request().getNamespace();
+        }
 
-        // Updating granularity on sharded time-series collections is not allowed.
-        auto catalogClient =
-            Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogClient() : nullptr;
-        if (catalogClient && cmd->getTimeseries() && cmd->getTimeseries()->getGranularity()) {
-            auto& nss = cmd->getNamespace();
-            auto bucketNss =
-                nss.isTimeseriesBucketsCollection() ? nss : nss.makeTimeseriesBucketsNamespace();
-            try {
-                auto coll = catalogClient->getCollection(opCtx, bucketNss);
-                uassert(ErrorCodes::NotImplemented,
-                        str::stream()
-                            << "Cannot update granularity of a sharded time-series collection.",
-                        !coll.getTimeseriesFields());
-            } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-                // Collection is not sharded, skip check.
+        void doCheckAuthorization(OperationContext* opCtx) const override {
+            uassertStatusOK(auth::checkAuthForCollMod(opCtx,
+                                                      AuthorizationSession::get(opCtx->getClient()),
+                                                      request().getNamespace(),
+                                                      unparsedRequest().body,
+                                                      false));
+        }
+
+        void run(OperationContext* opCtx, rpc::ReplyBuilderInterface* reply) final {
+            const auto& cmd = request();
+            const auto& nss = request().getNamespace();
+            // Targeting the underlying buckets collection directly would make the time-series
+            // Collection out of sync with the time-series view document. Additionally, we want to
+            // ultimately obscure/hide the underlying buckets collection from the user, so we're
+            // disallowing targetting it.
+            uassert(ErrorCodes::InvalidNamespace,
+                    "collMod on a time-series collection's underlying buckets collection is not "
+                    "supported.",
+                    !nss.isTimeseriesBucketsCollection());
+
+
+            // Updating granularity on sharded time-series collections is not allowed.
+            auto catalogClient =
+                Grid::get(opCtx)->isInitialized() ? Grid::get(opCtx)->catalogClient() : nullptr;
+            if (catalogClient && cmd.getTimeseries() && cmd.getTimeseries()->getGranularity()) {
+                auto bucketNss = nss.isTimeseriesBucketsCollection()
+                    ? nss
+                    : nss.makeTimeseriesBucketsNamespace();
+                try {
+                    auto coll = catalogClient->getCollection(opCtx, bucketNss);
+                    uassert(ErrorCodes::NotImplemented,
+                            str::stream()
+                                << "Cannot update granularity of a sharded time-series collection.",
+                            !coll.getTimeseriesFields());
+                } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                    // Collection is not sharded, skip check.
+                }
+            }
+
+            if (cmd.getValidator() || cmd.getValidationLevel() || cmd.getValidationAction()) {
+                // Check for config.settings in the user command since a validator is allowed
+                // internally on this collection but the user may not modify the validator.
+                uassert(ErrorCodes::InvalidOptions,
+                        str::stream() << "Document validators not allowed on system collection "
+                                      << nss.toStringForErrorMsg(),
+                        nss != NamespaceString::kConfigSettingsNamespace);
+            }
+
+            // We do not use the serialization context for reply object serialization as the reply
+            // object doesn't contain any nss or dbName structures.
+            auto result = reply->getBodyBuilder();
+            uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
+                opCtx, nss, cmd, true, &result));
+
+            // Only validate results in test mode so that we don't expose users to errors if we
+            // construct an invalid reply.
+            if (getTestCommandsEnabled()) {
+                validateResult(result.asTempObj());
             }
         }
 
-        if (cmd->getValidator() || cmd->getValidationLevel() || cmd->getValidationAction()) {
-            // Check for config.settings in the user command since a validator is allowed
-            // internally on this collection but the user may not modify the validator.
-            uassert(ErrorCodes::InvalidOptions,
-                    str::stream() << "Document validators not allowed on system collection "
-                                  << cmd->getNamespace().toStringForErrorMsg(),
-                    cmd->getNamespace() != NamespaceString::kConfigSettingsNamespace);
+        void validateResult(const BSONObj& resultObj) {
+            auto reply = Reply::parse(IDLParserContext("CollModReply"), resultObj);
+            coll_mod_reply_validation::validateReply(reply);
         }
-
-        uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
-            opCtx, cmd->getNamespace(), *cmd, true, &result));
-        return true;
-    }
-
-    void validateResult(const BSONObj& resultObj) final {
-        auto reply = Reply::parse(IDLParserContext("CollModReply"), resultObj);
-        coll_mod_reply_validation::validateReply(reply);
-    }
-
-    const AuthorizationContract* getAuthorizationContract() const final {
-        return &::mongo::CollMod::kAuthorizationContract;
-    }
+    };
 } collectionModCommand;
 
 class CmdDbStats final : public TypedCommand<CmdDbStats> {
