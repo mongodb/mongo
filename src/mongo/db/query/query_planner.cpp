@@ -776,13 +776,15 @@ StatusWith<std::vector<std::unique_ptr<QuerySolution>>> QueryPlanner::plan(
                     "index"_attr = relevantIndices[i].toString());
     }
 
-    QueryPlannerIXSelect::removeRepeatContainIndexes(relevantIndices);
-    for (size_t i = 0; i < relevantIndices.size(); ++i) {
-        LOGV2_DEBUG(20971,
-                    2,
-                    "After Remove Repeat Contain Btree And Hashed Index, Relevant index",
-                    "indexNumber"_attr = i,
-                    "index"_attr = relevantIndices[i].toString());
+    if (!hintedIndexEntry) {
+        QueryPlannerIXSelect::removeRepeatContainIndexes(relevantIndices);
+        for (size_t i = 0; i < relevantIndices.size(); ++i) {
+            LOGV2_DEBUG(20971,
+                        2,
+                        "After Remove Repeat Contain Btree And Hashed Index, Relevant index",
+                        "indexNumber"_attr = i,
+                        "index"_attr = relevantIndices[i].toString());
+        }
     }
 
     // Figure out how useful each index is to each predicate.
