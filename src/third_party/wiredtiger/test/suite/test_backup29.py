@@ -37,8 +37,8 @@ from wtbackup import backup_base
 #
 class test_backup29(backup_base):
     create_config = 'allocation_size=512,key_format=i,value_format=S'
-    # Backup directory name
-    dir='backup.dir'
+    # Backup directory name. Uncomment if actually taking a backup.
+    # dir='backup.dir'
     uri = 'test_backup29'
     uri2 = 'test_other'
     value_base = '-abcdefghijkl'
@@ -60,7 +60,6 @@ class test_backup29(backup_base):
         return blocks
 
     def test_backup29(self):
-        os.mkdir(self.dir)
 
         # Create and populate the table.
         file_uri = 'file:' + self.uri + '.wt'
@@ -79,13 +78,17 @@ class test_backup29(backup_base):
             c2[i] = val
         self.session.checkpoint()
 
-        # Take the initial full backup for incremental.
+        # Take the initial full backup for incremental. We don't actually need to
+        # take the backup, we only need to open and close the backup cursor to have
+        # the library keep track of the bitmaps.
         config = 'incremental=(enabled,granularity=4k,this_id="ID1")'
         bkup_c = self.session.open_cursor('backup:', None, config)
-        self.take_full_backup(self.dir, bkup_c)
+        # Uncomment these lines if actually taking the full backup is helpful for debugging.
+        # os.mkdir(self.dir)
+        # self.take_full_backup(self.dir, bkup_c)
         bkup_c.close()
 
-        # Add a lot more data to both tables to generate a filled in block mod bitmap.
+        # Add a lot more data to both tables to generate a filled-in block mod bitmap.
         last_i = self.few
         self.pr("Write: " + str(self.nentries) + " additional data items")
         for i in range(self.few, self.nentries):
