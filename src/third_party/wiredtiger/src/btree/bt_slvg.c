@@ -122,7 +122,7 @@ struct __wt_track {
 static int __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
 static int __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int __slvg_col_build_leaf(WT_SESSION_IMPL *, WT_TRACK *, WT_REF *);
-static int __slvg_col_ovfl(WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, uint64_t, uint64_t, uint64_t);
+static int __slvg_col_ovfl(WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *);
 static int __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
 static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int __slvg_col_range_overlap(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
@@ -670,7 +670,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, uint8_t *ad
           __wt_addr_string(session, trk->trk_addr, trk->trk_addr_size, ss->tmp1), trk->col_start,
           trk->col_stop);
 
-        /* Column-store pages can contain overflow items. */
+        /* VLCS pages can contain overflow items. */
         WT_ERR(__slvg_trk_leaf_ovfl(session, dsk, trk));
         break;
     case WT_PAGE_ROW_LEAF:
@@ -1269,12 +1269,17 @@ err:
 static int
 __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 {
+    WT_BTREE *btree;
     WT_COL *save_col_var;
     WT_DECL_RET;
     WT_PAGE *page;
     WT_SALVAGE_COOKIE *cookie, _cookie;
     uint64_t recno, skip, take;
     uint32_t save_entries;
+    int (*saved_free)(WT_BM *, WT_SESSION_IMPL *, const uint8_t *, size_t);
+
+    btree = S2BT(session);
+    saved_free = NULL;
 
     cookie = &_cookie;
     WT_CLEAR(*cookie);
@@ -1300,7 +1305,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
 
     /* Set the referenced flag on overflow pages we're using. */
     if (trk->trk_ovfl_cnt != 0)
-        WT_ERR(__slvg_col_ovfl(session, trk, page, recno, skip, take));
+        WT_ERR(__slvg_col_ovfl(session, trk, page));
 
     /*
      * If we're missing some part of the range, the real start range is in trk->col_missing, else,
@@ -1326,6 +1331,20 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
      */
     __wt_ref_addr_free(session, ref);
 
+    /*
+     * Reconciliation may skip a key/value pair (based on timestamps), and in that case, if the
+     * value is an overflow item, reconciliation will free the underlying object's backing blocks.
+     * Additionally, salvage of a column-store page can have start/stop points in the middle of a
+     * cell, and reconciliation therefore does all of the usual processing of cells, but skips the
+     * write if they're outside the salvage range. If the value is an overflow item and it's never
+     * used, reconciliation will free the underlying object's backing blocks, which is fine, but we
+     * need to adjust our list of overflow blocks so we don't free the overflow item twice.
+     * Intercept any attempt by reconciliation to free blocks.
+     */
+    saved_free = btree->bm->free;
+    btree->bm->free = __slvg_reconcile_free;
+    session->salvage_track = trk;
+
     /* Write the new version of the leaf page to disk. */
     WT_ERR(__slvg_modify_init(session, page));
     WT_ERR(__wt_reconcile(session, ref, cookie, WT_REC_VISIBILITY_ERR));
@@ -1342,6 +1361,10 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_REF *ref)
     if (0) {
 err:
         WT_TRET(__wt_page_release(session, ref, 0));
+    }
+    if (saved_free != NULL) {
+        btree->bm->free = saved_free;
+        session->salvage_track = NULL;
     }
 
     return (ret);
@@ -1376,57 +1399,41 @@ __slvg_col_ovfl_single(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_CELL_UNPACK_K
  *     Mark overflow items referenced by the merged page.
  */
 static int
-__slvg_col_ovfl(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_PAGE *page, uint64_t recno,
-  uint64_t skip, uint64_t take)
+__slvg_col_ovfl(WT_SESSION_IMPL *session, WT_TRACK *trk, WT_PAGE *page)
 {
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
     WT_DECL_RET;
-    uint64_t start, stop;
     uint32_t i;
 
     /*
-     * Merging a variable-length column-store page, and we took some number of records, figure out
-     * which (if any) overflow records we used.
+     * Reconciliation of a salvaged column-store page processes all of the page's cells, skipping
+     * the write if a cell is outside the salvage range. If the value is an overflow item and it's
+     * never used, reconciliation will free the underlying object's backing blocks. We'll set up a
+     * callback to track the blocks that are freed, mark all page overflow values as "referenced" so
+     * that tracking succeeds.
      */
-    start = recno + skip;
-    stop = (recno + skip + take) - 1;
-
     WT_COL_FOREACH (page, cip, i) {
         cell = WT_COL_PTR(page, cip);
         __wt_cell_unpack_kv(session, page->dsk, cell, &unpack);
-        recno += __wt_cell_rle(&unpack);
+        if (unpack.type != WT_CELL_VALUE_OVFL)
+            continue;
 
         /*
-         * I keep getting this calculation wrong, so here's the logic. Start is the first record we
-         * want, stop is the last record we want. The record number has already been incremented one
-         * past the maximum record number for this page entry, that is, it's set to the first record
-         * number for the next page entry. The test of start should be greater-than (not
-         * greater-than- or-equal), because of that increment, if the record number equals start, we
-         * want the next record, not this one. The test against stop is greater-than, not
-         * greater-than-or-equal because stop is the last record wanted, if the record number equals
-         * stop, we want the next record.
+         * When handling overlapping ranges on variable-length column-store leaf pages, we split
+         * ranges without considering if we were splitting RLE units. (See note at the beginning of
+         * this file for explanation of the overall process.) If the RLE unit was on-page, we can
+         * simply write it again. If the RLE unit was an overflow value that's already been used by
+         * another row (from some other page created by a range split), there's not much to do, this
+         * row can't reference an overflow record we don't have: delete the row.
          */
-        if (recno > start && unpack.type == WT_CELL_VALUE_OVFL) {
-            ret = __slvg_col_ovfl_single(session, trk, &unpack);
-
-            /*
-             * When handling overlapping ranges on variable-length column-store leaf pages, we split
-             * ranges without considering if we were splitting RLE units. (See note at the beginning
-             * of this file for explanation of the overall process.) If the RLE unit was on-page, we
-             * can simply write it again. If the RLE unit was an overflow value that's already been
-             * used by another row (from some other page created by a range split), there's not much
-             * to do, this row can't reference an overflow record we don't have: delete the row.
-             */
-            if (ret == EBUSY) {
-                __wt_cell_type_reset(session, cell, WT_CELL_VALUE_OVFL, WT_CELL_DEL);
-                ret = 0;
-            }
-            WT_RET(ret);
+        ret = __slvg_col_ovfl_single(session, trk, &unpack);
+        if (ret == EBUSY) {
+            __wt_cell_type_reset(session, cell, WT_CELL_VALUE_OVFL, WT_CELL_DEL);
+            ret = 0;
         }
-        if (recno > stop)
-            break;
+        WT_RET(ret);
     }
     return (0);
 }
@@ -2101,8 +2108,7 @@ __slvg_reconcile_free(WT_BM *bm, WT_SESSION_IMPL *session, const uint8_t *addr, 
         }
     }
 
-    WT_RET_PANIC(session, EINVAL,
-      "overflow record discarded by reconciliation during row-store page merge not %s",
+    WT_RET_PANIC(session, EINVAL, "overflow record discarded during page reconciliation not %s",
       i == trk->trk_ovfl_cnt ? "referenced" : "found");
 }
 
