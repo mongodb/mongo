@@ -51,9 +51,9 @@ versions. In such context we refer to `last-lts` and `last-continuous` versions 
 version and to `latest` as a `new` version.
 
 A `new` version is compiled in the same way as for non-multiversion tasks. The `old` versions of
-compiled binaries are downloaded from the old branch projects with the following script:
-[evergreen/multiversion_setup.sh](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/evergreen/multiversion_setup.sh).
-The script searches for the latest available compiled binaries on the old branch projects in
+compiled binaries are downloaded from the old branch projects with
+[`db-contrib-tool`](https://github.com/10gen/db-contrib-tool).
+`db-contrib-tool` searches for the latest available compiled binaries on the old branch projects in
 Evergreen.
 
 
@@ -64,17 +64,19 @@ Multiversion suites can be explicit and implicit.
 * Explicit - JS tests are aware of the binary versions they are running,
 e.g. [multiversion.yml](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/buildscripts/resmokeconfig/suites/multiversion.yml).
 The version of binaries is explicitly set in JS tests,
-e.g. [jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js](https://github.com/mongodb/mongo/blob/e91cda950e50aa4c707efbdd0be208481493fc96/jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js#L33-L42):
+e.g. [jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js](https://github.com/mongodb/mongo/blob/397c8da541940b3fbe6257243f97a342fe7e0d3b/jstests/multiVersion/genericSetFCVUsage/major_version_upgrade.js#L33-L44):
 
 ```js
 const versions = [
-    {binVersion: '4.0', featureCompatibilityVersion: '4.0', testCollection: 'four_zero'},
-    {binVersion: '4.2', featureCompatibilityVersion: '4.2', testCollection: 'four_two'},
     {binVersion: '4.4', featureCompatibilityVersion: '4.4', testCollection: 'four_four'},
     {binVersion: '5.0', featureCompatibilityVersion: '5.0', testCollection: 'five_zero'},
     {binVersion: '6.0', featureCompatibilityVersion: '6.0', testCollection: 'six_zero'},
-    {binVersion: 'last-lts', testCollection: 'last_lts'},
-    {binVersion: 'last-continuous', testCollection: 'last_continuous'},
+    {binVersion: 'last-lts', featureCompatibilityVersion: lastLTSFCV, testCollection: 'last_lts'},
+    {
+        binVersion: 'last-continuous',
+        featureCompatibilityVersion: lastContinuousFCV,
+        testCollection: 'last_continuous'
+    },
     {binVersion: 'latest', featureCompatibilityVersion: latestFCV, testCollection: 'latest'},
 ];
 ```
@@ -189,8 +191,8 @@ etc.)
     * [`initial_sync_fuzzer_last_continuous`](https://github.com/10gen/mongo/blob/612814f4ce56282c47d501817ba28337c26d7aba/buildscripts/resmokeconfig/matrix_suites/mappings/initial_sync_fuzzer_last_continuous.yml)
 
 
-If `last-lts` and `last-continuous` versions happen to be the same, we skip `last-continuous` and
-run multiversion suites with only `last-lts` combinations in Evergreen.
+If `last-lts` and `last-continuous` versions happen to be the same, or last-continuous is EOL, we skip `last-continuous`
+and run multiversion suites with only `last-lts` combinations in Evergreen.
 
 
 ## Working with multiversion tasks in Evergreen
@@ -225,6 +227,13 @@ below the specified FCV version, e.g. when the `latest` version is `6.2`, `last-
 `6.1` and `last-lts` is `6.0`, tests tagged with `requires_fcv_61` will NOT run in multiversion
 tasks that run `latest` with `last-lts`, but will run in multiversion tasks that run `lastest` with
 `last-continuous`.
+
+In addition to disabling multiversion tests based on FCV, there is no need to run in-development `featureFlagXYZ` tests
+(featureFlags that have `default: false`) because these tests will most likely fail on older versions that
+have not implemented this feature. For multiversion tasks, we pass the `--runNoFeatureFlagTests` flag to avoid these
+failures on `all feature flag` variants.
+
+For more info on FCV, take a look at [FCV_AND_FEATURE_FLAG_README.md](https://github.com/10gen/mongo/blob/master/src/mongo/db/repl/FCV_AND_FEATURE_FLAG_README.md).
 
 Another common case could be that the changes on master branch are breaking multiversion tests,
 but with those changes backported to the older branches the multiversion tests should work.
