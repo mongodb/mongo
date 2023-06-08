@@ -76,6 +76,18 @@ public:
                                                      const std::vector<IndexEntry>& allIndices);
 
     /**
+     * remove repeat contain index from the relevant candidate indexes, this can avoid some useless calculations.
+     * for example:
+     *   {a:1, b:1} contain {a:1}, so we can remove index {a:1} from the candidates
+     *   {a:"hashed", b:1} contain {a:"hashed"}, so we can remove index {a:"hahsed"} from the candidates
+     *
+     * {a:1, b:1} is better than {a:1},because both cases are satisfied for db.collection.find({a:xx}) 
+     *    and db.collection.find({a:xx,b:xx})
+     */
+    static void removeRepeatContainIndexes(std::vector<IndexEntry>& indexes);
+    
+
+    /**
      * Finds all indices prefixed by fields we have predicates over.  Only these indices are
      * useful in answering the query.
      */
