@@ -72,7 +72,7 @@ void IndexBuildBlock::_completeInit(OperationContext* opCtx, Collection* collect
     // Register this index with the CollectionQueryInfo to regenerate the cache. This way, updates
     // occurring while an index is being build in the background will be aware of whether or not
     // they need to modify any indexes.
-    auto desc = getEntry(opCtx, collection)->descriptor();
+    auto desc = getEntry(opCtx, CollectionPtr(collection))->descriptor();
     CollectionQueryInfo::get(collection).rebuildIndexData(opCtx, CollectionPtr(collection));
     CollectionIndexUsageTrackerDecoration::get(collection->getSharedDecorations())
         .registerIndex(desc->indexName(),
@@ -211,7 +211,7 @@ void IndexBuildBlock::fail(OperationContext* opCtx, Collection* collection) {
                           "IndexBuildAborted",
                           ErrorCodes::IndexBuildAborted);
 
-    auto indexCatalogEntry = getEntry(opCtx, collection);
+    auto indexCatalogEntry = getWritableEntry(opCtx, collection);
     if (indexCatalogEntry) {
         invariant(collection->getIndexCatalog()
                       ->dropIndexEntry(opCtx, collection, indexCatalogEntry)
@@ -242,7 +242,7 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
         _indexBuildInterceptor->invariantAllWritesApplied(opCtx);
     }
 
-    auto indexCatalogEntry = getEntry(opCtx, collection);
+    auto indexCatalogEntry = getWritableEntry(opCtx, collection);
     collection->indexBuildSuccess(opCtx, indexCatalogEntry);
     auto svcCtx = opCtx->getClient()->getServiceContext();
 
@@ -303,7 +303,8 @@ const IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx,
     return descriptor->getEntry();
 }
 
-IndexCatalogEntry* IndexBuildBlock::getEntry(OperationContext* opCtx, Collection* collection) {
+IndexCatalogEntry* IndexBuildBlock::getWritableEntry(OperationContext* opCtx,
+                                                     Collection* collection) {
     return collection->getIndexCatalog()->getWritableEntryByName(
         opCtx,
         _indexName,

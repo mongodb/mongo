@@ -325,6 +325,10 @@ private:
         std::unique_ptr<IndexAccessMethod::BulkBuilder> bulk;
 
         InsertDeleteOptions options;
+
+        // We cache index catalog entry pointer for the collection scan phase. This is necessary for
+        // index build performance in the insert path.
+        const IndexCatalogEntry* entryForScan = nullptr;
     };
 
     void _writeStateToDisk(OperationContext* opCtx, const CollectionPtr& collection) const;
@@ -384,5 +388,10 @@ private:
 
     // The current phase of the index build.
     IndexBuildPhaseEnum _phase = IndexBuildPhaseEnum::kInitialized;
+
+    // We cache the collection pointer for the collection scan phase. The collection pointer is
+    // compared after yielding, which is used to indicate whether we need to refetch the index
+    // catalog entry pointers in IndexToBuild. This is necessary for index build performance.
+    const Collection* _collForScan = nullptr;
 };
 }  // namespace mongo

@@ -952,7 +952,7 @@ public:
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             writableColl->ns(), indexSpec, IndexBuildMethod::kForeground, UUID::gen());
         uassertStatusOK(indexBuildBlock->init(opCtx, writableColl, /*forRecover=*/false));
-        uassertStatusOK(indexBuildBlock->getEntry(opCtx, writableColl)
+        uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty(opCtx));
         wuow.commit();

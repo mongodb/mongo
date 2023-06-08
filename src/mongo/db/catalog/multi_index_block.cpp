@@ -374,7 +374,7 @@ StatusWith<std::vector<BSONObj>> MultiIndexBlock::init(
                 return status;
 
             auto indexCatalogEntry =
-                index.block->getEntry(opCtx, collection.getWritableCollection(opCtx));
+                index.block->getWritableEntry(opCtx, collection.getWritableCollection(opCtx));
             index.real = indexCatalogEntry->accessMethod();
             status = index.real->initializeAsEmpty(opCtx);
             if (!status.isOK())
@@ -785,12 +785,22 @@ Status MultiIndexBlock::_insert(
         }
     }
 
+    // Cache the collection and index catalog entry pointers during the collection scan phase. This
+    // is necessary for index build performance to avoid looking up the index catalog entry for each
+    // insertion into the index table.
+    if (_collForScan != collection.get()) {
+        _collForScan = collection.get();
+
+        // Reset cached index catalog entry pointers.
+        for (size_t i = 0; i < _indexes.size(); i++) {
+            _indexes[i].entryForScan = _indexes[i].block->getEntry(opCtx, collection);
+        }
+    }
+
     for (size_t i = 0; i < _indexes.size(); i++) {
         if (_indexes[i].filterExpression && !_indexes[i].filterExpression->matchesBSON(doc)) {
             continue;
         }
-
-        auto indexCatalogEntry = _indexes[i].block->getEntry(opCtx, collection);
 
         Status idxStatus = Status::OK();
 
@@ -799,7 +809,7 @@ Status MultiIndexBlock::_insert(
         try {
             idxStatus = _indexes[i].bulk->insert(opCtx,
                                                  collection,
-                                                 indexCatalogEntry,
+                                                 _indexes[i].entryForScan,
                                                  doc,
                                                  loc,
                                                  _indexes[i].options,
@@ -1041,7 +1051,7 @@ Status MultiIndexBlock::commit(OperationContext* opCtx,
         // catalog entry. The interceptor will write multikey metadata keys into the index during
         // IndexBuildInterceptor::sideWrite, so we only need to pass the cached MultikeyPaths into
         // IndexCatalogEntry::setMultikey here.
-        auto indexCatalogEntry = _indexes[i].block->getEntry(opCtx, collection);
+        auto indexCatalogEntry = _indexes[i].block->getWritableEntry(opCtx, collection);
         auto interceptor = indexCatalogEntry->indexBuildInterceptor();
         if (interceptor) {
             auto multikeyPaths = interceptor->getMultikeyPaths();
