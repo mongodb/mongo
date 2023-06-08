@@ -700,3 +700,8 @@ Status exceptionToStatus() noexcept;
  * Like `MONGO_UNREACHABLE`, but triggers a `tassert` instead of an `invariant`
  */
 #define MONGO_UNREACHABLE_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNREACHABLE_TASSERT!")
+
+/**
+ * Like `MONGO_UNIMPLEMENTED`, but triggers a `tassert` instead of an `invariant`
+ */
+#define MONGO_UNIMPLEMENTED_TASSERT(msgid) tasserted(msgid, "Hit a MONGO_UNIMPLEMENTED_TASSERT!")

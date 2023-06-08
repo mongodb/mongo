@@ -157,7 +157,6 @@ void LiteParsedPipeline::tickGlobalStageCounters() const {
 void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                   bool performApiVersionChecks) const {
 
-    int internalUnpackBucketCount = 0;
     for (auto&& stage : _stageSpecs) {
         const auto& stageName = stage->getParseTimeName();
         const auto& stageInfo = LiteParsedDocumentSource::getInfo(stageName);
@@ -179,25 +178,10 @@ void LiteParsedPipeline::validate(const OperationContext* opCtx,
                                            sometimesCallback);
         }
 
-        internalUnpackBucketCount +=
-            (DocumentSourceInternalUnpackBucket::kStageNameInternal == stageName ||
-             DocumentSourceInternalUnpackBucket::kStageNameExternal == stageName)
-            ? 1
-            : 0;
-
         for (auto&& subPipeline : stage->getSubPipelines()) {
             subPipeline.validate(opCtx, performApiVersionChecks);
         }
     }
-
-
-    // Validates that the pipeline contains at most one $_internalUnpackBucket or $_unpackBucket
-    // stage.
-    uassert(5348304,
-            str::stream() << "Encountered pipeline with more than one "
-                          << DocumentSourceInternalUnpackBucket::kStageNameInternal << " or "
-                          << DocumentSourceInternalUnpackBucket::kStageNameExternal << " stage",
-            internalUnpackBucketCount <= 1);
 }
 
 }  // namespace mongo

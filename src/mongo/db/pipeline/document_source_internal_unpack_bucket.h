@@ -105,6 +105,8 @@ public:
                                      UnionRequirement::kAllowed,
                                      ChangeStreamRequirement::kDenylist};
         constraints.canSwapWithMatch = true;
+        // The user cannot specify multiple $unpackBucket stages in the pipeline.
+        constraints.canAppearOnlyOnceInPipeline = true;
         return constraints;
     }
 

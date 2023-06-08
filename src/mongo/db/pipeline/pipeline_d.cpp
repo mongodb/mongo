@@ -1306,7 +1306,7 @@ PipelineD::buildInnerQueryExecutorGeneric(const MultipleCollectionAccessor& coll
                                    dynamic_cast<const DocumentSourceInternalUnpackBucket*>(
                                        iter->get())) {
                         unpackIter = iter;
-                        uassert(6505001,
+                        tassert(6505001,
                                 str::stream()
                                     << "Expected at most one "
                                     << DocumentSourceInternalUnpackBucket::kStageNameInternal
