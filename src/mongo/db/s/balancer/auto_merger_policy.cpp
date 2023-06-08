@@ -184,6 +184,7 @@ void AutoMergerPolicy::_init(WithLock lk) {
     _intervalTimer.reset();
     _collectionsToMergePerShard.clear();
     _firstAction = true;
+    _outstandingActions = 0;
     _onStateUpdated();
 }
 

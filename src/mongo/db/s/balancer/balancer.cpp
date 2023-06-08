@@ -444,6 +444,10 @@ void Balancer::_consumeActionStreamLoop() {
     executor::ScopedTaskExecutor executor(
         Grid::get(opCtx.get())->getExecutorPool()->getFixedExecutor());
 
+    // The scoped task executor kills callbacks on destruction which may lead to
+    // _outstandingStreamingOps being non-zero after a step down. Reset it to 0 here on step up.
+    _outstandingStreamingOps.store(0);
+
     // Lambda function for applying action response
     auto applyActionResponseTo = [this](const BalancerStreamAction& action,
                                         const BalancerStreamActionResponse& response,
