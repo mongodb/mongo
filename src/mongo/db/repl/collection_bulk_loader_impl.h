@@ -73,9 +73,6 @@ public:
 
     CollectionBulkLoaderImpl::Stats getStats() const;
 
-    virtual std::string toString() const override;
-    virtual BSONObj toBSON() const override;
-
 private:
     void _releaseResources();
 

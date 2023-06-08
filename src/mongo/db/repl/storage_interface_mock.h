@@ -68,13 +68,6 @@ public:
                            std::vector<BSONObj>::const_iterator end) override;
     Status commit() override;
 
-    std::string toString() const override {
-        return toBSON().toString();
-    };
-    BSONObj toBSON() const override {
-        return BSONObj();
-    };
-
     std::shared_ptr<CollectionMockStats> stats;
 
     // Override functions.

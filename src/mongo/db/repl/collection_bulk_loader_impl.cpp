@@ -445,17 +445,5 @@ BSONObj CollectionBulkLoaderImpl::Stats::toBSON() const {
     return bob.obj();
 }
 
-
-std::string CollectionBulkLoaderImpl::toString() const {
-    return toBSON().toString();
-}
-
-BSONObj CollectionBulkLoaderImpl::toBSON() const {
-    BSONObjBuilder bob;
-    bob.append("BulkLoader", _nss.toString());
-    // TODO: Add index specs here.
-    return bob.done();
-}
-
 }  // namespace repl
 }  // namespace mongo
