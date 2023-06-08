@@ -98,7 +98,7 @@ public:
      * override this function if the summary stats for secondary collections need to be reported
      * separately.
      */
-    virtual void getSecondarySummaryStats(std::string secondaryColl,
+    virtual void getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                           PlanSummaryStats* statsOut) const {}
 
     /**

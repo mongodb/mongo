@@ -31,6 +31,7 @@
 
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/container_size_helper.h"
 
 namespace mongo::plan_cache_debug_info {
@@ -143,7 +144,7 @@ struct DebugInfoSBE {
     }
 
     CollectionDebugInfoSBE mainStats;
-    StringMap<CollectionDebugInfoSBE> secondaryStats;
+    mongo::stdx::unordered_map<NamespaceString, CollectionDebugInfoSBE> secondaryStats;
     std::string planSummary;
 };
 }  // namespace mongo::plan_cache_debug_info

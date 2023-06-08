@@ -1248,8 +1248,7 @@ Status runAggregate(OperationContext* opCtx,
             for (const auto& [secondaryNss, coll] : collections.getSecondaryCollections()) {
                 if (coll) {
                     PlanSummaryStats secondaryStats;
-                    planExplainer.getSecondarySummaryStats(secondaryNss.toString(),
-                                                           &secondaryStats);
+                    planExplainer.getSecondarySummaryStats(secondaryNss, &secondaryStats);
                     CollectionQueryInfo::get(coll).notifyOfQuery(opCtx, coll, secondaryStats);
                 }
             }

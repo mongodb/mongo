@@ -471,7 +471,7 @@ void PlanExplainerSBE::getSummaryStats(PlanSummaryStats* statsOut) const {
     statsOut->collectionScansNonTailable = _debugInfo->mainStats.collectionScansNonTailable;
 }
 
-void PlanExplainerSBE::getSecondarySummaryStats(std::string secondaryColl,
+void PlanExplainerSBE::getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                                 PlanSummaryStats* statsOut) const {
     tassert(6466202, "statsOut should be a valid pointer", statsOut);
 

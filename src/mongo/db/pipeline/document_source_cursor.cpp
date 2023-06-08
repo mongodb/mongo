@@ -349,7 +349,7 @@ DocumentSourceCursor::DocumentSourceCursor(
     for (auto& [nss, coll] : collections.getSecondaryCollections()) {
         if (coll) {
             PlanSummaryStats stats;
-            explainer.getSecondarySummaryStats(nss.toString(), &stats);
+            explainer.getSecondarySummaryStats(nss, &stats);
             CollectionQueryInfo::get(coll).notifyOfQuery(pExpCtx->opCtx, coll, stats);
         }
     }
