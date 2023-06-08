@@ -1776,7 +1776,7 @@ public:
         insert(nss(), BSON("a" << 3));
         std::unique_ptr<DBClientCursor> cursor =
             _client.find(FindCommandRequest{NamespaceStringOrUUID{"unittests", *coll_opts.uuid}});
-        ASSERT_EQUALS(string(ns()), cursor->getns());
+        ASSERT_EQUALS(nss(), cursor->getNamespaceString());
         for (int i = 1; i <= 3; ++i) {
             ASSERT(cursor->more());
             BSONObj obj(cursor->next());

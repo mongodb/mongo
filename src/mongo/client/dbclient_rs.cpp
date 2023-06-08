@@ -211,14 +211,14 @@ bool _isSecondaryCommand(StringData commandName, const BSONObj& commandArgs) {
 }
 
 // Internal implementation of isSecondaryQuery, takes previously-parsed read preference
-bool _isSecondaryQuery(StringData ns,
+bool _isSecondaryQuery(const NamespaceString& ns,
                        const BSONObj& filter,
                        const ReadPreferenceSetting& readPref) {
     // If the read pref is primary only, this is not a secondary query
     if (readPref.pref == ReadPreference::PrimaryOnly)
         return false;
 
-    if (ns.find(".$cmd") == string::npos) {
+    if (ns.coll().find("$cmd") == string::npos) {
         return true;
     }
 
@@ -502,8 +502,8 @@ std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest find
                                                          const ReadPreferenceSetting& readPref,
                                                          ExhaustMode exhaustMode) {
     invariant(findRequest.getNamespaceOrUUID().nss());
-    auto ns = findRequest.getNamespaceOrUUID().nss()->ns().toString();
-    if (_isSecondaryQuery(ns, findRequest.toBSON(BSONObj{}), readPref)) {
+    if (_isSecondaryQuery(
+            *findRequest.getNamespaceOrUUID().nss(), findRequest.toBSON(BSONObj{}), readPref)) {
         LOGV2_DEBUG(5951202,
                     3,
                     "dbclient_rs query using secondary or tagged node selection",

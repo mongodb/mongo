@@ -190,10 +190,6 @@ public:
         return _originalHost;
     }
 
-    StringData getns() const {
-        return _ns.ns();
-    }
-
     const NamespaceString& getNamespaceString() const {
         return _ns;
     }
