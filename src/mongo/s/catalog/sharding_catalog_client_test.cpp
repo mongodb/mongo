@@ -1199,10 +1199,10 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
     repl::ReadConcernLevel readConcernLevel(repl::ReadConcernLevel::kMajorityReadConcern);
 
     auto future = launchAsync([this, purpose, currentTime, readConcernLevel] {
-        auto status =
-            catalogClient()->getNewKeys(operationContext(), purpose, currentTime, readConcernLevel);
-        ASSERT_OK(status.getStatus());
-        return status.getValue();
+        auto swKeys = catalogClient()->getNewInternalKeys(
+            operationContext(), purpose, currentTime, readConcernLevel);
+        ASSERT_OK(swKeys.getStatus());
+        return swKeys.getValue();
     });
 
     LogicalTime dummyTime(Timestamp(9876, 5432));
@@ -1263,10 +1263,10 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
     repl::ReadConcernLevel readConcernLevel(repl::ReadConcernLevel::kMajorityReadConcern);
 
     auto future = launchAsync([this, purpose, currentTime, readConcernLevel] {
-        auto status =
-            catalogClient()->getNewKeys(operationContext(), purpose, currentTime, readConcernLevel);
-        ASSERT_OK(status.getStatus());
-        return status.getValue();
+        auto swKeys = catalogClient()->getNewInternalKeys(
+            operationContext(), purpose, currentTime, readConcernLevel);
+        ASSERT_OK(swKeys.getStatus());
+        return swKeys.getValue();
     });
 
     onFindCommand([this](const RemoteCommandRequest& request) {

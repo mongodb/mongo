@@ -38,20 +38,19 @@ namespace mongo {
 KeysCollectionClientSharded::KeysCollectionClientSharded(ShardingCatalogClient* client)
     : _catalogClient(client) {}
 
-
 StatusWith<std::vector<KeysCollectionDocument>> KeysCollectionClientSharded::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
     bool tryUseMajority) {
-
-    return _catalogClient->getNewKeys(
+    return _catalogClient->getNewInternalKeys(
         opCtx, purpose, newerThanThis, repl::ReadConcernLevel::kMajorityReadConcern);
 }
 
 StatusWith<std::vector<ExternalKeysCollectionDocument>>
 KeysCollectionClientSharded::getAllExternalKeys(OperationContext* opCtx, StringData purpose) {
-    return std::vector<ExternalKeysCollectionDocument>{};
+    return _catalogClient->getAllExternalKeys(
+        opCtx, purpose, repl::ReadConcernLevel::kMajorityReadConcern);
 }
 
 Status KeysCollectionClientSharded::insertNewKey(OperationContext* opCtx, const BSONObj& doc) {

@@ -46,8 +46,8 @@ public:
     KeysCollectionClientDirect(bool mustUseLocalReads);
 
     /**
-     * Returns keys in admin.system.keys that match the given purpose and have an expiresAt value
-     * greater than newerThanThis. Uses readConcern level majority if possible.
+     * Returns internal keys for the given purpose and have an expiresAt value greater than
+     * newerThanThis. Uses readConcern level majority if possible.
      */
     StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
@@ -56,7 +56,7 @@ public:
         bool tryUseMajority) override;
 
     /**
-     * Returns all keys in config.external_validation_keys that match the given purpose.
+     * Returns all external (i.e. validation-only) keys for the given purpose.
      */
     StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx, StringData purpose) override;
@@ -76,7 +76,7 @@ public:
 
 private:
     /**
-     * Returns keys in the given collection that match the given purpose and have an expiresAt value
+     * Returns keys in the given collection for the given purpose and have an expiresAt value
      * greater than newerThanThis, using readConcern level majority if possible.
      */
     template <typename KeyDocumentType>

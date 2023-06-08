@@ -199,11 +199,18 @@ Status ShardingCatalogClientMock::createDatabase(OperationContext* opCtx,
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
-StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewKeys(
+StatusWith<std::vector<KeysCollectionDocument>> ShardingCatalogClientMock::getNewInternalKeys(
     OperationContext* opCtx,
     StringData purpose,
     const LogicalTime& newerThanThis,
     repl::ReadConcernLevel readConcernLevel) {
+    return {ErrorCodes::InternalError, "Method not implemented"};
+}
+
+StatusWith<std::vector<ExternalKeysCollectionDocument>>
+ShardingCatalogClientMock::getAllExternalKeys(OperationContext* opCtx,
+                                              StringData purpose,
+                                              repl::ReadConcernLevel readConcernLevel) {
     return {ErrorCodes::InternalError, "Method not implemented"};
 }
 
