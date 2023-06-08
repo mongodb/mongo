@@ -4920,7 +4920,8 @@ TEST(IDLAccessCheck, TestComplexAccessCheck) {
 
     ac.addPrivilege(Privilege(ResourcePattern::forDatabaseName("test"), ActionType::trafficRecord));
 
-    ac.addPrivilege(Privilege(ResourcePattern::forAnyResource(), ActionType::splitVector));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forAnyResource(boost::none), ActionType::splitVector));
 
     ac.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
     ac.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);

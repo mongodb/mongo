@@ -110,7 +110,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // DB resource grants all non-system collections, so filter out system collections. This is done
     // inside the $or, since some system collections might be granted specific privileges.
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbName)))) {
+            ResourcePattern::forDatabaseName(dbName))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -120,7 +120,8 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // include them
     if (authzSession->isAuthorizedForAnyActionOnResource(
             ResourcePattern::forAnySystemBucketsInDatabase(dbName)) ||
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnySystemBuckets())) {
+        authzSession->isAuthorizedForAnyActionOnResource(
+            ResourcePattern::forAnySystemBuckets(dbName.tenantId()))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^system\\.buckets\\."))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -131,14 +132,12 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     if (auto authUser = authzSession->getAuthenticatedUser()) {
         for (const auto& [resource, privilege] : authUser.value()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
-                (resource.isExactNamespacePattern() &&
-                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
+                (resource.isExactNamespacePattern() && resource.dbNameToMatch() == dbName)) {
                 collectionNames.emplace(resource.collectionToMatch().toString());
             }
 
             if (resource.isAnySystemBucketsCollectionInAnyDB() ||
-                (resource.isExactSystemBucketsCollection() &&
-                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
+                (resource.isExactSystemBucketsCollection() && resource.dbNameToMatch() == dbName)) {
                 collectionNames.emplace(systemBucketsDot + resource.collectionToMatch().toString());
             }
         }

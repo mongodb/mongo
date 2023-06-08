@@ -145,8 +145,8 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
         // It seems that 'db' isn't used anymore. Require all actions to prevent casual use.
         ActionSet allActions;
         allActions.addAllActions();
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forAnyResource(),
-                                                           allActions)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyResource(nss.tenantId()), allActions)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();

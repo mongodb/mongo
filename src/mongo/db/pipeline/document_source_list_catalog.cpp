@@ -59,17 +59,19 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
     // See builtin_roles.cpp.
     ActionSet listCollectionsAndIndexesActions{ActionType::listCollections,
                                                ActionType::listIndexes};
-    return _ns.isCollectionlessAggregateNS()
-        ? PrivilegeVector{Privilege(ResourcePattern::forClusterResource(),
-                                    ActionType::listDatabases),
-                          Privilege(ResourcePattern::forAnyNormalResource(),
-                                    listCollectionsAndIndexesActions),
-                          Privilege(ResourcePattern::forCollectionName("system.js"),
-                                    listCollectionsAndIndexesActions),
-                          Privilege(ResourcePattern::forAnySystemBuckets(),
-                                    listCollectionsAndIndexesActions)}
-        : PrivilegeVector{
-              Privilege(ResourcePattern::forExactNamespace(_ns), listCollectionsAndIndexesActions)};
+    if (_ns.isCollectionlessAggregateNS()) {
+        const auto& tenantId = _ns.tenantId();
+        return {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::listDatabases),
+                Privilege(ResourcePattern::forAnyNormalResource(tenantId),
+                          listCollectionsAndIndexesActions),
+                Privilege(ResourcePattern::forCollectionName(tenantId, "system.js"_sd),
+                          listCollectionsAndIndexesActions),
+                Privilege(ResourcePattern::forAnySystemBuckets(tenantId),
+                          listCollectionsAndIndexesActions)};
+    } else {
+        return {
+            Privilege(ResourcePattern::forExactNamespace(_ns), listCollectionsAndIndexesActions)};
+    }
 }
 
 DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {

@@ -128,7 +128,7 @@ TEST(BuiltinRoles, addSystemBucketsPrivilegesForBuiltinRoleClusterManager) {
     ASSERT(auth::addPrivilegesForBuiltinRole(RoleName("clusterManager", "admin"), &privs));
     ASSERT_EQ(privs.size(), 11);
 
-    const auto systemBucketsResourcePattern = ResourcePattern::forAnySystemBuckets();
+    const auto systemBucketsResourcePattern = ResourcePattern::forAnySystemBuckets(boost::none);
 
     const ActionSet clusterManagerRoleDatabaseActionSet({
         ActionType::clearJumboFlag,

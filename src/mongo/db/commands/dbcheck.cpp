@@ -653,11 +653,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
-        const bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
-                                      ->isAuthorizedForActionsOnResource(
-                                          ResourcePattern::forAnyResource(), ActionType::dbCheck);
+        const bool isAuthorized =
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forAnyResource(dbName.tenantId()), ActionType::dbCheck);
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 

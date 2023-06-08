@@ -55,18 +55,16 @@ class ResourcePattern {
 
 public:
     // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-    // forAnyResource() - Remove boost::none default.
     // forAnyNormalResource() - Remove boost::none default.
     // forClusterResource() - Remove boost::none default.
     // forDatabaseName() - Remove `StringData` variant.
     // forCollectionName() - Remove variant without tenantId arg.
-    // forAnySystemBuckets() - Remove boost::none default.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
     /**
      * Returns a pattern that matches absolutely any resource.
      */
-    static ResourcePattern forAnyResource(const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forAnyResource(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchAnyResource, tenantId);
     }
 
@@ -129,8 +127,7 @@ public:
      * Returns a pattern that matches any collection with the prefix "system.buckets." in any
      * database.
      */
-    static ResourcePattern forAnySystemBuckets(
-        const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forAnySystemBuckets(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchAnySystemBucketResource, tenantId);
     }
 
