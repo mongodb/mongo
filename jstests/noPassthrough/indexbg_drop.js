@@ -55,7 +55,7 @@ jsTest.log("Starting background indexing for test of: " + tojson(dc));
 
 // Add another index to be sure the drop command works.
 primaryDB.getCollection(collection).createIndex({b: 1});
-primaryDB.getCollection(collection).createIndex({i: 1}, {background: true});
+primaryDB.getCollection(collection).createIndex({i: 1});
 
 // Make sure the index build has started on the secondary.
 IndexBuildTest.waitForIndexBuildToStart(secondDB);

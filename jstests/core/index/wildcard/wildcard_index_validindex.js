@@ -33,12 +33,6 @@ IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, {"a.$**": 1}, {name: kInd
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(
     coll, {"$**": 1}, {name: kIndexName, partialFilterExpression: {a: {"$gt": 0}}});
 
-// Can create a wildcard index with foreground & background construction.
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-    coll, {"$**": 1}, {background: false, name: kIndexName});
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-    coll, {"$**": 1}, {background: true, name: kIndexName});
-
 // Can create a wildcard index with index level collation.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(
     coll, {"$**": 1}, {collation: {locale: "fr"}, name: kIndexName});

@@ -143,7 +143,7 @@ assert.commandFailedWithCode(coll.createIndex(keyPattern, partialFilterUnsortedL
                              ErrorCodes.IndexKeySpecsConflict);
 
 // Verifies that non-signature options cannot distinguish a new index from an existing index.
-const nonSignatureOptions = [{expireAfterSeconds: 10}, {background: true}];
+const nonSignatureOptions = [{expireAfterSeconds: 10}];
 
 // Builds a new, basic index on {a: 1}, since some of the options we intend to test are not
 // compatible with the partialFilterExpression on the existing {a: 1} indexes.

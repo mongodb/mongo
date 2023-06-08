@@ -19,16 +19,15 @@ var $config = extendWorkload($config, function($config, $super) {
 
     $config.states.createIndexes = function createIndexes(db, collName) {
         const coll = db[this.threadCollName];
-        const options = {background: true};
 
         // The number of indexes created here is also stored in data.nIndexes.
-        assertWorkedHandleTxnErrors(coll.createIndex({text: 'text'}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({text: 'text'}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({geo: '2dsphere'}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({geo: '2dsphere'}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({integer: 1}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
-        assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}, options),
+        assertWorkedHandleTxnErrors(coll.createIndex({"$**": 1}),
                                     ErrorCodes.IndexBuildAlreadyInProgress);
     };
 

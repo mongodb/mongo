@@ -23,7 +23,7 @@ for (var i = 0; i < 100; i++) {
 }
 
 // Add a background index.
-coll.createIndex({x: 1}, {background: true});
+coll.createIndex({x: 1});
 
 // Rename the collection.
 assert.commandWorked(

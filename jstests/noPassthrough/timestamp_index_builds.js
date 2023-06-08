@@ -65,7 +65,7 @@ nodes.forEach(node => assert.commandWorked(node.adminCommand(
 
 // This test create indexes with majority of nodes not available for replication. So, disabling
 // index build commit quorum.
-assert.commandWorked(coll.createIndexes([{foo: 1}], {background: true}, 0));
+assert.commandWorked(coll.createIndexes([{foo: 1}], {}, 0));
 rst.awaitReplication();
 
 rst.stopSet(undefined, true);

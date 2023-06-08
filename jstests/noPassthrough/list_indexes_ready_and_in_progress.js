@@ -27,8 +27,7 @@ IndexBuildTest.assertIndexes(coll, 2, ["_id_", "a_1"]);
 assert.commandWorked(coll.insert({a: 1}));
 
 IndexBuildTest.pauseIndexBuilds(conn);
-const createIdx =
-    IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {b: 1}, {background: true});
+const createIdx = IndexBuildTest.startIndexBuild(conn, coll.getFullName(), {b: 1});
 IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'b_1');
 
 // The listIndexes command supports returning all indexes, including ones that are not ready.

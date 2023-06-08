@@ -44,7 +44,6 @@ assert.commandFailed(coll.createIndex({_id: 1}, {name: "_id_", unique: true}));
 assert.commandFailed(coll.createIndex({_id: 1}, {name: "_id_", sparse: false}));
 assert.commandFailed(coll.createIndex({_id: 1}, {name: "_id_", partialFilterExpression: {a: 1}}));
 assert.commandFailed(coll.createIndex({_id: 1}, {name: "_id_", expireAfterSeconds: 3600}));
-assert.commandFailed(coll.createIndex({_id: 1}, {name: "_id_", background: false}));
 assert.commandFailed(coll.createIndex({_id: 1}, {name: "_id_", unknown: true}));
 assert.commandWorked(coll.createIndex(
     {_id: 1}, {name: "_id_", ns: coll.getFullName(), v: 2, collation: {locale: "simple"}}));

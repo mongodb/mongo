@@ -106,7 +106,7 @@ var $config = (function() {
         },
 
         createIndex: function createIndex(db, collName) {
-            db[collName].createIndex({value: 1}, {background: true});
+            db[collName].createIndex({value: 1});
         },
 
         dropIndex: function dropIndex(db, collName) {

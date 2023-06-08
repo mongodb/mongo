@@ -16,7 +16,7 @@ const primaryDB = primary.getDB(dbName);
 
 jsTestLog("Creating the collection and an index.");
 assert.commandWorked(primaryDB.createCollection(collName));
-assert.commandWorked(primaryDB[collName].createIndex({"x": 1}, {background: true}));
+assert.commandWorked(primaryDB[collName].createIndex({"x": 1}));
 
 // Make the index multikey.
 primaryDB[collName].insert({x: [1, 2]});

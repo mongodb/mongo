@@ -51,7 +51,7 @@ const collScanFailPoint = configureFailPoint(
 
 // Start the background build.
 let bgBuild = startParallelShell(function() {
-    assert.commandWorked(db.hybrid.createIndex({i: 1}, {background: true}));
+    assert.commandWorked(db.hybrid.createIndex({i: 1}));
 }, conn.port);
 
 checkLog.containsJson(conn, 20386, {

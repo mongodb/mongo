@@ -20,8 +20,7 @@ function killopOnFailpoint(rst, failpointName, collName) {
     const fp = configureFailPoint(testDB, failpointName);
     IndexBuildTest.pauseIndexBuilds(primary);
 
-    const createIdx =
-        IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true});
+    const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
     // When the index build starts, find its op id.
     const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');

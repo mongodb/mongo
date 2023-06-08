@@ -40,7 +40,7 @@ var $config = (function() {
 
             const res = db.runCommand({
                 createIndexes: this.getCollectionNameForThread(this.tid),
-                indexes: [{key: {x: 1}, name: "x_1", unique: true, background: true}]
+                indexes: [{key: {x: 1}, name: "x_1", unique: true}]
             });
             // Multi-statement Transactions can fail with SnapshotUnavailable if there are
             // pending catalog changes as of the transaction start (see SERVER-43018).
