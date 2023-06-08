@@ -43,6 +43,7 @@
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
@@ -597,7 +598,7 @@ private:
 
     // Doesn't own the service, contains a pointer to the service owned by _servicesByName.
     // This is safe since services don't change after startup.
-    StringMap<PrimaryOnlyService*> _servicesByNamespace;
+    mongo::stdx::unordered_map<NamespaceString, PrimaryOnlyService*> _servicesByNamespace;
 };
 
 }  // namespace repl

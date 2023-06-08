@@ -148,7 +148,7 @@ void PrimaryOnlyServiceRegistry::registerService(std::unique_ptr<PrimaryOnlyServ
               str::stream() << "Attempted to register PrimaryOnlyService (" << name
                             << ") that is already registered");
 
-    auto [existingServiceIt, inserted2] = _servicesByNamespace.emplace(ns.toString(), servicePtr);
+    auto [existingServiceIt, inserted2] = _servicesByNamespace.emplace(ns, servicePtr);
     auto existingService = existingServiceIt->second;
     invariant(inserted2,
               str::stream() << "Attempted to register PrimaryOnlyService (" << name
@@ -173,7 +173,7 @@ PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByName(StringData s
 
 PrimaryOnlyService* PrimaryOnlyServiceRegistry::lookupServiceByNamespace(
     const NamespaceString& ns) {
-    auto it = _servicesByNamespace.find(ns.toString());
+    auto it = _servicesByNamespace.find(ns);
     if (it == _servicesByNamespace.end()) {
         return nullptr;
     }
