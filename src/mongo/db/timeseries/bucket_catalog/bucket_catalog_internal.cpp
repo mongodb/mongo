@@ -791,12 +791,19 @@ void removeBucket(
     // we can remove the state from the catalog altogether.
     switch (mode) {
         case RemovalMode::kClose: {
-            // Ensure that we are in a state of pending compression (represented by a negative
-            // direct write counter).
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            invariant(state.has_value());
-            invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
-            invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
+            if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                // When removing a closed bucket, the BucketStateRegistry doesn't hold any state for
+                // this bucket as it's not pending compression.
+                invariant(!state.has_value());
+            } else {
+                // Ensure that we are in a state of pending compression (represented by a negative
+                // direct write counter).
+                invariant(state.has_value());
+                invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
+                invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
+            }
             break;
         }
         case RemovalMode::kAbort:
@@ -1302,6 +1309,15 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      ClosedBuckets& closedBuckets) {
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Remove the bucket from the bucket state registry.
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+
+        removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
+        return;
+    }
+
     bool error = false;
     try {
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
@@ -1320,6 +1336,15 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      boost::optional<ClosedBucket>& closedBucket) {
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Remove the bucket from the bucket state registry.
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+
+        removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
+        return;
+    }
+
     bool error = false;
     try {
         closedBucket = boost::in_place(&catalog.bucketStateRegistry,
@@ -1337,6 +1362,13 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketStateRegistry& registry,
                          ArchivedBucket& bucket,
                          ClosedBuckets& closedBuckets) {
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Remove the bucket from the bucket state registry.
+        stopTrackingBucketState(registry, bucket.bucketId);
+        return;
+    }
+
     try {
         closedBuckets.emplace_back(&registry, bucket.bucketId, bucket.timeField, boost::none);
     } catch (...) {

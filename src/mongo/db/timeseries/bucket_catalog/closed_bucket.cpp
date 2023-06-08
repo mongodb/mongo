@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -43,6 +44,11 @@ ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
                            boost::optional<uint32_t> nm)
     : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateRegistry{bsr} {
     invariant(_bucketStateRegistry);
+
+    // When enabled, we skip constructing ClosedBuckets as we don't need to compress the bucket.
+    invariant(!feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+        serverGlobalParams.featureCompatibility));
+
     addDirectWrite(*_bucketStateRegistry, bucketId, /*stopTracking*/ true);
 }
 
