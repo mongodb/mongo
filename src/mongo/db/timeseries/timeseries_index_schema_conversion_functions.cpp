@@ -106,9 +106,10 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             if (!elem.isNumber()) {
                 return {ErrorCodes::BadValue,
                         str::stream()
-                            << "Invalid index spec for time-series collection: "
-                            << redact(timeseriesIndexSpecBSON)
-                            << ". Indexes on the time field must be ascending or descending "
+                            << "Invalid " << (isShardKeySpec ? "shard key" : "index spec")
+                            << " for time-series collection: " << redact(timeseriesIndexSpecBSON)
+                            << ". " << (isShardKeySpec ? "Shard keys" : "Indexes")
+                            << " on the time field must be ascending or descending "
                                "(numbers only): "
                             << elem};
             }
