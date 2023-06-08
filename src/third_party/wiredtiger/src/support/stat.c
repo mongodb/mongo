@@ -233,6 +233,7 @@ static const char *const __stats_dsrc_desc[] = {
   "session: tiered operations dequeued and processed",
   "session: tiered operations scheduled",
   "session: tiered storage local retention time (secs)",
+  "transaction: checkpoint has acquired a snapshot for its transaction",
   "transaction: race to read prepared update retry",
   "transaction: rollback to stable history store records with stop timestamps older than newer "
   "records",
@@ -507,6 +508,7 @@ __wt_stat_dsrc_clear_single(WT_DSRC_STATS *stats)
     stats->tiered_work_units_dequeued = 0;
     stats->tiered_work_units_created = 0;
     /* not clearing tiered_retention */
+    stats->txn_checkpoint_snapshot_acquired = 0;
     stats->txn_read_race_prepare_update = 0;
     stats->txn_rts_hs_stop_older_than_newer_start = 0;
     stats->txn_rts_inconsistent_ckpt = 0;
@@ -771,6 +773,7 @@ __wt_stat_dsrc_aggregate_single(WT_DSRC_STATS *from, WT_DSRC_STATS *to)
     to->tiered_work_units_dequeued += from->tiered_work_units_dequeued;
     to->tiered_work_units_created += from->tiered_work_units_created;
     to->tiered_retention += from->tiered_retention;
+    to->txn_checkpoint_snapshot_acquired += from->txn_checkpoint_snapshot_acquired;
     to->txn_read_race_prepare_update += from->txn_read_race_prepare_update;
     to->txn_rts_hs_stop_older_than_newer_start += from->txn_rts_hs_stop_older_than_newer_start;
     to->txn_rts_inconsistent_ckpt += from->txn_rts_inconsistent_ckpt;
@@ -1042,6 +1045,7 @@ __wt_stat_dsrc_aggregate(WT_DSRC_STATS **from, WT_DSRC_STATS *to)
     to->tiered_work_units_dequeued += WT_STAT_READ(from, tiered_work_units_dequeued);
     to->tiered_work_units_created += WT_STAT_READ(from, tiered_work_units_created);
     to->tiered_retention += WT_STAT_READ(from, tiered_retention);
+    to->txn_checkpoint_snapshot_acquired += WT_STAT_READ(from, txn_checkpoint_snapshot_acquired);
     to->txn_read_race_prepare_update += WT_STAT_READ(from, txn_read_race_prepare_update);
     to->txn_rts_hs_stop_older_than_newer_start +=
       WT_STAT_READ(from, txn_rts_hs_stop_older_than_newer_start);
@@ -1527,6 +1531,7 @@ static const char *const __stats_connection_desc[] = {
   "transaction: Number of prepared updates committed",
   "transaction: Number of prepared updates repeated on the same key",
   "transaction: Number of prepared updates rolled back",
+  "transaction: checkpoint has acquired a snapshot for its transaction",
   "transaction: prepared transactions",
   "transaction: prepared transactions committed",
   "transaction: prepared transactions currently active",
@@ -2090,6 +2095,7 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->txn_prepared_updates_committed = 0;
     stats->txn_prepared_updates_key_repeated = 0;
     stats->txn_prepared_updates_rolledback = 0;
+    stats->txn_checkpoint_snapshot_acquired = 0;
     stats->txn_prepare = 0;
     stats->txn_prepare_commit = 0;
     stats->txn_prepare_active = 0;
@@ -2668,6 +2674,7 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->txn_prepared_updates_committed += WT_STAT_READ(from, txn_prepared_updates_committed);
     to->txn_prepared_updates_key_repeated += WT_STAT_READ(from, txn_prepared_updates_key_repeated);
     to->txn_prepared_updates_rolledback += WT_STAT_READ(from, txn_prepared_updates_rolledback);
+    to->txn_checkpoint_snapshot_acquired += WT_STAT_READ(from, txn_checkpoint_snapshot_acquired);
     to->txn_prepare += WT_STAT_READ(from, txn_prepare);
     to->txn_prepare_commit += WT_STAT_READ(from, txn_prepare_commit);
     to->txn_prepare_active += WT_STAT_READ(from, txn_prepare_active);

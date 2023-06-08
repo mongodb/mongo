@@ -791,6 +791,7 @@ struct __wt_connection_stats {
     int64_t txn_prepared_updates_committed;
     int64_t txn_prepared_updates_key_repeated;
     int64_t txn_prepared_updates_rolledback;
+    int64_t txn_checkpoint_snapshot_acquired;
     int64_t txn_prepare;
     int64_t txn_prepare_commit;
     int64_t txn_prepare_active;
@@ -1087,6 +1088,7 @@ struct __wt_dsrc_stats {
     int64_t tiered_work_units_dequeued;
     int64_t tiered_work_units_created;
     int64_t tiered_retention;
+    int64_t txn_checkpoint_snapshot_acquired;
     int64_t txn_read_race_prepare_update;
     int64_t txn_rts_hs_stop_older_than_newer_start;
     int64_t txn_rts_inconsistent_ckpt;
