@@ -1862,7 +1862,7 @@ __rollback_to_stable(WT_SESSION_IMPL *session, bool no_ckpt)
      */
     WT_ORDERED_READ(rollback_timestamp, txn_global->stable_timestamp);
     __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session),
-      "performing rollback to stable with stable timestamp: %s and oldest timestamp: %s",
+      "start rollback to stable with stable timestamp: %s and oldest timestamp: %s",
       __wt_timestamp_to_string(rollback_timestamp, ts_string[0]),
       __wt_timestamp_to_string(txn_global->oldest_timestamp, ts_string[1]));
 
@@ -1915,6 +1915,8 @@ __wt_rollback_to_stable(WT_SESSION_IMPL *session, const char *cfg[], bool no_ckp
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 1);
     WT_WITH_CHECKPOINT_LOCK(
       session, WT_WITH_SCHEMA_LOCK(session, ret = __rollback_to_stable(session, no_ckpt)));
+
+    __wt_verbose_multi(session, WT_VERB_RECOVERY_RTS(session), "%s", "finished rollback to stable");
     WT_STAT_CONN_SET(session, txn_rollback_to_stable_running, 0);
 
     WT_TRET(__wt_session_close_internal(session));
