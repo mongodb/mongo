@@ -51,9 +51,14 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        bool allowShardedForeignCollection(NamespaceString nss,
-                                           bool inMultiDocumentTransaction) const final {
-            return _foreignNss != nss;
+        Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                              bool inMultiDocumentTransaction) const final {
+            if (_foreignNss != nss) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::NamespaceCannotBeSharded,
+                          "$out to a sharded collection is not allowed");
         }
 
         bool allowedToPassthroughFromMongos() const final {

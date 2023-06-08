@@ -192,13 +192,13 @@ public:
     }
 
     /**
-     * Returns true if the involved namespace 'nss' is allowed to be sharded. The behavior is to
-     * allow by default and stages should opt-out if foreign collections are not allowed to be
-     * sharded.
+     * Returns Status::OK() if the involved namespace 'nss' is allowed to be sharded. The behavior
+     * is to allow by default. Stages should opt-out if foreign collections are not allowed to be
+     * sharded by returning a Status with a message explaining why.
      */
-    virtual bool allowShardedForeignCollection(NamespaceString nss,
-                                               bool inMultiDocumentTransaction) const {
-        return true;
+    virtual Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                                  bool inMultiDocumentTransaction) const {
+        return Status::OK();
     }
 
     /**
@@ -326,8 +326,8 @@ public:
         stdx::unordered_set<NamespaceString>& nssSet) const override;
     bool allowedToPassthroughFromMongos() const override;
 
-    bool allowShardedForeignCollection(NamespaceString nss,
-                                       bool inMultiDocumentTransaction) const override;
+    Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                          bool inMultiDocumentTransaction) const override;
 
     const std::vector<LiteParsedPipeline>& getSubPipelines() const override {
         return _pipelines;

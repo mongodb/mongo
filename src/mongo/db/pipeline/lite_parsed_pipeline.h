@@ -148,16 +148,19 @@ public:
     }
 
     /**
-     * Returns false if at least one of the stages does not allow the involved namespace 'nss' to be
-     * sharded.
+     * Returns an error Status if at least one of the stages does not allow the involved namespace
+     * 'nss' to be sharded, otherwise returns Status::OK().
      */
-    bool allowShardedForeignCollection(NamespaceString nss, bool isMultiDocumentTransaction) const {
-        return std::all_of(_stageSpecs.begin(),
-                           _stageSpecs.end(),
-                           [&nss, isMultiDocumentTransaction](auto&& spec) {
-                               return spec->allowShardedForeignCollection(
-                                   nss, isMultiDocumentTransaction);
-                           });
+    Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                          bool isMultiDocumentTransaction) const {
+        for (auto&& spec : _stageSpecs) {
+            if (const auto status =
+                    spec->checkShardedForeignCollAllowed(nss, isMultiDocumentTransaction);
+                !status.isOK()) {
+                return status;
+            }
+        }
+        return Status::OK();
     }
 
     /**

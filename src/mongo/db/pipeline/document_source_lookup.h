@@ -80,13 +80,18 @@ public:
         /**
          * Lookup from a sharded collection may not be allowed.
          */
-        bool allowShardedForeignCollection(NamespaceString nss,
-                                           bool inMultiDocumentTransaction) const override final {
+        Status checkShardedForeignCollAllowed(
+            NamespaceString nss, bool inMultiDocumentTransaction) const override final {
             if (!inMultiDocumentTransaction) {
-                return true;
+                return Status::OK();
             }
             auto involvedNss = getInvolvedNamespaces();
-            return (involvedNss.find(nss) == involvedNss.end());
+            if (involvedNss.find(nss) == involvedNss.end()) {
+                return Status::OK();
+            }
+
+            return Status(ErrorCodes::NamespaceCannotBeSharded,
+                          "Sharded $lookup is not allowed within a multi-document transaction");
         }
 
         void assertPermittedInAPIVersion(const APIParameters& apiParameters) const final {

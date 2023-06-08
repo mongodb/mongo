@@ -136,12 +136,16 @@ bool LiteParsedDocumentSourceNestedPipelines::allowedToPassthroughFromMongos() c
     });
 }
 
-bool LiteParsedDocumentSourceNestedPipelines::allowShardedForeignCollection(
+Status LiteParsedDocumentSourceNestedPipelines::checkShardedForeignCollAllowed(
     NamespaceString nss, bool inMultiDocumentTransaction) const {
-    return std::all_of(
-        _pipelines.begin(), _pipelines.end(), [&nss, inMultiDocumentTransaction](auto&& pipeline) {
-            return pipeline.allowShardedForeignCollection(nss, inMultiDocumentTransaction);
-        });
+    for (auto&& pipeline : _pipelines) {
+        if (const auto status =
+                pipeline.checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
+            !status.isOK()) {
+            return status;
+        }
+    }
+    return Status::OK();
 }
 
 ReadConcernSupportResult LiteParsedDocumentSourceNestedPipelines::supportsReadConcern(
