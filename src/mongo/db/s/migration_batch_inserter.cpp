@@ -163,8 +163,7 @@ void MigrationBatchInserter::run(Status status) const try {
         ShardingStatistics::get(opCtx).countDocsClonedOnRecipient.addAndFetch(batchNumCloned);
         ShardingStatistics::get(opCtx).countBytesClonedOnRecipient.addAndFetch(batchClonedBytes);
         LOGV2(6718408,
-              "Incrementing numCloned count by {batchNumCloned} and numClonedBytes by "
-              "{batchClonedBytes}",
+              "Incrementing cloned count by  ",
               "batchNumCloned"_attr = batchNumCloned,
               "batchClonedBytes"_attr = batchClonedBytes);
         _migrationProgress->incNumCloned(batchNumCloned);
