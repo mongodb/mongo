@@ -4199,6 +4199,7 @@ buildvariants:
     posix_configure_flags:
       -DCMAKE_C_FLAGS="-ggdb"
       -DHAVE_DIAGNOSTIC=1
+      -DCC_OPTIMIZE_LEVEL=-O0
       -DENABLE_PYTHON=1
       -DENABLE_ZLIB=1
       -DENABLE_STRICT=1 

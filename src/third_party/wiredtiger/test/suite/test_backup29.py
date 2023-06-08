@@ -179,8 +179,8 @@ class test_backup29(backup_base):
         sleep = 0
         max = 20
         # The only files sweep won't close should be the metadata, the history store, the
-        # lock file, the statistics file, and our active file.
-        final_nfile = 5
+        # lock file, and our active file.
+        final_nfile = 4
         
         # Keep updating and checkpointing this table until all other handles have been swept.
         # The checkpoints have the side effect of sweeping the session cache, which will allow
