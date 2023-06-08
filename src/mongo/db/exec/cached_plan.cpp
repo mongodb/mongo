@@ -92,10 +92,10 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     size_t maxWorksBeforeReplan =
         static_cast<size_t>(internalQueryCacheEvictionRatio * _decisionWorks);
 
-    // the replan works can not exceed the number of works that is set to be this fraction of the 
+    // the replan works can not exceed the number of works that is set to be the fraction of the 
     // collection size.
     // in extreme cases, if there are no restrictions, Probably more than the total collection size,
-    // this replan may lose effectiveness. this may lead that the query use wrong index.
+    // this replan may lose effectiveness. it may lead that the query use wrong index.
     size_t numUpperLimitWorks = trial_period::getTrialPeriodMaxWorks(opCtx(), collection());
     if (maxWorksBeforeReplan > numUpperLimitWorks) {
         maxWorksBeforeReplan = numUpperLimitWorks;
