@@ -41,6 +41,12 @@
 namespace mongo {
 namespace {
 
+const auto kAdminDB = DatabaseNameUtil::deserialize(boost::none, "admin"_sd);
+const auto kAdminRsrc = ResourcePattern::forDatabaseName(kAdminDB);
+const auto kAdminSystemJSNSS =
+    NamespaceString::createNamespaceString_forTest(kAdminDB, "system.js"_sd);
+const auto kAdminSystemJSRsrc = ResourcePattern::forExactNamespace(kAdminSystemJSNSS);
+
 TEST(BuiltinRoles, BuiltinRolesOnlyOnAppropriateDatabases) {
     ASSERT(auth::isBuiltinRole(RoleName("read", "test")));
     ASSERT(auth::isBuiltinRole(RoleName("readWrite", "test")));
@@ -112,13 +118,10 @@ TEST(BuiltinRoles, addPrivilegesForBuiltinRole) {
         ActionType::listSearchIndexes,
         ActionType::planCacheRead,
     });
-    const auto adminDB = ResourcePattern::forDatabaseName("admin");
-    const auto adminSystemJS = ResourcePattern::forExactNamespace(
-        NamespaceString::createNamespaceString_forTest("admin", "system.js"));
 
     for (const auto& priv : privs) {
         auto resource = priv.getResourcePattern();
-        ASSERT((resource == adminDB) || (resource == adminSystemJS));
+        ASSERT((resource == kAdminRsrc) || (resource == kAdminSystemJSRsrc));
         ASSERT(priv.getActions() == expSet);
     }
 }

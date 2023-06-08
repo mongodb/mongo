@@ -626,11 +626,11 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
             auto as = AuthorizationSession::get(opCtx->getClient());
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    as->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forDatabaseName(request().getDbName().db()),
-                        ActionType::dbStats));
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forDatabaseName(request().getDbName()), ActionType::dbStats));
         }
 
         NamespaceString ns() const final {

@@ -84,7 +84,7 @@ public:
                 return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
             } else if (_nss.isCollectionlessAggregateNS()) {
                 // Watching a whole database.
-                return {Privilege(ResourcePattern::forDatabaseName(_nss.db()), actions)};
+                return {Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions)};
             } else {
                 // Watching a single collection. Note if this is in the admin database it will fail
                 // at parse time.

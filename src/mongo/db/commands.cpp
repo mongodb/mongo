@@ -338,8 +338,7 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
 ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceString& ns) {
     const auto& nss = NamespaceStringUtil::serialize(ns);
     if (!NamespaceString::validCollectionComponent(nss)) {
-        // TODO (SERVER-76195) pass a NamespaceString/object directly here instead of StringData.
-        return ResourcePattern::forDatabaseName(nss);
+        return ResourcePattern::forDatabaseName(ns.dbName());
     }
     return ResourcePattern::forExactNamespace(ns);
 }

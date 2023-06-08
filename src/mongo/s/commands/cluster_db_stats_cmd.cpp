@@ -116,7 +116,7 @@ public:
                                  const DatabaseName& dbname,
                                  const BSONObj&) const final {
         auto as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname.db()),
+        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbname),
                                                   ActionType::dbStats)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }

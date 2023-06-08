@@ -428,15 +428,17 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
     // return a vector of the minimum privileges required to bootstrap
     // a system and add the first user.
     if (_externalState->shouldAllowLocalhost()) {
-        ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(ADMIN_DBNAME);
-        ActionSet setupAdminUserActionSet;
-        setupAdminUserActionSet.addAction(ActionType::createUser);
-        setupAdminUserActionSet.addAction(ActionType::grantRole);
-        Privilege setupAdminUserPrivilege = Privilege(adminDBResource, setupAdminUserActionSet);
 
-        ResourcePattern externalDBResource = ResourcePattern::forDatabaseName("$external");
-        Privilege setupExternalUserPrivilege =
-            Privilege(externalDBResource, ActionType::createUser);
+        const DatabaseName kAdminDB =
+            DatabaseName::createDatabaseNameForAuth(boost::none, ADMIN_DBNAME);
+        const ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(kAdminDB);
+        const ActionSet setupAdminUserActionSet{ActionType::createUser, ActionType::grantRole};
+        Privilege setupAdminUserPrivilege(adminDBResource, setupAdminUserActionSet);
+
+        const DatabaseName kExternalDB =
+            DatabaseName::createDatabaseNameForAuth(boost::none, "$external"_sd);
+        const ResourcePattern externalDBResource = ResourcePattern::forDatabaseName(kExternalDB);
+        Privilege setupExternalUserPrivilege(externalDBResource, ActionType::createUser);
 
         ActionSet setupServerConfigActionSet;
 
@@ -454,7 +456,7 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
         setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
         setupServerConfigActionSet.addAction(ActionType::issueDirectShardOperations);
         Privilege setupServerConfigPrivilege =
-            Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
+            Privilege(ResourcePattern::forClusterResource(boost::none), setupServerConfigActionSet);
 
         Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupAdminUserPrivilege);
         Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupExternalUserPrivilege);
@@ -498,8 +500,8 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(const RoleName& roleName
     // A user is allowed to create a role under either of two conditions.
 
     // The user may create a role if the authorization system says they are allowed to.
-    if (isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(roleName.getDB()),
-                                         ActionType::createRole)) {
+    if (isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(roleName.getDatabaseName()), ActionType::createRole)) {
         return true;
     }
 
@@ -567,7 +569,8 @@ bool AuthorizationSessionImpl::isAuthorizedToChangeAsUser(const UserName& userNa
         return false;
     }
 
-    auth::ResourcePatternSearchList search(ResourcePattern::forDatabaseName(userName.getDB()));
+    auth::ResourcePatternSearchList search(
+        ResourcePattern::forDatabaseName(userName.getDatabaseName()));
     return std::any_of(search.cbegin(), search.cend(), [&user, &actionType](const auto& pattern) {
         return user->getActionsForResource(pattern).contains(actionType);
     });

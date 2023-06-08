@@ -293,10 +293,10 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            auto isAuthorizedOnResource = [&](const ResourcePattern& resourcePattern) {
-                return AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(resourcePattern,
-                                                       ActionType::checkMetadataConsistency);
+            auto* as = AuthorizationSession::get(opCtx->getClient());
+            const auto isAuthorizedOnResource = [as](const ResourcePattern& resourcePattern) {
+                return as->isAuthorizedForActionsOnResource(resourcePattern,
+                                                            ActionType::checkMetadataConsistency);
             };
 
             const auto nss = ns();
@@ -304,22 +304,26 @@ public:
                 case MetadataConsistencyCommandLevelEnum::kClusterLevel:
                     uassert(ErrorCodes::Unauthorized,
                             "Not authorized to check cluster metadata consistency",
-                            isAuthorizedOnResource(ResourcePattern::forClusterResource()));
+                            isAuthorizedOnResource(
+                                ResourcePattern::forClusterResource(nss.tenantId())));
                     break;
                 case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
-                    uassert(ErrorCodes::Unauthorized,
-                            str::stream()
-                                << "Not authorized to check metadata consistency for database "
-                                << nss.dbName().toStringForErrorMsg(),
-                            isAuthorizedOnResource(ResourcePattern::forClusterResource()) ||
-                                isAuthorizedOnResource(ResourcePattern::forDatabaseName(nss.db())));
+                    uassert(
+                        ErrorCodes::Unauthorized,
+                        str::stream()
+                            << "Not authorized to check metadata consistency for database "
+                            << nss.dbName().toStringForErrorMsg(),
+                        isAuthorizedOnResource(
+                            ResourcePattern::forClusterResource(nss.tenantId())) ||
+                            isAuthorizedOnResource(ResourcePattern::forDatabaseName(nss.dbName())));
                     break;
                 case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
                     uassert(ErrorCodes::Unauthorized,
                             str::stream()
                                 << "Not authorized to check metadata consistency for collection "
                                 << nss.toStringForErrorMsg(),
-                            isAuthorizedOnResource(ResourcePattern::forClusterResource()) ||
+                            isAuthorizedOnResource(
+                                ResourcePattern::forClusterResource(nss.tenantId())) ||
                                 isAuthorizedOnResource(ResourcePattern::forExactNamespace(nss)));
                     break;
                 default:

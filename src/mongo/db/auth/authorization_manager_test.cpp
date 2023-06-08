@@ -74,6 +74,9 @@ void setX509PeerInfo(const std::shared_ptr<transport::Session>& session, SSLPeer
 
 #endif
 
+const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
+const auto kTestRsrc = ResourcePattern::forDatabaseName(kTestDB);
+
 class AuthorizationManagerTest : public ServiceContextTest {
 public:
     AuthorizationManagerTest() {
@@ -149,7 +152,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT_EQUALS(RoleName("read", "test"), roles.next());
     ASSERT_FALSE(roles.more());
     auto privilegeMap = v2read->getPrivileges();
-    auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
+    auto testDBPrivilege = privilegeMap[kTestRsrc];
     ASSERT(testDBPrivilege.getActions().contains(ActionType::find));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
 
@@ -185,7 +188,7 @@ TEST_F(AuthorizationManagerTest, testLocalX509Authorization) {
 
     const User::ResourcePrivilegeMap& privileges = x509User->getPrivileges();
     ASSERT_FALSE(privileges.empty());
-    auto privilegeIt = privileges.find(ResourcePattern::forDatabaseName("test"));
+    auto privilegeIt = privileges.find(kTestRsrc);
     ASSERT(privilegeIt != privileges.end());
     ASSERT(privilegeIt->second.includesAction(ActionType::insert));
 }
@@ -246,7 +249,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2UserWithUnrecognizedActions) {
     ASSERT_EQUALS(RoleName("myRole", "test"), roles.next());
     ASSERT_FALSE(roles.more());
     auto privilegeMap = myUser->getPrivileges();
-    auto testDBPrivilege = privilegeMap[ResourcePattern::forDatabaseName("test")];
+    auto testDBPrivilege = privilegeMap[kTestRsrc];
     ActionSet actions = testDBPrivilege.getActions();
     ASSERT(actions.contains(ActionType::find));
     ASSERT(actions.contains(ActionType::insert));

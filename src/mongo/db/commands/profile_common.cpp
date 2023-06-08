@@ -63,8 +63,8 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
         }
     }
 
-    return authzSession->isAuthorizedForActionsOnResource(
-               ResourcePattern::forDatabaseName(dbName.db()), ActionType::enableProfiler)
+    return authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbName),
+                                                          ActionType::enableProfiler)
         ? Status::OK()
         : Status(ErrorCodes::Unauthorized, "unauthorized");
 }

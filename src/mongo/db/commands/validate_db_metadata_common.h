@@ -51,8 +51,11 @@ private:
 
 void assertUserCanRunValidate(OperationContext* opCtx,
                               const ValidateDBMetadataCommandRequest& request) {
-    const auto resource = request.getDb() ? ResourcePattern::forDatabaseName(*request.getDb())
-                                          : ResourcePattern::forAnyNormalResource();
+    const auto tenantId = request.getDbName().tenantId();
+    const auto resource = request.getDb()
+        ? ResourcePattern::forDatabaseName(
+              DatabaseNameUtil::deserialize(tenantId, *request.getDb()))
+        : ResourcePattern::forAnyNormalResource(tenantId);
     uassert(ErrorCodes::Unauthorized,
             str::stream() << "Not authorized to run validateDBMetadata command on resource: '"
                           << resource.toString() << "'",

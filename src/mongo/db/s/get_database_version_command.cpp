@@ -61,8 +61,9 @@ public:
         // The command parameter happens to be string so it's historically been interpreted
         // by parseNs as a collection. Continuing to do so here for unexamined compatibility.
         NamespaceString ns() const override {
-            return NamespaceStringUtil::parseNamespaceFromRequest(request().getDbName(),
-                                                                  _targetDb());
+            const auto& cmd = request();
+            return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
+                                                                  cmd.getCommandParameter());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -79,7 +80,7 @@ public:
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _targetDb());
+            auto dbName = _targetDb();
             AutoGetDb autoDb(opCtx, dbName, MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
@@ -95,8 +96,10 @@ public:
             }
         }
 
-        StringData _targetDb() const {
-            return request().getCommandParameter();
+        DatabaseName _targetDb() const {
+            const auto& cmd = request();
+            return DatabaseNameUtil::deserialize(cmd.getDbName().tenantId(),
+                                                 cmd.getCommandParameter());
         }
     };
 

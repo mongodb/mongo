@@ -57,7 +57,6 @@ public:
     // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
     // forAnyNormalResource() - Remove boost::none default.
     // forClusterResource() - Remove boost::none default.
-    // forDatabaseName() - Remove `StringData` variant.
     // forCollectionName() - Remove variant without tenantId arg.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
@@ -93,12 +92,6 @@ public:
         return ResourcePattern(
             MatchTypeEnum::kMatchDatabaseName,
             NamespaceString::createNamespaceStringForAuth(dbName.tenantId(), dbName.db(), ""_sd));
-    }
-
-    static ResourcePattern forDatabaseName(StringData dbName) {
-        return ResourcePattern(
-            MatchTypeEnum::kMatchDatabaseName,
-            NamespaceString::createNamespaceStringForAuth(boost::none, dbName, ""));
     }
 
     /**

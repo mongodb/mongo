@@ -193,7 +193,7 @@ Status checkAuthForKillCursors(AuthorizationSession* authSession,
 
     ResourcePattern target;
     if (ns.isListCollectionsCursorNS()) {
-        target = ResourcePattern::forDatabaseName(ns.db());
+        target = ResourcePattern::forDatabaseName(ns.dbName());
     } else {
         target = ResourcePattern::forExactNamespace(ns);
     }
