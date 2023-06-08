@@ -394,13 +394,18 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
-    // NOTE: Currently, we assume that each query operates on at most one collection, so there can
-    // be only one STAGE_COLLSCAN node.
+    // Currently, we assume that each query operates on at most one collection, but a rooted $or
+    // queries can have more than one collscan stages with clustered collections.
     auto [node, ct] = getFirstNodeByType(solution.root(), STAGE_COLLSCAN);
-    const auto count = ct;
+    auto [_, orCt] = getFirstNodeByType(solution.root(), STAGE_OR);
+    const unsigned long numCollscanStages = ct;
+    const unsigned long numOrStages = orCt;
     tassert(7182000,
-            str::stream() << "Found " << count << " nodes of type COLLSCAN, expected one or zero",
-            count <= 1);
+            str::stream() << "Found " << numCollscanStages << " nodes of type COLLSCAN, and "
+                          << numOrStages
+                          << " nodes of type OR, expected less than one COLLSCAN nodes or at "
+                             "least one OR stage.",
+            numCollscanStages <= 1 || numOrStages > 0);
 
     if (node) {
         auto csn = static_cast<const CollectionScanNode*>(node);

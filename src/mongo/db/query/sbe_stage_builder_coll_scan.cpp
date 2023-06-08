@@ -297,12 +297,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     boost::optional<sbe::value::SlotId> maxRecordSlot;
     if (csn->minRecord) {
         auto [tag, val] = sbe::value::makeCopyRecordId(csn->minRecord->recordId());
-        minRecordSlot = env->registerSlot("minRecordId"_sd, tag, val, true, state.slotIdGenerator);
+        minRecordSlot =
+            boost::make_optional(state.env->registerSlot(tag, val, true, state.slotIdGenerator));
     }
     if (csn->maxRecord) {
         auto [tag, val] = sbe::value::makeCopyRecordId(csn->maxRecord->recordId());
-        maxRecordSlot = env->registerSlot("maxRecordId"_sd, tag, val, true, state.slotIdGenerator);
+        maxRecordSlot =
+            boost::make_optional(state.env->registerSlot(tag, val, true, state.slotIdGenerator));
     }
+    state.data->clusteredCollBoundsInfos.emplace_back(
+        ParameterizedClusteredScanSlots{minRecordSlot, maxRecordSlot});
 
     // Create the ScanStage.
     bool excludeScanEndRecordId =

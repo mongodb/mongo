@@ -104,6 +104,13 @@ struct ParameterizedIndexScanSlots {
     stdx::variant<SingleIntervalPlan, GenericPlan> slots;
 };
 
+// Holds the slots for the clustered collection scan bounds.
+struct ParameterizedClusteredScanSlots {
+    // Holds the min and max record for the bounds of a clustered collection scan.
+    boost::optional<sbe::value::SlotId> minRecord;
+    boost::optional<sbe::value::SlotId> maxRecord;
+};
+
 /**
  * The PlanStageSlots class is used by SlotBasedStageBuilder to return the output slots produced
  * after building a stage.
@@ -520,6 +527,10 @@ struct PlanStageStaticData {
     // Stores auxiliary data to restore index bounds for a cached auto-parameterized SBE plan
     // for every index used by the plan.
     std::vector<IndexBoundsEvaluationInfo> indexBoundsEvaluationInfos;
+
+    // Stores data to restore collection scan bounds for a cached auto-parameterized SBE plan for
+    // every clustered collection scan used by the plan.
+    std::vector<ParameterizedClusteredScanSlots> clusteredCollBoundsInfos;
 
     // Stores all namespaces involved in the build side of a hash join plan. Needed to check if
     // the plan should be evicted as the size of the foreign namespace changes.

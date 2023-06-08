@@ -31,6 +31,7 @@
 #include "mongo/platform/basic.h"
 
 #include "mongo/base/exact_cast.h"
+#include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/query/projection_ast_path_tracking_visitor.h"
 #include "mongo/db/query/query_planner_common.h"
 #include "mongo/db/query/query_solution.h"
@@ -167,4 +168,22 @@ std::vector<FieldPath> QueryPlannerCommon::extractSortKeyMetaFieldsFromProjectio
 
     return std::move(ctx.data().metaPaths);
 }
+
+boost::optional<int> QueryPlannerCommon::determineClusteredScanDirection(
+    const CanonicalQuery& query, const QueryPlannerParams& params) {
+    if (params.clusteredInfo && query.getSortPattern() &&
+        CollatorInterface::collatorsMatch(params.clusteredCollectionCollator,
+                                          query.getCollator())) {
+        BSONObj kp = clustered_util::getSortPattern(params.clusteredInfo->getIndexSpec());
+        if (QueryPlannerCommon::providesSort(query, kp)) {
+            return 1;
+        } else if (QueryPlannerCommon::providesSort(query,
+                                                    QueryPlannerCommon::reverseSortObj(kp))) {
+            return -1;
+        }
+    }
+
+    return boost::none;
+}
+
 }  // namespace mongo

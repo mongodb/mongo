@@ -459,48 +459,73 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
                                    const stage_builder::PlanStageData* data,
                                    sbe::RuntimeEnvironment* runtimeEnvironment) {
     // Arguments needed to mimic the original build-time bounds setting from the current query.
-    const MatchExpression* conjunct = cq.root();                // this is csn->filter
+    //
+    // If the 'cq' is an OR query, then every child of the OR query that uses a clustered collection
+    // scan needs to be bound to its correct slot. However, queries with a 'min' or 'max' set
+    // default to clustered collection scans, and should not be iterated through.
+    auto clusteredBoundInfos = data->staticData->clusteredCollBoundsInfos;
+    std::vector<MatchExpression*> conjuncts;
+    bool minAndMaxEmpty = cq.getFindCommandRequest().getMin().isEmpty() &&
+        cq.getFindCommandRequest().getMax().isEmpty();
+    if (cq.root()->matchType() == MatchExpression::OR && minAndMaxEmpty) {
+        for (auto& child : *cq.root()->getChildVector()) {
+            if (child->path() == data->staticData->clusterKeyFieldName) {
+                conjuncts.emplace_back(child.get());
+            }
+        }
+    } else {
+        // this is csn->filter
+        conjuncts.emplace_back(cq.root());
+    }
+    tassert(7228000,
+            "Must have the same number of slots saved as collection scans requested.",
+            conjuncts.size() == clusteredBoundInfos.size());
+
     const CollatorInterface* queryCollator = cq.getCollator();  // current query's desired collator
 
-    // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
-    boost::optional<RecordIdBound> minRecord;                 // scan start bound
-    boost::optional<RecordIdBound> maxRecord;                 // scan end bound
-    CollectionScanParams::ScanBoundInclusion boundInclusion;  // whether end bound is inclusive
+    for (size_t i = 0; i < clusteredBoundInfos.size(); ++i) {
+        MatchExpression* conjunct = conjuncts[i];
+        // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
+        boost::optional<RecordIdBound> minRecord;  // scan start bound
+        boost::optional<RecordIdBound> maxRecord;  // scan end bound
 
-    // Cast the return value to void since we are not building a CollectionScanNode here so do not
-    // need to set it in its 'hasCompatibleCollation' member.
-    static_cast<void>(QueryPlannerAccess::handleRIDRangeScan(conjunct,
-                                                             queryCollator,
-                                                             data->staticData->ccCollator.get(),
-                                                             data->staticData->clusterKeyFieldName,
-                                                             minRecord,
-                                                             maxRecord));
-    QueryPlannerAccess::handleRIDRangeMinMax(cq,
-                                             data->staticData->direction,
-                                             queryCollator,
-                                             data->staticData->ccCollator.get(),
-                                             minRecord,
-                                             maxRecord,
-                                             boundInclusion);
+        // 'boundInclusion' is needed for handleRIDRangeMinMax, but we don't need to bind it to a
+        // slot because it is always the same as the original in a plan matched from cache since
+        // only the "max" keyword can change it from its default, and plans using "max" are not
+        // cached.
+        CollectionScanParams::ScanBoundInclusion boundInclusion;  // whether end bound is inclusive
 
-    // Bind the scan bounds to input slots. We don't need to bind 'boundInclusion' to a slot because
-    // it is always the same as the original in a plan matched from cache since only the "max"
-    // keyword can change it from its default, and plans using "max" are not cached.
-    if (minRecord) {
-        boost::optional<sbe::value::SlotId> slotId =
-            runtimeEnvironment->getSlotIfExists("minRecordId"_sd);
-        tassert(7571500, "minRecordId slot missing", slotId);
-        auto [tag, val] = sbe::value::makeCopyRecordId(minRecord->recordId());
-        sbe::RuntimeEnvironment::Accessor* accessor = runtimeEnvironment->getAccessor(*slotId);
-        accessor->reset(true, tag, val);
-    }
-    if (maxRecord) {
-        boost::optional<sbe::value::SlotId> slotId =
-            runtimeEnvironment->getSlotIfExists("maxRecordId"_sd);
-        tassert(7571501, "maxRecordId slot missing", slotId);
-        auto [tag, val] = sbe::value::makeCopyRecordId(maxRecord->recordId());
-        sbe::RuntimeEnvironment::Accessor* accessor = runtimeEnvironment->getAccessor(*slotId);
-        accessor->reset(true, tag, val);
+        // Cast the return value to void since we are not building a CollectionScanNode here so do
+        // not need to set it in its 'hasCompatibleCollation' member.
+        static_cast<void>(
+            QueryPlannerAccess::handleRIDRangeScan(conjunct,
+                                                   queryCollator,
+                                                   data->staticData->ccCollator.get(),
+                                                   data->staticData->clusterKeyFieldName,
+                                                   minRecord,
+                                                   maxRecord));
+        QueryPlannerAccess::handleRIDRangeMinMax(cq,
+                                                 data->staticData->direction,
+                                                 queryCollator,
+                                                 data->staticData->ccCollator.get(),
+                                                 minRecord,
+                                                 maxRecord,
+                                                 boundInclusion);
+        // Bind the scan bounds to input slots.
+        if (minRecord) {
+            boost::optional<sbe::value::SlotId> minRecordId =
+                data->staticData->clusteredCollBoundsInfos[i].minRecord;
+            tassert(7571500, "minRecordId slot missing", minRecordId.has_value());
+            auto [tag, val] = sbe::value::makeCopyRecordId(minRecord->recordId());
+            runtimeEnvironment->resetSlot(minRecordId.value(), tag, val, true);
+        }
+        if (maxRecord) {
+            boost::optional<sbe::value::SlotId> maxRecordId =
+                data->staticData->clusteredCollBoundsInfos[i].maxRecord;
+            tassert(7571501, "maxRecordId slot missing", maxRecordId.has_value());
+            auto [tag, val] = sbe::value::makeCopyRecordId(maxRecord->recordId());
+            runtimeEnvironment->resetSlot(maxRecordId.value(), tag, val, true);
+        }
     }
 }  // bindClusteredCollectionBounds
 }  // namespace mongo::input_params

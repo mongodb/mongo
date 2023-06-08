@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/simple_bsonelement_comparator.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
 
 namespace mongo {
@@ -113,6 +115,19 @@ public:
      */
     static std::vector<FieldPath> extractSortKeyMetaFieldsFromProjection(
         const projection_ast::Projection& proj);
+
+    static bool providesSort(const CanonicalQuery& query, const BSONObj& kp) {
+        return query.getFindCommandRequest().getSort().isPrefixOf(
+            kp, SimpleBSONElementComparator::kInstance);
+    }
+
+    /**
+     * Determine whether this query has a sort that can be provided by the collection's clustering
+     * index, if so, which direction the scan should be. If the collection is not clustered, or the
+     * sort cannot be provided, returns 'boost::none'.
+     */
+    static boost::optional<int> determineClusteredScanDirection(const CanonicalQuery& query,
+                                                                const QueryPlannerParams& params);
 };
 
 }  // namespace mongo

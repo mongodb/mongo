@@ -30,6 +30,9 @@ selector:
   - jstests/core/index/wildcard/compound_wildcard_index_hint.js
   # This test expects a certain number of indexes at the start.
   - jstests/core/administrative/check_shard_index.js
+  # This test checks explain, and creating an implicit index results in the following failure:
+  # "IndexOptionsConflict" that generates an unexpected plan.
+  - jstests/core/query/or_use_clustered_collection.js
   # Latency histogram statistics are affected by the creation of an implicit index.
   - jstests/core/top.js
   # Creating an implicit index results in the following failure: "add index fails, too many indexes

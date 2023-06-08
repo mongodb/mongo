@@ -458,6 +458,11 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
         return (isClustered && !isOplog && (minRecord || maxRecord || resumeAfterRecordId));
     }
 
+    // Tells whether this scan will be performed as a clustered collection scan in classic.
+    bool doClusteredCollectionScanClassic() const {
+        return (isClustered && !isOplog && (minRecord || maxRecord));
+    }
+
     std::unique_ptr<QuerySolutionNode> clone() const final;
 
     // Name of the namespace.
