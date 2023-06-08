@@ -286,13 +286,20 @@ public:
                                                      repl::ReadConcernLevel readConcern) = 0;
 
     /**
-     * Returns keys for the given purpose and with an expiresAt value greater than newerThanThis.
+     * Returns internal keys for the given purpose and have an expiresAt value greater than
+     * newerThanThis.
      */
-    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+    virtual StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
         repl::ReadConcernLevel readConcernLevel) = 0;
+
+    /**
+     * Returns all external (i.e. validation-only) keys for the given purpose.
+     */
+    virtual StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+        OperationContext* opCtx, StringData purpose, repl::ReadConcernLevel readConcernLevel) = 0;
 
     /**
      * Directly inserts a document in the specified namespace on the config server. The document
