@@ -18,7 +18,6 @@ Import([
 snappySuffix = '-1.1.7'
 icuSuffix = '-57.1'
 tomcryptSuffix = '-1.18.2'
-variantSuffix = '-1.4.0'
 
 thirdPartyEnvironmentModifications = {
     'abseil-cpp': {'CPPPATH': ['#/src/third_party/abseil-cpp/dist'], },
@@ -38,7 +37,6 @@ thirdPartyEnvironmentModifications = {
     },
     'timelib': {'CPPPATH': ['#/src/third_party/timelib'], },
     'unwind': {},
-    'variant': {'CPPPATH': ['#src/third_party/variant' + variantSuffix + '/include'], },
     'mozjs': {
         'CPPPATH': [
             '#/src/third_party/mozjs/include',
@@ -327,7 +325,6 @@ s2Env.InjectThirdParty(libraries=[
     'abseil-cpp',
     'fmt',
     'safeint',
-    'variant',
 ])
 s2Env.InjectMongoIncludePaths()
 s2Env.SConscript('s2/SConscript', exports={'env': s2Env})
