@@ -576,7 +576,7 @@ private:
         batch.setMd5(md5);
         batch.setMinKey(first);
         batch.setMaxKey(BSONKey(hasher->lastKey()));
-        batch.setReadTimestamp(readTimestamp);
+        batch.setReadTimestamp(*readTimestamp);
 
         // Send information on this batch over the oplog.
         BatchStats result;
