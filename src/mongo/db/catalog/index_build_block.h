@@ -95,7 +95,7 @@ public:
      */
     const IndexCatalogEntry* getEntry(OperationContext* opCtx,
                                       const CollectionPtr& collection) const;
-    IndexCatalogEntry* getEntry(OperationContext* opCtx, Collection* collection);
+    IndexCatalogEntry* getWritableEntry(OperationContext* opCtx, Collection* collection);
 
     /**
      * Returns the name of the index managed by this index builder.
