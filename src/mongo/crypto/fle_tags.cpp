@@ -95,16 +95,12 @@ size_t sizeArrayElementsMemory(size_t tagCount) {
     return size;
 }
 
-// A positive contention factor (cm) means we must run the above algorithm (cm) times.
-std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
-                               const NamespaceString& nssEsc,
-                               ESCDerivedFromDataToken s,
-                               EDCDerivedFromDataToken d,
-                               boost::optional<int64_t> cm) {
-
-    auto memoryLimit = static_cast<size_t>(internalQueryFLERewriteMemoryLimit.load());
+std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(FLETagQueryInterface* queryImpl,
+                                                            const NamespaceString& nssEsc,
+                                                            ESCDerivedFromDataToken s,
+                                                            EDCDerivedFromDataToken d,
+                                                            boost::optional<int64_t> cm) {
     auto contentionMax = cm.value_or(0);
-    std::vector<PrfBlock> binaryTags;
 
     std::vector<FLEEdgePrfBlock> blocks;
     blocks.reserve(contentionMax + 1);
@@ -123,9 +119,21 @@ std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
     std::vector<std::vector<FLEEdgePrfBlock>> blockSets;
     blockSets.push_back(blocks);
 
-    auto countInfoSets =
-        queryImpl->getTags(nssEsc, blockSets, FLETagQueryInterface::TagQueryType::kQuery);
+    return queryImpl->getTags(nssEsc, blockSets, FLETagQueryInterface::TagQueryType::kQuery);
+}
 
+
+// A positive contention factor (cm) means we must run the above algorithm (cm) times.
+std::vector<PrfBlock> readTags(FLETagQueryInterface* queryImpl,
+                               const NamespaceString& nssEsc,
+                               ESCDerivedFromDataToken s,
+                               EDCDerivedFromDataToken d,
+                               boost::optional<int64_t> cm) {
+
+    auto memoryLimit = static_cast<size_t>(internalQueryFLERewriteMemoryLimit.load());
+    std::vector<PrfBlock> binaryTags;
+
+    auto countInfoSets = getCountInfoSets(queryImpl, nssEsc, s, d, cm);
 
     // Count how many tags we will need and check once if we they will fit
     //

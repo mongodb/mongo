@@ -39,6 +39,12 @@ class FLETagQueryInterface;
 
 namespace mongo::fle {
 
+std::vector<std::vector<FLEEdgeCountInfo>> getCountInfoSets(FLETagQueryInterface* queryImpl,
+                                                            const NamespaceString& nssEsc,
+                                                            ESCDerivedFromDataToken s,
+                                                            EDCDerivedFromDataToken d,
+                                                            boost::optional<int64_t> cm);
+
 /**
  * Read a list of binary tags given ESC and and EDC derived tokens and a maximum contention
  * factor.
