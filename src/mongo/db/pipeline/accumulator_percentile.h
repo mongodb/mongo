@@ -39,6 +39,10 @@ namespace mongo {
  */
 class AccumulatorPercentile : public AccumulatorState {
 public:
+    static constexpr auto kApproximate = "approximate"_sd;
+    static constexpr auto kContinuous = "continuous"_sd;
+    static constexpr auto kDiscrete = "discrete"_sd;
+
     static constexpr auto kName = "$percentile"_sd;
     const char* getOpName() const {
         return kName.rawData();
@@ -48,6 +52,11 @@ public:
      * Checks that 'pv' is an array of valid percentile specifications. Called by the IDL file.
      */
     static Status validatePercentileArg(const std::vector<double>& pv);
+
+    /**
+     * Blocks the percentile methods that aren't supported yet.
+     */
+    static Status validatePercentileMethod(StringData method);
 
     /**
      * Parsing and creating the accumulator. A separate accumulator object is created per group.
@@ -62,9 +71,11 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& ps,
-                                                         int32_t method);
+                                                         PercentileMethod method);
 
-    AccumulatorPercentile(ExpressionContext* expCtx, const std::vector<double>& ps, int32_t method);
+    AccumulatorPercentile(ExpressionContext* expCtx,
+                          const std::vector<double>& ps,
+                          PercentileMethod method);
 
     /**
      * Ingressing values and computing the requested percentiles.
@@ -80,7 +91,7 @@ public:
     /**
      * Necessary for supporting $percentile as window functions and/or as expression.
      */
-    static std::pair<std::vector<double> /*ps*/, int32_t /*method*/> parsePercentileAndMethod(
+    static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
         BSONElement elem);
     static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
@@ -105,16 +116,13 @@ public:
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                 SerializationOptions options,
                                 std::vector<double> percentiles,
-                                int32_t method,
+                                PercentileMethod method,
                                 MutableDocument& md);
 
 protected:
     std::vector<double> _percentiles;
     std::unique_ptr<PercentileAlgorithm> _algo;
-
-    // TODO SERVER-74894: This should have been 'PercentileMethodEnum' but the generated
-    // header from the IDL includes this header, creating a dependency.
-    const int32_t _method;
+    const PercentileMethod _method;
 };
 
 /*
@@ -141,19 +149,21 @@ public:
 
     static boost::intrusive_ptr<AccumulatorState> create(ExpressionContext* expCtx,
                                                          const std::vector<double>& unused,
-                                                         int32_t method);
+                                                         PercentileMethod method);
 
     /**
      * We are matching the signature of the AccumulatorPercentile for the purpose of using
      * ExpressionFromAccumulatorQuantile as a template for both $median and $percentile. This is the
      * reason for passing in `unused` and it will not be referenced.
      */
-    AccumulatorMedian(ExpressionContext* expCtx, const std::vector<double>& unused, int32_t method);
+    AccumulatorMedian(ExpressionContext* expCtx,
+                      const std::vector<double>& unused,
+                      PercentileMethod method);
 
     /**
      * Necessary for supporting $median as window functions and/or as expression.
      */
-    static std::pair<std::vector<double> /*ps*/, int32_t /*method*/> parsePercentileAndMethod(
+    static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
         BSONElement elem);
     static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
@@ -174,7 +184,7 @@ public:
     static void serializeHelper(const boost::intrusive_ptr<Expression>& argument,
                                 SerializationOptions options,
                                 std::vector<double> percentiles,
-                                int32_t method,
+                                PercentileMethod method,
                                 MutableDocument& md);
 };
 }  // namespace mongo

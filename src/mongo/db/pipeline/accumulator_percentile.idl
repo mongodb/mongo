@@ -31,14 +31,6 @@ global:
     - "mongo/db/pipeline/accumulator_percentile.h"
 imports:
   - "mongo/db/basic_types.idl"
-enums:
-    PercentileMethod:
-        description: "The method used to calculate the percentile."
-        type: string
-        values: 
-            Approximate: "approximate"
-            Discrete: "discrete"
-            Continuous: "continuous"
 structs:
     AccumulatorPercentileSpec:
         description: "Specification for the $percentile accumulator."
@@ -56,8 +48,10 @@ structs:
                     {callback: "AccumulatorPercentile::validatePercentileArg"}
             method:
                 description: "The method we will use to find the percentile."
-                type: PercentileMethod
+                type: string
                 optional: false
+                validator:
+                    {callback: "AccumulatorPercentile::validatePercentileMethod"}
     AccumulatorMedianSpec:
         description: "Specification for the $median accumulator."
         strict: true
@@ -68,5 +62,7 @@ structs:
                 optional: false
             method:
                 description: "The method we will use to find the percentile."
-                type: PercentileMethod
+                type: string
                 optional: false
+                validator:
+                    {callback: "AccumulatorPercentile::validatePercentileMethod"}

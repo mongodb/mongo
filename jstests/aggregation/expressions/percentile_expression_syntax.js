@@ -57,16 +57,20 @@ assertInvalidSyntax(
     "Should fail if 'p' field in $percentile is an array with any value outside of [0, 1] range");
 
 assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: 42}},
-                    "Should fail if 'method' field isn't a string");
+                    "$percentile should fail if 'method' field isn't a string");
 
 assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "fancy"}},
-                    "Should fail if 'method' isn't one of _predefined_ strings");
+                    "$percentile should fail if 'method' isn't one of the _predefined_ strings");
+
+assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "continuous"}},
+                    "$percentile should fail because continuous 'method' isn't supported yet");
+
+assertInvalidSyntax({$percentile: {p: [0.5, 0.7], input: ["$k1", "$k2"], method: "discrete"}},
+                    "$percentile should fail because discrete 'method' isn't supported yet");
 
 /**
- * Tests for $median. $median desugars to $percentile with the field p:[0.5] added, and therefore
- * has similar syntax to $percentile.
+ * Tests for $median.
  */
-
 assertInvalidSyntax({$median: {p: [0.5], input: "$k4", method: "approximate"}},
                     "Should fail if 'p' is defined");
 
@@ -81,6 +85,15 @@ assertInvalidSyntax({$median: {input: ["$k1", "$k2"]}},
 
 assertInvalidSyntax({$median: {input: "$x", method: "approximate", extras: 42}},
                     "Should fail if $median contains an unexpected field");
+
+assertInvalidSyntax({$median: {input: ["$k1", "$k2"], method: "fancy"}},
+                    "$median should fail if 'method' isn't one of the _predefined_ strings");
+
+assertInvalidSyntax({$median: {input: ["$k1", "$k2"], method: "continuous"}},
+                    "$median should fail because continuous 'method' isn't supported yet");
+
+assertInvalidSyntax({$median: {input: ["$k1", "$k2"], method: "discrete"}},
+                    "$median should fail because discrete 'method' isn't supported yet");
 
 /**
  * Test that valid $percentile specifications are accepted. The results, i.e. semantics, are

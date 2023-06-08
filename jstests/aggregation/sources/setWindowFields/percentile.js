@@ -118,6 +118,10 @@ testError({$median: "not an object"}, 7436100);
 
 testError({$percentile: {p: [0.1, 0.6], input: "$str", method: false}}, ErrorCodes.TypeMismatch);
 testError({$median: {input: "$str", method: false}}, ErrorCodes.TypeMismatch);
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
+testError({$median: {input: "$str", method: "discrete"}}, ErrorCodes.BadValue);
+testError({$percentile: {p: [0.1, 0.6], input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
+testError({$median: {input: "$str", method: "continuous"}}, ErrorCodes.BadValue);
 
 testError({$percentile: {input: "$str", method: "approximate"}},
           40414 /* IDL required field error */);
