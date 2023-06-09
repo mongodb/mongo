@@ -794,9 +794,14 @@ void removeBucket(
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
             if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
                     serverGlobalParams.featureCompatibility)) {
-                // When removing a closed bucket, the BucketStateRegistry doesn't hold any state for
-                // this bucket as it's not pending compression.
-                invariant(!state.has_value());
+                // When removing a closed bucket, the BucketStateRegistry may contain state for this
+                // bucket due to an untracked ongoing direct write (such as TTL delete).
+                if (state.has_value()) {
+                    invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()),
+                              bucketStateToString(*state));
+                    invariant(stdx::get<DirectWriteCounter>(state.value()) < 0,
+                              bucketStateToString(*state));
+                }
             } else {
                 // Ensure that we are in a state of pending compression (represented by a negative
                 // direct write counter).
