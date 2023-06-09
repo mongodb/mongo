@@ -45,6 +45,10 @@ public:
     FreeMonOpObserver();
     ~FreeMonOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kSystem, NamespaceFilter::kSystem};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

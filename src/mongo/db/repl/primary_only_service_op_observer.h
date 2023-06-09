@@ -47,6 +47,10 @@ public:
     explicit PrimaryOnlyServiceOpObserver(ServiceContext* serviceContext);
     ~PrimaryOnlyServiceOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {/*update=*/NamespaceFilter::kNone, /*delete=*/NamespaceFilter::kAll};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

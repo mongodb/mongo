@@ -46,6 +46,10 @@ public:
     TenantMigrationRecipientOpObserver() = default;
     ~TenantMigrationRecipientOpObserver() = default;
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

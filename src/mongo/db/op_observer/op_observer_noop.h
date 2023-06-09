@@ -35,6 +35,10 @@ namespace mongo {
 
 class OpObserverNoop : public OpObserver {
 public:
+    NamespaceFilters getNamespaceFilters() const override {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

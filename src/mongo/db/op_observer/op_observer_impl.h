@@ -53,6 +53,10 @@ public:
     OpObserverImpl(std::unique_ptr<OplogWriter> oplogWriter);
     virtual ~OpObserverImpl() = default;
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

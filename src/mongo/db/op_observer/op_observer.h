@@ -113,6 +113,24 @@ class OpObserver {
 public:
     using ApplyOpsOplogSlotAndOperationAssignment = TransactionOperations::ApplyOpsInfo;
 
+    /**
+     * Used by CRUD ops: onInserts, onUpdate, aboutToDelete, and onDelete.
+     */
+    enum class NamespaceFilter {
+        kConfig,           // config database (i.e. config.*)
+        kSystem,           // system collection (i.e. *.system.*)
+        kConfigAndSystem,  // run the observer on config and system, but not user collections
+        kAll,              // run the observer on all collections/databases
+        kNone,             // never run the observer for this CRUD event
+    };
+
+    // Controls the OpObserverRegistry's filtering of CRUD events.
+    // Each OpObserver declares which events it cares about with this.
+    struct NamespaceFilters {
+        NamespaceFilter updateFilter;  // onInserts, onUpdate
+        NamespaceFilter deleteFilter;  // aboutToDelete, onDelete
+    };
+
     enum class CollectionDropType {
         // The collection is being dropped immediately, in one step.
         kOnePhase,
@@ -123,6 +141,12 @@ public:
     };
 
     virtual ~OpObserver() = default;
+
+    // Used by the OpObserverRegistry to filter out CRUD operations.
+    // With this method, each OpObserver should declare if it wants to subscribe
+    // to a subset of operations to special internal collections. This helps
+    // improve performance. Avoid using 'kAll' as much as possible.
+    virtual NamespaceFilters getNamespaceFilters() const = 0;
 
     virtual void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                         const NamespaceString& nss,

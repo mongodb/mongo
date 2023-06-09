@@ -45,6 +45,10 @@ public:
     AuthOpObserver();
     ~AuthOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

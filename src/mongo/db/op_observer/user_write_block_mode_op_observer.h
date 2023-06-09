@@ -45,6 +45,10 @@ public:
     UserWriteBlockModeOpObserver() = default;
     ~UserWriteBlockModeOpObserver() = default;
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
+
     // Operations to check for allowed writes.
 
     // CUD operations

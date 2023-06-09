@@ -45,6 +45,10 @@ public:
     ShardServerOpObserver();
     ~ShardServerOpObserver();
 
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfigAndSystem, NamespaceFilter::kConfigAndSystem};
+    }
+
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
                                                 const NamespaceString& nss,
                                                 const UUID& uuid,

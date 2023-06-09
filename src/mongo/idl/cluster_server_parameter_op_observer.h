@@ -46,6 +46,9 @@ namespace mongo {
 class ClusterServerParameterOpObserver final : public OpObserver {
 public:
     // Interface methods.
+    NamespaceFilters getNamespaceFilters() const final {
+        return {NamespaceFilter::kConfig, NamespaceFilter::kConfig};
+    }
 
     void onInserts(OperationContext* opCtx,
                    const CollectionPtr& coll,

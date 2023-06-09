@@ -52,10 +52,58 @@ public:
     OpObserverRegistry() = default;
     virtual ~OpObserverRegistry() = default;
 
+    // This implementaton is unused, but needs to be implemented to conform to the OpObserver
+    // interface.
+    NamespaceFilters getNamespaceFilters() const {
+        return {NamespaceFilter::kAll, NamespaceFilter::kAll};
+    }
+
     // Add 'observer' to the list of observers to call. Observers are called in registration order.
     // Registration must be done while no calls to observers are made.
     void addObserver(std::unique_ptr<OpObserver> observer) {
+        const auto& nsFilters = observer->getNamespaceFilters();
         _observers.push_back(std::move(observer));
+
+        OpObserver* observerPtr = _observers.back().get();
+        switch (nsFilters.updateFilter) {
+            case OpObserver::NamespaceFilter::kConfig:
+                _insertAndUpdateConfigObservers.push_back(observerPtr);
+                break;
+            case OpObserver::NamespaceFilter::kSystem:
+                _insertAndUpdateSystemObservers.push_back(observerPtr);
+                break;
+            case OpObserver::NamespaceFilter::kConfigAndSystem:
+                _insertAndUpdateConfigObservers.push_back(observerPtr);
+                _insertAndUpdateSystemObservers.push_back(observerPtr);
+                break;
+            case OpObserver::NamespaceFilter::kAll:
+                _insertAndUpdateConfigObservers.push_back(observerPtr);
+                _insertAndUpdateSystemObservers.push_back(observerPtr);
+                _insertAndUpdateUserObservers.push_back(observerPtr);
+                break;
+            default:
+                break;
+        }
+
+        switch (nsFilters.deleteFilter) {
+            case OpObserver::NamespaceFilter::kConfig:
+                _onDeleteConfigObservers.push_back(observerPtr);
+                break;
+            case OpObserver::NamespaceFilter::kSystem:
+                _onDeleteSystemObservers.push_back(observerPtr);
+                break;
+            case OpObserver::NamespaceFilter::kConfigAndSystem:
+                _onDeleteConfigObservers.push_back(observerPtr);
+                _onDeleteSystemObservers.push_back(observerPtr);
+                break;
+            case OpObserver::NamespaceFilter::kAll:
+                _onDeleteConfigObservers.push_back(observerPtr);
+                _onDeleteSystemObservers.push_back(observerPtr);
+                _onDeleteUserObservers.push_back(observerPtr);
+                break;
+            default:
+                break;
+        }
     }
 
     void onModifyCollectionShardingIndexCatalog(OperationContext* opCtx,
@@ -154,7 +202,18 @@ public:
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate) override {
         ReservedTimes times{opCtx};
-        for (auto& o : _observers)
+
+        const auto& nss = coll->ns();
+        std::vector<OpObserver*>* observerQueue;
+        if (nss.isConfigDB()) {
+            observerQueue = &_insertAndUpdateConfigObservers;
+        } else if (nss.isSystem()) {
+            observerQueue = &_insertAndUpdateSystemObservers;
+        } else {
+            observerQueue = &_insertAndUpdateUserObservers;
+        }
+
+        for (auto& o : *observerQueue)
             o->onInserts(opCtx, coll, begin, end, fromMigrate, defaultFromMigrate);
     }
 
@@ -181,7 +240,18 @@ public:
 
     void onUpdate(OperationContext* const opCtx, const OplogUpdateEntryArgs& args) override {
         ReservedTimes times{opCtx};
-        for (auto& o : _observers)
+
+        const auto& nss = args.coll->ns();
+        std::vector<OpObserver*>* observerQueue;
+        if (nss.isConfigDB()) {
+            observerQueue = &_insertAndUpdateConfigObservers;
+        } else if (nss.isSystem()) {
+            observerQueue = &_insertAndUpdateSystemObservers;
+        } else {
+            observerQueue = &_insertAndUpdateUserObservers;
+        }
+
+        for (auto& o : *observerQueue)
             o->onUpdate(opCtx, args);
     }
 
@@ -189,7 +259,18 @@ public:
                        const CollectionPtr& coll,
                        const BSONObj& doc) override {
         ReservedTimes times{opCtx};
-        for (auto& o : _observers)
+
+        const auto& nss = coll->ns();
+        std::vector<OpObserver*>* observerQueue;
+        if (nss.isConfigDB()) {
+            observerQueue = &_onDeleteConfigObservers;
+        } else if (nss.isSystem()) {
+            observerQueue = &_onDeleteSystemObservers;
+        } else {
+            observerQueue = &_onDeleteUserObservers;
+        }
+
+        for (auto& o : *observerQueue)
             o->aboutToDelete(opCtx, coll, doc);
     }
 
@@ -198,7 +279,18 @@ public:
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args) override {
         ReservedTimes times{opCtx};
-        for (auto& o : _observers)
+
+        const auto& nss = coll->ns();
+        std::vector<OpObserver*>* observerQueue;
+        if (nss.isConfigDB()) {
+            observerQueue = &_onDeleteConfigObservers;
+        } else if (nss.isSystem()) {
+            observerQueue = &_onDeleteSystemObservers;
+        } else {
+            observerQueue = &_onDeleteUserObservers;
+        }
+
+        for (auto& o : *observerQueue)
             o->onDelete(opCtx, coll, stmtId, args);
     }
 
@@ -534,6 +626,26 @@ private:
         return times.front();
     }
 
+    // For use by the long tail of non-performance-critical operations: non-CRUD.
+    // CRUD operations have the most observers and are worth optimizing. For non-CRUD operations,
+    // there are few implemented observers and as little as one that implement the interface.
     std::vector<std::unique_ptr<OpObserver>> _observers;
+
+    // For performance reasons, store separate but still ordered queues for CRUD ops.
+    // Each CRUD operation will iterate through one of these queues based on the nss
+    // of the target document of the operation.
+    std::vector<OpObserver*> _insertAndUpdateConfigObservers;  // config.*
+    std::vector<OpObserver*> _insertAndUpdateSystemObservers;  // *.system.*
+    std::vector<OpObserver*>
+        _insertAndUpdateUserObservers;  // not config nor system.
+                                        // Will impact writes to all user collections.
+
+    // Having separate queues for delete operations allows observers like
+    // PrimaryOnlyServiceOpObserver to use the filtering differently between insert/update, and
+    // delete.
+    std::vector<OpObserver*> _onDeleteConfigObservers;  // config.*
+    std::vector<OpObserver*> _onDeleteSystemObservers;  // *.system.*
+    std::vector<OpObserver*> _onDeleteUserObservers;    // not config nor system
+                                                      // Will impact writes to all user collections.
 };
 }  // namespace mongo
