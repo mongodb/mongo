@@ -8,6 +8,9 @@ set -o errexit
 # Should output contents to new file in home directory.
 cat << EOF > $HOME/oidc_e2e_setup.json
 {
+    "tD548GwE1@outlook.com" : "${oidc_azure_test_user_account_one_secret}",
+    "tD548GwE2@outlook.com" : "${oidc_azure_test_user_account_two_secret}",
+    "tD548GwE3@outlook.com" : "${oidc_azure_test_user_account_three_secret}",
     "testserversecurityone@okta-test.com" : "${oidc_okta_test_user_account_one_secret}",
     "testserversecuritytwo@okta-test.com" : "${oidc_okta_test_user_account_two_secret}",
     "testserversecuritythree@okta-test.com" : "${oidc_okta_test_user_account_three_secret}"
