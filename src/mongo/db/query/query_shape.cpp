@@ -274,11 +274,12 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const Pipeline& pipeline,
                           const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const NamespaceString& nss) {
     BSONObjBuilder bob;
 
     // namespace
-    bob.append("cmdNs", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
+    bob.append("cmdNs", extractNamespaceShape(nss, opts));
     bob.append("command", "aggregate");
 
     // pipeline

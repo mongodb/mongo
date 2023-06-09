@@ -60,6 +60,7 @@ function confirmAllFieldsPresent(queryStatsEntries) {
         "apiDeprecationErrors",
         "apiVersion",
         "apiStrict",
+        "collectionType",
         "client"
     ];
 

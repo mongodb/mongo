@@ -955,6 +955,32 @@ Status runAggregate(OperationContext* opCtx,
             }
         }
 
+        auto parsePipeline = [&](std::unique_ptr<CollatorInterface> collator) {
+            expCtx =
+                makeExpressionContext(opCtx,
+                                      request,
+                                      std::move(collator),
+                                      uuid,
+                                      collatorToUseMatchesDefault,
+                                      collections.getMainCollection()
+                                          ? collections.getMainCollection()->getCollectionOptions()
+                                          : boost::optional<CollectionOptions>(boost::none));
+
+            // If any involved collection contains extended-range data, set a flag which individual
+            // DocumentSource parsers can check.
+            collections.forEach([&](const CollectionPtr& coll) {
+                if (coll->getRequiresTimeseriesExtendedRangeSupport())
+                    expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
+            });
+
+            expCtx->startExpressionCounters();
+            auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
+            curOp->beginQueryPlanningTimer();
+            expCtx->stopExpressionCounters();
+
+            return std::make_pair(expCtx, std::move(pipeline));
+        };
+
         // If this is a view, resolve it by finding the underlying collection and stitching view
         // pipelines and this request's pipeline together. We then release our locks before
         // recursively calling runAggregate(), which will re-acquire locks on the underlying
@@ -966,6 +992,34 @@ Status runAggregate(OperationContext* opCtx,
         // underlying bucket collection.
         if (ctx && ctx->getView() &&
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
+
+            try {
+                invariant(collatorToUse);
+                // We can't move out of collatorToUse as it's needed for runAggregateOnView(). Clone
+                // instead.
+                auto&& expCtxAndPipeline =
+                    parsePipeline(*collatorToUse ? (*collatorToUse)->clone() : nullptr);
+                auto expCtx = expCtxAndPipeline.first;
+                auto pipeline = std::move(expCtxAndPipeline.second);
+
+                query_stats::registerRequest(expCtx, nss, [&]() {
+                    // In this path we haven't yet parsed the pipeline, but we need to do so for
+                    // query shape stats - which should track the queries before views are resolved.
+                    // Inside this callback we know we have already checked that query stats are
+                    // enabled and know that this request has not been rate limited.
+                    return std::make_unique<query_stats::AggregateKeyGenerator>(
+                        request, *pipeline, expCtx, origNss);
+                });
+            } catch (const DBException& ex) {
+                if (ex.code() == 6347902) {
+                    // TODO Handle the $$SEARCH_META case in SERVER-76087.
+                    LOGV2_WARNING(7198701,
+                                  "Failed to parse pipeline before view resolution",
+                                  "error"_attr = ex.toStatus());
+                } else {
+                    throw;
+                }
+            }
             return runAggregateOnView(opCtx,
                                       origNss,
                                       request,
@@ -985,35 +1039,17 @@ Status runAggregate(OperationContext* opCtx,
             opCtx, nss, collections.getMainCollection(), request.getCollectionUUID());
 
         invariant(collatorToUse);
-        expCtx = makeExpressionContext(opCtx,
-                                       request,
-                                       std::move(*collatorToUse),
-                                       uuid,
-                                       collatorToUseMatchesDefault,
-                                       collections.getMainCollection()
-                                           ? collections.getMainCollection()->getCollectionOptions()
-                                           : boost::optional<CollectionOptions>(boost::none));
-
-        // If any involved collection contains extended-range data, set a flag which individual
-        // DocumentSource parsers can check.
-        collections.forEach([&](const CollectionPtr& coll) {
-            if (coll->getRequiresTimeseriesExtendedRangeSupport())
-                expCtx->setRequiresTimeseriesExtendedRangeSupport(true);
-        });
-
-        expCtx->startExpressionCounters();
-        auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-        curOp->beginQueryPlanningTimer();
-        expCtx->stopExpressionCounters();
+        auto&& expCtxAndPipeline = parsePipeline(std::move(*collatorToUse));
+        auto expCtx = expCtxAndPipeline.first;
+        auto pipeline = std::move(expCtxAndPipeline.second);
 
         // Register query stats with the pre-optimized pipeline. Exclude queries against collections
         // with encrypted fields. We still collect query stats on collection-less aggregations.
-        // TODO SERVER-75912 make sure query shape is unresolved for queries on views
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerRequest(expCtx, nss, [&]() {
+            query_stats::registerRequest(expCtx, origNss, [&]() {
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request, *pipeline, expCtx);
+                    request, *pipeline, expCtx, origNss);
             });
         }
 

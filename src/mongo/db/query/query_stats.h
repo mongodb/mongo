@@ -39,6 +39,7 @@
 #include "mongo/db/query/query_stats_key_generator.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/views/view.h"
 #include <cstdint>
 #include <memory>
 

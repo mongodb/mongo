@@ -70,7 +70,8 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const Pipeline& pipeline,
                           const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const NamespaceString& nss);
 
 NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt);
 

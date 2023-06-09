@@ -75,7 +75,7 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool applyHmac = false,
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
-        AggregateKeyGenerator aggKeyGenerator(acr, pipeline, expCtx);
+        AggregateKeyGenerator aggKeyGenerator(acr, pipeline, expCtx, acr.getNamespace());
 
         SerializationOptions opts(literalPolicy);
         if (applyHmac) {
@@ -185,7 +185,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                         "$eq": "?number"
                     }
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -209,7 +210,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<sortVal>": 1,
                     "HASH<otherSort>": -1
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -238,7 +240,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<sortVal>": 1,
                     "HASH<otherSort>": -1
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -272,7 +275,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<sortVal>": 1,
                     "HASH<otherSort>": -1
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -317,7 +321,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                     "HASH<sortVal>": 1,
                     "HASH<otherSort>": -1
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -370,7 +375,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 "skip": "?number"
             },
             "maxTimeMS": "?number",
-            "batchSize": "?number"
+            "batchSize": "?number",
+            "collectionType": "collection"
         })",
         key);
 
@@ -428,7 +434,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "allowPartialResults": true,
             "maxTimeMS": "?number",
-            "batchSize": "?number"
+            "batchSize": "?number",
+            "collectionType": "collection"
         })",
         key);
 
@@ -480,7 +487,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
             },
             "allowPartialResults": false,
             "maxTimeMS": "?number",
-            "batchSize": "?number"
+            "batchSize": "?number",
+            "collectionType": "collection"
         })",
         key);
 
@@ -503,7 +511,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestAllFields) {
                 },
                 "tailable": true,
                 "awaitData": true
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 }
@@ -526,7 +535,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsFindCommandRequestEmptyFields) {
                 },
                 "command": "find",
                 "filter": {}
-            }
+            },
+            "collectionType": "collection"
         })",
         hmacApplied);  // NOLINT (test auto-update)
 }
@@ -566,7 +576,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                 "min": {
                     "z": "?number"
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
     // Test with a string hint. Note that this is the internal representation of the string hint
@@ -597,7 +608,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                 "min": {
                     "z": "?number"
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -626,7 +638,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                 "min": {
                     "HASH<z>": "?number"
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 
@@ -655,7 +668,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsHintsWithOptions) {
                 "min": {
                     "HASH<z>": "?number"
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         key);
 }
@@ -710,7 +724,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
                     "varIs": "$$var",
                     "_id": true
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         hmacApplied);
 
@@ -743,7 +758,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
                     "BL649QER7lTs0+8ozTMVNAa6JNjbhf57YT8YQ4EkT1E=": "$$adaJc6H3zDirh5/52MLv5yvnb6nXNP15Z4HzGfumvx8=",
                     "ljovqLSfuj6o2syO1SynOzHQK1YVij6+Wlx1fL8frUo=": true
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         hmacApplied);
 }
@@ -822,7 +838,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     }
                 ]
-            }
+            },
+            "collectionType": "collection"
         })",
         shapified);
 
@@ -879,7 +896,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                         }
                     }
                 ]
-            }
+            },
+            "collectionType": "collection"
         })",
         shapified);
 
@@ -951,7 +969,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                     "HASH<z>": 1,
                     "HASH<c>": 1
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         shapified);
 
@@ -1026,7 +1045,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
                     "HASH<var1>": "$HASH<foo>",
                     "HASH<var2>": "?string"
                 }
-            }
+            },
+            "collectionType": "collection"
         })",
         shapified);
 
@@ -1110,7 +1130,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
             },
             "maxTimeMS": "?number",
             "bypassDocumentValidation": "?bool",
-            "comment": "?string"
+            "comment": "?string",
+            "collectionType": "collection"
         })",
         shapified);
 }
@@ -1131,7 +1152,8 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) 
                 },
                 "command": "aggregate",
                 "pipeline": []
-            }
+            },
+            "collectionType": "collection"
         })",
         shapified);  // NOLINT (test auto-update)
 }

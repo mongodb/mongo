@@ -54,6 +54,8 @@ let commandObj = {
 const replSetConn = new Mongo(replTest.getURL());
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
 let telemetry = getTelemetryReplSet(replSetConn, collName);
+// We're not concerned with this field here.
+delete telemetry[0].key["collectionType"];
 confirmCommandFieldsPresent(telemetry[0].key, commandObj);
 // check that readConcern afterClusterTime is normalized.
 assert.eq(telemetry[0].key.readConcern.afterClusterTime, "?timestamp");
@@ -65,6 +67,8 @@ commandObj["readConcern"] = {
 delete commandObj["$readPreference"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
 telemetry = getTelemetryReplSet(replSetConn, collName);
+// We're not concerned with this field here.
+delete telemetry[0].key["collectionType"];
 confirmCommandFieldsPresent(telemetry[0].key, commandObj);
 assert.eq(telemetry[0].key["readConcern"], {"afterClusterTime": "?timestamp"});
 
@@ -78,6 +82,8 @@ delete commandObj["apiStrict"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
 telemetry = getTelemetryReplSet(replSetConn, collName);
 assert.eq(telemetry[1].key["readConcern"], {level: "local"});
+// We're not concerned with this field here.
+delete telemetry[1].key["collectionType"];
 confirmCommandFieldsPresent(telemetry[1].key, commandObj);
 
 replTest.stopSet();

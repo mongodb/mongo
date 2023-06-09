@@ -150,12 +150,12 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // Register query stats collection. Exclude queries against non-existent collections and
     // collections with encrypted fields. It is important to do this before canonicalizing and
     // optimizing the query, each of which would alter the query shape.
-    if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
+    if (!collection || !collection.get()->getCollectionOptions().encryptedFieldConfig) {
         BSONObj queryShape = query_shape::extractQueryShape(
             *parsedRequest,
             SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
             expCtx);
-        query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
+        query_stats::registerRequest(expCtx, nss, [&]() {
             return std::make_unique<query_stats::FindKeyGenerator>(
                 expCtx, *parsedRequest, std::move(queryShape));
         });

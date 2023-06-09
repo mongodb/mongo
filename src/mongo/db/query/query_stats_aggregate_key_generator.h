@@ -44,12 +44,15 @@ class AggregateKeyGenerator final : public KeyGenerator {
 public:
     AggregateKeyGenerator(AggregateCommandRequest request,
                           const Pipeline& pipeline,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx)
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const NamespaceString& origNss)
         : KeyGenerator(
               expCtx->opCtx,
               // TODO: SERVER-76330 Store representative agg query shape in telemetry store.
-              BSONObj()),
+              BSONObj(),
+              classifyCollectionType(expCtx->opCtx, origNss)),
           _request(std::move(request)),
+          _origNss(origNss),
           _initialQueryStatsKey(_makeQueryStatsKeyHelper(
               SerializationOptions::kDebugQueryShapeSerializeOptions, expCtx, pipeline)) {
         _queryShapeHash = query_shape::hash(*_initialQueryStatsKey);
@@ -95,6 +98,9 @@ private:
     // We make a copy of AggregateCommandRequest since this instance may outlive the
     // original request once the KeyGenerator is moved to the query stats store.
     AggregateCommandRequest _request;
+
+    // The original NSS of the request before views are resolved.
+    const NamespaceString _origNss;
 
     // This is computed and cached upon construction until asked for once - at which point this
     // transitions to boost::none. This both a performance and a memory optimization.

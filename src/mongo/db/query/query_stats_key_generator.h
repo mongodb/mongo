@@ -33,6 +33,7 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/serialization_options.h"
@@ -72,8 +73,10 @@ public:
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,
+                 StringData collectionType,
                  boost::optional<query_shape::QueryShapeHash> queryShapeHash = boost::none)
         : _parseableQueryShape(parseableQueryShape.getOwned()),
+          _collectionType(collectionType),
           _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))) {
         if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
             _clientMetaData = boost::make_optional(metadata->getDocument());
@@ -148,9 +151,12 @@ protected:
         if (_clientMetaData) {
             bob.append("client", *_clientMetaData);
         }
+
+        bob.append("collectionType"_sd, _collectionType);
     }
 
     BSONObj _parseableQueryShape;
+    StringData _collectionType;
     query_shape::QueryShapeHash _queryShapeHash;
 
     // Preserve this value in the query shape.
@@ -163,5 +169,23 @@ protected:
     // Preserve this value in the query shape.
     boost::optional<BSONObj> _readPreference = boost::none;
 };
+
+
+static StringData classifyCollectionType(OperationContext* opCtx, const NamespaceString& nss) {
+    if (nss.isCollectionlessAggregateNS()) {
+        return "none"_sd;
+    } else {
+        auto catalog = CollectionCatalog::get(opCtx);
+        auto view = catalog->lookupView(opCtx, nss);
+        if (view) {
+            if (view->timeseries()) {
+                return "timeseries"_sd;
+            } else {
+                return "view"_sd;
+            }
+        }
+        return "collection"_sd;
+    }
+}
 }  // namespace query_stats
 }  // namespace mongo

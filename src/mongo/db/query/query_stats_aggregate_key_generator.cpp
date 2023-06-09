@@ -84,7 +84,7 @@ BSONObj AggregateKeyGenerator::_makeQueryStatsKeyHelper(
     const SerializationOptions& opts,
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const Pipeline& pipeline) const {
-    return generateWithQueryShape(query_shape::extractQueryShape(_request, pipeline, opts, expCtx),
-                                  opts);
+    return generateWithQueryShape(
+        query_shape::extractQueryShape(_request, pipeline, opts, expCtx, _origNss), opts);
 }
 }  // namespace mongo::query_stats

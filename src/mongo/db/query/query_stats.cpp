@@ -63,20 +63,6 @@ namespace mongo {
 
 namespace query_stats {
 
-/**
- * Redacts all BSONObj field names as if they were paths, unless the field name is a special hint
- * operator.
- */
-namespace {
-
-boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
-    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-        return metadata->getApplicationName().toString();
-    }
-    return boost::none;
-}
-}  // namespace
-
 CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
 
 namespace {
@@ -293,6 +279,17 @@ void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
         return;
     }
     auto& opDebug = CurOp::get(opCtx)->debug();
+
+    if (opDebug.queryStatsKeyGenerator) {
+        // A find() request may have already registered the shapifier. Ie, it's a find command over
+        // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
+        LOGV2_DEBUG(7198700,
+                    2,
+                    "Query stats request shapifier already registered",
+                    "collection"_attr = collection);
+        return;
+    }
+
     opDebug.queryStatsKeyGenerator = makeKeyGenerator();
     opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
