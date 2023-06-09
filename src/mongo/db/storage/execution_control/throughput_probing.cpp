@@ -155,7 +155,7 @@ void ThroughputProbing::_probeStable(double throughput) {
     _stableThroughput = throughput;
 
     auto readTotal = _readTicketHolder->outof();
-    auto writeTotal = _readTicketHolder->outof();
+    auto writeTotal = _writeTicketHolder->outof();
     auto readPeak = _readTicketHolder->getAndResetPeakUsed();
     auto writePeak = _writeTicketHolder->getAndResetPeakUsed();
 
