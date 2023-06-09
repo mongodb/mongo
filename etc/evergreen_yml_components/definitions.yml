@@ -574,16 +574,6 @@ functions:
       extract_to: src/corpora
       remote_file: ${mongo_fuzzer_corpus}
 
-  "fetch legacy corpus": &fetch_legacy_corpus
-    command: s3.get
-    params:
-      aws_key: ${s3_access_key_id}
-      aws_secret: ${s3_secret_access_key}
-      bucket: fuzzer-artifacts
-      # Extract the legacy corpora to the merge directory to synthesize together until we burn in.
-      extract_to: src/corpora-merged
-      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
-
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
     params:
@@ -3022,8 +3012,6 @@ tasks:
 - name: fetch_and_run_libfuzzertests
   tags: []
   commands:
-  - func: "fetch corpus"
-  - func: "fetch legacy corpus"
   - func: "run tests"
     vars:
       suite: libfuzzer
@@ -8293,6 +8281,28 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_archive_and_run_libfuzzertests_TG
+  setup_group_can_fail_task: false
+  setup_group:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  # The python virtual environment is installed in ${workdir}, which is created in
+  # "set up venv".
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "f_expansions_write"
+  - func: "configure evergreen api credentials"
+  - func: "get buildnumber"
+  - func: "f_expansions_write"
+  - func: "set up credentials"
+  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "set up win mount script"
+  - func: "generate compile expansions"
+  - func: "f_expansions_write"
+  - func: "fetch corpus"
   tasks:
   - compile_and_archive_libfuzzertests
   - fetch_and_run_libfuzzertests
