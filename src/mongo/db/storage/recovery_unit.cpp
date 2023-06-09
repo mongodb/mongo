@@ -81,6 +81,11 @@ void RecoveryUnit::registerChange(std::unique_ptr<Change> change) {
     _changes.push_back(std::move(change));
 }
 
+void RecoveryUnit::registerChangeForTwoPhaseDrop(std::unique_ptr<Change> change) {
+    validateInUnitOfWork();
+    _changesForTwoPhaseDrop.push_back(std::move(change));
+}
+
 void RecoveryUnit::registerChangeForCatalogVisibility(std::unique_ptr<Change> change) {
     validateInUnitOfWork();
     _changesForCatalogVisibility.push_back(std::move(change));
@@ -130,6 +135,18 @@ void RecoveryUnit::setOperationContext(OperationContext* opCtx) {
 
 void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimestamp) {
     invariant(_opCtx);
+    for (auto& change : _changesForTwoPhaseDrop) {
+        try {
+            // Log at higher level because commits occur far more frequently than rollbacks.
+            LOGV2_DEBUG(7789501,
+                        3,
+                        "Custom commit",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            change->commit(_opCtx, commitTimestamp);
+        } catch (...) {
+            std::terminate();
+        }
+    }
     for (auto& change : _changesForCatalogVisibility) {
         try {
             // Log at higher level because commits occur far more frequently than rollbacks.
@@ -156,6 +173,7 @@ void RecoveryUnit::_executeCommitHandlers(boost::optional<Timestamp> commitTimes
     }
     _changes.clear();
     _changesForCatalogVisibility.clear();
+    _changesForTwoPhaseDrop.clear();
 }
 
 void RecoveryUnit::abortRegisteredChanges() {
@@ -168,7 +186,9 @@ void RecoveryUnit::abortRegisteredChanges() {
 void RecoveryUnit::_executeRollbackHandlers() {
     // Make sure we have an OperationContext when executing rollback handlers. Unless we have no
     // handlers to run, which might be the case in unit tests.
-    invariant(_opCtx || (_changes.empty() && _changesForCatalogVisibility.empty()));
+    invariant(_opCtx ||
+              (_changes.empty() && _changesForCatalogVisibility.empty() &&
+               _changesForTwoPhaseDrop.empty()));
     try {
         // TODO SERVER-77425: Rollback handlers should execute in the reverse order of commit
         // handlers. However, the ScopedLocalCatalogWriteFence currently expects the local catalog
@@ -197,6 +217,19 @@ void RecoveryUnit::_executeRollbackHandlers() {
             change->rollback(_opCtx);
         }
 
+        for (Changes::const_reverse_iterator it = _changesForTwoPhaseDrop.rbegin(),
+                                             end = _changesForTwoPhaseDrop.rend();
+             it != end;
+             ++it) {
+            Change* change = it->get();
+            LOGV2_DEBUG(7789502,
+                        2,
+                        "Custom rollback",
+                        "changeName"_attr = redact(demangleName(typeid(*change))));
+            change->rollback(_opCtx);
+        }
+
+        _changesForTwoPhaseDrop.clear();
         _changesForCatalogVisibility.clear();
         _changes.clear();
     } catch (...) {

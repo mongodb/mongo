@@ -129,7 +129,7 @@ void removeIndex(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommit(
+    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(),
          recoveryUnit,
          storageEngine,
@@ -201,7 +201,7 @@ Status dropCollection(OperationContext* opCtx,
 
     // Schedule the second phase of drop to delete the data when it is no longer in use, if the
     // first phase is successfully committed.
-    opCtx->recoveryUnit()->onCommit(
+    opCtx->recoveryUnit()->onCommitForTwoPhaseDrop(
         [svcCtx = opCtx->getServiceContext(), recoveryUnit, storageEngine, nss, ident](
             OperationContext*, boost::optional<Timestamp> commitTimestamp) {
             StorageEngine::DropIdentCallback onDrop =

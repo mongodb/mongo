@@ -646,6 +646,16 @@ public:
     void registerChangeForCatalogVisibility(std::unique_ptr<Change> change);
 
     /**
+     * Like registerChange() above but should only be used to push idents for two phase drop to the
+     * reaper. This currently needs to happen before a drop is made visible in the catalog to avoid
+     * a window where a reader would observe the drop in the catalog but not be able to find the
+     * ident in the reaper.
+     *
+     * TODO SERVER-77959: Remove this.
+     */
+    void registerChangeForTwoPhaseDrop(std::unique_ptr<Change> change);
+
+    /**
      * Registers a callback to be called if the current WriteUnitOfWork rolls back.
      *
      * Be careful about the lifetimes of all variables captured by the callback!
@@ -695,6 +705,31 @@ public:
         };
 
         registerChange(std::make_unique<OnCommitChange>(std::move(callback)));
+    }
+
+    /**
+     * Registers a callback to be called if the current WriteUnitOfWork commits for two phase drop.
+     *
+     * Should only be used for adding drop pending idents to the reaper!
+     *
+     * TODO SERVER-77959: Remove this.
+     */
+    template <typename Callback>
+    void onCommitForTwoPhaseDrop(Callback callback) {
+        class OnCommitTwoPhaseChange final : public Change {
+        public:
+            OnCommitTwoPhaseChange(Callback&& callback) : _callback(std::move(callback)) {}
+            void rollback(OperationContext* opCtx) final {}
+            void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
+                _callback(opCtx, commitTime);
+            }
+
+        private:
+            Callback _callback;
+        };
+
+        registerChangeForTwoPhaseDrop(
+            std::make_unique<OnCommitTwoPhaseChange>(std::move(callback)));
     }
 
     virtual void setOrderedCommit(bool orderedCommit) = 0;
@@ -864,6 +899,7 @@ private:
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
     Changes _changesForCatalogVisibility;
+    Changes _changesForTwoPhaseDrop;
     // The Snapshot is always initialized by the RecoveryUnit constructor. We use an optional to
     // simplify destructing and re-constructing the Snapshot in-place.
     boost::optional<Snapshot> _snapshot;
