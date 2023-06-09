@@ -56,7 +56,7 @@ const int kDelayMillis = 100;
 
 void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
                                                    WiredTigerRecordStore* oplogRecordStore) {
-    invariant(!_isRunning);
+    invariant(!_isRunning.loadRelaxed());
     // Prime the oplog read timestamp.
     std::unique_ptr<SeekableRecordCursor> reverseOplogCursor =
         oplogRecordStore->getCursor(opCtx, false /* false = reverse cursor */);
@@ -90,26 +90,33 @@ void WiredTigerOplogManager::startVisibilityThread(OperationContext* opCtx,
                                           WiredTigerRecoveryUnit::get(opCtx)->getSessionCache(),
                                           oplogRecordStore);
 
-    _isRunning = true;
+    _isRunning.store(true);
     _shuttingDown = false;
 }
 
 void WiredTigerOplogManager::haltVisibilityThread() {
+    // This is called from two places; on clean shutdown and when the record store for the
+    // oplog is destroyed. We will perform the actual shutdown on the first call and the
+    // second call will be a no-op. Calling this on clean shutdown is necessary because the
+    // oplog manager makes calls into WiredTiger to retrieve the all durable timestamp. Lock
+    // Free Reads introduced shared collections which can offset when their respective
+    // destructors run. This created a scenario where the oplog manager visibility loop can
+    // be executed after the storage engine has shutdown.
+    if (!_isRunning.loadRelaxed()) {
+        return;
+    }
+
     {
         stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-        if (!_isRunning) {
-            // This is called from two places; on clean shutdown and when the record store for the
-            // oplog is destroyed. We will perform the actual shutdown on the first call and the
-            // second call will be a no-op. Calling this on clean shutdown is necessary because the
-            // oplog manager makes calls into WiredTiger to retrieve the all durable timestamp. Lock
-            // Free Reads introduced shared collections which can offset when their respective
-            // destructors run. This created a scenario where the oplog manager visibility loop can
-            // be executed after the storage engine has shutdown.
+
+        // In between when we checked '_isRunning' above and when we acquired the mutex, it's
+        // possible another thread modified '_isRunning', so check it again.
+        if (!_isRunning.loadRelaxed()) {
             return;
         }
 
+        _isRunning.store(false);
         _shuttingDown = true;
-        _isRunning = false;
     }
 
     if (_oplogVisibilityThread.joinable()) {

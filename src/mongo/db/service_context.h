@@ -744,6 +744,7 @@ private:
     /**
      * Managing classes for our issued operation IDs.
      */
+    Mutex _clientByOpIdMutex = MONGO_MAKE_LATCH("ServiceContext::_clientByOpIdMutex");
     std::shared_ptr<UniqueOperationIdRegistry> _opIdRegistry;
     stdx::unordered_map<OperationId, Client*> _clientByOperationId;
 

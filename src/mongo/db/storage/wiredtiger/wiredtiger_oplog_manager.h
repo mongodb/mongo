@@ -70,8 +70,7 @@ public:
     void haltVisibilityThread();
 
     bool isRunning() {
-        stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-        return _isRunning && !_shuttingDown;
+        return _isRunning.load();
     }
 
     /**
@@ -122,7 +121,8 @@ private:
     mutable Mutex _oplogVisibilityStateMutex =
         MONGO_MAKE_LATCH("WiredTigerOplogManager::_oplogVisibilityStateMutex");
 
-    bool _isRunning = false;
+    AtomicWord<bool> _isRunning{false};
+
     bool _shuttingDown = false;
 
     // Triggers an oplog visibility update -- can be delayed if no callers are waiting for an
