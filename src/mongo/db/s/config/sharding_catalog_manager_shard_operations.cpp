@@ -103,7 +103,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyingaddShardCommitted);
 MONGO_FAIL_POINT_DEFINE(hangAfterDroppingCollectionInTransitionToDedicatedConfigServer);
 
 using CallbackHandle = executor::TaskExecutor::CallbackHandle;
@@ -1507,8 +1506,6 @@ void ShardingCatalogManager::_addShardInTransaction(
 
     txn_api::SyncTransactionWithRetries txn(opCtx, executor, nullptr, inlineExecutor);
     txn.run(opCtx, transactionChain);
-
-    hangBeforeNotifyingaddShardCommitted.pauseWhileSet();
 
     // 3. Reuse the existing notification object to also broadcast the event of successful commit.
     notification.setPhase(CommitPhaseEnum::kSuccessful);
