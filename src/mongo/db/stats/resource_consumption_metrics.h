@@ -231,7 +231,7 @@ public:
         WriteMetrics writeMetrics;
 
         // Records CPU time consumed by this operation.
-        std::shared_ptr<OperationCPUTimer> cpuTimer;
+        std::unique_ptr<OperationCPUTimer> cpuTimer;
     };
 
     /**

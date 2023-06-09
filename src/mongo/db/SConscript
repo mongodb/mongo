@@ -2829,14 +2829,3 @@ env.Benchmark(
         '$BUILD_DIR/mongo/idl/idl_parser',
     ],
 )
-
-env.Benchmark(
-    target='operation_cpu_timer_bm',
-    source=[
-        'operation_cpu_timer_bm.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        'service_context',
-    ],
-)
