@@ -50,7 +50,6 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/shard_util.h"
 #include "mongo/s/write_ops/batched_command_response.h"
-#include "mongo/util/fail_point.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
@@ -59,9 +58,6 @@
 
 namespace mongo {
 namespace {
-
-MONGO_FAIL_POINT_DEFINE(hangBeforeNotifyingCreateDatabaseCommitted);
-
 
 using namespace fmt::literals;
 
@@ -277,8 +273,6 @@ DatabaseType ShardingCatalogManager::createDatabase(
             txn_api::SyncTransactionWithRetries txn(
                 opCtx, executor, nullptr /*resourceYielder*/, inlineExecutor);
             txn.run(opCtx, transactionChain);
-
-            hangBeforeNotifyingCreateDatabaseCommitted.pauseWhileSet();
 
             DatabasesAdded commitCompletedEvent(
                 {DatabaseNameUtil::deserialize(boost::none, dbName)},
