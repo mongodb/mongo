@@ -42,6 +42,15 @@
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/unittest/unittest.h"
 
+#define ASSERT_DOES_NOT_THROW(EXPRESSION)                                          \
+    try {                                                                          \
+        EXPRESSION;                                                                \
+    } catch (const AssertionException& e) {                                        \
+        str::stream err;                                                           \
+        err << "Threw an exception incorrectly: " << e.toString();                 \
+        ::mongo::unittest::TestAssertionFailure(__FILE__, __LINE__, err).stream(); \
+    }
+
 namespace mongo {
 namespace document_path_support {
 
@@ -361,6 +370,26 @@ TEST(DocumentToBsonWithPathsTest, ShouldExtractEntireArrayFromPrefixOfDottedFiel
     ASSERT_BSONOBJ_EQ(expected, document_path_support::documentToBsonWithPaths(input, {"a.b"}));
 }
 
+TEST(DocumentToBsonWithPathsTest, SizeTraits) {
+    constexpr size_t longStringLength = 9 * 1024 * 1024;
+    static_assert(longStringLength <= BSONObjMaxInternalSize &&
+                  2 * longStringLength > BSONObjMaxInternalSize &&
+                  2 * longStringLength <= BufferMaxSize);
+    std::string longString(longStringLength, 'A');
+    MutableDocument md;
+    md.addField("a", Value(longString));
+    md.addField("b", Value(longString));
+    ASSERT_DOES_NOT_THROW(document_path_support::documentToBsonWithPaths(md.peek(), {"a"}));
+    ASSERT_THROWS_CODE(document_path_support::documentToBsonWithPaths(md.peek(), {"a", "b"}),
+                       DBException,
+                       ErrorCodes::BSONObjectTooLarge);
+    ASSERT_THROWS_CODE(document_path_support::documentToBsonWithPaths<BSONObj::DefaultSizeTrait>(
+                           md.peek(), {"a", "b"}),
+                       DBException,
+                       ErrorCodes::BSONObjectTooLarge);
+    ASSERT_DOES_NOT_THROW(document_path_support::documentToBsonWithPaths<BSONObj::LargeSizeTrait>(
+        md.peek(), {"a", "b"}));
+}
 }  // namespace
 }  // namespace document_path_support
 }  // namespace mongo
