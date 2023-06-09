@@ -334,10 +334,36 @@ OpMsgRequest OpMsgRequestBuilder::createWithValidatedTenancyScope(
     request.validatedTenancyScope = validatedTenancyScope;
     return request;
 }
+namespace {
+std::string compactStr(const std::string& input) {
+    if (input.length() > 2024) {
+        return input.substr(0, 1000) + " ... " + input.substr(input.length() - 1000);
+    }
+    return input;
+}
+}  // namespace
 
 OpMsgRequest OpMsgRequestBuilder::create(const DatabaseName& dbName,
                                          BSONObj body,
                                          const BSONObj& extraFields) {
+    int bodySize = body.objsize();
+    int extraFieldsSize = extraFields.objsize();
+
+    // Log a warning if the sum of the sizes of 'body' and 'extraFields' exceeds
+    // 'BSONObjMaxInternalSize'.
+    if (bodySize + extraFieldsSize > BSONObjMaxInternalSize) {
+        LOGV2_WARNING(
+            6491800,
+            "Request body exceeded limit with body.objsize() = {bodySize} bytes, "
+            "extraFields.objsize() = {extraFieldsSize} bytes, body.toString() = {body}, db = "
+            "{db}, extraFields.toString() = {extraFields}",
+            "bodySize"_attr = bodySize,
+            "extraFieldsSize"_attr = extraFieldsSize,
+            "body"_attr = compactStr(body.toString()),
+            "db"_attr = dbName.toStringForErrorMsg(),
+            "extraFields"_attr = compactStr(extraFields.toString()));
+    }
+
     auto dollarTenant = parseDollarTenant(body);
     BSONObjBuilder bodyBuilder(std::move(body));
     bodyBuilder.appendElements(extraFields);
