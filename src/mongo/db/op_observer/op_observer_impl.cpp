@@ -801,7 +801,7 @@ void OpObserverImpl::onInserts(OperationContext* opCtx,
     }
 
     if (opAccumulator) {
-        opAccumulator->opTimes = opTimeList;
+        opAccumulator->opTimes = std::move(opTimeList);
         shardingWriteRouterInsertsOpStateAccumulatorDecoration(opAccumulator) =
             std::move(shardingWriteRouter);
     }
