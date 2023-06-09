@@ -43,7 +43,7 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-Document ReplaceRootTransformation::applyTransformation(const Document& input) {
+Document ReplaceRootTransformation::applyTransformation(const Document& input) const {
     // Extract subdocument in the form of a Value.
     Value newRoot = _newRoot->evaluate(input, &_expCtx->variables);
     // The newRoot expression, if it exists, must evaluate to an object.

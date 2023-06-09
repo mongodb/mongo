@@ -54,7 +54,7 @@ public:
         return TransformerType::kReplaceRoot;
     }
 
-    Document applyTransformation(const Document& input) final;
+    Document applyTransformation(const Document& input) const final;
 
     // Optimize the newRoot expression.
     void optimize() final {

@@ -74,7 +74,7 @@ public:
         return _expectedInput;
     }
 
-    Document applyTransformation(const Document& input) final;
+    Document applyTransformation(const Document& input) const final;
 
     void optimize() final;
 

@@ -74,7 +74,7 @@ public:
     /**
      * Apply the projection transformation.
      */
-    Document applyTransformation(const Document& input) override {
+    Document applyTransformation(const Document& input) const override {
         auto output = applyProjection(input);
         if (_rootReplacementExpression) {
             return _applyRootReplacementExpression(input, output);
@@ -136,7 +136,7 @@ protected:
     boost::intrusive_ptr<Expression> _rootReplacementExpression;
 
 private:
-    Document _applyRootReplacementExpression(const Document& input, const Document& output) {
+    Document _applyRootReplacementExpression(const Document& input, const Document& output) const {
         using namespace fmt::literals;
 
         _expCtx->variables.setValue(_projectionPostImageVarId, Value{output});
