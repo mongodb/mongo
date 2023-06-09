@@ -64,22 +64,16 @@ struct OpTimeBundle {
 struct OpStateAccumulator : Decorable<OpStateAccumulator> {
     OpStateAccumulator() = default;
 
+    // Use either 'opTime' for non-insert operations or 'insertOpTimes', but not both.
     OpTimeBundle opTime;
+    std::vector<repl::OpTime> insertOpTimes;
 
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;
     OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;
 };
 
-struct InsertsOpStateAccumulator : Decorable<InsertsOpStateAccumulator> {
-    InsertsOpStateAccumulator() = default;
-
-    std::vector<repl::OpTime> opTimes;
-
-private:
-    InsertsOpStateAccumulator(const InsertsOpStateAccumulator&) = delete;
-    InsertsOpStateAccumulator& operator=(const InsertsOpStateAccumulator&) = delete;
-};
+using InsertsOpStateAccumulator = OpStateAccumulator;
 
 enum class RetryableFindAndModifyLocation {
     // The operation is not retryable, or not a "findAndModify" command. Do not record a

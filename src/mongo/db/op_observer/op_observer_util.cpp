@@ -43,10 +43,6 @@ const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
     shardingWriteRouterOpStateAccumulatorDecoration =
         OpStateAccumulator::declareDecoration<std::unique_ptr<ShardingWriteRouter>>();
 
-const InsertsOpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
-    shardingWriteRouterInsertsOpStateAccumulatorDecoration =
-        InsertsOpStateAccumulator::declareDecoration<std::unique_ptr<ShardingWriteRouter>>();
-
 MONGO_FAIL_POINT_DEFINE(addDestinedRecipient);
 MONGO_FAIL_POINT_DEFINE(sleepBetweenInsertOpTimeGenerationAndLogOp);
 

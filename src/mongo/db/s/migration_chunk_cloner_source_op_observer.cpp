@@ -131,7 +131,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     // If there's no ShardingWriteRouter instance available, it means that OpObserverImpl did not
     // get far enough to require one so there's nothing to do here but return early.
     auto shardingWriteRouter =
-        std::move(shardingWriteRouterInsertsOpStateAccumulatorDecoration(opAccumulator));
+        std::move(shardingWriteRouterOpStateAccumulatorDecoration(opAccumulator));
     if (!shardingWriteRouter) {
         return;
     }
@@ -164,7 +164,7 @@ void MigrationChunkClonerSourceOpObserver::onInserts(
     }
 
     int index = 0;
-    const auto& opTimeList = opAccumulator->opTimes;
+    const auto& opTimeList = opAccumulator->insertOpTimes;
     for (auto it = first; it != last; it++, index++) {
         auto opTime = opTimeList.empty() ? repl::OpTime() : opTimeList[index];
 

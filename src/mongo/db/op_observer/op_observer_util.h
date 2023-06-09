@@ -80,7 +80,4 @@ extern const OplogDeleteEntryArgs::Decoration<boost::optional<DocumentKey>> docu
 extern const OpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
     shardingWriteRouterOpStateAccumulatorDecoration;
 
-extern const InsertsOpStateAccumulator::Decoration<std::unique_ptr<ShardingWriteRouter>>
-    shardingWriteRouterInsertsOpStateAccumulatorDecoration;
-
 }  // namespace mongo
