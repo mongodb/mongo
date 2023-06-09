@@ -20,6 +20,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/sharding/conn_pool_stats.js
+    ticket: SERVER-75911
   - test_file: jstests/core/administrative/check_shard_index.js
     ticket: SERVER-50792
   - test_file: jstests/sharding/refine_collection_shard_key_basic.js
@@ -200,6 +202,8 @@ last-continuous:
     ticket: SERVER-65022
   - test_file: jstests/sharding/database_versioning_all_commands.js
     ticket: SERVER-65101
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-75911
   - test_file: jstests/sharding/sessions_collection_auto_healing.js
     ticket: SERVER-65188
   - test_file: jstests/replsets/sessions_collection_auto_healing.js
@@ -389,6 +393,10 @@ last-continuous:
   suites: null
 last-lts:
   all:
+  - test_file: jstests/sharding/conn_pool_stats.js
+    ticket: SERVER-75911
+  - test_file: jstests/sharding/database_versioning_all_commands.js
+    ticket: SERVER-75911
   - test_file: jstests/core/query/null_query_semantics.js
     ticket: SERVER-21929
   - test_file: jstests/core/query/or/or_to_in.js

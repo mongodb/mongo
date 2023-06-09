@@ -270,6 +270,8 @@ let testCases = {
     _isSelf: {skip: "executes locally on mongos (not sent to any remote node)"},
     _killOperations: {skip: "executes locally on mongos (not sent to any remote node)"},
     _mergeAuthzCollections: {skip: "always targets the config server"},
+    _mongotConnPoolStats: {skip: "not on a user database", conditional: true},
+    _dropConnectionsToMongot: {skip: "not on a user database", conditional: true},
     abortReshardCollection: {skip: "always targets the config server"},
     abortTransaction: {skip: "unversioned and uses special targetting rules"},
     addShard: {skip: "not on a user database"},

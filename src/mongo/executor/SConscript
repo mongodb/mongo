@@ -125,6 +125,16 @@ env.Library(
 )
 
 env.Library(
+    target='connection_pool_controllers',
+    source=[
+        'connection_pool_controllers.cpp',
+    ],
+    LIBDEPS=[
+        'connection_pool_executor',
+    ],
+)
+
+env.Library(
     target='network_test_env',
     source=[
         'network_test_env.cpp',
