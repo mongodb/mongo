@@ -31,6 +31,7 @@
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/fetcher.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands/notify_sharding_event_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -735,6 +736,28 @@ private:
      */
     void _setUserWriteBlockingStateOnNewShard(OperationContext* opCtx,
                                               RemoteCommandTargeter* targeter);
+
+    using FetcherDocsCallbackFn = std::function<bool(const std::vector<BSONObj>& batch)>;
+    using FetcherStatusCallbackFn = std::function<void(const Status& status)>;
+
+    /**
+     * Creates a Fetcher task for fetching documents in the given collection on the given shard.
+     * After the task is scheduled, applies 'processDocsCallback' to each fetched batch and
+     * 'processStatusCallback' to the fetch status.
+     */
+    std::unique_ptr<Fetcher> _createFetcher(OperationContext* opCtx,
+                                            std::shared_ptr<RemoteCommandTargeter> targeter,
+                                            const NamespaceString& nss,
+                                            const repl::ReadConcernLevel& readConcernLevel,
+                                            FetcherDocsCallbackFn processDocsCallback,
+                                            FetcherStatusCallbackFn processStatusCallback);
+
+    /**
+     * Gets the cluster time keys on the given shard and then saves them locally.
+     */
+    Status _pullClusterTimeKeys(OperationContext* opCtx,
+                                std::shared_ptr<RemoteCommandTargeter> targeter);
+
     /**
      * Given a vector of cluster parameters in disk format, sets them locally.
      */

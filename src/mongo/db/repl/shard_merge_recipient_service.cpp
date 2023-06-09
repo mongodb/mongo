@@ -2165,7 +2165,8 @@ void ShardMergeRecipientService::Instance::_fetchAndStoreDonorClusterTimeKeyDocs
     auto cursor = _client->find(std::move(findRequest), _readPreference);
     while (cursor->more()) {
         const auto doc = cursor->nextSafe().getOwned();
-        keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(doc, _migrationUuid));
+        keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(
+            doc, _migrationUuid, boost::none /* expireAt */));
     }
 
     auto opCtx = cc().makeOperationContext();

@@ -392,6 +392,8 @@ last-continuous:
     ticket: SERVER-77237
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-78050
+  - test_file: jstests/sharding/cluster_time_across_add_shard.js
+    ticket: SERVER-60466
   suites: null
 last-lts:
   all:
@@ -871,4 +873,6 @@ last-lts:
     ticket: SERVER-77386
   - test_file: jstests/core/timeseries/timeseries_resume_after.js
     ticket: SERVER-77386
+  - test_file: jstests/sharding/cluster_time_across_add_shard.js
+    ticket: SERVER-60466
   suites: null

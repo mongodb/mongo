@@ -43,6 +43,7 @@
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
@@ -51,6 +52,7 @@
 #include "mongo/db/s/type_shard_identity.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/idl/cluster_server_parameter_common.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
@@ -107,6 +109,7 @@ protected:
         LogicalSessionCache::set(getServiceContext(), std::make_unique<LogicalSessionCacheNoop>());
         TransactionCoordinatorService::get(operationContext())
             ->onShardingInitialization(operationContext(), true);
+        WaitForMajorityService::get(getServiceContext()).startup(getServiceContext());
 
         _skipShardingEventNotificationFP =
             globalFailPointRegistry().find("shardingCatalogManagerSkipNotifyClusterOnNewDatabases");
@@ -115,6 +118,7 @@ protected:
 
     void tearDown() override {
         _skipShardingEventNotificationFP->setMode(FailPoint::off);
+        WaitForMajorityService::get(getServiceContext()).shutDown();
         TransactionCoordinatorService::get(operationContext())->onStepDown();
         ConfigServerTestFixture::tearDown();
     }
@@ -374,7 +378,7 @@ protected:
                 dbnamesOnTarget.erase(it);
                 ASSERT_BSONOBJ_EQ(request.cmdObj,
                                   BSON("find" << NamespaceString::kClusterParametersNamespace.coll()
-                                              << "maxTimeMS" << 30000 << "readConcern"
+                                              << "maxTimeMS" << 60000 << "readConcern"
                                               << BSON("level"
                                                       << "majority")));
                 auto cursorRes =
@@ -388,6 +392,27 @@ protected:
                 return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
             });
         }
+    }
+
+    void expectClusterTimeKeysPullRequest(const HostAndPort& target) {
+        onCommandForAddShard([&](const RemoteCommandRequest& request) {
+            ASSERT_EQ(request.target, target);
+            ASSERT_BSONOBJ_EQ(request.cmdObj,
+                              BSON("find" << NamespaceString::kKeysCollectionNamespace.coll()
+                                          << "maxTimeMS" << 60000 << "readConcern"
+                                          << BSON("level"
+                                                  << "local")));
+
+            KeysCollectionDocument key(1);
+            key.setKeysCollectionDocumentBase(
+                {"dummy", TimeProofService::generateRandomKey(), LogicalTime(Timestamp(105, 0))});
+            auto cursorRes = CursorResponse(
+                NamespaceString::createNamespaceString_forTest(
+                    request.dbname, NamespaceString::kKeysCollectionNamespace.coll()),
+                0,
+                {key.toBSON()});
+            return cursorRes.toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
     }
 
     /**
@@ -660,6 +685,9 @@ TEST_F(AddShardTest, StandaloneBasicSuccess) {
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
+
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
@@ -748,6 +776,9 @@ TEST_F(AddShardTest, StandaloneBasicPushSuccess) {
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
+
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
@@ -829,6 +860,9 @@ TEST_F(AddShardTest, StandaloneMultitenantPullSuccess) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -934,6 +968,9 @@ TEST_F(AddShardTest, StandaloneMultitenantPushSuccess) {
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
+
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
@@ -1024,6 +1061,9 @@ TEST_F(AddShardTest, StandaloneGenerateName) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
@@ -1426,6 +1466,9 @@ TEST_F(AddShardTest, SuccessfullyAddReplicaSet) {
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
 
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
+
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);
 
@@ -1556,6 +1599,9 @@ TEST_F(AddShardTest, ReplicaSetExtraHostsDiscovered) {
 
     expectCollectionDrop(
         shardTarget, NamespaceString::createNamespaceString_forTest("config", "system.sessions"));
+
+    // The shard receives a find to pull all clusterTime keys from the new shard.
+    expectClusterTimeKeysPullRequest(shardTarget);
 
     // The shard receives the _addShard command
     expectAddShardCmdReturnSuccess(shardTarget, expectedShardName);

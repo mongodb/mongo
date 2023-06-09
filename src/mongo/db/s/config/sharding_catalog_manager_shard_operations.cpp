@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobj_comparator.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
-#include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/replica_set_monitor.h"
@@ -52,6 +51,7 @@
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/db/keys_collection_util.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_gen.h"
@@ -60,9 +60,11 @@
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/add_shard_cmd_gen.h"
 #include "mongo/db/s/add_shard_util.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
+#include "mongo/db/s/sharding_config_server_parameters_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_state.h"
@@ -114,6 +116,8 @@ const ReadPreferenceSetting kConfigReadSelector(ReadPreference::Nearest, TagSet{
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
                                                 WriteConcernOptions::kNoTimeout};
+
+const Seconds kRemoteCommandTimeout{60};
 
 /**
  * Generates a unique name to be given to a newly added shard.
@@ -172,7 +176,7 @@ StatusWith<Shard::CommandResponse> ShardingCatalogManager::_runCommandForAddShar
     auto host = std::move(swHost.getValue());
 
     executor::RemoteCommandRequest request(
-        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), opCtx, Seconds(60));
+        host, dbName.toString(), cmdObj, rpc::makeEmptyMetadata(), opCtx, kRemoteCommandTimeout);
 
     executor::RemoteCommandResponse response =
         Status(ErrorCodes::InternalError, "Internal error running command");
@@ -708,6 +712,15 @@ StatusWith<std::string> ShardingCatalogManager::addShard(
             "collection from the shard manually and try again.");
     }
 
+    if (!isConfigShard) {
+        // If the shard is also the config server itself, there is no need to pull the keys since
+        // the keys already exists in the local admin.system.keys collection.
+        auto pullKeysStatus = _pullClusterTimeKeys(opCtx, targeter);
+        if (!pullKeysStatus.isOK()) {
+            return pullKeysStatus;
+        }
+    }
+
     // If a name for a shard wasn't provided, generate one
     if (shardType.getName().empty()) {
         auto result = generateNewShardName(opCtx, _localConfigShard.get());
@@ -1224,6 +1237,109 @@ void ShardingCatalogManager::_setUserWriteBlockingStateOnNewShard(OperationConte
     });
 }
 
+std::unique_ptr<Fetcher> ShardingCatalogManager::_createFetcher(
+    OperationContext* opCtx,
+    std::shared_ptr<RemoteCommandTargeter> targeter,
+    const NamespaceString& nss,
+    const repl::ReadConcernLevel& readConcernLevel,
+    FetcherDocsCallbackFn processDocsCallback,
+    FetcherStatusCallbackFn processStatusCallback) {
+    auto host = uassertStatusOK(
+        targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
+
+    FindCommandRequest findCommand(nss);
+    const auto readConcern =
+        repl::ReadConcernArgs(boost::optional<repl::ReadConcernLevel>(readConcernLevel));
+    findCommand.setReadConcern(readConcern.toBSONInner());
+    const Milliseconds maxTimeMS =
+        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(kRemoteCommandTimeout));
+    findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
+
+    auto fetcherCallback = [processDocsCallback,
+                            processStatusCallback](const Fetcher::QueryResponseStatus& dataStatus,
+                                                   Fetcher::NextAction* nextAction,
+                                                   BSONObjBuilder* getMoreBob) {
+        // Throw out any accumulated results on error.
+        if (!dataStatus.isOK()) {
+            processStatusCallback(dataStatus.getStatus());
+            return;
+        }
+        const auto& data = dataStatus.getValue();
+
+        try {
+            if (!processDocsCallback(data.documents)) {
+                *nextAction = Fetcher::NextAction::kNoAction;
+            }
+        } catch (DBException& ex) {
+            processStatusCallback(ex.toStatus());
+            return;
+        }
+        processStatusCallback(Status::OK());
+
+        if (!getMoreBob) {
+            return;
+        }
+        getMoreBob->append("getMore", data.cursorId);
+        getMoreBob->append("collection", data.nss.coll());
+    };
+
+    return std::make_unique<Fetcher>(_executorForAddShard.get(),
+                                     host,
+                                     DatabaseNameUtil::serialize(nss.dbName()),
+                                     findCommand.toBSON({}),
+                                     fetcherCallback,
+                                     BSONObj(), /* metadata tracking, only used for shards */
+                                     maxTimeMS, /* command network timeout */
+                                     maxTimeMS /* getMore network timeout */);
+}
+
+Status ShardingCatalogManager::_pullClusterTimeKeys(
+    OperationContext* opCtx, std::shared_ptr<RemoteCommandTargeter> targeter) {
+    Status fetchStatus =
+        Status(ErrorCodes::InternalError, "Internal error running cursor callback in command");
+    std::vector<ExternalKeysCollectionDocument> keyDocs;
+
+    auto expireAt = opCtx->getServiceContext()->getFastClockSource()->now() +
+        Seconds(gNewShardExistingClusterTimeKeysExpirationSecs.load());
+    auto fetcher = _createFetcher(
+        opCtx,
+        targeter,
+        NamespaceString::kKeysCollectionNamespace,
+        repl::ReadConcernLevel::kLocalReadConcern,
+        [&](const std::vector<BSONObj>& docs) -> bool {
+            for (const BSONObj& doc : docs) {
+                keyDocs.push_back(keys_collection_util::makeExternalClusterTimeKeyDoc(
+                    doc.getOwned(), boost::none /* migrationId */, expireAt));
+            }
+            return true;
+        },
+        [&](const Status& status) { fetchStatus = status; });
+
+    auto scheduleStatus = fetcher->schedule();
+    if (!scheduleStatus.isOK()) {
+        return scheduleStatus;
+    }
+
+    auto joinStatus = fetcher->join(opCtx);
+    if (!joinStatus.isOK()) {
+        return joinStatus;
+    }
+
+    if (keyDocs.empty()) {
+        return fetchStatus;
+    }
+
+    auto opTime = keys_collection_util::storeExternalClusterTimeKeyDocs(opCtx, std::move(keyDocs));
+    auto waitStatus = WaitForMajorityService::get(opCtx->getServiceContext())
+                          .waitUntilMajority(opTime, opCtx->getCancellationToken())
+                          .getNoThrow();
+    if (!waitStatus.isOK()) {
+        return waitStatus;
+    }
+
+    return fetchStatus;
+}
+
 void ShardingCatalogManager::_setClusterParametersLocally(OperationContext* opCtx,
                                                           const boost::optional<TenantId>& tenantId,
                                                           const std::vector<BSONObj>& parameters) {
@@ -1252,12 +1368,8 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
     // We can safely query the cluster parameters because the replica set must have been started
     // with --shardsvr in order to add it into the cluster, and in this mode no setClusterParameter
     // can be called on the replica set directly.
-    auto host = uassertStatusOK(
-        targeter->findHost(opCtx, ReadPreferenceSetting{ReadPreference::PrimaryOnly}));
     auto tenantIds =
         uassertStatusOK(getTenantsWithConfigDbsOnShard(opCtx, shard, _executorForAddShard.get()));
-    const Milliseconds maxTimeMS =
-        std::min(opCtx->getRemainingMaxTimeMillis(), Milliseconds(Seconds{30}));
 
     std::vector<std::unique_ptr<Fetcher>> fetchers;
     fetchers.reserve(tenantIds.size());
@@ -1267,58 +1379,25 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
         tenantIds.size(),
         Status(ErrorCodes::InternalError, "Internal error running cursor callback in command"));
     std::vector<std::vector<BSONObj>> allParameters(tenantIds.size());
+
     int i = 0;
     for (const auto& tenantId : tenantIds) {
-        BSONObjBuilder findCmdBuilder;
-        {
-            FindCommandRequest findCommand(NamespaceString::makeClusterParametersNSS(tenantId));
-            auto readConcern = repl::ReadConcernArgs(boost::optional<repl::ReadConcernLevel>(
-                repl::ReadConcernLevel::kMajorityReadConcern));
-            findCommand.setReadConcern(readConcern.toBSONInner());
-            findCommand.setMaxTimeMS(durationCount<Milliseconds>(maxTimeMS));
-            findCommand.serialize(BSONObj(), &findCmdBuilder);
-        }
-
-        auto fetcherCallback =
-            [this, &statuses, &allParameters, i](const Fetcher::QueryResponseStatus& dataStatus,
-                                                 Fetcher::NextAction* nextAction,
-                                                 BSONObjBuilder* getMoreBob) {
-                // Throw out any accumulated results on error
-                if (!dataStatus.isOK()) {
-                    statuses[i] = dataStatus.getStatus();
-                    return;
-                }
-                const auto& data = dataStatus.getValue();
-
+        auto fetcher = _createFetcher(
+            opCtx,
+            targeter,
+            NamespaceString::makeClusterParametersNSS(tenantId),
+            repl::ReadConcernLevel::kMajorityReadConcern,
+            [&allParameters, i](const std::vector<BSONObj>& docs) -> bool {
                 std::vector<BSONObj> parameters;
-                for (const BSONObj& doc : data.documents) {
+                for (const BSONObj& doc : docs) {
                     parameters.push_back(doc.getOwned());
                 }
-
                 allParameters[i] = parameters;
-                statuses[i] = Status::OK();
-
-                if (!getMoreBob) {
-                    return;
-                }
-                getMoreBob->append("getMore", data.cursorId);
-                getMoreBob->append("collection", data.nss.coll());
-            };
-
-        auto fetcher = std::make_unique<Fetcher>(
-            _executorForAddShard.get(),
-            host,
-            NamespaceString::makeClusterParametersNSS(tenantId).dbName().toStringWithTenantId(),
-            findCmdBuilder.obj(),
-            fetcherCallback,
-            BSONObj(), /* metadata tracking, only used for shards */
-            maxTimeMS, /* command network timeout */
-            maxTimeMS /* getMore network timeout */);
-
+                return true;
+            },
+            [&statuses, i](const Status& status) { statuses[i] = status; });
         uassertStatusOK(fetcher->schedule());
-
         fetchers.push_back(std::move(fetcher));
-
         i++;
     }
 
@@ -1326,7 +1405,6 @@ void ShardingCatalogManager::_pullClusterParametersFromNewShard(OperationContext
     for (const auto& tenantId : tenantIds) {
         uassertStatusOK(fetchers[i]->join(opCtx));
         uassertStatusOK(statuses[i]);
-
         _setClusterParametersLocally(opCtx, tenantId, allParameters[i]);
 
         i++;

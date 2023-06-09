@@ -1135,32 +1135,34 @@ TenantMigrationDonorService::Instance::_fetchAndStoreRecipientClusterTimeKeyDocs
                            std::make_shared<std::vector<ExternalKeysCollectionDocument>>();
                        auto fetchStatus = std::make_shared<boost::optional<Status>>();
 
-                       auto fetcherCallback =
-                           [this, self = shared_from_this(), fetchStatus, keyDocs](
-                               const Fetcher::QueryResponseStatus& dataStatus,
-                               Fetcher::NextAction* nextAction,
-                               BSONObjBuilder* getMoreBob) {
-                               // Throw out any accumulated results on error
-                               if (!dataStatus.isOK()) {
-                                   *fetchStatus = dataStatus.getStatus();
-                                   keyDocs->clear();
-                                   return;
-                               }
+                       auto fetcherCallback = [this,
+                                               self = shared_from_this(),
+                                               fetchStatus,
+                                               keyDocs](
+                                                  const Fetcher::QueryResponseStatus& dataStatus,
+                                                  Fetcher::NextAction* nextAction,
+                                                  BSONObjBuilder* getMoreBob) {
+                           // Throw out any accumulated results on error
+                           if (!dataStatus.isOK()) {
+                               *fetchStatus = dataStatus.getStatus();
+                               keyDocs->clear();
+                               return;
+                           }
 
-                               const auto& data = dataStatus.getValue();
-                               for (const BSONObj& doc : data.documents) {
-                                   keyDocs->push_back(
-                                       keys_collection_util::makeExternalClusterTimeKeyDoc(
-                                           doc.getOwned(), _migrationUuid));
-                               }
-                               *fetchStatus = Status::OK();
+                           const auto& data = dataStatus.getValue();
+                           for (const BSONObj& doc : data.documents) {
+                               keyDocs->push_back(
+                                   keys_collection_util::makeExternalClusterTimeKeyDoc(
+                                       doc.getOwned(), _migrationUuid, boost::none /* expireAt */));
+                           }
+                           *fetchStatus = Status::OK();
 
-                               if (!getMoreBob) {
-                                   return;
-                               }
-                               getMoreBob->append("getMore", data.cursorId);
-                               getMoreBob->append("collection", data.nss.coll());
-                           };
+                           if (!getMoreBob) {
+                               return;
+                           }
+                           getMoreBob->append("getMore", data.cursorId);
+                           getMoreBob->append("collection", data.nss.coll());
+                       };
 
                        auto fetcher = std::make_shared<Fetcher>(
                            _recipientCmdExecutor.get(),
