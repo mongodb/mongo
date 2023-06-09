@@ -106,19 +106,34 @@ public:
 
         Response typedRun(OperationContext* opCtx) {
             uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
-            const auto nss = ns();
-            switch (metadata_consistency_util::getCommandLevel(nss)) {
-                case MetadataConsistencyCommandLevelEnum::kClusterLevel:
-                    return _runClusterLevel(opCtx, nss);
-                case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
-                    return _runDatabaseLevel(opCtx, nss);
-                case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
-                    return _runCollectionLevel(opCtx, nss);
-                default:
-                    MONGO_UNREACHABLE;
+            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+            {
+                // Ensure that opCtx will get interrupted in the event of a stepdown.
+                Lock::GlobalLock lk(opCtx, MODE_IX);
+                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                        "Not primary while attempting to start a metadata consistency check",
+                        repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
+
+            const auto response = [&] {
+                const auto nss = ns();
+                switch (metadata_consistency_util::getCommandLevel(nss)) {
+                    case MetadataConsistencyCommandLevelEnum::kClusterLevel:
+                        return _runClusterLevel(opCtx, nss);
+                    case MetadataConsistencyCommandLevelEnum::kDatabaseLevel:
+                        return _runDatabaseLevel(opCtx, nss);
+                    case MetadataConsistencyCommandLevelEnum::kCollectionLevel:
+                        return _runCollectionLevel(opCtx, nss);
+                    default:
+                        MONGO_UNREACHABLE;
+                }
+            }();
+
+            // Make sure the response gets invalidated in case of interruption
+            opCtx->checkForInterrupt();
+
+            return response;
         }
 
     private:
