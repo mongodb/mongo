@@ -293,7 +293,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     batonGuard.dismiss();
 
     {
-        stdx::lock_guard lk(_mutex);
+        stdx::lock_guard lk(_clientByOpIdMutex);
         bool clientByOperationContextInsertionSuccessful =
             _clientByOperationId.insert({opCtx->getOpID(), client}).second;
         invariant(clientByOperationContextInsertionSuccessful);
@@ -317,7 +317,8 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
 }
 
 LockedClient ServiceContext::getLockedClient(OperationId id) {
-    stdx::lock_guard lk(_mutex);
+    stdx::lock_guard lk(_clientByOpIdMutex);
+
     auto it = _clientByOperationId.find(id);
     if (it == _clientByOperationId.end()) {
         return {};
@@ -394,7 +395,7 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
     // its client to prevent situations that another thread could use the service context to get a
     // hold of an `opCtx` that has been removed from its client.
     {
-        stdx::lock_guard lk(_mutex);
+        stdx::lock_guard lk(_clientByOpIdMutex);
         if (_clientByOperationId.erase(opCtx->getOpID()) != 1) {
             // Another thread has already delisted this `opCtx`.
             return;
