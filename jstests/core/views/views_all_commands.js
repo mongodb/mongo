@@ -127,6 +127,7 @@ let viewsCommandTests = {
     _configsvrShardCollection:
         {skip: isAnInternalCommand},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrUpdateZoneKeyRange: {skip: isAnInternalCommand},
+    _dropConnectionsToMongot: {skip: isAnInternalCommand},
     _flushDatabaseCacheUpdates: {skip: isUnrelated},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: isUnrelated},
     _flushReshardingStateChange: {skip: isUnrelated},
@@ -140,6 +141,7 @@ let viewsCommandTests = {
     _killOperations: {skip: isUnrelated},
     _mergeAuthzCollections: {skip: isAnInternalCommand},
     _migrateClone: {skip: isAnInternalCommand},
+    _mongotConnPoolStats: {skip: isAnInternalCommand},
     _movePrimary: {skip: isAnInternalCommand},
     _recvChunkAbort: {skip: isAnInternalCommand},
     _recvChunkCommit: {skip: isAnInternalCommand},

@@ -74,6 +74,7 @@ let testCases = {
     _configsvrShardCollection:
         {skip: "primary only"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrUpdateZoneKeyRange: {skip: "primary only"},
+    _dropConnectionsToMongot: {skip: "does not return user data"},
     _flushReshardingStateChange: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdates: {skip: "does not return user data"},
     _flushRoutingTableCacheUpdatesWithWriteConcern: {skip: "does not return user data"},
@@ -84,6 +85,7 @@ let testCases = {
     _killOperations: {skip: "does not return user data"},
     _mergeAuthzCollections: {skip: "primary only"},
     _migrateClone: {skip: "primary only"},
+    _mongotConnPoolStats: {skip: "internal command"},
     _shardsvrCompactStructuredEncryptionData: {skip: "primary only"},
     _shardsvrMovePrimary: {skip: "primary only"},
     _shardsvrMoveRange: {skip: "primary only"},

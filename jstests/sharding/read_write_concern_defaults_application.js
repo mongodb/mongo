@@ -125,6 +125,7 @@ let testCases = {
     _configsvrShardCollection:
         {skip: "internal command"},  // TODO SERVER-58843: Remove once 6.0 becomes last LTS
     _configsvrUpdateZoneKeyRange: {skip: "internal command"},
+    _dropConnectionsToMongot: {skip: "internal command"},
     _flushDatabaseCacheUpdates: {skip: "internal command"},
     _flushDatabaseCacheUpdatesWithWriteConcern: {skip: "internal command"},
     _flushReshardingStateChange: {skip: "internal command"},
@@ -138,6 +139,7 @@ let testCases = {
     _killOperations: {skip: "internal command"},
     _mergeAuthzCollections: {skip: "internal command"},
     _migrateClone: {skip: "internal command"},
+    _mongotConnPoolStats: {skip: "internal command"},
     _recvChunkAbort: {skip: "internal command"},
     _recvChunkCommit: {skip: "internal command"},
     _recvChunkReleaseCritSec: {skip: "internal command"},
