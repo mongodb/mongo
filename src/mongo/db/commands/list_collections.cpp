@@ -255,14 +255,12 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
 ListCollectionsReply createListCollectionsCursorReply(
     CursorId cursorId,
     const NamespaceString& cursorNss,
-    const SerializationContext& serializationContext,
+    const SerializationContext& respSerializationContext,
     std::vector<mongo::ListCollectionsReplyItem>&& firstBatch) {
     return ListCollectionsReply(
-        ListCollectionsReplyCursor(cursorId,
-                                   cursorNss,
-                                   std::move(firstBatch),
-                                   SerializationContext::stateCommandReply(serializationContext)),
-        SerializationContext::stateCommandReply(serializationContext));
+        ListCollectionsReplyCursor(
+            cursorId, cursorNss, std::move(firstBatch), respSerializationContext),
+        respSerializationContext);
 }
 
 class CmdListCollections : public ListCollectionsCmdVersion1Gen<CmdListCollections> {
@@ -318,7 +316,8 @@ public:
             const bool authorizedCollections = listCollRequest.getAuthorizedCollections();
 
             // We need to copy the serialization context from the request to the reply object
-            const auto serializationContext = listCollRequest.getSerializationContext();
+            const auto respSerializationContext =
+                SerializationContext::stateCommandReply(listCollRequest.getSerializationContext());
 
             // The collator is null because collection objects are compared using binary comparison.
             auto expCtx = make_intrusive<ExpressionContext>(
@@ -524,11 +523,10 @@ public:
 
                     try {
                         firstBatch.push_back(ListCollectionsReplyItem::parse(
-                            IDLParserContext(
-                                "ListCollectionsReplyItem",
-                                false /* apiStrict*/,
-                                cursorNss.tenantId(),
-                                SerializationContext::stateCommandReply(serializationContext)),
+                            IDLParserContext("ListCollectionsReplyItem",
+                                             false /* apiStrict*/,
+                                             cursorNss.tenantId(),
+                                             respSerializationContext),
                             nextDoc));
                     } catch (const DBException& exc) {
                         LOGV2_ERROR(
@@ -541,8 +539,10 @@ public:
                     responseSizeTracker.add(nextDoc);
                 }
                 if (exec->isEOF()) {
-                    return createListCollectionsCursorReply(
-                        0 /* cursorId */, cursorNss, serializationContext, std::move(firstBatch));
+                    return createListCollectionsCursorReply(0 /* cursorId */,
+                                                            cursorNss,
+                                                            respSerializationContext,
+                                                            std::move(firstBatch));
                 }
                 exec->saveState();
                 exec->detachFromOperationContext();
@@ -566,7 +566,7 @@ public:
 
             return createListCollectionsCursorReply(pinnedCursor.getCursor()->cursorid(),
                                                     cursorNss,
-                                                    serializationContext,
+                                                    respSerializationContext,
                                                     std::move(firstBatch));
         }
     };

@@ -530,7 +530,9 @@ Status validate(OperationContext* opCtx,
     uassertStatusOK(replCoord->checkCanServeReadsFor(
         opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-    output->append("ns", NamespaceStringUtil::serialize(validateState.nss()));
+    SerializationContext sc = SerializationContext::stateCommandReply();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
+    output->append("ns", NamespaceStringUtil::serialize(validateState.nss(), sc));
 
     validateState.uuid().appendToBuilder(output, "uuid");
 
