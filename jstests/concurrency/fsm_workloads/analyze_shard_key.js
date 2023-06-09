@@ -515,16 +515,77 @@ var $config = extendWorkload($config, function($config, $super) {
     // distribution.
     $config.data.intermediateReadDistributionMetricsMaxDiff = 20;
     $config.data.intermediateWriteDistributionMetricsMaxDiff = 20;
-    // The final diff windows are larger when the reads and writes are run inside transactions or
-    // with stepdown/kill/terminate in the background due to the presence of retries from the
-    // external client.
-    $config.data.finalReadDistributionMetricsMaxDiff =
-        (TestData.runInsideTransaction || TestData.runningWithShardStepdowns) ? 15 : 12;
-    $config.data.finalWriteDistributionMetricsMaxDiff =
-        (TestData.runInsideTransaction || TestData.runningWithShardStepdowns) ? 15 : 12;
+    $config.data.finalReadDistributionMetricsMaxDiff = 12;
+    $config.data.finalWriteDistributionMetricsMaxDiff = 12;
     // The minimum number of sampled queries to wait for before verifying the read and write
     // distribution metrics.
     $config.data.numSampledQueriesThreshold = 1500;
+
+    // The diff window for the sample size for each command for the sample population to be
+    // considered as matching the mock query pattern.
+    $config.data.sampleSizePercentageMaxDiff = 5;
+
+    $config.data.isAcceptableSampleSize = function isAcceptableSampleSize(
+        part, whole, expectedPercentage) {
+        return Math.abs(AnalyzeShardKeyUtil.calculatePercentage(part, whole) - expectedPercentage) <
+            this.sampleSizePercentageMaxDiff;
+    };
+
+    $config.data.shouldValidateReadDistribution = function shouldValidateReadDistribution(
+        sampleSize) {
+        if (sampleSize.total < this.numSampledQueriesThreshold) {
+            return false;
+        }
+
+        // There are 4 read states (i.e. find, aggregate, count and distinct) and they have the
+        // same incoming and outgoing state transition probabilities.
+        const isAcceptable = this.isAcceptableSampleSize(
+                                 sampleSize.find, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.aggregate, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.count, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.distinct, sampleSize.total, 25 /* expectedPercentage */);
+
+        if (!isAcceptable) {
+            print(
+                `Skip validating the read distribution metrics because the sample ` +
+                `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
+            // The sample population should always match the mock query patterns unless there are
+            // retries.
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer);
+        }
+        return isAcceptable;
+    };
+
+    $config.data.shouldValidateWriteDistribution = function shouldValidateWriteDistribution(
+        sampleSize) {
+        if (sampleSize.total < this.numSampledQueriesThreshold) {
+            return false;
+        }
+
+        // There are 4 write states (i.e. update, remove, findAndModifyUpdate and
+        // findAndModifyRemove) and they have the same incoming and outgoing state transition
+        // probabilities.
+        const isAcceptable =
+            this.isAcceptableSampleSize(
+                sampleSize.update, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.delete, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.findAndModify, sampleSize.total, 50 /* expectedPercentage */);
+
+        if (!isAcceptable) {
+            print(
+                `Skip validating the write distribution metrics because the sample ` +
+                `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
+            // The sample population should always match the mock query patterns unless there are
+            // retries.
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer);
+        }
+        return isAcceptable;
+    };
 
     /**
      * Verifies that the metrics about the read and write distribution are within acceptable ranges.
@@ -544,7 +605,7 @@ var $config = extendWorkload($config, function($config, $super) {
             assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
         };
 
-        if (metrics.readDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
+        if (this.shouldValidateReadDistribution(metrics.readDistribution.sampleSize)) {
             assertReadMetricsDiff(metrics.readDistribution.percentageOfSingleShardReads,
                                   this.readDistribution.percentageOfSingleShardReads);
             assertReadMetricsDiff(metrics.readDistribution.percentageOfMultiShardReads,
@@ -554,7 +615,8 @@ var $config = extendWorkload($config, function($config, $super) {
             assert.eq(metrics.readDistribution.numReadsByRange.length,
                       this.analyzeShardKeyNumRanges);
         }
-        if (metrics.writeDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
+
+        if (this.shouldValidateWriteDistribution(metrics.writeDistribution.sampleSize)) {
             assertWriteMetricsDiff(metrics.writeDistribution.percentageOfSingleShardWrites,
                                    this.writeDistribution.percentageOfSingleShardWrites);
             assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiShardWrites,
