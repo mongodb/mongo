@@ -59,7 +59,9 @@ assert.commandWorked(coll.insert([{
     _id: 0,
     veryBigNegativeLong: NumberLong("-9223372036854775808"),
     veryBigNegativeDouble: -9223372036854775808,
-    veryBigNegativeDecimal: NumberDecimal("-9223372036854775808")
+    veryBigNegativeDecimal: NumberDecimal("-9223372036854775808"),
+    doubleNaN: NaN,
+    decimalNaN: NumberDecimal("NaN"),
 }]));
 
 let pipeline = [{$project: {res: {$subtract: [new Date(10), "$veryBigNegativeLong"]}}}];
@@ -69,5 +71,11 @@ pipeline = [{$project: {res: {$subtract: [new Date(10), "$veryBigNegativeDouble"
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
 
 pipeline = [{$project: {res: {$subtract: [new Date(10), "$veryBigNegativeDecimal"]}}}];
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
+
+pipeline = [{$project: {res: {$subtract: [new Date(-1), "$doubleNaN"]}}}];
+assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
+
+pipeline = [{$project: {res: {$subtract: [new Date(-1), "$decimalNaN"]}}}];
 assertErrCodeAndErrMsgContains(coll, pipeline, ErrorCodes.Overflow, "date overflow");
 }());

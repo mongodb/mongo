@@ -5719,12 +5719,12 @@ StatusWith<Value> ExpressionSubtract::apply(Value lhs, Value rhs) {
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
                 double doubleRhs = rhs.coerceToDouble();
                 // check the doubleRhs should not exceed int64 limit and result will not overflow
-                if (doubleRhs < static_cast<double>(limits::min()) ||
-                    doubleRhs >= static_cast<double>(limits::max()) ||
-                    overflow::sub(longDiff, llround(doubleRhs), &longDiff)) {
-                    return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
+                if (doubleRhs >= static_cast<double>(limits::min()) &&
+                    doubleRhs < static_cast<double>(limits::max()) &&
+                    !overflow::sub(longDiff, llround(doubleRhs), &longDiff)) {
+                    return Value(Date_t::fromMillisSinceEpoch(longDiff));
                 }
-                return Value(Date_t::fromMillisSinceEpoch(longDiff));
+                return Status(ErrorCodes::Overflow, str::stream() << "date overflow");
             }
             case NumberDecimal: {
                 long long longDiff = lhs.getDate().toMillisSinceEpoch();
