@@ -1,5 +1,5 @@
 """
-Test hook for verifying $telemetry collects expected metrics and can redact query shapes.
+Test hook for verifying $queryStats collects expected metrics and can redact query shapes.
 
 This runs in the background as other tests are ongoing.
 """
@@ -23,7 +23,7 @@ class RunQueryStats(BGHook):
         self.hmac_key = binary.Binary(("0" * 32).encode('utf-8'))
 
     def run_action(self):
-        """Runs telemetry on the fixture, and verifies it has the expected shape."""
+        """Runs $queryStats on the fixture, and verifies it has the expected shape."""
 
         self.logger.info("Running $queryStats")
 

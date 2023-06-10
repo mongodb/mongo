@@ -236,9 +236,12 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
                             "hash"_attr = *key);
-                if (kDebugBuild) {
-                    tasserted(7349401,
-                              "Was not able to re-parse queryStats key when reading queryStats.");
+                if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
+                    auto keyString = std::to_string(*key);
+                    tasserted(
+                        7349401,
+                        "Was not able to re-parse queryStats key when reading queryStats. Status: "s +
+                            ex.toString() + " Hash: " + keyString);
                 }
             }
         }
