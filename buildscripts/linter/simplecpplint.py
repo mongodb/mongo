@@ -8,52 +8,8 @@ import logging
 import re
 import sys
 
-
-def _make_polyfill_regex():
-    polyfill_required_names = [
-        '_',
-        'adopt_lock',
-        'async',
-        'chrono',
-        'condition_variable',
-        'condition_variable_any',
-        'cv_status',
-        'defer_lock',
-        'future',
-        'future_status',
-        'get_terminate',
-        'launch',
-        'lock_guard',
-        'mutex',
-        'notify_all_at_thread_exit',
-        'packaged_task',
-        'promise',
-        'recursive_mutex',
-        'set_terminate',
-        'shared_lock',
-        'shared_mutex',
-        'shared_timed_mutex',
-        'this_thread(?!::at_thread_exit)',
-        'thread',
-        'timed_mutex',
-        'try_to_lock',
-        'unique_lock',
-        'unordered_map',
-        'unordered_multimap',
-        'unordered_multiset',
-        'unordered_set',
-    ]
-
-    qualified_names = ['boost::' + name + "\\b" for name in polyfill_required_names]
-    qualified_names.extend('std::' + name + "\\b" for name in polyfill_required_names)
-    qualified_names_regex = '|'.join(qualified_names)
-    return re.compile('(' + qualified_names_regex + ')')
-
-
 _RE_LINT = re.compile("//.*NOLINT")
 _RE_COMMENT_STRIP = re.compile("//.*")
-
-_RE_PATTERN_MONGO_POLYFILL = _make_polyfill_regex()
 _RE_RAND = re.compile(r'\b(srand\(|rand\(\))')
 
 _RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
@@ -146,7 +102,6 @@ class Linter:
             if not self.clean_lines[linenum]:
                 continue
 
-            self._check_for_mongo_polyfill(linenum)
             self._check_for_rand(linenum)
             self._check_for_c_stdlib_headers(linenum)
 
@@ -205,15 +160,6 @@ class Linter:
                 clean_line = ""
 
             self.clean_lines.append(clean_line)
-
-    def _check_for_mongo_polyfill(self, linenum):
-        line = self.clean_lines[linenum]
-        match = _RE_PATTERN_MONGO_POLYFILL.search(line)
-        if match:
-            self._error(
-                linenum, 'mongodb/polyfill',
-                'Illegal use of banned name from std::/boost:: for "%s", use mongo::stdx:: variant instead'
-                % (match.group(0)))
 
     def _check_for_rand(self, linenum):
         line = self.clean_lines[linenum]
