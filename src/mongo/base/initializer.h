@@ -30,7 +30,9 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"

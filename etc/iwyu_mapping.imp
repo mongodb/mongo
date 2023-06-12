@@ -1,4 +1,6 @@
 [
+    {include: ["\"mongo/platform/compiler_gcc.h\"", "private", "\"mongo/platform/compiler.h\"", "public"]},
+    
     {include: ["<boost/smart_ptr/detail/operator_bool.hpp>", "private", "<boost/smart_ptr.hpp>", "public"]},
     {include: ["\"boost/smart_ptr/detail/operator_bool.hpp\"", "private", "<boost/smart_ptr.hpp>", "public"]},
     {include: ["<boost/optional/detail/optional_relops.hpp>", "private", "<boost/optional.hpp>", "public"]},

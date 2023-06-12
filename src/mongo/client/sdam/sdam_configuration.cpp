@@ -28,6 +28,13 @@
  */
 #include "sdam_configuration.h"
 
+#include <algorithm>
+#include <iterator>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo::sdam {
 SdamConfiguration::SdamConfiguration(boost::optional<std::vector<HostAndPort>> seedList,
                                      TopologyType initialType,

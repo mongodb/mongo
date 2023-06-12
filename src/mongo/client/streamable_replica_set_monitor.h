@@ -29,26 +29,50 @@
 
 #pragma once
 
+#include <boost/smart_ptr.hpp>
 #include <functional>
+#include <list>
 #include <memory>
 #include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_change_notifier.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_stats.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_selector.h"
+#include "mongo/client/sdam/topology_listener.h"
 #include "mongo/client/server_discovery_monitor.h"
 #include "mongo/client/server_ping_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -57,6 +81,7 @@ class BSONObj;
 class ReplicaSetMonitor;
 class ReplicaSetMonitorTest;
 struct ReadPreferenceSetting;
+
 using ReplicaSetMonitorPtr = std::shared_ptr<ReplicaSetMonitor>;
 
 /**

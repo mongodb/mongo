@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory.h"
 
 namespace mongo {

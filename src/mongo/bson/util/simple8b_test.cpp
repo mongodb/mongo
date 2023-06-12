@@ -28,11 +28,27 @@
  */
 
 #include "mongo/bson/util/simple8b.h"
-#include "mongo/bson/util/simple8b_builder.h"
-#include "mongo/unittest/unittest.h"
 
 #include <boost/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstring>
+#include <fmt/format.h>
+#include <limits>
+#include <memory>
+#include <utility>
 #include <vector>
+
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/simple8b_builder.h"
+#include "mongo/platform/int128.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/shared_buffer.h"
 
 using namespace mongo;
 

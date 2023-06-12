@@ -28,32 +28,34 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/secure_allocator.h"
-
+#include <cerrno>
 #include <fmt/format.h>
 #include <memory>
+#include <mutex>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/initializer.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/errno_util.h"
 
 #ifdef _WIN32
 #include <psapi.h>
 #include <windows.h>
 #else
 #include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #endif
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/secure_zero_memory.h"
 #include "mongo/util/static_immortal.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -27,19 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
-
 #include <algorithm>
-#include <ostream>
+#include <cstddef>
+#include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/unittest/assert.h"
 
 namespace mongo {
 namespace mutablebson {

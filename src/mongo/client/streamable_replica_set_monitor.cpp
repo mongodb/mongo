@@ -27,33 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/streamable_replica_set_monitor.h"
-
 #include <algorithm>
 #include <limits>
+#include <map>
+#include <mutex>
+#include <ostream>
 #include <set>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
-#include "mongo/client/connpool.h"
-#include "mongo/client/global_conn_pool.h"
+#include <boost/none.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/client/replica_set_monitor_interface.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/client/sdam/topology_description.h"
+#include "mongo/client/sdam/topology_manager.h"
+#include "mongo/client/streamable_replica_set_monitor.h"
 #include "mongo/client/streamable_replica_set_monitor_discovery_time_processor.h"
 #include "mongo/client/streamable_replica_set_monitor_query_processor.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/server_options.h"
-#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/timer.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

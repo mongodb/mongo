@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <functional>
+#include <string>
+
+#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_params.h"
 

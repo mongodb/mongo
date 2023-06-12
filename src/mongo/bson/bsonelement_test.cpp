@@ -27,17 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <fmt/format.h>
+// IWYU pragma: no_include "ext/type_traits.h"
 #include <array>
 #include <cmath>
-#include <fmt/format.h>
 #include <limits>
+#include <ostream>
 
+#include "mongo/base/data_range.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

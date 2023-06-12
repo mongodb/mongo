@@ -31,12 +31,14 @@
 
 #include <algorithm>  // for min
 #include <cstring>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <limits>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 
-#include <fmt/format.h>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/type_traits.h"

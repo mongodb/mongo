@@ -28,6 +28,13 @@
  */
 #include "mongo/client/sdam/server_description_builder.h"
 
+#include <map>
+#include <set>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
 namespace mongo::sdam {
 ServerDescriptionPtr ServerDescriptionBuilder::instance() const {
     return _instance;

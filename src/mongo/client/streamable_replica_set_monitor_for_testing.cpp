@@ -29,10 +29,15 @@
 
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
 
+#include <utility>
+
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/rpc/metadata/metadata_hook.h"
 
 namespace mongo {
 

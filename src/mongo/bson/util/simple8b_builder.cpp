@@ -29,12 +29,20 @@
 
 #include "mongo/bson/util/simple8b_builder.h"
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/bson/util/simple8b_constants.h"
-#include "mongo/platform/bits.h"
-
 #include <algorithm>
 #include <array>
+#include <boost/optional.hpp>
+#include <limits>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/bson/util/simple8b_constants.h"
+#include "mongo/platform/bits.h"
+#include "mongo/platform/int128.h"
 
 namespace mongo {
 

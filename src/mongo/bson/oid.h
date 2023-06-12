@@ -29,12 +29,21 @@
 
 #pragma once
 
+#include <cstdint>
+#include <cstring>
+#include <iosfwd>
 #include <string>
+#include <string_view>
+#include <sys/types.h>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

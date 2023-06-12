@@ -17,13 +17,17 @@ fix_options:
   # - '--nosafe_headers'
 
 # filename regex to swap no_include in place
-# quotes and brackets not included quotes are always assumed
+# quotes and brackets not included in this config
 # since this is targeting IWYU added headers
 no_includes:
   # avoid boost crazyness
   - 'boost/.+/detail/.+'
   - 'asio/impl/.+'
   - 'boost/.+\.ipp'
+  # avoid stdlib detail headers
+  - 'ext/alloc_traits\.h'
+  - 'ext/type_traits\.h'
+  - 'cxxabi\.h' # https://github.com/include-what-you-use/include-what-you-use/issues/909
   # arch specific
   - 'boost/predef/hardware/simd/x86.+'
   - 'emmintrin\.h'
@@ -70,3 +74,4 @@ keep_includes:
   - '"mongo/config\.h"'
   - '"mongo/util/overloaded_visitor\.h"'
   - '"mongo/db/query/optimizer/node\.h"'
+  - '"mongo/util/text\.h"' # includes platform specific functions

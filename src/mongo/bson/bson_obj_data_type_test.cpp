@@ -27,12 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/base/data_range.h"
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

@@ -29,6 +29,11 @@
 
 #include "mongo/client/sdam/topology_description_builder.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/client/sdam/election_id_set_version_pair.h"
+
 namespace mongo::sdam {
 
 

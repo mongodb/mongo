@@ -29,16 +29,21 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstring>
 #include <tuple>
 #include <type_traits>
 #include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/platform/endian.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

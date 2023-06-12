@@ -53,9 +53,14 @@ def main():
 
         # perform the swap replacement of the binary data
         file_bytes = bytearray(file_bytes)
+        adjustments = 0
         for replacement in fixes[recorded_md5]['replacements']:
-            file_bytes[replacement['Offset']:replacement['Offset'] +
+
+            file_bytes[replacement['Offset'] + adjustments:replacement['Offset'] + adjustments +
                        replacement['Length']] = replacement['ReplacementText'].encode()
+
+            if replacement['Length'] != len(replacement['ReplacementText']):
+                adjustments += len(replacement['ReplacementText']) - replacement['Length']
 
         with open(fixes[recorded_md5]['filepath'], 'wb') as fout:
             fout.write(bytes(file_bytes))

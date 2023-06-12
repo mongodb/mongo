@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <set>
+#include <utility>
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/client/connection_string.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -29,12 +29,20 @@
 
 #pragma once
 
+#include <array>
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/bson/util/simple8b_constants.h"
 #include "mongo/platform/int128.h"
-
-#include <boost/optional.hpp>
 
 namespace mongo {
 

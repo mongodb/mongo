@@ -27,19 +27,23 @@
  *    it in the license file.
  */
 
-#include <exception>
-#include <stdexcept>
-#include <string>
-
 #include <boost/exception/exception.hpp>
 #include <fmt/format.h>
+#include <functional>
+#include <stdexcept>
+#include <string>
+#include <string_view>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
-#include "mongo/config.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/json.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

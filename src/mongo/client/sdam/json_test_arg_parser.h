@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <fstream>
-#include <iostream>
-#include <memory>
-
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/format.hpp>
+#include <cstdlib>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "mongo/client/sdam/json_test_runner_cli_options_gen.h"
 

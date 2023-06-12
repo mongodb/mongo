@@ -29,16 +29,21 @@
 
 #include <algorithm>
 #include <functional>
+#include <initializer_list>
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
+
+#include <fmt/format.h>
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

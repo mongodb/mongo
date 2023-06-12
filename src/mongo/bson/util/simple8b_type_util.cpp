@@ -29,10 +29,17 @@
 
 #include "mongo/bson/util/simple8b_type_util.h"
 
-#include "mongo/base/data_type_endian.h"
-#include "mongo/bson/bsonelement.h"
-
+#include <algorithm>
 #include <cmath>
+#include <cstring>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonelement.h"
 
 namespace mongo {
 namespace {

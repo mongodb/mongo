@@ -29,12 +29,19 @@
 
 #include "mongo/client/sdam/topology_state_machine.h"
 
-#include <ostream>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <boost/optional.hpp>
+#include <set>
+
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/client/sdam/election_id_set_version_pair.h"
-#include "mongo/client/sdam/sdam_test_base.h"
+#include "mongo/client/sdam/server_description.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

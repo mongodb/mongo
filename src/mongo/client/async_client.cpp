@@ -28,34 +28,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/async_client.h"
-
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
 #include <memory>
+#include <ratio>
+#include <type_traits>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/client/async_client.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/executor/egress_tag_closer_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
+#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
 

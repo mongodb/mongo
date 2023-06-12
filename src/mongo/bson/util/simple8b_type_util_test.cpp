@@ -28,9 +28,15 @@
  */
 
 #include "mongo/bson/util/simple8b_type_util.h"
-#include "mongo/unittest/unittest.h"
 
+#include <algorithm>
+#include <cstring>
 #include <limits>
+#include <vector>
+
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using namespace mongo;
 

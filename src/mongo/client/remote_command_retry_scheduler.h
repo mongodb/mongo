@@ -30,15 +30,21 @@
 #pragma once
 
 #include <cstdlib>
+#include <fmt/format.h>
 #include <initializer_list>
 #include <memory>
+#include <string>
+#include <type_traits>
 
-#include <fmt/format.h>
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 

@@ -160,7 +160,7 @@ SHUTDOWN_FLAG = False
 CLANG_INCLUDES = None
 IWYU_OPTIONS = [val for pair in zip(['-Xiwyu'] * len(IWYU_OPTIONS), IWYU_OPTIONS) for val in pair]
 if NO_INCLUDES:
-    NO_INCLUDE_REGEX = re.compile(r'^\s*#include\s+\"(' + '|'.join(NO_INCLUDES) + ')\"')
+    NO_INCLUDE_REGEX = re.compile(r'^\s*#include\s+[\",<](' + '|'.join(NO_INCLUDES) + ')[\",>]')
 if KEEP_INCLUDES:
     KEEP_INCLUDE_REGEX = re.compile(r'^\s*#include\s+(' + '|'.join(KEEP_INCLUDES) + ')')
 CHANGED_FILES_REGEX = re.compile(r"^The\sfull\sinclude-list\sfor\s(.+):$", re.MULTILINE)

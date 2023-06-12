@@ -29,18 +29,25 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
+#include <array>
 #include <cstddef>
+#include <cstdlib>
 #include <limits>
 #include <memory>
+#include <new>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/server_options.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/allocator.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -29,20 +29,38 @@
 
 #include "mongo/client/dbclient_rs.h"
 
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
 #include <memory>
+#include <ostream>
+#include <set>
+#include <type_traits>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/global_conn_pool.h"
+#include "mongo/client/internal_auth.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/replica_set_monitor.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/dbmessage.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

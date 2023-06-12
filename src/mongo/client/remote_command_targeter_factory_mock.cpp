@@ -27,9 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace {

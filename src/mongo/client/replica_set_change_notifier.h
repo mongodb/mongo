@@ -29,9 +29,15 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <set>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/task_executor.h"
@@ -39,6 +45,7 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

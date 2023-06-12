@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/mutable/element.h"
-
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 
 namespace mongo {

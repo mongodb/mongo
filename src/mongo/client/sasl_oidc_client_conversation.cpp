@@ -27,20 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <fmt/format.h>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/client/sasl_oidc_client_conversation.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/data_builder.h"
 #include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_validated.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/client/sasl_client_session.h"
+#include "mongo/client/sasl_oidc_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_types_gen.h"
+#include "mongo/db/auth/oauth_authorization_server_metadata_gen.h"
 #include "mongo/db/auth/oauth_discovery_factory.h"
 #include "mongo/db/auth/oidc_protocol_gen.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/shell/program_runner.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

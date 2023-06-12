@@ -29,6 +29,12 @@
 
 #include "mongo/client/sdam/sdam_datatypes.h"
 
+#include <ostream>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo::sdam {
 std::string toString(const ServerType serverType) {
     switch (serverType) {

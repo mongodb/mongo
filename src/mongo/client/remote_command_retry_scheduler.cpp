@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <algorithm>
+// IWYU pragma: no_include "cxxabi.h"
+#include <functional>
 #include <memory>
-#include <vector>
+#include <mutex>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/remote_command_retry_scheduler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
