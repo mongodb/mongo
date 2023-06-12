@@ -340,7 +340,7 @@ void HashLookupStage::spillBufferedValueToDisk(OperationContext* opCtx,
 size_t HashLookupStage::bufferValueOrSpill(value::MaterializedRow& value) {
     size_t bufferIndex = _valueId;
     const long long newMemUsage = _computedTotalMemUsage + size_estimator::estimate(value);
-    if (newMemUsage <= _memoryUseInBytesBeforeSpill) {
+    if (!hasSpilledBufToDisk() && newMemUsage <= _memoryUseInBytesBeforeSpill) {
         _buffer.emplace_back(std::move(value));
         _computedTotalMemUsage = newMemUsage;
     } else {
