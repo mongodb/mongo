@@ -107,6 +107,7 @@ PlanCacheKeyInfo makePlanCacheKeyInfo(CanonicalQuery::QueryShapeString&& shapeSt
 }
 
 namespace {
+// TODO: SERVER-77571 use acquisitions APIs for retrieving the shardVersion.
 sbe::PlanCacheKeyCollectionState computeCollectionState(OperationContext* opCtx,
                                                         const CollectionPtr& collection,
                                                         bool isSecondaryColl) {

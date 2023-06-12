@@ -151,12 +151,16 @@ void PlanExecutorSBE::saveState() {
         _root->saveState(relinquishCursor, discardSlotState);
     }
 
-    _yieldPolicy->setYieldable(nullptr);
+    if (!_yieldPolicy->usesCollectionAcquisitions()) {
+        _yieldPolicy->setYieldable(nullptr);
+    }
     _lastGetNext = BSONObj();
 }
 
 void PlanExecutorSBE::restoreState(const RestoreContext& context) {
-    _yieldPolicy->setYieldable(context.collection());
+    if (!_yieldPolicy->usesCollectionAcquisitions()) {
+        _yieldPolicy->setYieldable(context.collection());
+    }
 
     if (_isSaveRecoveryUnitAcrossCommandsEnabled) {
         _root->restoreState(false /* NOT relinquishing cursor */);

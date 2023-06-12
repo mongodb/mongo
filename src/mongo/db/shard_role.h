@@ -146,6 +146,8 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
         AcquisitionPrerequisites::OperationType operationType);
 };
 
+class ScopedCollectionOrViewAcquisition;
+
 class ScopedCollectionAcquisition {
 public:
     ScopedCollectionAcquisition(const mongo::ScopedCollectionAcquisition&) = delete;
@@ -156,6 +158,8 @@ public:
     }
 
     ~ScopedCollectionAcquisition();
+
+    explicit ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other);
 
     ScopedCollectionAcquisition(OperationContext* opCtx,
                                 shard_role_details::AcquiredCollection& acquiredCollection)
@@ -234,8 +238,54 @@ private:
     const shard_role_details::AcquiredView& _acquiredView;
 };
 
-using ScopedCollectionOrViewAcquisition =
-    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition>;
+class ScopedCollectionOrViewAcquisition {
+public:
+    ScopedCollectionOrViewAcquisition(ScopedCollectionAcquisition&& collection)
+        : _collectionOrViewAcquisition(std::move(collection)) {}
+
+    ScopedCollectionOrViewAcquisition(ScopedViewAcquisition&& view)
+        : _collectionOrViewAcquisition(std::move(view)) {}
+
+    bool isCollection() const {
+        return std::holds_alternative<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    bool isView() const {
+        return std::holds_alternative<ScopedViewAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const ScopedCollectionAcquisition& getCollection() const {
+        invariant(isCollection());
+        return std::get<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const CollectionPtr& getCollectionPtr() const {
+        if (isCollection()) {
+            return getCollection().getCollectionPtr();
+        } else {
+            return CollectionPtr::null;
+        }
+    }
+
+    const ScopedViewAcquisition& getView() const {
+        invariant(isView());
+        return std::get<ScopedViewAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const NamespaceString& nss() const {
+        if (isCollection()) {
+            return getCollection().nss();
+        } else {
+            return getView().nss();
+        }
+    }
+
+    friend class ScopedCollectionAcquisition;
+
+private:
+    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition, std::monostate>
+        _collectionOrViewAcquisition;
+};
 
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,

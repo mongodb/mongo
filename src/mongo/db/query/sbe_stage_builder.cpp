@@ -29,6 +29,7 @@
 
 #include "mongo/db/query/sbe_stage_builder.h"
 
+#include "mongo/db/exec/shard_filterer_impl.h"
 #include <fmt/format.h>
 
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -206,13 +207,20 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
     if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"_sd)) {
-        const auto& collection = collections.getMainCollection();
-        tassert(6108307,
-                "Setting shard filterer slot on un-sharded collection",
-                collection.isSharded());
+        auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
+            if (collections.isAcquisition()) {
+                return std::make_unique<ShardFiltererImpl>(
+                    *collections.getMainAcquisition()->getShardingFilter());
+            } else {
+                const auto& collection = collections.getMainCollection();
+                tassert(6108307,
+                        "Setting shard filterer slot on un-sharded collection",
+                        collection.isSharded());
 
-        ShardFiltererFactoryImpl shardFiltererFactory(collection);
-        auto shardFilterer = shardFiltererFactory.makeShardFilterer(opCtx);
+                ShardFiltererFactoryImpl shardFiltererFactory(collection);
+                return shardFiltererFactory.makeShardFilterer(opCtx);
+            }
+        }();
         env->resetSlot(*shardFiltererSlot,
                        sbe::value::TypeTags::shardFilterer,
                        sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),

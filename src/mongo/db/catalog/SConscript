@@ -604,7 +604,8 @@ env.Library(
         '$BUILD_DIR/mongo/db/query/query_planner',
         '$BUILD_DIR/mongo/db/server_base',
         '$BUILD_DIR/mongo/db/service_context',
-        '$BUILD_DIR/mongo/db/shard_role_api',
+        #TODO SERVER-77571 this should only depend on the shard_role_api library.
+        '$BUILD_DIR/mongo/db/shard_role',
         'index_catalog',
     ],
 )

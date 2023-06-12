@@ -323,7 +323,6 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
         ASSERT_EQ(nssUnshardedCollection1, acquisition.nss());
         ASSERT_EQ(nssUnshardedCollection1, acquisition.getCollectionPtr()->ns());
         ASSERT_FALSE(acquisition.getShardingDescription().isSharded());
-        ASSERT_FALSE(acquisition.getShardingFilter().has_value());
     };
 
     // With locks.
@@ -350,9 +349,8 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
                                                           AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquisitions.front()));
-        const ScopedCollectionAcquisition& acquisition =
-            std::get<ScopedCollectionAcquisition>(acquisitions.front());
+        ASSERT_TRUE(acquisitions.front().isCollection());
+        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -492,7 +490,6 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
         ASSERT_EQ(nssUnshardedCollection1, acquisition.nss());
         ASSERT_EQ(nssUnshardedCollection1, acquisition.getCollectionPtr()->ns());
         ASSERT_FALSE(acquisition.getShardingDescription().isSharded());
-        ASSERT_FALSE(acquisition.getShardingFilter().has_value());
     };
 
     // With locks.
@@ -517,9 +514,8 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
                 opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead)});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquisitions.front()));
-        const ScopedCollectionAcquisition& acquisition =
-            std::get<ScopedCollectionAcquisition>(acquisitions.front());
+        ASSERT_TRUE(acquisitions.front().isCollection());
+        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -553,9 +549,9 @@ DEATH_TEST_F(ShardRoleTest,
     (void)acquisition.getShardingDescription();
 }
 
-DEATH_TEST_F(ShardRoleTest,
-             AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessFilter,
-             "Invariant failure") {
+DEATH_TEST_REGEX_F(ShardRoleTest,
+                   AcquireLocalCatalogOnlyWithPotentialDataLossForbiddenToAccessFilter,
+                   "Tripwire assertion.*7740800") {
     auto acquisition = acquireCollectionForLocalCatalogOnlyWithPotentialDataLoss(
         opCtx(), nssUnshardedCollection1, MODE_IX);
 
@@ -599,9 +595,8 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
                                                           AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquisitions.front()));
-        const ScopedCollectionAcquisition& acquisition =
-            std::get<ScopedCollectionAcquisition>(acquisitions.front());
+        ASSERT_TRUE(acquisitions.front().isCollection());
+        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -744,7 +739,6 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithoutSpecifyingPlacementVersion) {
 
     // Note that the collection is treated as unsharded because the operation is unversioned.
     ASSERT_FALSE(acquisition.getShardingDescription().isSharded());
-    ASSERT_FALSE(acquisition.getShardingFilter().has_value());
 }
 
 // ---------------------------------------------------------------------------
@@ -763,7 +757,6 @@ TEST_F(ShardRoleTest, AcquireCollectionNonExistentNamespace) {
                               MODE_IX);
         ASSERT(!acquisition.getCollectionPtr());
         ASSERT(!acquisition.getShardingDescription().isSharded());
-        ASSERT(!acquisition.getShardingFilter());
     }
 
     // Without locks.
@@ -774,13 +767,11 @@ TEST_F(ShardRoleTest, AcquireCollectionNonExistentNamespace) {
                 opCtx(), inexistentNss, AcquisitionPrerequisites::kRead)});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquisitions.front()));
-        const ScopedCollectionAcquisition& acquisition =
-            std::get<ScopedCollectionAcquisition>(acquisitions.front());
+        ASSERT_TRUE(acquisitions.front().isCollection());
+        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
 
         ASSERT(!acquisition.getCollectionPtr());
         ASSERT(!acquisition.getShardingDescription().isSharded());
-        ASSERT(!acquisition.getShardingFilter());
     }
 }
 
@@ -830,8 +821,8 @@ TEST_F(ShardRoleTest, AcquireCollectionButItIsAView) {
                                     opCtx(), nssView, AcquisitionPrerequisites::kWrite),
                                 MODE_IX);
 
-    ASSERT_TRUE(std::holds_alternative<ScopedViewAcquisition>(acquisition));
-    const ScopedViewAcquisition& viewAcquisition = std::get<ScopedViewAcquisition>(acquisition);
+    ASSERT_TRUE(acquisition.isView());
+    const ScopedViewAcquisition& viewAcquisition = acquisition.getView();
 
     ASSERT_EQ(nssView, viewAcquisition.nss());
     ASSERT_EQ(nssUnshardedCollection1, viewAcquisition.getViewDefinition().viewOn());
@@ -864,7 +855,7 @@ TEST_F(ShardRoleTest, WritesOnMultiDocTransactionsUseLatestCatalog) {
         CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead),
         MODE_IX);
-    ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquireForRead));
+    ASSERT_TRUE(acquireForRead.isCollection());
 
     ASSERT_THROWS_CODE(acquireCollectionOrView(
                            opCtx(),
@@ -901,7 +892,6 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
                      });
     ASSERT(acquisitionUnshardedColl != acquisitions.end());
     ASSERT_FALSE(acquisitionUnshardedColl->getShardingDescription().isSharded());
-    ASSERT_FALSE(acquisitionUnshardedColl->getShardingFilter().has_value());
 
     const auto& acquisitionShardedColl =
         std::find_if(acquisitions.begin(),
@@ -1111,7 +1101,7 @@ TEST_F(ShardRoleTest, AcquireCollectionOrView) {
                                                        AcquisitionPrerequisites::kCanBeView,
                                                    },
                                                    MODE_IX);
-        ASSERT_TRUE(std::holds_alternative<ScopedViewAcquisition>(acquisition));
+        ASSERT_TRUE(acquisition.isView());
     }
 
     {
@@ -1124,7 +1114,7 @@ TEST_F(ShardRoleTest, AcquireCollectionOrView) {
                                                        AcquisitionPrerequisites::kCanBeView,
                                                    },
                                                    MODE_IX);
-        ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquisition));
+        ASSERT_TRUE(acquisition.isCollection());
     }
 }
 
@@ -1174,7 +1164,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
                                                     }});
 
     ASSERT_EQ(1, acquisitions.size());
-    ASSERT_TRUE(std::holds_alternative<ScopedCollectionAcquisition>(acquisitions.front()));
+    ASSERT_TRUE(acquisitions.front().isCollection());
 
     ASSERT_TRUE(opCtx()->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_IS));
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));

@@ -1228,13 +1228,17 @@ private:
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecutor(
     OperationContext* opCtx,
-    const CollectionPtr& collection,
+    VariantCollectionPtrOrAcquisition collection,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerParams) {
     auto ws = std::make_unique<WorkingSet>();
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collection, ws.get(), canonicalQuery.get(), nullptr, plannerParams};
+    ClassicPrepareExecutionHelper helper{opCtx,
+                                         collection.getCollectionPtr(),
+                                         ws.get(),
+                                         canonicalQuery.get(),
+                                         nullptr,
+                                         plannerParams};
     auto executionResult = helper.prepare();
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
@@ -1250,7 +1254,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     return plan_executor_factory::make(std::move(canonicalQuery),
                                        std::move(ws),
                                        std::move(root),
-                                       &collection,
+                                       collection,
                                        yieldPolicy,
                                        plannerParams.options,
                                        {},
@@ -1319,10 +1323,11 @@ std::unique_ptr<sbe::RuntimePlanner> makeRuntimePlannerIfNeeded(
     return nullptr;
 }
 
-std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(OperationContext* opCtx,
-                                                       PlanYieldPolicy::YieldPolicy policy,
-                                                       const Yieldable* yieldable,
-                                                       NamespaceString nss) {
+std::unique_ptr<PlanYieldPolicySBE> makeSbeYieldPolicy(
+    OperationContext* opCtx,
+    PlanYieldPolicy::YieldPolicy policy,
+    stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable,
+    NamespaceString nss) {
     return std::make_unique<PlanYieldPolicySBE>(opCtx,
                                                 policy,
                                                 opCtx->getServiceContext()->getFastClockSource(),
@@ -1516,8 +1521,14 @@ attemptToGetSlotBasedExecutor(
         // Create the SBE prepare execution helper and initialize the params for the planner. If
         // planning results in any 'QuerySolution' which cannot be handled by the SBE stage builder,
         // then we will fall back to the classic engine.
-        auto sbeYieldPolicy = makeSbeYieldPolicy(
-            opCtx, yieldPolicy, &collections.getMainCollection(), canonicalQuery->nss());
+        stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
+        if (collections.isAcquisition()) {
+            yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
+        } else {
+            yieldable = &collections.getMainCollection();
+        }
+        auto sbeYieldPolicy =
+            makeSbeYieldPolicy(opCtx, yieldPolicy, yieldable, canonicalQuery->nss());
         SlotBasedPrepareExecutionHelper helper{
             opCtx, collections, canonicalQuery.get(), sbeYieldPolicy.get(), plannerParams.options};
         auto planningResultWithStatus = helper.prepare();
@@ -1621,8 +1632,16 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
         }
         // Ensure that 'sbeCompatible' is set accordingly.
         canonicalQuery->setSbeCompatible(false);
-        return getClassicExecutor(
-            opCtx, mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
+        if (collections.isAcquisition()) {
+            return getClassicExecutor(opCtx,
+                                      collections.getMainAcquisition(),
+                                      std::move(canonicalQuery),
+                                      yieldPolicy,
+                                      plannerParams);
+        } else {
+            return getClassicExecutor(
+                opCtx, &mainColl, std::move(canonicalQuery), yieldPolicy, plannerParams);
+        }
     }();
     if (exec.isOK()) {
         stdx::lock_guard<Client> lk(*opCtx->getClient());
@@ -1633,19 +1652,21 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
     OperationContext* opCtx,
-    const CollectionPtr* collection,
+    VariantCollectionPtrOrAcquisition coll,
     std::unique_ptr<CanonicalQuery> canonicalQuery,
     std::function<void(CanonicalQuery*, bool)> extractAndAttachPipelineStages,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    MultipleCollectionAccessor multi{collection};
 
-    return getExecutor(opCtx,
-                       multi,
-                       std::move(canonicalQuery),
-                       std::move(extractAndAttachPipelineStages),
-                       yieldPolicy,
-                       QueryPlannerParams{plannerOptions});
+    return getExecutor(
+        opCtx,
+        stdx::holds_alternative<const ScopedCollectionAcquisition*>(coll.get())
+            ? MultipleCollectionAccessor{stdx::get<const ScopedCollectionAcquisition*>(coll.get())}
+            : MultipleCollectionAccessor{coll.getCollectionPtr()},
+        std::move(canonicalQuery),
+        std::move(extractAndAttachPipelineStages),
+        yieldPolicy,
+        QueryPlannerParams{plannerOptions});
 }
 
 //
@@ -2777,11 +2798,11 @@ QueryPlannerParams fillOutPlannerParamsForDistinct(OperationContext* opCtx,
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForSimpleDistinct(
     OperationContext* opCtx,
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     const QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     ParsedDistinct* parsedDistinct) {
-    const auto& collection = *coll;
+    const auto& collectionPtr = coll.getCollectionPtr();
 
     invariant(parsedDistinct->getQuery());
     auto collator = parsedDistinct->getQuery()->getCollator();
@@ -2822,7 +2843,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto&& root = stage_builder::buildClassicExecutableTree(
-        opCtx, collection, *parsedDistinct->getQuery(), *soln, ws.get());
+        opCtx, collectionPtr, *parsedDistinct->getQuery(), *soln, ws.get());
 
     auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                             std::move(ws),
@@ -2857,13 +2878,13 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 // 'strictDistinctOnly' parameter.
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>>
 getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
-                                      const CollectionPtr* coll,
+                                      VariantCollectionPtrOrAcquisition coll,
                                       std::vector<std::unique_ptr<QuerySolution>> solutions,
                                       PlanYieldPolicy::YieldPolicy yieldPolicy,
                                       ParsedDistinct* parsedDistinct,
                                       bool flipDistinctScanDirection,
                                       size_t plannerOptions) {
-    const auto& collection = *coll;
+    const auto& collectionPtr = coll.getCollectionPtr();
     const bool strictDistinctOnly = (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -2876,7 +2897,7 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
             std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
             std::unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
             auto&& root = stage_builder::buildClassicExecutableTree(
-                opCtx, collection, *parsedDistinct->getQuery(), *currentSolution, ws.get());
+                opCtx, collectionPtr, *parsedDistinct->getQuery(), *currentSolution, ws.get());
 
             auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                                     std::move(ws),
@@ -2908,17 +2929,17 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
  */
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWithoutProjection(
     OperationContext* opCtx,
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     const CanonicalQuery* cq,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     size_t plannerOptions) {
-    const auto& collection = *coll;
+    const auto& collectionPtr = coll.getCollectionPtr();
 
     auto findCommand = std::make_unique<FindCommandRequest>(cq->getFindCommandRequest());
     findCommand->setProjection(BSONObj());
 
     const boost::intrusive_ptr<ExpressionContext> expCtx;
-    const ExtensionsCallbackReal extensionsCallback(opCtx, &collection->ns());
+    const ExtensionsCallbackReal extensionsCallback(opCtx, &collectionPtr->ns());
 
     auto cqWithoutProjection = uassertStatusOKWithContext(
         CanonicalQuery::canonicalize(opCtx,
@@ -2939,11 +2960,11 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorWith
 }  // namespace
 
 StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDistinct(
-    const CollectionPtr* coll,
+    VariantCollectionPtrOrAcquisition coll,
     size_t plannerOptions,
     ParsedDistinct* parsedDistinct,
     bool flipDistinctScanDirection) {
-    const auto& collection = *coll;
+    const auto& collectionPtr = coll.getCollectionPtr();
 
     auto expCtx = parsedDistinct->getQuery()->getExpCtx();
     OperationContext* opCtx = expCtx->opCtx;
@@ -2952,9 +2973,9 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // Assert that not eligible for bonsai
     uassert(ErrorCodes::InternalErrorNotSupported,
             "distinct command is not eligible for bonsai",
-            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collection));
+            !isEligibleForBonsai(*parsedDistinct->getQuery(), opCtx, collectionPtr));
 
-    if (!collection) {
+    if (!collectionPtr) {
         // Treat collections that do not exist as empty collections.
         return plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                            std::make_unique<WorkingSet>(),
@@ -2976,7 +2997,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDist
     // a soln with the above properties.
 
     auto plannerParams = fillOutPlannerParamsForDistinct(
-        opCtx, collection, plannerOptions, *parsedDistinct, flipDistinctScanDirection);
+        opCtx, collectionPtr, plannerOptions, *parsedDistinct, flipDistinctScanDirection);
 
     // If there are no suitable indices for the distinct hack bail out now into regular planning
     // with no projection.

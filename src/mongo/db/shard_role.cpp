@@ -551,6 +551,15 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
 }
 
+ScopedCollectionAcquisition::ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other)
+    : _opCtx((invariant(other.isCollection()),
+              get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._opCtx)),
+      _acquiredCollection(get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)
+                              ._acquiredCollection) {
+    get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._opCtx = nullptr;
+    other._collectionOrViewAcquisition = std::monostate();
+};
+
 UUID ScopedCollectionAcquisition::uuid() const {
     invariant(exists(),
               str::stream() << "Collection " << nss().toStringForErrorMsg()
@@ -567,9 +576,12 @@ const ScopedCollectionDescription& ScopedCollectionAcquisition::getShardingDescr
 
 const boost::optional<ScopedCollectionFilter>& ScopedCollectionAcquisition::getShardingFilter()
     const {
-    // The collectionDescription will only not be set if the caller as acquired the acquisition
+    // The collectionDescription will only not be set if the caller has acquired the acquisition
     // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
-    invariant(_acquiredCollection.collectionDescription);
+    tassert(7740800,
+            "Getting shard filter on non-sharded or invalid collection",
+            _acquiredCollection.collectionDescription &&
+                _acquiredCollection.collectionDescription->isSharded());
     return _acquiredCollection.ownershipFilter;
 }
 
@@ -615,8 +627,7 @@ ScopedViewAcquisition::~ScopedViewAcquisition() {
 ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
                                               CollectionAcquisitionRequest acquisitionRequest,
                                               LockMode mode) {
-    return std::get<ScopedCollectionAcquisition>(
-        acquireCollectionOrView(opCtx, acquisitionRequest, mode));
+    return ScopedCollectionAcquisition(acquireCollectionOrView(opCtx, acquisitionRequest, mode));
 }
 
 std::vector<ScopedCollectionAcquisition> acquireCollections(
@@ -636,10 +647,9 @@ std::vector<ScopedCollectionAcquisition> acquireCollections(
     std::vector<ScopedCollectionAcquisition> collectionAcquisitions;
     for (auto& acquisition : acquisitions) {
         // It must be a collection, because that's what the acquisition request stated.
-        invariant(std::holds_alternative<ScopedCollectionAcquisition>(acquisition));
+        invariant(acquisition.isCollection());
 
-        collectionAcquisitions.emplace_back(
-            std::move(std::get<ScopedCollectionAcquisition>(acquisition)));
+        collectionAcquisitions.emplace_back(std::move(acquisition));
     }
     return collectionAcquisitions;
 }

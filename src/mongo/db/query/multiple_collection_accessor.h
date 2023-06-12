@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
 
@@ -71,12 +72,15 @@ public:
     explicit MultipleCollectionAccessor(const CollectionPtr& mainColl)
         : MultipleCollectionAccessor(&mainColl) {}
 
+    explicit MultipleCollectionAccessor(const ScopedCollectionAcquisition* mainAcq)
+        : _mainAcq(mainAcq) {}
+
     bool hasMainCollection() const {
-        return _mainColl && _mainColl->get();
+        return (_mainColl && _mainColl->get()) || (_mainAcq && _mainAcq->exists());
     }
 
     const CollectionPtr& getMainCollection() const {
-        return *_mainColl;
+        return _mainAcq ? _mainAcq->getCollectionPtr() : *_mainColl;
     }
 
     const std::map<NamespaceString, CollectionPtr>& getSecondaryCollections() const {
@@ -87,9 +91,19 @@ public:
         return _isAnySecondaryNamespaceAViewOrSharded;
     }
 
+    bool isAcquisition() const {
+        return _mainAcq;
+    }
+
+    const ScopedCollectionAcquisition* getMainAcquisition() const {
+        return _mainAcq;
+    }
+
     const CollectionPtr& lookupCollection(const NamespaceString& nss) const {
         if (_mainColl && _mainColl->get() && nss == _mainColl->get()->ns()) {
             return *_mainColl;
+        } else if (_mainAcq && nss == _mainAcq->getCollectionPtr()->ns()) {
+            return _mainAcq->getCollectionPtr();
         } else if (auto itr = _secondaryColls.find(nss); itr != _secondaryColls.end()) {
             return itr->second;
         }
@@ -98,6 +112,7 @@ public:
 
     void clear() {
         _mainColl = &CollectionPtr::null;
+        _mainAcq = nullptr;
         _secondaryColls.clear();
     }
 
@@ -114,6 +129,7 @@ public:
 
 private:
     const CollectionPtr* _mainColl{&CollectionPtr::null};
+    const ScopedCollectionAcquisition* _mainAcq{};
 
     // Tracks whether any secondary namespace is a view or sharded based on information captured
     // at the time of lock acquisition. This is used to determine if a $lookup is eligible for

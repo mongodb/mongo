@@ -154,25 +154,35 @@ public:
         const BSONObj& cmdObj = request.body;
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.
-        boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(
+        const auto nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+
+        AutoStatsTracker tracker(
             opCtx,
-            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        const auto nss = ctx->getNss();
+            nss,
+            Top::LockType::ReadLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+
+        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::kRead);
+        boost::optional<ScopedCollectionOrViewAcquisition> collectionOrView =
+            supportsLockFreeRead(opCtx)
+            ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
+            : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto defaultCollator =
-            ctx->getCollection() ? ctx->getCollection()->getDefaultCollator() : nullptr;
+        const CollatorInterface* defaultCollator = collectionOrView->getCollectionPtr()
+            ? collectionOrView->getCollectionPtr()->getDefaultCollator()
+            : nullptr;
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
         SerializationContext sc(SerializationContext::stateCommandRequest());
         sc.setTenantIdSource(request.getValidatedTenantId() != boost::none);
 
-        if (ctx->getView()) {
+        if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
-            ctx.reset();
+            collectionOrView.reset();
 
             auto viewAggregation = parsedDistinct.asAggregationCommand();
             if (!viewAggregation.isOK()) {
@@ -191,16 +201,16 @@ public:
                 APIParameters::get(opCtx).getAPIStrict().value_or(false),
                 sc);
 
-            // An empty PrivilegeVector is acceptable because these privileges are only checked on
-            // getMore and explain will not open a cursor.
+            // An empty PrivilegeVector is acceptable because these privileges are only checked
+            // on getMore and explain will not open a cursor.
             return runAggregate(
                 opCtx, nss, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
         }
 
-        const auto& collection = ctx->getCollection();
+        const auto& collection = collectionOrView->getCollectionPtr();
 
-        auto executor = uassertStatusOK(
-            getExecutorDistinct(&collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
+        auto executor = uassertStatusOK(getExecutorDistinct(
+            &collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(executor.get(),
@@ -220,14 +230,40 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
-        boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(
-            opCtx,
-            CommandHelpers::parseNsOrUUID(dbName, cmdObj),
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        const auto& nss = ctx->getNss();
 
-        if (!ctx->getView()) {
+        // TODO: Make nicer. We need to instantiate the AutoStatsTracker before the acquisition in
+        // case it would throw so we can ensure data is written to the profile collection that some
+        // test may rely on. However, we might not know the namespace at this point so it is wrapped
+        // in a boost::optional. If the request is with a UUID we instantiate it after, but this is
+        // fine as the request should not be for sharded collections.
+        boost::optional<AutoStatsTracker> tracker;
+        auto const initializeTracker = [&](const NamespaceString& nss) {
+            tracker.emplace(opCtx,
+                            nss,
+                            Top::LockType::ReadLocked,
+                            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        };
+        auto const nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, cmdObj);
+        auto optNss = nssOrUUID.nss();
+        if (optNss) {
+            initializeTracker(*optNss);
+        }
+        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
+
+        boost::optional<ScopedCollectionOrViewAcquisition> collectionOrView =
+            supportsLockFreeRead(opCtx)
+            ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
+            : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
+        const auto nss = collectionOrView->nss();
+
+        if (!tracker) {
+            initializeTracker(nss);
+        }
+
+        if (collectionOrView->isCollection()) {
+            const auto& coll = collectionOrView->getCollection();
             // Distinct doesn't filter orphan documents so it is not allowed to run on sharded
             // collections in multi-document transactions.
             uassert(
@@ -235,7 +271,7 @@ public:
                 "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
                 "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
                 "alternative.",
-                !opCtx->inMultiDocumentTransaction() || !ctx->getCollection().isSharded());
+                !opCtx->inMultiDocumentTransaction() || !coll.getShardingDescription().isSharded());
 
             // Similarly, we ban readConcern level snapshot for sharded collections.
             uassert(
@@ -243,12 +279,13 @@ public:
                 "Cannot run 'distinct' on a sharded collection with readConcern level 'snapshot'",
                 repl::ReadConcernArgs::get(opCtx).getLevel() !=
                         repl::ReadConcernLevel::kSnapshotReadConcern ||
-                    !ctx->getCollection().isSharded());
+                    !coll.getShardingDescription().isSharded());
         }
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto defaultCollation =
-            ctx->getCollection() ? ctx->getCollection()->getDefaultCollator() : nullptr;
+        const CollatorInterface* defaultCollation = collectionOrView->getCollectionPtr()
+            ? collectionOrView->getCollectionPtr()->getDefaultCollator()
+            : nullptr;
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false, defaultCollation));
 
@@ -267,9 +304,9 @@ public:
                 .getAsync([](auto) {});
         }
 
-        if (ctx->getView()) {
+        if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
-            ctx.reset();
+            collectionOrView.reset();
 
             auto viewAggregation = parsedDistinct.asAggregationCommand();
             uassertStatusOK(viewAggregation.getStatus());
@@ -293,10 +330,8 @@ public:
         uassertStatusOK(replCoord->checkCanServeReadsFor(
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-        const auto& collection = ctx->getCollection();
-
-        auto executor =
-            getExecutorDistinct(&collection, QueryPlannerParams::DEFAULT, &parsedDistinct);
+        auto executor = getExecutorDistinct(
+            &collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct);
         uassertStatusOK(executor.getStatus());
 
         {
@@ -357,6 +392,7 @@ public:
         }
 
         auto curOp = CurOp::get(opCtx);
+        const auto& collection = collectionOrView->getCollectionPtr();
 
         // Get summary information about the plan.
         PlanSummaryStats stats;

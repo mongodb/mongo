@@ -176,8 +176,8 @@ public:
                 MODE_X);
             uassert(ErrorCodes::CommandNotSupportedOnView,
                     "can't re-index a view",
-                    !std::holds_alternative<ScopedViewAcquisition>(collOrViewAcquisition));
-            return std::move(std::get<ScopedCollectionAcquisition>(collOrViewAcquisition));
+                    !collOrViewAcquisition.isView());
+            return ScopedCollectionAcquisition(std::move(collOrViewAcquisition));
         }();
         uassert(ErrorCodes::NamespaceNotFound, "collection does not exist", acquisition.exists());
 
