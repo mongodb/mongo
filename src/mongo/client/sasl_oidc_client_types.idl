@@ -41,11 +41,20 @@ structs:
                 description: "Device code to use in token request"
                 cpp_name: deviceCode
                 type: string
-            verification_uri_complete:
-                description: "URI for end user authentication"
-                cpp_name: verificationUriComplete
+            user_code:
+                description: "Code to be added in verification_uri to authenticate"
+                cpp_name: userCode
                 type: string
-
+            verification_uri:
+                description: "URI for end user authentication"
+                cpp_name: verificationUri
+                type: string
+                optional: true
+            verification_url:
+                description: "Same as verification_uri, some providers use this name"
+                cpp_name: verificationUrl
+                type: string
+                optional: true
     OIDCTokenResponse:
         description: IdP response from the token endpoint.
         strict: false

@@ -658,9 +658,10 @@ void MongoBase::Functions::_setOIDCIdPAuthCallback::call(JSContext* cx, JS::Call
     // the function as a string, stash it into a lambda, and execute it directly when needed.
     std::string stringifiedFn = ValueWriter(cx, args.get(0)).toString();
     SaslOIDCClientConversation::setOIDCIdPAuthCallback(
-        [=](StringData userName, StringData idpEndpoint) {
+        [=](StringData userName, StringData idpEndpoint, StringData userCode) {
             auto* jsScope = getGlobalScriptEngine()->newScope();
-            BSONObj authInfo = BSON("userName" << userName << "activationEndpoint" << idpEndpoint);
+            BSONObj authInfo = BSON("userName" << userName << "userCode" << userCode
+                                               << "activationEndpoint" << idpEndpoint);
             ScriptingFunction function = jsScope->createFunction(stringifiedFn.c_str());
             jsScope->invoke(function, nullptr, &authInfo);
         });

@@ -68,6 +68,7 @@ constexpr auto kGrantTypeParameterDeviceCodeValue =
     "urn:ietf:params:oauth:grant-type:device_code"_sd;
 constexpr auto kGrantTypeParameterRefreshTokenValue = "refresh_token"_sd;
 constexpr auto kDeviceCodeParameterName = "device_code"_sd;
+constexpr auto kCodeParameterName = "code"_sd;
 constexpr auto kRefreshTokenParameterName = kGrantTypeParameterRefreshTokenValue;
 
 inline void appendPostBodyRequiredParams(StringBuilder* sb, StringData clientId) {
@@ -88,8 +89,10 @@ inline void appendPostBodyDeviceCodeRequestParams(
 }
 
 inline void appendPostBodyTokenRequestParams(StringBuilder* sb, StringData deviceCode) {
+    // kDeviceCodeParameterName and kCodeParameterName are the same, IDP's use different names.
     *sb << "&" << kGrantTypeParameterName << "=" << kGrantTypeParameterDeviceCodeValue << "&"
-        << kDeviceCodeParameterName << "=" << uriEncode(deviceCode);
+        << kDeviceCodeParameterName << "=" << uriEncode(deviceCode) << "&" << kCodeParameterName
+        << "=" << uriEncode(deviceCode);
 }
 
 inline void appendPostBodyRefreshFlowParams(StringBuilder* sb, StringData refreshToken) {
@@ -139,8 +142,18 @@ std::pair<std::string, std::string> doDeviceAuthorizationGrantFlow(
     // Simulate end user login via user verification URI.
     auto deviceAuthorizationResponse = OIDCDeviceAuthorizationResponse::parse(
         IDLParserContext{"oidcDeviceAuthorizationResponse"}, deviceAuthorizationResponseObj);
+
+    // IDP's use different names to refer to the verification url.
+    const auto& optURI = deviceAuthorizationResponse.getVerificationUri();
+    const auto& optURL = deviceAuthorizationResponse.getVerificationUrl();
+    uassert(ErrorCodes::BadValue, "Encountered empty device authorization url", optURI || optURL);
+    uassert(ErrorCodes::BadValue,
+            "Encounterd both verification_uri and verification_url",
+            !(optURI && optURL));
+    auto deviceAuthURL = optURI ? optURI.get() : optURL.get();
+
     oidcClientGlobalParams.oidcIdPAuthCallback(
-        principalName, deviceAuthorizationResponse.getVerificationUriComplete());
+        principalName, deviceAuthURL, deviceAuthorizationResponse.getUserCode());
 
     // Poll token endpoint for access and refresh tokens. It should return immediately since
     // the shell blocks on the authenticationSimulator until it completes, but poll anyway.
