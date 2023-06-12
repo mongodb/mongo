@@ -103,10 +103,8 @@ public:
 
         for (size_t i = 0; i < writes.results.size(); ++i) {
             auto idx = firstOpIdx + i;
-            // We do not pass in a proper numErrors since it causes unwanted truncation in error
-            // message generation.
             if (auto error = write_ops_exec::generateError(
-                    opCtx, writes.results[i].getStatus(), idx, 0 /* numErrors */)) {
+                    opCtx, writes.results[i].getStatus(), idx, _numErrors)) {
                 auto replyItem = BulkWriteReplyItem(idx, error.get().getStatus());
                 _replies.emplace_back(replyItem);
                 _numErrors++;
@@ -189,8 +187,7 @@ public:
     void addErrorReply(OperationContext* opCtx,
                        BulkWriteReplyItem& replyItem,
                        const Status& status) {
-        auto error =
-            write_ops_exec::generateError(opCtx, status, replyItem.getIdx(), 0 /* numErrors */);
+        auto error = write_ops_exec::generateError(opCtx, status, replyItem.getIdx(), _numErrors);
         invariant(error);
         replyItem.setStatus(error.get().getStatus());
         replyItem.setOk(status.isOK() ? 1.0 : 0.0);
