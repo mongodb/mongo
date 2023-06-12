@@ -52,6 +52,11 @@ ClusterIdentityLoader* ClusterIdentityLoader::get(OperationContext* operationCon
 }
 
 OID ClusterIdentityLoader::getClusterId() {
+    // TODO SERVER-78051: Re-evaluate use of ClusterIdentityLoader for shards.
+    tassert(7800000,
+            "Unexpectedly tried to get cluster id on a non config server node",
+            serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
+
     stdx::unique_lock<Latch> lk(_mutex);
     invariant(_initializationState == InitializationState::kInitialized && _lastLoadResult.isOK());
     return _lastLoadResult.getValue();
