@@ -67,6 +67,9 @@ BSONObj getReplSecondaryOkMetadata() {
 class ClusterIdentityTest : public ShardingTestFixture {
 public:
     void setUp() {
+        // TODO SERVER-78051: Remove once shards can access the loaded cluster id.
+        serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
     }

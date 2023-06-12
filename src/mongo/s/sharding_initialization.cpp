@@ -246,17 +246,20 @@ Status loadGlobalSettingsFromConfigServer(OperationContext* opCtx,
         }
 
         try {
-            // It's safe to use local read concern on a config server because we'll read from the
-            // local node, and we only enter here if we found a shardIdentity document, which could
-            // only exist locally if we already inserted the cluster identity document. Between
-            // inserting a cluster id and adding a shard, there is at least one majority write on
-            // the added shard (dropping the sessions collection), so we should be guaranteed the
-            // cluster id cannot roll back.
-            auto readConcern = serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)
-                ? repl::ReadConcernLevel::kLocalReadConcern
-                : repl::ReadConcernLevel::kMajorityReadConcern;
-            uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
-                opCtx, catalogClient, readConcern));
+            // TODO SERVER-78051: Re-evaluate use of ClusterIdentityLoader.
+            //
+            // Skip loading the cluster id on config servers to avoid an issue where a failed
+            // initial sync may lead the config server to transiently have a shard identity document
+            // but no cluster id, which would trigger infinite retries.
+            //
+            // To match the shard behavior, the config server should load the cluster id, but
+            // currently shards never use the loaded cluster id, so skipping the load is safe. Only
+            // the config server uses it when adding a new shard, and each config server node will
+            // load this on its first step up to primary.
+            if (!serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                uassertStatusOK(ClusterIdentityLoader::get(opCtx)->loadClusterId(
+                    opCtx, catalogClient, repl::ReadConcernLevel::kMajorityReadConcern));
+            }
 
             // Assert will be raised on failure to talk to config server.
             loadCWWCFromConfigServerForReplication(opCtx);
