@@ -175,8 +175,8 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
     const auto cmdNss = fromCollection.getCommandNS();
 
     BSONObjBuilder builder;
-    builder.append("renameCollection", fromCollection.ns());
-    builder.append("to", toCollection.ns());
+    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection));
+    builder.append("to", NamespaceStringUtil::serialize(toCollection));
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");

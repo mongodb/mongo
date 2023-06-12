@@ -47,7 +47,7 @@ std::string ResourcePattern::toString() const {
         case MatchTypeEnum::kMatchCollectionName:
             return "<collection " + _ns.coll().toString() + " in any database>";
         case MatchTypeEnum::kMatchExactNamespace:
-            return "<" + _ns.ns() + ">";
+            return "<" + NamespaceStringUtil::serializeForAuth(_ns) + ">";
         case MatchTypeEnum::kMatchAnyNormalResource:
             return "<all normal resources>";
         case MatchTypeEnum::kMatchAnyResource:

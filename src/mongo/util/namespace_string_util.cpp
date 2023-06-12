@@ -96,6 +96,11 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
     }
 }
 
+std::string NamespaceStringUtil::serializeForAuth(const NamespaceString& ns,
+                                                  const SerializationContext& context) {
+    return ns.toStringWithTenantId();
+}
+
 NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenantId,
                                                  StringData ns,
                                                  const SerializationContext& context) {
