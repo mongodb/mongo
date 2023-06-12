@@ -1733,6 +1733,18 @@ var ReplSetTest = function(opts) {
             }
         }
 
+        // Wait for the query analysis writer to finish setting up to avoid background writes
+        // after initiation is done.
+        if (!doNotWaitForReplication) {
+            primary = self.getPrimary();
+            // TODO(SERVER-57924): cleanup asCluster() to avoid checking here.
+            if (self._notX509Auth(primary) || primary.isTLS()) {
+                asCluster(self.nodes, function() {
+                    self.waitForQueryAnalysisWriterSetup(primary);
+                });
+            }
+        }
+
         // Turn off the failpoints now that initial sync and initial setup is complete.
         if (failPointsSupported) {
             this.nodes.forEach(function(conn) {
@@ -1764,6 +1776,16 @@ var ReplSetTest = function(opts) {
             self.stepUp(newPrimary);
             if (!doNotWaitForPrimaryOnlyServices) {
                 self.waitForPrimaryOnlyServices(newPrimary);
+            }
+        });
+
+        // Wait for the query analysis writer to finish setting up to avoid background writes
+        // after initiation is done.
+        asCluster(this.nodes, function() {
+            const newPrimary = self.nodes[0];
+            self.stepUp(newPrimary);
+            if (!doNotWaitForPrimaryOnlyServices) {
+                self.waitForQueryAnalysisWriterSetup(newPrimary);
             }
         });
 
@@ -1866,6 +1888,41 @@ var ReplSetTest = function(opts) {
                 return services[s].state === undefined || services[s].state === "running";
             });
         }, "Timed out waiting for primary only services to finish rebuilding");
+    };
+
+    /**
+     * If query sampling is supported, waits for the query analysis writer to finish setting up
+     * after a primary is elected. This is useful for tests that expect particular write timestamps
+     * since the query analysis writer setup involves building indexes for the config.sampledQueries
+     * and config.sampledQueriesDiff collections.
+     */
+    this.waitForQueryAnalysisWriterSetup = function(primary) {
+        primary = primary || self.getPrimary();
+
+        const serverStatusRes = assert.commandWorked(primary.adminCommand({serverStatus: 1}));
+        if (!serverStatusRes.hasOwnProperty("queryAnalyzers")) {
+            // Query sampling is not supported on this replica set. That is, either it uses binaries
+            // released before query sampling was introduced or it uses binaries where query
+            // sampling is guarded by a feature flag and the feature flag is not enabled.
+            return;
+        }
+
+        const getParamsRes = primary.adminCommand({getParameter: 1, multitenancySupport: 1});
+        if (!getParamsRes.ok || getParamsRes["multitenancySupport"]) {
+            // Query sampling is not supported on a multi-tenant replica set.
+            return;
+        }
+
+        jsTest.log("Waiting for query analysis writer to finish setting up");
+
+        assert.soonNoExcept(function() {
+            const sampledQueriesIndexes =
+                primary.getCollection("config.sampledQueries").getIndexes();
+            const sampledQueriesDiffIndexes =
+                primary.getCollection("config.sampledQueriesDiff").getIndexes();
+            // There should be two indexes: _id index and TTL index.
+            return sampledQueriesIndexes.length == 2 && sampledQueriesDiffIndexes.length == 2;
+        }, "Timed out waiting for query analysis writer to finish setting up");
     };
 
     /**
