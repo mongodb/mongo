@@ -36,7 +36,7 @@
 namespace mongo::plan_cache_commands {
 
 StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
-                                                         StringData ns,
+                                                         const NamespaceString& nss,
                                                          const BSONObj& cmdObj) {
     // query - required
     BSONElement queryElt = cmdObj.getField("query");
@@ -85,7 +85,7 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     }
 
     // Create canonical query
-    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString{ns});
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(queryObj.getOwned());
     findCommand->setSort(sortObj.getOwned());
     findCommand->setProjection(projObj.getOwned());

@@ -42,7 +42,7 @@ namespace mongo::plan_cache_commands {
  * that command represented as a CanonicalQuery.
  */
 StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
-                                                         StringData ns,
+                                                         const NamespaceString& nss,
                                                          const BSONObj& cmdObj);
 
 /**

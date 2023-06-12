@@ -67,7 +67,7 @@ PlanCache* getPlanCache(OperationContext* opCtx, const CollectionPtr& collection
 Status clear(OperationContext* opCtx,
              const CollectionPtr& collection,
              PlanCache* planCache,
-             StringData ns,
+             const NamespaceString& nss,
              const BSONObj& cmdObj) {
     invariant(planCache);
 
@@ -76,7 +76,7 @@ Status clear(OperationContext* opCtx,
     // - clear plans for single query shape when a query shape is described in the
     //   command arguments.
     if (cmdObj.hasField("query")) {
-        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, ns, cmdObj);
+        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, nss, cmdObj);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -112,8 +112,7 @@ Status clear(OperationContext* opCtx,
                                    version,
                                    false /*matchSecondaryCollections*/);
 
-    LOGV2_DEBUG(
-        23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", "namespace"_attr = ns);
+    LOGV2_DEBUG(23908, 1, "{namespace}: Cleared plan cache", "Cleared plan cache", logAttrs(nss));
 
     return Status::OK();
 }
@@ -185,7 +184,7 @@ bool PlanCacheClearCommand::run(OperationContext* opCtx,
     }
 
     auto planCache = getPlanCache(opCtx, ctx.getCollection());
-    uassertStatusOK(clear(opCtx, ctx.getCollection(), planCache, nss.ns(), cmdObj));
+    uassertStatusOK(clear(opCtx, ctx.getCollection(), planCache, nss, cmdObj));
     return true;
 }
 

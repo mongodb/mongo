@@ -221,7 +221,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
     // - clear index filters for single query shape when a query shape is described in the
     //   command arguments.
     if (cmdObj.hasField("query")) {
-        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns().ns(), cmdObj);
+        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns(), cmdObj);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -364,7 +364,7 @@ Status SetFilter::set(OperationContext* opCtx,
         }
     }
 
-    auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns().ns(), cmdObj);
+    auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns(), cmdObj);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }
