@@ -1262,10 +1262,6 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
     }
 
     if (!params.sslCAFile.empty()) {
-        // SChannel always has a CA even when the user does not specify one
-        // The openssl implementations uses this to decide if it wants to do certificate validation
-        // on the server side.
-        _sslConfiguration.hasCA = true;
 
         auto swChain = readCertChains(params.sslCAFile, params.sslCRLFile);
         if (!swChain.isOK()) {
@@ -1305,7 +1301,6 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         }
 
         _serverEngine.CAstore = std::move(swChain.getValue());
-        _sslConfiguration.hasCA = true;
     }
     _serverEngine.hasCRL = !params.sslCRLFile.empty();
 
@@ -1329,10 +1324,8 @@ Status SSLManagerWindows::_loadCertificates(const SSLParams& params) {
         if (!params.sslCAFile.empty()) {
             LOGV2_WARNING(23271,
                           "Mixing certs from the system certificate store and PEM files. This may "
-                          "produced unexpected results.");
+                          "produce unexpected results.");
         }
-
-        _sslConfiguration.hasCA = true;
     }
 
     if (_sslCertificate) {
@@ -1983,9 +1976,6 @@ Future<SSLPeerInfo> SSLManagerWindows::parseAndValidatePeerCertificate(
     }
 
     recordTLSVersion(tlsVersionStatus.getValue(), hostForLogging);
-
-    if (!_sslConfiguration.hasCA && isSSLServer)
-        return Future<SSLPeerInfo>::makeReady(SSLPeerInfo(sni));
 
     SECURITY_STATUS ss = QueryContextAttributes(ssl, SECPKG_ATTR_REMOTE_CERT_CONTEXT, &cert);
 

@@ -878,7 +878,6 @@ bool SSLConfiguration::isClusterMember(
 
 void SSLConfiguration::getServerStatusBSON(BSONObjBuilder* security) const {
     security->append("SSLServerSubjectName", _serverSubjectName.toString());
-    security->appendBool("SSLServerHasCertificateAuthority", hasCA);
     security->appendDate("SSLServerCertificateExpirationDate", serverCertificateExpirationDate);
 }
 

@@ -843,19 +843,10 @@ certs:
 # Split Horizon
 ###
 
-- name: 'splithorizon-ca.pem'
-  description: CA for split horizon testing.
-  Subject: {O: 'MongoDB, Inc.', CN: 'Kernel Split Horizon Test CA'}
-  Issuer: self
-  extensions:
-    subjectKeyIdentifier: hash
-    authorityKeyIdentifier: keyid
-    basicConstraints: {CA: true}
-
 - name: 'splithorizon-server.pem'
   description: Server certificate for split horizon testing.
   Subject: {O: 'MongoDB, Inc. (Splithorizon)', CN: 'server'}
-  Issuer: 'splithorizon-ca.pem'
+  Issuer: 'ca.pem'
   extensions:
     extendedKeyUsage: [serverAuth, clientAuth]
     subjectAltName:

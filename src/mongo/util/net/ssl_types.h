@@ -161,7 +161,6 @@ public:
 
     SSLX509Name clientSubjectName;
     Date_t serverCertificateExpirationDate;
-    bool hasCA = false;
 
 private:
     SSLX509Name _serverSubjectName;

@@ -15,58 +15,69 @@ if (HOST_TYPE == "windows") {
     // Current User.
     runProgram("certutil.exe", "-addstore", "-f", "Root", "jstests\\libs\\trusted-ca.pem");
 }
+try {
+    const x509Options = {
+        sslMode: 'requireSSL',
+        sslPEMKeyFile: 'jstests/libs/trusted-server.pem',
+        sslCAFile: 'jstests/libs/trusted-ca.pem',
+        sslAllowInvalidCertificates: '',
+        sslWeakCertificateValidation: '',
+    };
 
-const x509Options = {
-    sslMode: 'requireSSL',
-    sslPEMKeyFile: 'jstests/libs/trusted-server.pem',
-    sslCAFile: 'jstests/libs/trusted-ca.pem',
-    sslAllowInvalidCertificates: '',
-    sslWeakCertificateValidation: '',
-};
-
-const rst = new ReplSetTest(
-    {nodes: 2, name: "sslSet", useHostName: false, nodeOptions: x509Options, waitForKeys: false});
-rst.startSet();
-rst.initiate();
-
-const subShellCommand = function(hosts) {
-    var Ms = [];
-    for (let i = 0; i < 10; i++) {
-        Ms.push(
-            new Mongo("mongodb://" + hosts[0] + "," + hosts[1] + "/?ssl=true&replicaSet=sslSet"));
-    }
-
-    for (let i = 0; i < 10; i++) {
-        var db = Ms[i].getDB("test");
-        db.setSecondaryOk();
-        db.col.find().readPref("secondary").toArray();
-    }
-};
-
-const subShellCommandFormatter = function(replSet) {
-    var hosts = [];
-    replSet.nodes.forEach((node) => {
-        hosts.push("localhost:" + node.port);
+    const rst = new ReplSetTest({
+        nodes: 2,
+        name: "sslSet",
+        useHostName: false,
+        nodeOptions: x509Options,
+        waitForKeys: false
     });
+    rst.startSet();
+    rst.initiate();
 
-    let command = `
-            (function () {
-                let command = ${subShellCommand.toString()};
-                let hosts = ${tojson(hosts)};
-                command(hosts);
-            }());`;
+    const subShellCommand = function(hosts) {
+        var Ms = [];
+        for (let i = 0; i < 10; i++) {
+            Ms.push(new Mongo("mongodb://" + hosts[0] + "," + hosts[1] +
+                              "/?ssl=true&replicaSet=sslSet"));
+        }
 
-    return command;
-};
+        for (let i = 0; i < 10; i++) {
+            var db = Ms[i].getDB("test");
+            db.setSecondaryOk();
+            db.col.find().readPref("secondary").toArray();
+        }
+    };
 
-function runWithEnv(args, env) {
-    const pid = _startMongoProgram({args: args, env: env});
-    return waitProgram(pid);
+    const subShellCommandFormatter = function(replSet) {
+        var hosts = [];
+        replSet.nodes.forEach((node) => {
+            hosts.push("localhost:" + node.port);
+        });
+
+        let command = `
+                (function () {
+                    let command = ${subShellCommand.toString()};
+                    let hosts = ${tojson(hosts)};
+                    command(hosts);
+                }());`;
+
+        return command;
+    };
+
+    function runWithEnv(args, env) {
+        const pid = _startMongoProgram({args: args, env: env});
+        return waitProgram(pid);
+    }
+
+    const subShellArgs = ['mongo', '--nodb', '--eval', subShellCommandFormatter(rst)];
+
+    const retVal = runWithEnv(subShellArgs, {"SSL_CERT_FILE": "jstests/libs/trusted-ca.pem"});
+    assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
+
+    rst.stopSet();
+} finally {
+    if (HOST_TYPE == "windows") {
+        const trusted_ca_thumbprint = cat('jstests/libs/ca.pem.digest.sha1');
+        runProgram("certutil.exe", "-delstore", "-f", "Root", trusted_ca_thumbprint);
+    }
 }
-
-const subShellArgs = ['mongo', '--nodb', '--eval', subShellCommandFormatter(rst)];
-
-const retVal = runWithEnv(subShellArgs, {"SSL_CERT_FILE": "jstests/libs/trusted-ca.pem"});
-assert.eq(retVal, 0, 'mongo shell did not succeed with exit code 0');
-
-rst.stopSet();
