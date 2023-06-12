@@ -1577,7 +1577,6 @@ void ExecCommandDatabase::_initiateCommand() {
     _invocation->checkAuthorization(opCtx, request);
     const auto dbName =
         DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
-    const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1781,8 +1780,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (!opCtx->getClient()->isInDirectClient() &&
-        readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
-        (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
+        readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern) {
         boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
