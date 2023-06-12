@@ -1,6 +1,17 @@
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" > /dev/null 2>&1 && pwd)"
 . "$DIR/prelude.sh"
 
+packagesfile=${project}-${build_variant}-${revision}-${build_id}-packages.tgz
+
+curl https://s3.amazonaws.com/mciuploads/${project}/${build_variant}/${revision}/artifacts/${build_id}-packages.tgz >> $packagesfile
+
+podman run \
+  -v $(pwd):$(pwd) \
+  -w $(pwd) \
+  --env-host \
+  ${UPLOAD_LOCK_IMAGE} \
+  upload-lock -key=${packagesfile} -tag=task-id=${EVERGREEN_TASK_ID} ${packagesfile}
+
 cd src
 
 . ./notary_env.sh
