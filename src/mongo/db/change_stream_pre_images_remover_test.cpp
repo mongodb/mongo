@@ -118,6 +118,11 @@ protected:
     const NamespaceString kPreImageEnabledCollection =
         NamespaceString::createNamespaceString_forTest("test.collection");
 
+    // All truncate markers require a creation method. Unless specifically testing the creation
+    // method, the creation method is arbitrary and should not impact post-initialisation behavior.
+    const CollectionTruncateMarkers::MarkersCreationMethod kArbitraryMarkerCreationMethod{
+        CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
+
     PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {}
 
     ChangeStreamPreImage generatePreImage(const UUID& nsUUID, Timestamp ts) {
@@ -284,8 +289,12 @@ TEST_F(PreImagesRemoverTest, hasExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(
-        nullTenantId() /* tenantId */, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(nullTenantId() /* tenantId */,
+                                              std::move(initialMarkers),
+                                              0,
+                                              0,
+                                              100,
+                                              kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }
@@ -314,8 +323,12 @@ TEST_F(PreImagesRemoverTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(
-        nullTenantId() /* tenantId */, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(nullTenantId() /* tenantId */,
+                                              std::move(initialMarkers),
+                                              0,
+                                              0,
+                                              100,
+                                              kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
@@ -333,7 +346,8 @@ TEST_F(PreImagesRemoverTest, serverlessHasNoExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(
+        tenantId, std::move(initialMarkers), 0, 0, 100, kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
@@ -351,7 +365,8 @@ TEST_F(PreImagesRemoverTest, serverlessHasExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(
+        tenantId, std::move(initialMarkers), 0, 0, 100, kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }

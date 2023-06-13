@@ -201,7 +201,8 @@ PreImagesTruncateManager::TenantTruncateMarkers createWholeMarkersFromSamples(
             std::move(initialWholeMarkers.markers),
             0,
             0,
-            initialEstimates.minBytesPerMarker);
+            initialEstimates.minBytesPerMarker,
+            CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
         truncateMarkersMap.emplace(nsUUID, std::move(truncateMarkersForNsUUID));
     }
     return truncateMarkersMap;
@@ -308,7 +309,8 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
             std::move(initialSetOfMarkers.markers),
             initialSetOfMarkers.leftoverRecordsCount,
             initialSetOfMarkers.leftoverRecordsBytes,
-            minBytesPerMarker);
+            minBytesPerMarker,
+            CollectionTruncateMarkers::MarkersCreationMethod::Scanning);
         truncateMap.emplace(currentCollectionUUID.get(), truncateMarkers);
     }
 
@@ -393,7 +395,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
     // The creationMethod returned is the initial creationMethod to try. However, there is no
     // guarantee at this point initialisation won't default to another creation method later in the
     // initalisation process.
-    auto creationMethod = CollectionTruncateMarkers::computeMarkersCreationMethod(
+    auto creationMethod = CollectionTruncateMarkers::computeInitialCreationMethod(
         numRecords, dataSize, minBytesPerMarker);
     LOGV2_INFO(7658604,
                "Decided on initial creation method for pre-images truncate markers initialization",
@@ -591,13 +593,14 @@ void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
         //  Either way, the first pre-images enabled insert to call 'getOrEmplace()' creates the
         //  truncate markers for the 'nsUUID'. Any following calls to 'getOrEmplace()' return a
         //  pointer to the existing truncate markers.
-        truncateMarkersForNsUUID =
-            tenantTruncateMarkers->getOrEmplace(nsUuid,
-                                                tenantId,
-                                                std::deque<CollectionTruncateMarkers::Marker>{},
-                                                0,
-                                                0,
-                                                gPreImagesCollectionTruncateMarkersMinBytes);
+        truncateMarkersForNsUUID = tenantTruncateMarkers->getOrEmplace(
+            nsUuid,
+            tenantId,
+            std::deque<CollectionTruncateMarkers::Marker>{},
+            0,
+            0,
+            gPreImagesCollectionTruncateMarkersMinBytes,
+            CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection);
     }
 
     auto wallTime = preImage.getOperationTime();

@@ -48,11 +48,13 @@ namespace mongo {
 class PreImagesTruncateMarkersPerNsUUID final
     : public CollectionTruncateMarkersWithPartialExpiration {
 public:
-    PreImagesTruncateMarkersPerNsUUID(boost::optional<TenantId> tenantId,
-                                      std::deque<Marker> markers,
-                                      int64_t leftoverRecordsCount,
-                                      int64_t leftoverRecordsBytes,
-                                      int64_t minBytesPerMarker);
+    PreImagesTruncateMarkersPerNsUUID(
+        boost::optional<TenantId> tenantId,
+        std::deque<Marker> markers,
+        int64_t leftoverRecordsCount,
+        int64_t leftoverRecordsBytes,
+        int64_t minBytesPerMarker,
+        CollectionTruncateMarkers::MarkersCreationMethod creationMethod);
 
     /**
      * Creates an 'InitialSetOfMarkers' from samples of pre-images with 'nsUUID'. The generated
@@ -95,6 +97,10 @@ public:
                                               Date_t wallTime,
                                               int64_t numRecords);
 
+    CollectionTruncateMarkers::MarkersCreationMethod markersCreationMethod() {
+        return _creationMethod;
+    }
+
 private:
     friend class PreImagesRemoverTest;
 
@@ -106,6 +112,8 @@ private:
      * When initialized, indicates this is a serverless environment.
      */
     boost::optional<TenantId> _tenantId;
+
+    CollectionTruncateMarkers::MarkersCreationMethod _creationMethod;
 };
 
 }  // namespace mongo

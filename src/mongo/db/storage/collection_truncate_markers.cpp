@@ -350,7 +350,7 @@ CollectionTruncateMarkers::InitialSetOfMarkers CollectionTruncateMarkers::create
 }
 
 CollectionTruncateMarkers::MarkersCreationMethod
-CollectionTruncateMarkers::computeMarkersCreationMethod(
+CollectionTruncateMarkers::computeInitialCreationMethod(
     int64_t numRecords,
     int64_t dataSize,
     int64_t minBytesPerMarker,
@@ -400,7 +400,7 @@ CollectionTruncateMarkers::createFromExistingRecordStore(
           "numRecords"_attr = numRecords,
           "dataSize"_attr = dataSize);
 
-    auto creationMethod = CollectionTruncateMarkers::computeMarkersCreationMethod(
+    auto creationMethod = CollectionTruncateMarkers::computeInitialCreationMethod(
         numRecords, dataSize, minBytesPerMarker, numberOfMarkersToKeepForOplog);
 
     switch (creationMethod) {

@@ -137,12 +137,16 @@ public:
 
     // Given the estimated collection 'dataSize' and 'numRecords', along with a target
     // 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
-    // creation method), computes the appropriate creation method for the collection.
+    // creation method), computes the initial creation method to try for the initialization.
+    //
+    // It's possible the initial creation method is not the actual creation method. However, it will
+    // be the first creation method tried. For example, if estimates of 'dataSize' and 'numRecords'
+    // are really far off, sampling may default back to scanning later on.
     //
     // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
     // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
     // reclaiming the oldest truncate markers.
-    static CollectionTruncateMarkers::MarkersCreationMethod computeMarkersCreationMethod(
+    static CollectionTruncateMarkers::MarkersCreationMethod computeInitialCreationMethod(
         int64_t numRecords,
         int64_t dataSize,
         int64_t minBytesPerMarker,

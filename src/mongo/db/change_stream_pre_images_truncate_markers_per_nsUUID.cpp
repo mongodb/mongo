@@ -86,10 +86,12 @@ PreImagesTruncateMarkersPerNsUUID::PreImagesTruncateMarkersPerNsUUID(
     std::deque<Marker> markers,
     int64_t leftoverRecordsCount,
     int64_t leftoverRecordsBytes,
-    int64_t minBytesPerMarker)
+    int64_t minBytesPerMarker,
+    CollectionTruncateMarkers::MarkersCreationMethod creationMethod)
     : CollectionTruncateMarkersWithPartialExpiration(
           std::move(markers), leftoverRecordsCount, leftoverRecordsBytes, minBytesPerMarker),
-      _tenantId(std::move(tenantId)) {}
+      _tenantId(std::move(tenantId)),
+      _creationMethod(creationMethod) {}
 
 CollectionTruncateMarkers::RecordIdAndWallTime
 PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(const Record& record) {
