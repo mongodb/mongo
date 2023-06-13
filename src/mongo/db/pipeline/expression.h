@@ -3648,10 +3648,7 @@ private:
 class ExpressionTrunc final : public ExpressionRangedArity<ExpressionTrunc, 1, 2> {
 public:
     explicit ExpressionTrunc(ExpressionContext* const expCtx)
-        : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {
-        expCtx->sbeCompatibility =
-            std::min(expCtx->sbeCompatibility, SbeCompatibility::flagGuarded);
-    }
+        : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx) {}
     ExpressionTrunc(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionRangedArity<ExpressionTrunc, 1, 2>(expCtx, std::move(children)) {}
 
