@@ -453,11 +453,6 @@ public:
             }
 
             if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
-                uassert(ErrorCodes::OperationNotSupportedInTransaction,
-                        str::stream() << "Cannot perform a multi-document transaction on a "
-                                         "time-series collection: "
-                                      << ns().toStringForErrorMsg(),
-                        !opCtx->inMultiDocumentTransaction());
                 source = OperationSource::kTimeseriesUpdate;
             }
 

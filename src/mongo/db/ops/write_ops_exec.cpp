@@ -1366,10 +1366,18 @@ WriteResult performUpdates(OperationContext* opCtx,
     const auto& runtimeConstants =
         wholeOp.getLegacyRuntimeConstants().value_or(Variables::generateRuntimeConstants(opCtx));
 
-    // Increment operator counters only during the fisrt single update operation in a batch of
+    // Increment operator counters only during the first single update operation in a batch of
     // updates.
     bool forgoOpCounterIncrements = false;
     for (auto&& singleOp : wholeOp.getUpdates()) {
+        if (source == OperationSource::kTimeseriesUpdate) {
+            uassert(ErrorCodes::OperationNotSupportedInTransaction,
+                    fmt::format(
+                        "Cannot perform a multi update inside of a multi-document transaction on a "
+                        "time-series collection: {}",
+                        ns.toString()),
+                    !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti());
+        }
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         if (opCtx->isRetryableWrite()) {
