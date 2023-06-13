@@ -191,7 +191,7 @@ void ThroughputProbing::_probeUp(double throughput) {
         _stableThroughput = throughput;
         _stableConcurrency = newConcurrency;
         _setConcurrency(_stableConcurrency);
-    } else if (_readTicketHolder->outof() > gMinConcurrency) {
+    } else {
         // Increasing concurrency did not cause throughput to increase, so go back to stable and get
         // a new baseline to compare against.
         _state = ProbingState::kStable;
