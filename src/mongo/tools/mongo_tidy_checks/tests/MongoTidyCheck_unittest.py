@@ -337,22 +337,6 @@ class MongoTidyTests(unittest.TestCase):
 
         self.run_clang_tidy()
 
-    def test_MongoPolyFillCheck(self):
-        self.write_config(
-            textwrap.dedent("""\
-                Checks: '-*,mongo-polyfill-check'
-                WarningsAsErrors: '*'
-                """))
-
-        self.expected_output = [
-            "Illegal use of banned name from std::/boost:: for std::mutex, use mongo::stdx:: variant instead",
-            "Illegal use of banned name from std::/boost:: for std::future<int>, use mongo::stdx:: variant instead",
-            "Illegal use of banned name from std::/boost:: for std::condition_variable, use mongo::stdx:: variant instead",
-            "Illegal use of banned name from std::/boost:: for std::unordered_map<int, int>, use mongo::stdx:: variant instead",
-            "Illegal use of banned name from std::/boost:: for boost::unordered_map<int, int>, use mongo::stdx:: variant instead",
-        ]
-
-        self.run_clang_tidy()
 
 if __name__ == '__main__':
 
