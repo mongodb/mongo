@@ -149,7 +149,11 @@ bool updateShardKeyForDocumentLegacy(OperationContext* opCtx,
     auto updatePreImage = documentKeyChangeInfo.getPreImage().getOwned();
     auto updatePostImage = documentKeyChangeInfo.getPostImage().getOwned();
 
-    auto deleteCmdObj = constructShardKeyDeleteCmdObj(nss, updatePreImage);
+    // If the WouldChangeOwningShard error happens for a timeseries collection, the pre-image is
+    // a measurement to be deleted and so the delete command should be sent to the timeseries view.
+    auto deleteCmdObj = constructShardKeyDeleteCmdObj(
+        nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
+        updatePreImage);
     auto insertCmdObj = constructShardKeyInsertCmdObj(nss, updatePostImage, fleCrudProcessed);
 
     return executeOperationsAsPartOfShardKeyUpdate(
@@ -190,8 +194,11 @@ SemiFuture<bool> updateShardKeyForDocument(const txn_api::TransactionClient& txn
                                            const NamespaceString& nss,
                                            const WouldChangeOwningShardInfo& changeInfo,
                                            bool fleCrudProcessed) {
+    // If the WouldChangeOwningShard error happens for a timeseries collection, the pre-image is
+    // a measurement to be deleted and so the delete command should be sent to the timeseries view.
     auto deleteCmdObj = documentShardKeyUpdateUtil::constructShardKeyDeleteCmdObj(
-        nss, changeInfo.getPreImage().getOwned());
+        nss.isTimeseriesBucketsCollection() ? nss.getTimeseriesViewNamespace() : nss,
+        changeInfo.getPreImage().getOwned());
     auto deleteOpMsg = OpMsgRequest::fromDBAndBody(nss.db(), std::move(deleteCmdObj));
     auto deleteRequest = BatchedCommandRequest::parseDelete(std::move(deleteOpMsg));
 

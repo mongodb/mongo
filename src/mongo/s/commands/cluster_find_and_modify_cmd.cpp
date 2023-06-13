@@ -237,11 +237,18 @@ void updateReplyOnWouldChangeOwningShardSuccess(bool matchedDocOrUpserted,
     }
     lastErrorObjBuilder.doneFast();
 
+    // For timeseries collections, the 'postMeasurementImage' is returned back through
+    // WouldChangeOwningShardInfo from the old shard as well and it should be returned to the user
+    // instead of the post-image.
+    auto postImage = [&] {
+        return changeInfo.getUserPostImage() ? *changeInfo.getUserPostImage()
+                                             : changeInfo.getPostImage();
+    }();
+
     if (updatedExistingDocument) {
-        result->append(
-            "value", shouldReturnPostImage ? changeInfo.getPostImage() : changeInfo.getPreImage());
+        result->append("value", shouldReturnPostImage ? postImage : changeInfo.getPreImage());
     } else if (upserted && shouldReturnPostImage) {
-        result->append("value", changeInfo.getPostImage());
+        result->append("value", postImage);
     } else {
         result->appendNull("value");
     }
@@ -486,11 +493,11 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
             "Cannot perform findAndModify with sort on a sharded timeseries collection",
             !cmdObj.hasField("sort"));
 
-    // TODO SERVER-76871: Remove this check. For now, we only support findAndModify remove on
+    // TODO SERVER-77775: Remove this check. For now, we do not support findAndModify upsert on
     // sharded timeseries collections.
-    uassert(7653001,
-            "Cannot perform findAndModify update on a sharded timeseries collection",
-            cmdObj["remove"].trueValue());
+    uassert(7687101,
+            "Cannot perform findAndModify upsert on a sharded timeseries collection",
+            !cmdObj["upsert"].trueValue());
 
     return bucketCollCri;
 }

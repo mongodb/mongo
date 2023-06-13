@@ -165,6 +165,7 @@ function makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation) {
 
 function makeFindOneAndUpdateCommand(
     coll, filter, update, returnNew, upsert, fields, sort, collation) {
+    assert(filter !== undefined && update !== undefined);
     let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, update: update};
     if (returnNew !== undefined) {
         findAndModifyCmd["new"] = returnNew;
@@ -490,7 +491,7 @@ function testFindOneAndUpdate({
 
     const findAndModifyCmd = makeFindOneAndUpdateCommand(
         coll, filter, update, returnNew, upsert, fields, sort, collation);
-    jsTestLog(`Running findAndModify remove: ${tojson(findAndModifyCmd)}`);
+    jsTestLog(`Running findAndModify update: ${tojson(findAndModifyCmd)}`);
 
     // TODO SERVER-76583: Remove this check and always verify the result or verify the 'errorCode'.
     if (coll.getDB().getSession().getOptions().shouldRetryWrites()) {
@@ -503,10 +504,9 @@ function testFindOneAndUpdate({
         return;
     }
 
-    const explainRes = assert.commandWorked(
-        coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
-    jsTestLog(`Explain: ${tojson(explainRes)}`);
     if (bucketFilter !== undefined) {
+        const explainRes = assert.commandWorked(
+            coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
         verifyExplain({
             explain: explainRes,
             rootStageName: rootStage,
@@ -813,6 +813,154 @@ function testFindOneAndRemoveOnShardedCollection({
         assert.commandFailedWithCode(
             testDB.runCommand(findAndModifyCmd), 7308305, `cmd = ${tojson(findAndModifyCmd)}`);
     }
+}
+
+/**
+ * Verifies that a findAndModify update on a sharded timeseries collection returns the expected
+ * result(s) 'res'.
+ *
+ * - initialDocList: The initial documents in the collection.
+ * - cmd.filter: The 'query' spec for the findAndModify command.
+ * - cmd.update: The 'update' spec for the findAndModify command.
+ * - cmd.returnNew: The 'new' option for the findAndModify command.
+ * - cmd.upsert: The 'upsert' option for the findAndModify command.
+ * - cmd.fields: The projection for the findAndModify command.
+ * - cmd.sort: The sort option for the findAndModify command.
+ * - cmd.collation: The collation option for the findAndModify command.
+ * - res.errorCode: If errorCode is set, we expect the command to fail with that code and other
+ *                  fields of 'res' are ignored.
+ * - res.resultDocList: The expected documents in the collection after the update.
+ * - res.returnDoc: The expected document returned by the findAndModify command.
+ * - res.writeType: "twoPhaseProtocol" or "targeted". On sharded time-series collection, we route
+ *                  queries to shards if the queries contain the shardkey. "twoPhaseProtocol" means
+ *                  that we cannot target a specific data-bearing shard from the query and should
+ *                  the scatter-gather-like two-phase protocol. On the other hand, "targeted" means
+ *                  we can from the query.
+ * - res.dataBearingShard: "primary", "other", "none", or "any". For "none" and "any", only
+ *                         the "twoPhaseProtocol" is allowed.
+ * - res.rootStage: The expected root stage of the explain plan.
+ * - res.bucketFilter: The expected bucket filter of the TS_MODIFY stage.
+ * - res.residualFilter: The expected residual filter of the TS_MODIFY stage.
+ * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
+ * - res.nMatched: The expected number of documents matched by the TS_MODIFY stage.
+ * - res.nModified: The expected number of documents modified by the TS_MODIFY stage.
+ * - res.nUpserted: The expected number of documents upserted by the TS_MODIFY stage.
+ */
+function testFindOneAndUpdateOnShardedCollection({
+    initialDocList,
+    startTxn = false,
+    includeMeta = true,
+    cmd: {filter, update, returnNew, upsert, fields, sort, collation},
+    res: {
+        errorCode,
+        resultDocList,
+        returnDoc,
+        writeType,
+        dataBearingShard,
+        rootStage,
+        bucketFilter,
+        residualFilter,
+        nBucketsUnpacked,
+        nMatched,
+        nModified,
+        nUpserted,
+    },
+}) {
+    const callerName = getCallerName();
+    jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
+
+    const coll = prepareShardedCollection(
+        {collName: callerName, initialDocList: initialDocList, includeMeta: includeMeta});
+
+    const findAndModifyCmd = makeFindOneAndUpdateCommand(
+        coll, filter, update, returnNew, upsert, fields, sort, collation);
+    jsTestLog(`Running findAndModify update: ${tojson(findAndModifyCmd)}`);
+
+    if (errorCode) {
+        assert.commandFailedWithCode(coll.runCommand(findAndModifyCmd), errorCode);
+        assert.sameMembers(initialDocList,
+                           coll.find().toArray(),
+                           "Collection contents did not match expected after update failure.");
+        return;
+    }
+
+    // Explain can't be run inside a transaction.
+    if (!startTxn && bucketFilter) {
+        // Due to the limitation of two-phase write protocol, the TS_MODIFY stage's execution
+        // stats can't really show the results close to real execution. We can just verify
+        // plan part.
+        assert(writeType !== "twoPhaseProtocol" ||
+                   (nBucketsUnpacked === undefined && nMatched === undefined &&
+                    nModified === undefined),
+               "Can't verify stats for the two-phase protocol.");
+
+        const explainRes = assert.commandWorked(
+            coll.runCommand({explain: findAndModifyCmd, verbosity: "executionStats"}));
+        verifyExplain({
+            explain: explainRes,
+            rootStageName: rootStage,
+            opType: "updateOne",
+            bucketFilter: bucketFilter,
+            residualFilter: residualFilter,
+            nBucketsUnpacked: nBucketsUnpacked,
+            nReturned: returnDoc ? 1 : 0,
+            nMatched: nMatched,
+            nModified: nModified,
+            nUpserted: nUpserted,
+        });
+    }
+
+    restartProfiler();
+    const res = (() => {
+        if (!startTxn) {
+            return assert.commandWorked(testDB.runCommand(findAndModifyCmd));
+        }
+
+        const session = coll.getDB().getMongo().startSession();
+        const sessionDb = session.getDatabase(coll.getDB().getName());
+        session.startTransaction();
+        const res = assert.commandWorked(sessionDb.runCommand(findAndModifyCmd));
+        session.commitTransaction();
+
+        return res;
+    })();
+    jsTestLog(`findAndModify update result: ${tojson(res)}`);
+    if (upsert) {
+        assert(nUpserted !== undefined && (nUpserted === 0 || nUpserted === 1),
+               "nUpserted must be 0 or 1");
+
+        assert.eq(1, res.lastErrorObject.n, tojson(res));
+        if (returnNew !== undefined) {
+            assert(returnDoc, "returnDoc must be provided when upsert are true");
+            assert.docEq(returnDoc, res.value, tojson(res));
+        }
+
+        if (nUpserted === 1) {
+            assert(res.lastErrorObject.upserted, `Expected upserted ObjectId: ${tojson(res)}`);
+            assert.eq(false, res.lastErrorObject.updatedExisting, tojson(res));
+        } else {
+            assert(!res.lastErrorObject.upserted, `Expected no upserted ObjectId: ${tojson(res)}`);
+            assert.eq(true, res.lastErrorObject.updatedExisting, tojson(res));
+        }
+    } else {
+        if (returnDoc !== undefined && returnDoc !== null) {
+            assert.eq(1, res.lastErrorObject.n, tojson(res));
+            assert.eq(true, res.lastErrorObject.updatedExisting, tojson(res));
+            assert.docEq(returnDoc, res.value, tojson(res));
+        } else {
+            assert.eq(0, res.lastErrorObject.n, tojson(res));
+            assert.eq(false, res.lastErrorObject.updatedExisting, tojson(res));
+            assert.eq(null, res.value, tojson(res));
+        }
+    }
+
+    if (resultDocList !== undefined) {
+        assert.sameMembers(resultDocList,
+                           coll.find().toArray(),
+                           "Collection contents did not match expected after update");
+    }
+
+    verifyThatRequestIsRoutedToCorrectShard(coll, "findAndModify", writeType, dataBearingShard);
 }
 
 /**

@@ -151,6 +151,18 @@ protected:
      */
     void _prepareToReturnMeasurement(WorkingSetID& out);
 
+    /**
+     * Gets the user-level shard key paths.
+     */
+    const std::vector<std::unique_ptr<FieldRef>>& _getUserLevelShardKeyPaths(
+        const ScopedCollectionDescription& collDesc);
+
+    /**
+     * Gets immutable paths when the request is user-initiated and the timeseries collection is
+     * sharded and the request does not come from the router.
+     */
+    const std::vector<std::unique_ptr<FieldRef>>& _getImmutablePaths();
+
     // A user-initiated write is one which is not caused by oplog application and is not part of a
     // chunk migration.
     bool _isUserInitiatedUpdate;
@@ -214,16 +226,19 @@ private:
 
     void _checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
                                              const BSONObj& oldBucket,
+                                             const BSONObj& newMeasurement,
                                              const BSONObj& oldMeasurement);
 
     void _checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
                                           const BSONObj& newBucket,
-                                          const BSONObj& oldBucke,
+                                          const BSONObj& oldBucket,
+                                          const BSONObj& newMeasurement,
                                           const BSONObj& oldMeasurementt);
 
     void _checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
-                                           const BSONObj& oldBucke,
-                                           const BSONObj& oldMeasurementt);
+                                           const BSONObj& oldBucket,
+                                           const BSONObj& newMeasurement,
+                                           const BSONObj& oldMeasurement);
 
     WorkingSet* _ws;
 
@@ -251,5 +266,8 @@ private:
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.
     WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
+
+    // Temporary storage for _getImmutablePaths().
+    std::vector<std::unique_ptr<FieldRef>> _immutablePaths;
 };
 }  //  namespace mongo

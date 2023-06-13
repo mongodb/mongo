@@ -72,6 +72,10 @@ public:
         return _fieldSet.empty();
     }
 
+    size_t size() const {
+        return _fieldSet.size();
+    }
+
     inline const_iterator begin() const {
         return _fieldSet.begin();
     }

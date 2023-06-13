@@ -8,6 +8,7 @@
  *   requires_persistence,
  *   # 'NamespaceNotSharded' error is supported since 7.1
  *   requires_fcv_71,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 
@@ -127,8 +128,15 @@ setUpShardedCluster({nMongos: 2});
     });
 })();
 
-// TODO SERVER-76871: Add tests for updateOne update and findAndModify update/upsert.
-// TODO SERVER-77132: Add tests for updateOne upsert.
+(function testFindOneAndUpdateOnCollectionWithStaleShardingState() {
+    testWriteOneOnCollectionWithStaleShardingState({
+        writeCmd: {findAndModify: "$$$", query: {f: 106}, update: {$set: {f: 107}}},
+        nAffected: 1,
+        resultDoc: doc7_c_f106,
+    });
+})();
+
+// TODO SERVER-77132: Add tests for updateOne / findAndModify upsert.
 
 tearDownShardedCluster();
 })();
