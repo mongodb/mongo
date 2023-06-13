@@ -96,7 +96,7 @@ MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeCompletion);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforeStartingErrorFlow);
 MONGO_FAIL_POINT_DEFINE(reshardingPauseCoordinatorBeforePersistingStateTransition);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeTellDonorToRefresh);
-MONGO_FAIL_POINT_DEFINE(pauseBeforeInsertCoordinatorDoc);
+MONGO_FAIL_POINT_DEFINE(pauseAfterInsertCoordinatorDoc);
 MONGO_FAIL_POINT_DEFINE(pauseBeforeCTHolderInitialization);
 
 const std::string kReshardingCoordinatorActiveIndexName = "ReshardingCoordinatorActiveIndex";
@@ -1951,7 +1951,7 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
         _metrics->onStarted();
     }
 
-    pauseBeforeInsertCoordinatorDoc.pauseWhileSet();
+    pauseAfterInsertCoordinatorDoc.pauseWhileSet();
 }
 
 void ReshardingCoordinator::_calculateParticipantsAndChunksThenWriteToDisk() {

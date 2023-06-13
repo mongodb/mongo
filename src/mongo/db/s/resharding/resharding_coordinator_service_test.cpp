@@ -704,9 +704,9 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
                                                       CoordinatorStateEnum::kPreparingToDonate};
 
     auto opCtx = operationContext();
-    auto pauseBeforeInsertCoordinatorDoc =
-        globalFailPointRegistry().find("pauseBeforeInsertCoordinatorDoc");
-    auto timesEnteredFailPoint = pauseBeforeInsertCoordinatorDoc->setMode(FailPoint::alwaysOn, 0);
+    auto pauseAfterInsertCoordinatorDoc =
+        globalFailPointRegistry().find("pauseAfterInsertCoordinatorDoc");
+    auto timesEnteredFailPoint = pauseAfterInsertCoordinatorDoc->setMode(FailPoint::alwaysOn, 0);
 
     auto doc = insertStateAndCatalogEntries(CoordinatorStateEnum::kUnused, _originalEpoch);
     doc.setRecipientShards({});
@@ -735,11 +735,11 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpDuringInitializing) {
     auto instanceId =
         BSON(ReshardingCoordinatorDocument::kReshardingUUIDFieldName << doc.getReshardingUUID());
 
-    pauseBeforeInsertCoordinatorDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
+    pauseAfterInsertCoordinatorDoc->waitForTimesEntered(timesEnteredFailPoint + 1);
 
     auto coordinator = getCoordinator(opCtx, instanceId);
     stepDown(opCtx);
-    pauseBeforeInsertCoordinatorDoc->setMode(FailPoint::off, 0);
+    pauseAfterInsertCoordinatorDoc->setMode(FailPoint::off, 0);
     ASSERT_EQ(coordinator->getCompletionFuture().getNoThrow(), ErrorCodes::CallbackCanceled);
 
     coordinator.reset();
