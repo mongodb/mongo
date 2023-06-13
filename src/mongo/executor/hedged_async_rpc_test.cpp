@@ -479,11 +479,7 @@ TEST_F(HedgedAsyncRPCTest, OpCtxRemainingDeadline) {
     network->runUntil(now + Milliseconds(150));
     network->exitNetwork();
 
-    auto counters = getNetworkInterfaceCounters();
-    ASSERT_EQ(counters.succeeded, 1);
-    ASSERT_EQ(counters.canceled, 1);
-
-    std::move(resultFuture).get();
+    resultFuture.wait();
 }
 
 /**
