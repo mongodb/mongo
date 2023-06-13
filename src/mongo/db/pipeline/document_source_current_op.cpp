@@ -43,6 +43,7 @@ const StringData kLocalOpsFieldName = "localOps"_sd;
 const StringData kTruncateOpsFieldName = "truncateOps"_sd;
 const StringData kIdleCursorsFieldName = "idleCursors"_sd;
 const StringData kBacktraceFieldName = "backtrace"_sd;
+const StringData kTargetAllNodesFieldName = "targetAllNodes"_sd;
 
 const StringData kOpIdFieldName = "opid"_sd;
 const StringData kClientFieldName = "client"_sd;
@@ -193,6 +194,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
     boost::optional<TruncationMode> truncateOps;
     boost::optional<CursorMode> idleCursors;
     boost::optional<BacktraceMode> backtrace;
+    boost::optional<bool> targetAllNodes;
 
     for (auto&& elem : spec.embeddedObject()) {
         const auto fieldName = elem.fieldNameStringData();
@@ -228,6 +230,10 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                      "a boolean value, but found: "
                                   << typeName(elem.type()),
                     elem.type() == BSONType::Bool);
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "The 'localOps' parameter of the $currentOp stage cannot be "
+                                     "true when 'targetAllNodes' is also true",
+                    !(targetAllNodes.value_or(false) && elem.boolean()));
             showLocalOpsOnMongoS =
                 (elem.boolean() ? LocalOpsMode::kLocalMongosOps : LocalOpsMode::kRemoteShardOps);
         } else if (fieldName == kTruncateOpsFieldName) {
@@ -254,6 +260,24 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                     elem.type() == BSONType::Bool);
             backtrace = (elem.boolean() ? BacktraceMode::kIncludeBacktrace
                                         : BacktraceMode::kExcludeBacktrace);
+        } else if (fieldName == kTargetAllNodesFieldName) {
+            uassert(ErrorCodes::FailedToParse,
+                    str::stream() << "The 'targetAllNodes' parameter of the $currentOp stage must "
+                                     "be a boolean value, but found: "
+                                  << typeName(elem.type()),
+                    elem.type() == BSONType::Bool);
+            uassert(ErrorCodes::FailedToParse,
+                    "The 'localOps' parameter of the $currentOp stage cannot be "
+                    "true when 'targetAllNodes' is also true",
+                    !((showLocalOpsOnMongoS &&
+                       showLocalOpsOnMongoS.value() == LocalOpsMode::kLocalMongosOps) &&
+                      elem.boolean()));
+            targetAllNodes = elem.boolean();
+            if (targetAllNodes.value_or(false)) {
+                uassert(ErrorCodes::FailedToParse,
+                        "$currentOp supports targetAllNodes parameter only for sharded clusters",
+                        pExpCtx->fromMongos || pExpCtx->inMongos);
+            }
         } else {
             uasserted(ErrorCodes::FailedToParse,
                       str::stream()
@@ -268,7 +292,8 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
                                        showLocalOpsOnMongoS,
                                        truncateOps,
                                        idleCursors,
-                                       backtrace);
+                                       backtrace,
+                                       targetAllNodes);
 }
 
 intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
@@ -279,7 +304,8 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
     boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
     boost::optional<TruncationMode> truncateOps,
     boost::optional<CursorMode> idleCursors,
-    boost::optional<BacktraceMode> backtrace) {
+    boost::optional<BacktraceMode> backtrace,
+    boost::optional<bool> targetAllNodes) {
     return new DocumentSourceCurrentOp(pExpCtx,
                                        includeIdleConnections,
                                        includeIdleSessions,
@@ -287,7 +313,8 @@ intrusive_ptr<DocumentSourceCurrentOp> DocumentSourceCurrentOp::create(
                                        showLocalOpsOnMongoS,
                                        truncateOps,
                                        idleCursors,
-                                       backtrace);
+                                       backtrace,
+                                       targetAllNodes);
 }
 
 Value DocumentSourceCurrentOp::serialize(SerializationOptions opts) const {
@@ -322,6 +349,9 @@ Value DocumentSourceCurrentOp::serialize(SerializationOptions opts) const {
              {kBacktraceFieldName,
               _backtrace.has_value()
                   ? opts.serializeLiteral(_backtrace.value() == BacktraceMode::kIncludeBacktrace)
-                  : Value()}}}});
+                  : Value()},
+             {kTargetAllNodesFieldName,
+              _targetAllNodes.has_value() ? opts.serializeLiteral(_targetAllNodes.value())
+                                          : Value()}}}});
 }
 }  // namespace mongo

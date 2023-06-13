@@ -112,17 +112,26 @@ public:
         boost::optional<LocalOpsMode> showLocalOpsOnMongoS = boost::none,
         boost::optional<TruncationMode> truncateOps = boost::none,
         boost::optional<CursorMode> idleCursors = boost::none,
-        boost::optional<BacktraceMode> backtrace = boost::none);
+        boost::optional<BacktraceMode> backtrace = boost::none,
+        boost::optional<bool> targetAllNodes = boost::none);
 
     const char* getSourceName() const final;
 
     StageConstraints constraints(Pipeline::SplitState pipeState) const final {
         bool showLocalOps =
             _showLocalOpsOnMongoS.value_or(kDefaultLocalOpsMode) == LocalOpsMode::kLocalMongosOps;
+        HostTypeRequirement hostTypeRequirement;
+        if (showLocalOps) {
+            hostTypeRequirement = HostTypeRequirement::kLocalOnly;
+        } else if (_targetAllNodes.value_or(false)) {
+            hostTypeRequirement = HostTypeRequirement::kAllShardServers;
+        } else {
+            hostTypeRequirement = HostTypeRequirement::kAnyShard;
+        }
         StageConstraints constraints(
             StreamType::kStreaming,
             PositionRequirement::kFirst,
-            (showLocalOps ? HostTypeRequirement::kLocalOnly : HostTypeRequirement::kAnyShard),
+            hostTypeRequirement,
             DiskUseRequirement::kNoDiskUse,
             FacetRequirement::kNotAllowed,
             TransactionRequirement::kNotAllowed,
@@ -153,7 +162,8 @@ private:
                             boost::optional<LocalOpsMode> showLocalOpsOnMongoS,
                             boost::optional<TruncationMode> truncateOps,
                             boost::optional<CursorMode> idleCursors,
-                            boost::optional<BacktraceMode> backtrace)
+                            boost::optional<BacktraceMode> backtrace,
+                            boost::optional<bool> targetAllNodes)
         : DocumentSource(kStageName, pExpCtx),
           _includeIdleConnections(includeIdleConnections),
           _includeIdleSessions(includeIdleSessions),
@@ -161,7 +171,8 @@ private:
           _showLocalOpsOnMongoS(showLocalOpsOnMongoS),
           _truncateOps(truncateOps),
           _idleCursors(idleCursors),
-          _backtrace(backtrace) {}
+          _backtrace(backtrace),
+          _targetAllNodes(targetAllNodes) {}
 
     GetNextResult doGetNext() final;
 
@@ -173,6 +184,7 @@ private:
     boost::optional<CursorMode> _idleCursors;
     boost::optional<BacktraceMode> _backtrace;
 
+    boost::optional<bool> _targetAllNodes;
     std::string _shardName;
 
     std::vector<BSONObj> _ops;
