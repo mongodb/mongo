@@ -33,7 +33,6 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/serialization_options.h"
@@ -170,22 +169,6 @@ protected:
     boost::optional<BSONObj> _readPreference = boost::none;
 };
 
-
-static StringData classifyCollectionType(OperationContext* opCtx, const NamespaceString& nss) {
-    if (nss.isCollectionlessAggregateNS()) {
-        return "none"_sd;
-    } else {
-        auto catalog = CollectionCatalog::get(opCtx);
-        auto view = catalog->lookupView(opCtx, nss);
-        if (view) {
-            if (view->timeseries()) {
-                return "timeseries"_sd;
-            } else {
-                return "view"_sd;
-            }
-        }
-        return "collection"_sd;
-    }
-}
+StringData classifyCollectionType(OperationContext* opCtx, const NamespaceString& nss);
 }  // namespace query_stats
 }  // namespace mongo
