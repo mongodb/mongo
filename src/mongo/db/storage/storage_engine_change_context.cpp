@@ -112,11 +112,13 @@ StorageChangeLock::Token StorageEngineChangeContext::killOpsForStorageEngineChan
                     StorageEngineChangeOperationContextDoneNotifier::get(opCtxToKill);
                 doneNotifier.setNotifyWhenDone(service);
                 ++_numOpCtxtsToWaitFor;
+                killedOperationId = opCtxToKill->getOpID();
             }
             LOGV2_DEBUG(5781190,
                         1,
                         "Killed OpCtx for storage change",
-                        "killedOperationId"_attr = killedOperationId);
+                        "killedOperationId"_attr = killedOperationId,
+                        "client"_attr = client->desc());
         }
     }
 
