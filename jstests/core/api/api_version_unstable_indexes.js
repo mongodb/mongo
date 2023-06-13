@@ -21,8 +21,9 @@ load("jstests/libs/analyze_plan.js");      // For 'getWinningPlan'.
 load("jstests/libs/fixture_helpers.js");   // For 'isMongos'.
 load("jstests/libs/columnstore_util.js");  // For 'setUpServerForColumnStoreIndexTest'.
 
+const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_verision_unstable_indexes";
-const coll = db[collName];
+const coll = testDb[collName];
 coll.drop();
 
 assert.commandWorked(coll.insert([
@@ -36,14 +37,14 @@ assert.commandWorked(coll.createIndex({subject: "text"}));
 assert.commandWorked(coll.createIndex({"views": 1}, {sparse: true}));
 
 // The "text" index, "subject_text", can be used normally.
-if (!FixtureHelpers.isMongos(db)) {
+if (!FixtureHelpers.isMongos(testDb)) {
     const explainRes = assert.commandWorked(
-        db.runCommand({explain: {"find": collName, "filter": {$text: {$search: "coffee"}}}}));
+        testDb.runCommand({explain: {"find": collName, "filter": {$text: {$search: "coffee"}}}}));
     assert.eq(getWinningPlan(explainRes.queryPlanner).indexName, "subject_text", explainRes);
 }
 
 // No "text" index can be used for $text search as the "text" index is excluded from API version 1.
-assert.commandFailedWithCode(db.runCommand({
+assert.commandFailedWithCode(testDb.runCommand({
     explain: {"find": collName, "filter": {$text: {$search: "coffee"}}},
     apiVersion: "1",
     apiStrict: true
@@ -51,7 +52,7 @@ assert.commandFailedWithCode(db.runCommand({
                              ErrorCodes.NoQueryExecutionPlans);
 
 // Can not hint a sparse index which is excluded from API version 1 with 'apiStrict: true'.
-assert.commandFailedWithCode(db.runCommand({
+assert.commandFailedWithCode(testDb.runCommand({
     "find": collName,
     "filter": {views: 50},
     "hint": {views: 1},
@@ -60,15 +61,15 @@ assert.commandFailedWithCode(db.runCommand({
 }),
                              ErrorCodes.BadValue);
 
-if (!FixtureHelpers.isMongos(db)) {
-    const explainRes = assert.commandWorked(
-        db.runCommand({explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}));
+if (!FixtureHelpers.isMongos(testDb)) {
+    const explainRes = assert.commandWorked(testDb.runCommand(
+        {explain: {"find": collName, "filter": {views: 50}, "hint": {views: 1}}}));
     assert.eq(getWinningPlan(explainRes.queryPlanner).inputStage.indexName, "views_1", explainRes);
 }
 
-if (setUpServerForColumnStoreIndexTest(db)) {
+if (setUpServerForColumnStoreIndexTest(testDb)) {
     // Column store indexes cannot be created with apiStrict: true.
-    assert.commandFailedWithCode(db.runCommand({
+    assert.commandFailedWithCode(testDb.runCommand({
         createIndexes: coll.getName(),
         indexes: [{key: {"$**": "columnstore"}, name: "$**_columnstore"}],
         apiVersion: "1",
@@ -82,14 +83,14 @@ if (setUpServerForColumnStoreIndexTest(db)) {
     const projection = {_id: 0, x: 1};
 
     // Sanity check that this query can use column scan.
-    assert(planHasStage(db, coll.find({}, projection).explain(), "COLUMN_SCAN"));
+    assert(planHasStage(testDb, coll.find({}, projection).explain(), "COLUMN_SCAN"));
 
     // No hint should work (but redirect to coll scan).
-    assert.commandWorked(db.runCommand(
+    assert.commandWorked(testDb.runCommand(
         {find: coll.getName(), projection: {_id: 0, x: 1}, apiVersion: "1", apiStrict: true}));
 
     // Hint should fail.
-    assert.commandFailedWithCode(db.runCommand({
+    assert.commandFailedWithCode(testDb.runCommand({
         find: coll.getName(),
         projection: projection,
         hint: {"$**": "columnstore"},

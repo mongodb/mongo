@@ -13,9 +13,10 @@
 "use strict";
 load("jstests/libs/api_version_helpers.js");  // For 'APIVersionHelpers'.
 
+const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_new_52_language_features";
 const viewName = collName + "_view";
-const coll = db[collName];
+const coll = testDb[collName];
 coll.drop();
 assert.commandWorked(coll.insert({a: 1, arr: [2, 1, 4]}));
 
@@ -89,7 +90,7 @@ for (const pipeline of stablePipelines) {
     APIVersionHelpers.assertViewSucceedsWithAPIStrict(pipeline, viewName, collName);
 
     // Assert error is not thrown when running without apiStrict=true.
-    assert.commandWorked(db.runCommand({
+    assert.commandWorked(testDb.runCommand({
         aggregate: coll.getName(),
         pipeline: pipeline,
         apiVersion: "1",
