@@ -196,6 +196,14 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
+
+    if (isWriteBatchFinished(*batch)) {
+        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
+        // should now be able to fully abort the bucket.
+        internal::abort(catalog, stripe, stripeLock, batch, getBatchStatus());
+        return getBatchStatus();
+    }
+
     Bucket* bucket =
         internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
                                                   stripe,
@@ -203,14 +211,7 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
                                                   batch->bucketHandle.bucketId,
                                                   internal::BucketPrepareAction::kPrepare);
 
-    if (isWriteBatchFinished(*batch)) {
-        // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
-        // should now be able to fully abort the bucket.
-        if (bucket) {
-            internal::abort(catalog, stripe, stripeLock, batch, getBatchStatus());
-        }
-        return getBatchStatus();
-    } else if (!bucket) {
+    if (!bucket) {
         internal::abort(catalog,
                         stripe,
                         stripeLock,

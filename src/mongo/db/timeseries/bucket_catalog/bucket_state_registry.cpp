@@ -242,6 +242,9 @@ StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
         return StateChangeSucessful::kNo;
     }
 
+    // We cannot prepare an already prepared bucket.
+    invariant(!isBucketStatePrepared(it->second));
+
     it->second = BucketState::kPrepared;
     return StateChangeSucessful::kYes;
 }

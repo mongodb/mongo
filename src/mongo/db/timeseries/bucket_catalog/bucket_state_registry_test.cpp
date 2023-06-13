@@ -309,6 +309,16 @@ DEATH_TEST_F(BucketStateRegistryTest, CannotInitializeAPreparedBucket, "invarian
     ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
 }
 
+DEATH_TEST_F(BucketStateRegistryTest, CannotPrepareAnAlreadyPreparedBucket, "invariant") {
+    // Start with a 'kPrepared' bucket in the registry.
+    auto& bucket = createBucket(info1);
+    ASSERT_OK(initializeBucketState(bucketStateRegistry, bucket.bucketId));
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+    ASSERT_TRUE(doesBucketStateMatch(bucket.bucketId, BucketState::kPrepared));
+    // We expect to invariant when attempting to prepare an untracked bucket.
+    (void)prepareBucketState(bucketStateRegistry, bucket.bucketId);
+}
+
 TEST_F(BucketStateRegistryTest, TransitionsFromPreparedAndClearedState) {
     RAIIServerParameterControllerForTest controller{"featureFlagTimeseriesScalabilityImprovements",
                                                     true};
