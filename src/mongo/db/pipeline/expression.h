@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/data_range.h"
+#include "mongo/db/pipeline/percentile_algo.h"
 #include "mongo/platform/basic.h"
 
 #include <algorithm>
@@ -604,7 +605,7 @@ public:
     explicit ExpressionFromAccumulatorQuantile(ExpressionContext* const expCtx,
                                                std::vector<double>& ps,
                                                boost::intrusive_ptr<Expression> input,
-                                               int32_t method)
+                                               PercentileMethod method)
         : Expression(expCtx, {input}), _ps(ps), _input(input), _method(method) {
         expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
     }
@@ -632,7 +633,7 @@ public:
                     "Input to $percentile or $median cannot be an empty array.",
                     input.getArray().size() > 0);
 
-            if (_method != 2 /*continuous*/) {
+            if (_method != PercentileMethod::Continuous) {
                 std::vector<double> samples;
                 samples.reserve(input.getArrayLength());
                 for (const auto& item : input.getArray()) {
@@ -672,8 +673,7 @@ public:
 private:
     std::vector<double> _ps;
     boost::intrusive_ptr<Expression> _input;
-    // TODO SERVER-74894: This should be 'PercentileMethodEnum', not 'int32_t'.
-    int32_t _method;
+    PercentileMethod _method;
 };
 
 /**

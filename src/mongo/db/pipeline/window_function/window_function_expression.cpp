@@ -404,11 +404,12 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
 
     std::vector<double> ps;
-    int32_t method = -1;
+    PercentileMethod method = PercentileMethod::Approximate;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;
     boost::intrusive_ptr<::mongo::Expression> initializeExpr;  // need for serializer.
     boost::optional<WindowBounds> bounds = WindowBounds::defaultBounds();
     auto name = AccumulatorTType::kName;
+
     for (auto&& elem : obj) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == name) {
@@ -421,6 +422,7 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
 
             // Retrieve the values of 'ps' and 'method' from the accumulator's IDL parser.
             std::tie(ps, method) = AccumulatorTType::parsePercentileAndMethod(elem);
+
         } else if (fieldName == kWindowArg) {
             bounds = WindowBounds::parse(elem, sortBy, expCtx);
         } else {
@@ -429,9 +431,9 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
         }
     }
 
-    tassert(7455900,
-            str::stream() << "missing accumulator specification for " << name,
-            initializeExpr && outputExpr && !ps.empty() && method != -1);
+    uassert(7455900,
+            str::stream() << "Missing or incomplete accumulator specification for " << name,
+            initializeExpr && outputExpr && !ps.empty());
 
     return make_intrusive<ExpressionQuantile>(
         expCtx, std::string(name), std::move(outputExpr), initializeExpr, *bounds, ps, method);
