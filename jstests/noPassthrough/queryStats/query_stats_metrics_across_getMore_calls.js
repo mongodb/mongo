@@ -3,7 +3,7 @@
  * calls.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");  // For verifyMetrics and getQueryStatsAggCmd.
+load("jstests/libs/query_stats_utils.js");  // For verifyMetrics and getQueryStatsAggCmd.
 
 (function() {
 "use strict";

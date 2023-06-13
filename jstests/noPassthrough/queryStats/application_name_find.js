@@ -2,7 +2,7 @@
  * Test that applicationName and namespace appear in telemetry for the find command.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 

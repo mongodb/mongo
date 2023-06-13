@@ -275,7 +275,7 @@ std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
  */
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
-    const StringMap<ExpressionContext::ResolvedNamespace>& resolvedNamespaces,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
     const NamespaceString& executionNss,
     AggregateCommandRequest& request,
     boost::optional<CollectionRoutingInfo> cri,
@@ -302,15 +302,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
     // includes all involved namespaces, and creates a shared MongoProcessInterface for use by
     // the pipeline's stages.
-    boost::intrusive_ptr<ExpressionContext> expCtx = makeExpressionContext(
-        opCtx, request, collationObj, uuid, resolvedNamespaces, hasChangeStream);
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        makeExpressionContext(opCtx,
+                              request,
+                              collationObj,
+                              uuid,
+                              resolveInvolvedNamespaces(involvedNamespaces),
+                              hasChangeStream);
 
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(expCtx, executionNss, [&]() {
             return std::make_unique<query_stats::AggregateKeyGenerator>(
-                request, *pipeline, expCtx, executionNss);
+                request, *pipeline, expCtx, involvedNamespaces, executionNss);
         });
     }
     return pipeline;
@@ -408,11 +413,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
     }
 
-    auto resolvedNamespaces = resolveInvolvedNamespaces(involvedNamespaces);
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const auto pipelineBuilder = [&]() {
         auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
-                                                           resolvedNamespaces,
+                                                           involvedNamespaces,
                                                            namespaces.executionNss,
                                                            request,
                                                            cri,
@@ -478,7 +482,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         expCtx = make_intrusive<ExpressionContext>(
             opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
-        expCtx->setResolvedNamespaces(resolvedNamespaces);
+        expCtx->addResolvedNamespaces(involvedNamespaces);
 
         // Skip query stats recording for queryable encryption queries.
         if (!shouldDoFLERewrite) {
@@ -488,7 +492,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             query_stats::registerRequest(expCtx, namespaces.executionNss, [&]() {
                 auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request, *pipeline, expCtx, namespaces.executionNss);
+                    request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
             });
         }
     }

@@ -72,11 +72,21 @@ void AggregateKeyGenerator::appendCommandSpecificComponents(
         opts.appendLiteral(
             &bob, AggregateCommandRequest::kBypassDocumentValidationFieldName, bool(param.get()));
     }
+
+    // otherNss
+    if (!_involvedNamespaces.empty()) {
+        BSONArrayBuilder otherNss = bob.subarrayStart(kOtherNssFieldName);
+        for (const auto& nss : _involvedNamespaces) {
+            otherNss.append(query_shape::extractNamespaceShape(nss, opts));
+        }
+        otherNss.done();
+    }
 }
 
 BSONObj AggregateKeyGenerator::makeQueryStatsKey(
     const SerializationOptions& opts, const boost::intrusive_ptr<ExpressionContext>& expCtx) const {
     auto pipeline = Pipeline::parse(_request.getPipeline(), expCtx);
+    expCtx->setUserRoles();
     return _makeQueryStatsKeyHelper(opts, expCtx, *pipeline);
 }
 

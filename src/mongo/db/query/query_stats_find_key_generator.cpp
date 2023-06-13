@@ -73,6 +73,7 @@ BSONObj FindKeyGenerator::generate(
                                    std::move(request),
                                    ExtensionsCallbackNoop(),
                                    MatchExpressionParser::kAllowAllSpecialFeatures));
+    expCtx->setUserRoles();
 
     auto opts = hmacPolicy
         ? SerializationOptions(*hmacPolicy, LiteralSerializationPolicy::kToDebugTypeString)

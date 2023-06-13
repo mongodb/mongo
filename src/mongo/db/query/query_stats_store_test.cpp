@@ -75,7 +75,8 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool applyHmac = false,
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
-        AggregateKeyGenerator aggKeyGenerator(acr, pipeline, expCtx, acr.getNamespace());
+        AggregateKeyGenerator aggKeyGenerator(
+            acr, pipeline, expCtx, pipeline.getInvolvedCollections(), acr.getNamespace());
 
         SerializationOptions opts(literalPolicy);
         if (applyHmac) {
@@ -764,7 +765,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
         hmacApplied);
 }
 
-TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimplePipeline) {
+TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestAllFieldsSimplePipeline) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     AggregateCommandRequest acr(NamespaceString::createNamespaceString_forTest("testDB.testColl"));
     auto matchStage = fromjson(R"({
@@ -1135,7 +1136,7 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestAllFieldsSimp
         })",
         shapified);
 }
-TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) {
+TEST_F(QueryStatsStoreTest, CorrectlyTokenizesAggregateCommandRequestEmptyFields) {
     auto expCtx = make_intrusive<ExpressionContextForTest>();
     AggregateCommandRequest acr(NamespaceString::createNamespaceString_forTest("testDB.testColl"));
     acr.setPipeline({});
@@ -1156,5 +1157,68 @@ TEST_F(QueryStatsStoreTest, CorrectlyRedactsAggregateCommandRequestEmptyFields) 
             "collectionType": "collection"
         })",
         shapified);  // NOLINT (test auto-update)
+}
+
+TEST_F(QueryStatsStoreTest,
+       CorrectlyTokenizesAggregateCommandRequestPipelineWithSecondaryNamespaces) {
+    auto expCtx = make_intrusive<ExpressionContextForTest>();
+    auto nsToUnionWith =
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "otherColl");
+    expCtx->addResolvedNamespaces({nsToUnionWith});
+
+    AggregateCommandRequest acr(
+        NamespaceString::createNamespaceString_forTest(expCtx->ns.dbName(), "testColl"));
+    auto unionWithStage = fromjson(R"({
+            $unionWith: {
+                coll: "otherColl",
+                pipeline: [{$match: {val: "foo"}}]
+            }
+        })");
+    auto sortStage = fromjson("{$sort: {age: 1}}");
+    auto rawPipeline = {unionWithStage, sortStage};
+    acr.setPipeline(rawPipeline);
+    auto pipeline = Pipeline::parse(rawPipeline, expCtx);
+
+    auto shapified = makeTelemetryKeyAggregateRequest(
+        acr, *pipeline, expCtx, true, LiteralSerializationPolicy::kToDebugTypeString);
+    ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
+        R"({
+            "queryShape": {
+                "cmdNs": {
+                    "db": "HASH<test>",
+                    "coll": "HASH<testColl>"
+                },
+                "command": "aggregate",
+                "pipeline": [
+                    {
+                        "$unionWith": {
+                            "coll": "HASH<otherColl>",
+                            "pipeline": [
+                                {
+                                    "$match": {
+                                        "HASH<val>": {
+                                            "$eq": "?string"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        "$sort": {
+                            "HASH<age>": 1
+                        }
+                    }
+                ]
+            },
+            "otherNss": [
+                {
+                    "db": "HASH<test>",
+                    "coll": "HASH<otherColl>"
+                }
+            ],
+            "collectionType": "collection"
+        })",
+        shapified);
 }
 }  // namespace mongo::query_stats

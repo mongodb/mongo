@@ -2,7 +2,7 @@
  * This test confirms that telemetry store key fields are properly nested and none are missing.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 

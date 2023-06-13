@@ -173,3 +173,11 @@ function confirmAllExpectedFieldsPresent(expectedKey, resultingKey) {
     // Make sure the resulting key isn't missing any fields.
     assert.eq(fieldsCounter, Object.keys(expectedKey).length, resultingKey);
 }
+
+function asFieldPath(str) {
+    return "$" + str;
+}
+
+function asVarRef(str) {
+    return "$$" + str;
+}

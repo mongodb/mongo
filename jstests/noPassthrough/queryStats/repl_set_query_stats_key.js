@@ -4,7 +4,7 @@
  * versioning are included for good measure.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 

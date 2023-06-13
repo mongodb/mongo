@@ -1,7 +1,7 @@
 /**
- * Test that $queryStats properly applies hmac to find commands, on mongod and mongos.
+ * Test that $queryStats properly tokenizes find commands, on mongod and mongos.
  */
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 

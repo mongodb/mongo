@@ -992,7 +992,6 @@ Status runAggregate(OperationContext* opCtx,
         // underlying bucket collection.
         if (ctx && ctx->getView() &&
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
-
             try {
                 invariant(collatorToUse);
                 // We can't move out of collatorToUse as it's needed for runAggregateOnView(). Clone
@@ -1008,7 +1007,7 @@ Status runAggregate(OperationContext* opCtx,
                     // Inside this callback we know we have already checked that query stats are
                     // enabled and know that this request has not been rate limited.
                     return std::make_unique<query_stats::AggregateKeyGenerator>(
-                        request, *pipeline, expCtx, origNss);
+                        request, *pipeline, expCtx, pipelineInvolvedNamespaces, origNss);
                 });
             } catch (const DBException& ex) {
                 if (ex.code() == 6347902) {
@@ -1043,16 +1042,6 @@ Status runAggregate(OperationContext* opCtx,
         auto expCtx = expCtxAndPipeline.first;
         auto pipeline = std::move(expCtxAndPipeline.second);
 
-        // Register query stats with the pre-optimized pipeline. Exclude queries against collections
-        // with encrypted fields. We still collect query stats on collection-less aggregations.
-        if (!(ctx && ctx->getCollection() &&
-              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerRequest(expCtx, origNss, [&]() {
-                return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request, *pipeline, expCtx, origNss);
-            });
-        }
-
         // This prevents opening a new change stream in the critical section of a serverless shard
         // split or merge operation to prevent resuming on the recipient with a resume token higher
         // than that operation's blockTimestamp.
@@ -1068,6 +1057,17 @@ Status runAggregate(OperationContext* opCtx,
         // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
         // $$USER_ROLES for the aggregation.
         expCtx->setUserRoles();
+
+        // Register query stats with the pre-optimized pipeline. Exclude queries against collections
+        // with encrypted fields. We still collect query stats on collection-less aggregations.
+        // TODO SERVER-75912 make sure query shape is unresolved for queries on views
+        if (!(ctx && ctx->getCollection() &&
+              ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
+            query_stats::registerRequest(expCtx, nss, [&]() {
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
+                    request, *pipeline, expCtx, pipelineInvolvedNamespaces, nss);
+            });
+        }
 
         if (!request.getAllowDiskUse().value_or(true)) {
             allowDiskUseFalseCounter.increment();

@@ -42,9 +42,12 @@ namespace mongo::query_stats {
  */
 class AggregateKeyGenerator final : public KeyGenerator {
 public:
+    static constexpr StringData kOtherNssFieldName = "otherNss"_sd;
+
     AggregateKeyGenerator(AggregateCommandRequest request,
                           const Pipeline& pipeline,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          stdx::unordered_set<NamespaceString> involvedNamespaces,
                           const NamespaceString& origNss)
         : KeyGenerator(
               expCtx->opCtx,
@@ -52,6 +55,7 @@ public:
               BSONObj(),
               classifyCollectionType(expCtx->opCtx, origNss)),
           _request(std::move(request)),
+          _involvedNamespaces(std::move(involvedNamespaces)),
           _origNss(origNss),
           _initialQueryStatsKey(_makeQueryStatsKeyHelper(
               SerializationOptions::kDebugQueryShapeSerializeOptions, expCtx, pipeline)) {
@@ -82,9 +86,10 @@ private:
     boost::intrusive_ptr<ExpressionContext> makeDummyExpCtx(OperationContext* opCtx) const {
         // TODO SERVER-76087 We will likely want to set a flag here to stop $search from calling out
         // to mongot.
-        // TODO SERVER-76220 look into if this could be consolidated between query stats key
+        // TODO SERVER-76330 look into if this could be consolidated between query stats key
         // generator types and potentially remove one of the makeQueryStatsKey() overrides
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, _request.getNamespace());
+        auto expCtx = make_intrusive<ExpressionContext>(
+            opCtx, nullptr, _request.getNamespace(), boost::none, _request.getLet());
         expCtx->variables.setDefaultRuntimeConstants(opCtx);
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         // Expression counters are reported in serverStatus to indicate how often
@@ -92,12 +97,17 @@ private:
         // stop expression counters before re-parsing to avoid adding to the counters more than once
         // per a given query.
         expCtx->stopExpressionCounters();
+        expCtx->addResolvedNamespaces(_involvedNamespaces);
+
         return expCtx;
     }
 
     // We make a copy of AggregateCommandRequest since this instance may outlive the
     // original request once the KeyGenerator is moved to the query stats store.
     AggregateCommandRequest _request;
+
+    // The set of secondary namespaces involved in this query.
+    stdx::unordered_set<NamespaceString> _involvedNamespaces;
 
     // The original NSS of the request before views are resolved.
     const NamespaceString _origNss;

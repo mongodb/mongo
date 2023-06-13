@@ -4,7 +4,7 @@
  */
 
 load("jstests/aggregation/extras/utils.js");  // For assertAdminDBErrCodeAndErrMsgContains.
-load("jstests/libs/telemetry_utils.js");
+load("jstests/libs/query_stats_utils.js");
 
 (function() {
 "use strict";
