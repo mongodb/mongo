@@ -90,16 +90,17 @@ Top& Top::get(ServiceContext* service) {
 }
 
 void Top::record(OperationContext* opCtx,
-                 StringData ns,
+                 const NamespaceString& nss,
                  LogicalOp logicalOp,
                  LockType lockType,
                  long long micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
-    if (ns[0] == '?')
+    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    if (nssStr[0] == '?')
         return;
 
-    auto hashedNs = UsageMap::hasher().hashed_key(ns);
+    auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
     stdx::lock_guard<Latch> lk(_lock);
 
     CollectionData& coll = _usage[hashedNs];
@@ -114,7 +115,7 @@ void Top::record(OperationContext* opCtx,
                  bool command,
                  Command::ReadWriteType readWriteType) {
     for (const auto& nss : nssSet) {
-        record(opCtx, nss.ns(), logicalOp, lockType, micros, command, readWriteType);
+        record(opCtx, nss, logicalOp, lockType, micros, command, readWriteType);
     }
 }
 
