@@ -266,7 +266,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
 }
 
 void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
-    nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+    nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
         obj.getStringField("ns").toString());
 
     if (obj["options"].isABSONObj()) {

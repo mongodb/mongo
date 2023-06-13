@@ -423,6 +423,20 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
     }
 }
 
+TEST(NamespaceStringUtilTest, ParseNSSWithTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    TenantId tenantId(OID::gen());
+    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+
+    NamespaceString nss =
+        NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
+    ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
+    ASSERT(nss.tenantId());
+    ASSERT_EQ(*nss.tenantId(), tenantId);
+}
+
 TEST(NamespaceStringUtilTest, ParseFailPointData) {
     const TenantId tid = TenantId(OID::gen());
 

@@ -54,32 +54,6 @@ constexpr auto fle2EcocSuffix = ".ecoc"_sd;
 
 }  // namespace
 
-
-NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
-    if (!gMultitenancySupport) {
-        return NamespaceString(boost::none, ns);
-    }
-
-    auto tenantDelim = ns.find('_');
-    auto collDelim = ns.find('.');
-    // If the first '_' is after the '.' that separates the db and coll names, the '_' is part
-    // of the coll name and is not a db prefix.
-    if (tenantDelim == std::string::npos || collDelim < tenantDelim) {
-        return NamespaceString(boost::none, ns);
-    }
-
-    auto swOID = OID::parse(ns.substr(0, tenantDelim));
-    if (swOID.getStatus() == ErrorCodes::BadValue) {
-        // If we fail to parse an OID, either the size of the substring is incorrect, or there is an
-        // invalid character. This indicates that the db has the "_" character, but it does not act
-        // as a delimeter for a tenantId prefix.
-        return NamespaceString(boost::none, ns);
-    }
-
-    const TenantId tenantId(swOID.getValue());
-    return NamespaceString(tenantId, ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
-}
-
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
 }

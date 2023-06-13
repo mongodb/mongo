@@ -138,7 +138,7 @@ NamespaceString NamespaceStringUtil::deserializeForStorage(boost::optional<Tenan
         return NamespaceString(std::move(tenantId), ns);
     }
 
-    auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
     // TenantId could be prefixed, or passed in separately (or both) and namespace is always
     // constructed with the tenantId separately.
     if (tenantId != boost::none) {
@@ -167,7 +167,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
             case SerializationContext::Prefix::Default:
                 return NamespaceString(std::move(tenantId), ns);
             case SerializationContext::Prefix::IncludePrefix: {
-                auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+                auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
                 massert(8423385,
                         str::stream() << "TenantId from $tenant or security token present as '"
                                       << tenantId->toString()
@@ -186,7 +186,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
         }
     }
 
-    auto nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(ns);
+    auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
     if ((nss.dbName() != DatabaseName::kAdmin) && (nss.dbName() != DatabaseName::kLocal) &&
         (nss.dbName() != DatabaseName::kConfig)) {
         massert(8423387,
@@ -275,6 +275,35 @@ NamespaceString NamespaceStringUtil::parseNamespaceFromDoc(const DatabaseName& d
 NamespaceString NamespaceStringUtil::parseNamespaceFromResponse(const DatabaseName& dbName,
                                                                 StringData coll) {
     return parseNamespaceFromDoc(dbName, coll);
+}
+
+
+NamespaceString NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+    StringData ns) {
+
+    if (!gMultitenancySupport) {
+        return NamespaceString(boost::none, ns);
+    }
+
+    const auto tenantDelim = ns.find('_');
+    const auto collDelim = ns.find('.');
+
+    // If the first '_' is after the '.' that separates the db and coll names, the '_' is part
+    // of the coll name and is not a db prefix.
+    if (tenantDelim == std::string::npos || collDelim < tenantDelim) {
+        return NamespaceString(boost::none, ns);
+    }
+
+    auto swOID = OID::parse(ns.substr(0, tenantDelim));
+    if (!swOID.getStatus().isOK()) {
+        // If we fail to parse an OID, either the size of the substring is incorrect, or there is an
+        // invalid character. This indicates that the db has the "_" character, but it does not act
+        // as a delimeter for a tenantId prefix.
+        return NamespaceString(boost::none, ns);
+    }
+
+    const TenantId tenantId(swOID.getValue());
+    return NamespaceString(tenantId, ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
 }
 
 NamespaceString NamespaceStringUtil::parseFailPointData(const BSONObj& data,

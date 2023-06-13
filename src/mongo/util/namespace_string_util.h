@@ -154,6 +154,12 @@ public:
 
     static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
 
+    /**
+     * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
+     * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
+     */
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
+
     static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
 };
 

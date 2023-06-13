@@ -151,7 +151,7 @@ void listDurableCatalog(OperationContext* opCtx,
             continue;
         }
 
-        NamespaceString ns(NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+        NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             obj.getStringField("ns")));
         if (ns.isSystemDotViews()) {
             systemViewsNamespaces->push_back(ns);
@@ -326,7 +326,7 @@ boost::optional<BSONObj> CommonMongodProcessInterface::getCatalogEntry(
     auto cursor = rs->getCursor(opCtx);
     while (auto record = cursor->next()) {
         auto obj = record->data.toBson();
-        if (NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+        if (NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
                 obj.getStringField("ns")) != ns) {
             continue;
         }

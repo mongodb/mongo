@@ -31,7 +31,6 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
 #include "mongo/db/storage/kv/kv_engine.h"
@@ -40,6 +39,7 @@
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -180,8 +180,8 @@ void DurableCatalog::init(OperationContext* opCtx) {
 
         // No rollback since this is just loading already committed data.
         auto ident = obj["ident"].String();
-        auto nss =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
         _catalogIdToEntryMap[record->id] = EntryIdentifier(record->id, ident, nss);
     }
 
@@ -204,8 +204,8 @@ std::vector<DurableCatalog::EntryIdentifier> DurableCatalog::getAllCatalogEntrie
             continue;
         }
         auto ident = obj["ident"].String();
-        auto nss =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
 
         ret.emplace_back(record->id, ident, nss);
     }
@@ -224,8 +224,8 @@ boost::optional<DurableCatalogEntry> DurableCatalog::scanForCatalogEntryByNss(
             continue;
         }
 
-        auto entryNss =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        auto entryNss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
         if (entryNss == nss) {
             return _getDurableCatalogEntry(record->id, obj);
         }

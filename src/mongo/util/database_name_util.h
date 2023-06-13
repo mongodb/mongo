@@ -126,7 +126,7 @@ public:
         StringData db, const SerializationContext& context = SerializationContext());
 
 private:
-    static DatabaseName parseDbNameFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
+    static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 };
 
 }  // namespace mongo

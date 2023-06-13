@@ -532,20 +532,6 @@ TEST(NamespaceStringTest, NSSNoCollectionWithTenantId) {
     ASSERT_EQ(*nss3.tenantId(), tenantId);
 }
 
-TEST(NamespaceStringTest, ParseNSSWithTenantId) {
-    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
-
-    TenantId tenantId(OID::gen());
-    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
-
-    NamespaceString nss =
-        NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
-    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
-    ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
-    ASSERT(nss.tenantId());
-    ASSERT_EQ(*nss.tenantId(), tenantId);
-}
-
 TEST(NamespaceStringTest, CompareNSSWithTenantId) {
     TenantId tenantIdMin(OID("000000000000000000000000"));
     TenantId tenantIdMax(OID::max());
