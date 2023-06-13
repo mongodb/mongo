@@ -462,7 +462,8 @@ bool CurOp::completeAndLogOperation(OperationContext* opCtx,
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
-                                    Lock::InterruptBehavior::kLeaveUnlocked);
+                                    Lock::InterruptBehavior::kLeaveUnlocked,
+                                    true /* skipRSTLLock */);
                 if (lk.isLocked()) {
                     _debug.storageStats =
                         opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
