@@ -28,7 +28,6 @@
  */
 
 #pragma once
-
 #include <map>
 
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
@@ -117,7 +116,7 @@ struct MultikeynessTrie {
     void merge(const MultikeynessTrie& other);
     void add(const ABT& path);
 
-    opt::unordered_map<FieldNameType, MultikeynessTrie, FieldNameType::Hasher> children;
+    std::map<FieldNameType, MultikeynessTrie> children;
     // An empty trie doesn't know whether anything is multikey.
     // 'true' means "not sure" while 'false' means "definitely no arrays".
     bool isMultiKey = true;
