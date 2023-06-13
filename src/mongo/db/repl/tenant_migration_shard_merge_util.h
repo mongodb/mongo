@@ -126,10 +126,7 @@ void cloneFile(OperationContext* opCtx,
 /**
  * Import a donor collection after its files have been cloned to a temp dir.
  */
-void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
-                                      const UUID& migrationId,
-                                      const std::string& importPath,
-                                      std::vector<CollectionImportMetadata>&& metadatas);
+void wiredTigerImport(OperationContext* opCtx, const UUID& migrationId);
 
 /**
  * Send a "getMore" to keep a backup cursor from timing out.

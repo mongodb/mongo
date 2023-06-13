@@ -171,6 +171,11 @@ void ReplicationCoordinatorMock::setAwaitReplicationReturnValueFunction(
     _awaitReplicationReturnValueFunction = std::move(returnValueFunction);
 }
 
+void ReplicationCoordinatorMock::setRunCmdOnPrimaryAndAwaitResponseFunction(
+    RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction) {
+    _runCmdOnPrimaryAndAwaitResponseFn = std::move(runCmdFunction);
+}
+
 SharedSemiFuture<void> ReplicationCoordinatorMock::awaitReplicationAsyncNoWTimeout(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
     auto opCtx = cc().makeOperationContext();
@@ -802,6 +807,10 @@ BSONObj ReplicationCoordinatorMock::runCmdOnPrimaryAndAwaitResponse(
     const BSONObj& cmdObj,
     OnRemoteCmdScheduledFn onRemoteCmdScheduled,
     OnRemoteCmdCompleteFn onRemoteCmdComplete) {
+    if (_runCmdOnPrimaryAndAwaitResponseFn) {
+        return _runCmdOnPrimaryAndAwaitResponseFn(
+            opCtx, dbName, cmdObj, onRemoteCmdScheduled, onRemoteCmdComplete);
+    }
     return BSON("ok" << 1);
 }
 void ReplicationCoordinatorMock::restartScheduledHeartbeats_forTest() {

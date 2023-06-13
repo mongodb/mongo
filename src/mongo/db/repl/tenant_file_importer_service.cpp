@@ -41,11 +41,9 @@
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/replication_auth.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/logv2/log.h"
@@ -53,12 +51,11 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
+MONGO_FAIL_POINT_DEFINE(hangBeforeFileImporterThreadExit);
 
 namespace mongo::repl {
 
 using namespace fmt::literals;
-using namespace shard_merge_utils;
-using namespace tenant_migration_access_blocker;
 
 namespace {
 const auto _TenantFileImporterService =
@@ -68,37 +65,13 @@ const ReplicaSetAwareServiceRegistry::Registerer<TenantFileImporterService>
     _TenantFileImporterServiceRegisterer("TenantFileImporterService");
 
 /**
- * Makes a connection to the provided 'source'.
+ * Connect to the donor source.
  */
-Status connect(const HostAndPort& source, DBClientConnection* client) {
-    Status status = client->connect(source, "TenantFileImporterService", boost::none);
-    if (!status.isOK())
-        return status;
-    return replAuthenticate(client).withContext(str::stream()
-                                                << "Failed to authenticate to " << source);
-}
-
-void importCopiedFiles(OperationContext* opCtx, const UUID& migrationId) {
-    auto tempWTDirectory = fileClonerTempDir(migrationId);
-    uassert(6113315,
-            str::stream() << "Missing file cloner's temporary dbpath directory: "
-                          << tempWTDirectory.string(),
-            boost::filesystem::exists(tempWTDirectory));
-
-    // TODO SERVER-63204: Evaluate correct place to remove the temporary WT dbpath.
-    ON_BLOCK_EXIT([&tempWTDirectory, &migrationId] {
-        LOGV2_INFO(6113324,
-                   "Done importing files, removing the temporary WT dbpath",
-                   "migrationId"_attr = migrationId,
-                   "tempDbPath"_attr = tempWTDirectory.string());
-        boost::system::error_code ec;
-        boost::filesystem::remove_all(tempWTDirectory, ec);
-    });
-
-    auto metadatas =
-        wiredTigerRollbackToStableAndGetMetadata(opCtx, tempWTDirectory.string(), migrationId);
-    wiredTigerImportFromBackupCursor(
-        opCtx, migrationId, tempWTDirectory.string(), std::move(metadatas));
+void connect(const BSONObj& metadataDoc, DBClientConnection* client) {
+    auto source = HostAndPort::parseThrowing(metadataDoc[shard_merge_utils::kDonorFieldName].str());
+    uassertStatusOK(client->connect(source, "TenantFileImporterService", boost::none));
+    uassertStatusOK(replAuthenticate(client).withContext(
+        str::stream() << "Failed to authenticate to " << source));
 }
 
 }  // namespace
@@ -110,6 +83,11 @@ TenantFileImporterService* TenantFileImporterService::get(ServiceContext* servic
 TenantFileImporterService* TenantFileImporterService::get(OperationContext* opCtx) {
     return get(opCtx->getServiceContext());
 }
+
+TenantFileImporterService::TenantFileImporterService()
+    : _importFiles(shard_merge_utils::wiredTigerImport), _createConnection([]() {
+          return std::make_shared<DBClientConnection>(true /* autoReconnect */);
+      }) {}
 
 void TenantFileImporterService::startMigration(const UUID& migrationId) {
     _reset();
@@ -148,6 +126,8 @@ void TenantFileImporterService::startMigration(const UUID& migrationId) {
                         "TenantFileImporterService::_handleEvents encountered an error",
                         "error"_attr = err.toString());
         }
+
+        hangBeforeFileImporterThreadExit.pauseWhileSet();
     });
 }
 
@@ -251,15 +231,14 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
     std::shared_ptr<ThreadPool> writerPool;
     std::shared_ptr<TenantMigrationSharedData> sharedData;
 
-    auto setUpImporterResourcesIfNeeded = [&](const BSONObj& metadataDoc) {
+    auto setUpDonorConnectionIfNeeded = [&](const BSONObj& metadataDoc) {
         // Return early if we have already set up the donor connection.
         if (donorConnection) {
             return;
         }
 
-        auto conn = std::make_shared<DBClientConnection>(true /* autoReconnect */);
-        auto donor = HostAndPort::parseThrowing(metadataDoc[kDonorFieldName].str());
-        uassertStatusOK(connect(donor, conn.get()));
+        auto conn = _createConnection();
+        connect(metadataDoc, conn.get());
 
         stdx::lock_guard lk(_mutex);
         uassert(ErrorCodes::Interrupted,
@@ -272,7 +251,6 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
             makeReplWriterPool(tenantApplierThreadCount, "TenantFileImporterServiceWriter"_sd);
         _sharedData = std::make_shared<TenantMigrationSharedData>(
             getGlobalServiceContext()->getFastClockSource(), _migrationId.get());
-
         donorConnection = _donorConnection;
         writerPool = _writerPool;
         sharedData = _sharedData;
@@ -291,21 +269,20 @@ void TenantFileImporterService::_handleEvents(const UUID& migrationId) {
             case eventType::kNone:
                 continue;
             case eventType::kLearnedFileName: {
-                // we won't have valid donor metadata until the first
+                // We won't have valid donor metadata until the first
                 // 'TenantFileImporterService::learnedFilename' call, so we need to set up the
                 // connection for the first kLearnedFileName event.
-                setUpImporterResourcesIfNeeded(event.metadataDoc);
+                setUpDonorConnectionIfNeeded(event.metadataDoc);
 
-                cloneFile(opCtx,
-                          donorConnection.get(),
-                          writerPool.get(),
-                          sharedData.get(),
-                          event.metadataDoc);
+                shard_merge_utils::cloneFile(opCtx,
+                                             donorConnection.get(),
+                                             writerPool.get(),
+                                             sharedData.get(),
+                                             event.metadataDoc);
                 continue;
             }
             case eventType::kLearnedAllFilenames:
-                importCopiedFiles(opCtx, migrationId);
-                shard_merge_utils::createImportDoneMarkerLocalCollection(opCtx, migrationId);
+                _importFiles(opCtx, migrationId);
                 // Take a stable checkpoint so that all the imported donor & marker collection
                 // metadata infos are persisted to disk.
                 opCtx->recoveryUnit()->waitUntilUnjournaledWritesDurable(opCtx,

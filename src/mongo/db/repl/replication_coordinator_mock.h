@@ -350,6 +350,15 @@ public:
     void setAwaitReplicationReturnValueFunction(
         AwaitReplicationReturnValueFunction returnValueFunction);
 
+    using RunCmdOnPrimaryAndAwaitResponseFunction =
+        std::function<BSONObj(OperationContext* opCtx,
+                              const std::string& dbName,
+                              const BSONObj& cmdObj,
+                              OnRemoteCmdScheduledFn onRemoteCmdScheduled,
+                              OnRemoteCmdCompleteFn onRemoteCmdComplete)>;
+    void setRunCmdOnPrimaryAndAwaitResponseFunction(
+        RunCmdOnPrimaryAndAwaitResponseFunction runCmdFunction);
+
     /**
      * Always allow writes even if this node is a writable primary. Used by sharding unit tests.
      */
@@ -451,6 +460,7 @@ private:
                                                                                   const OpTime&) {
         return StatusAndDuration(Status::OK(), Milliseconds(0));
     };
+    RunCmdOnPrimaryAndAwaitResponseFunction _runCmdOnPrimaryAndAwaitResponseFn;
 
     // Guards all the variables below
     mutable Mutex _mutex = MONGO_MAKE_LATCH("ReplicationCoordinatorExternalStateMock::_mutex");
