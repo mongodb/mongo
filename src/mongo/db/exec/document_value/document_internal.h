@@ -628,6 +628,16 @@ public:
     }
 
 private:
+    enum class ConstructorTag { InitApproximateSize = 0 };
+    DocumentStorage(ConstructorTag tag) : DocumentStorage() {
+        switch (tag) {
+            case ConstructorTag::InitApproximateSize:
+                snapshottedApproximateSize();
+                return;
+        }
+        MONGO_UNREACHABLE;
+    }
+
     /// Returns the position of the named field in the cache or Position()
     template <typename T>
     Position findFieldInCache(T name) const;

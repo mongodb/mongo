@@ -79,7 +79,7 @@ getNestedFieldHelperBSON(BSONElement elt, const FieldPath& fp, size_t level) {
 }
 }  // namespace
 
-const DocumentStorage DocumentStorage::kEmptyDoc;
+const DocumentStorage DocumentStorage::kEmptyDoc{ConstructorTag::InitApproximateSize};
 
 const StringDataSet Document::allMetadataFieldNames{Document::metaFieldTextScore,
                                                     Document::metaFieldRandVal,
