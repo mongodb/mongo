@@ -33,7 +33,6 @@
 
 #include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
@@ -392,44 +391,4 @@ void appendStorageEngineList(ServiceContext* service, BSONObjBuilder* result) {
     result->append("storageEngines", storageEngineList(service));
 }
 
-namespace {
-
-class StorageClientObserver final : public ServiceContext::ClientObserver {
-public:
-    void onCreateClient(Client* client) override{};
-    void onDestroyClient(Client* client) override{};
-    void onCreateOperationContext(OperationContext* opCtx) {
-        auto service = opCtx->getServiceContext();
-
-        // There are a few cases where we don't have a storage engine available yet when creating an
-        // operation context.
-        // 1. During startup, we create an operation context to allow the storage engine
-        //    initialization code to make use of the lock manager.
-        // 2. There are unit tests that create an operation context before initializing the storage
-        //    engine.
-        // 3. Unit tests that use an operation context but don't require a storage engine for their
-        //    testing purpose.
-        auto storageEngine = service->getStorageEngine();
-        if (!storageEngine) {
-            return;
-        }
-        opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(storageEngine->newRecoveryUnit()),
-                               WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-    }
-    void onDestroyOperationContext(OperationContext* opCtx) {}
-};
-
-ServiceContext::ConstructorActionRegisterer registerLockerImplClientObserverConstructor{
-    "LockerImplClientObserver", [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-    }};
-
-ServiceContext::ConstructorActionRegisterer registerStorageClientObserverConstructor{
-    "RegisterStorageClientObserverConstructor",
-    {"LockerImplClientObserver"},
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<StorageClientObserver>());
-    }};
-
-}  // namespace
 }  // namespace mongo

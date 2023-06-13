@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/test_utils.h"
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
@@ -41,7 +38,7 @@
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context_test_fixture.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -61,7 +58,7 @@ protected:
     }
 };
 
-class CEHeuristicTest : public LockerNoopServiceContextTest {};
+class CEHeuristicTest : public ServiceContextTest {};
 
 TEST_F(CEHeuristicTest, CEWithoutOptimizationGtLtNum) {
     std::string query = "{a0 : {$gt : 14, $lt : 21}}";

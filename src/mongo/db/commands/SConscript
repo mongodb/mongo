@@ -841,7 +841,7 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/auth/authorization_manager_global',
         '$BUILD_DIR/mongo/db/commands',
-        '$BUILD_DIR/mongo/db/service_context',
+        '$BUILD_DIR/mongo/db/service_context_non_d',
         '$BUILD_DIR/mongo/unittest/unittest',
         'standalone',
     ],
@@ -858,8 +858,8 @@ env.CppUnitTest(
         "$BUILD_DIR/mongo/db/auth/authorization_manager_global",
         "$BUILD_DIR/mongo/db/commands",
         "$BUILD_DIR/mongo/db/commands/standalone",
+        '$BUILD_DIR/mongo/db/service_context_non_d',
         "$BUILD_DIR/mongo/db/service_context_test_fixture",
-        "$BUILD_DIR/mongo/unittest/unittest",
         "$BUILD_DIR/mongo/util/version_impl",
     ],
 )

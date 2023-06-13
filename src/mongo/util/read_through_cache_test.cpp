@@ -29,10 +29,9 @@
 
 #include <string>
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/scopeguard.h"
@@ -100,7 +99,7 @@ private:
  * Fixture for tests, which do not need to exercise the multi-threading capabilities of the cache
  * and as such do not require control over the creation/destruction of their operation contexts.
  */
-class ReadThroughCacheTest : public LockerNoopServiceContextTest {
+class ReadThroughCacheTest : public ServiceContextTest {
 protected:
     // Extends any of Cache/CausallyConsistentCache and automatically provides it with a thread
     // pool, which will be shutdown and joined before the Cache is destroyed (which is part of the
@@ -369,13 +368,8 @@ TEST_F(ReadThroughCacheTest, CausalConsistency) {
 /**
  * Fixture for tests, which need to control the creation/destruction of their operation contexts.
  */
-class ReadThroughCacheAsyncTest : public unittest::Test, public ScopedGlobalServiceContextForTest {
-public:
-    ReadThroughCacheAsyncTest() {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-    }
-};
+class ReadThroughCacheAsyncTest : public unittest::Test,
+                                  public ScopedGlobalServiceContextForTest {};
 
 using Barrier = unittest::Barrier;
 

@@ -30,7 +30,6 @@
 #include "mongo/db/concurrency/locker_impl.h"
 
 namespace mongo {
-namespace shard_role_details {
 namespace {
 
 class TransactionResourcesNonMongoDClientObserver : public ServiceContext::ClientObserver {
@@ -56,5 +55,4 @@ ServiceContext::ConstructorActionRegisterer transactionResourcesConstructor{
     }};
 
 }  // namespace
-}  // namespace shard_role_details
 }  // namespace mongo

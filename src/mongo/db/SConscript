@@ -364,11 +364,10 @@ env.Library(
     ],
 )
 
-# mongod options
 env.Library(
-    target="mongod_options",
+    target='mongod_options',
     source=[
-        "mongod_options.cpp",
+        'mongod_options.cpp',
         'mongod_options_general.idl',
         'mongod_options_legacy.idl',
         'mongod_options_replication.idl',
@@ -627,9 +626,9 @@ env.Library(
 )
 
 env.Library(
-    target="read_write_concern_defaults_mock",
+    target='read_write_concern_defaults_mock',
     source=[
-        "read_write_concern_defaults_cache_lookup_mock.cpp",
+        'read_write_concern_defaults_cache_lookup_mock.cpp',
     ],
     LIBDEPS=[
         'read_write_concern_defaults',
@@ -1091,6 +1090,7 @@ env.Library(
     target='service_context_d',
     source=[
         'service_entry_point_mongod.cpp',
+        'transaction_resources_init_mongod.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/transport/service_entry_point',
@@ -1118,7 +1118,7 @@ env.Library(
 env.Library(
     target='service_context_non_d',
     source=[
-        'transaction_resources_decoration_non_mongod.cpp',
+        'transaction_resources_init_non_mongod.cpp',
     ],
     LIBDEPS=[
         'service_context',

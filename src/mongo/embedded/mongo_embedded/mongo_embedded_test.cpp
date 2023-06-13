@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo_embedded/mongo_embedded.h"
-
-#include <memory>
 #include <set>
 #include <yaml-cpp/yaml.h>
 
@@ -56,13 +52,13 @@
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/text.h"
+#include "mongo_embedded/mongo_embedded.h"
 
 namespace moe = mongo::optionenvironment;
 
 mongo_embedded_v1_lib* global_lib_handle;
 
 namespace {
-
 
 auto& getGlobalTempDir() {
     static std::unique_ptr<mongo::unittest::TempDir> globalTempDir;
@@ -564,6 +560,7 @@ TEST_F(MongodbCAPITest, CreateMultipleDBs) {
     ASSERT_EQUALS(mongo_embedded_v1_status_get_error(status.get()),
                   MONGO_EMBEDDED_V1_ERROR_DB_MAX_OPEN);
 }
+
 }  // namespace
 
 // Define main function as an entry to these tests.

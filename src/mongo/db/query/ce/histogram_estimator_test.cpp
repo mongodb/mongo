@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
@@ -35,7 +34,7 @@
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/db/query/stats/max_diff.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context_test_fixture.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -190,7 +189,7 @@ void addHistogramFromValues(CEHistogramTester& t,
     }
 }
 
-class CEHistogramTest : public LockerNoopServiceContextTest {};
+class CEHistogramTest : public ServiceContextTest {};
 
 TEST_F(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
     constexpr CEType kCollCard{8.0};

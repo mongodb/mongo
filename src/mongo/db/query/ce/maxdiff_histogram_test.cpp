@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
@@ -60,31 +59,6 @@ using stats::ScalarHistogram;
 const double kTolerance = 0.001;
 
 class HistogramTest : public ServiceContextTest {};
-class HistogramTestLarge : public ServiceContextTest {};
-
-class TestObserver : public ServiceContext::ClientObserver {
-public:
-    TestObserver() = default;
-    ~TestObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "TestObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<TestObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
 
 static double estimateCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
     const auto [tag, val] = makeInt64Value(v);
