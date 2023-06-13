@@ -40,7 +40,11 @@ var MetadataConsistencyChecker = (function() {
         try {
             checkMetadataConsistency();
         } catch (e) {
-            if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code)) {
+            // Metadata consistency check can fail with ShardNotFound if the router's ShardRegistry
+            // reloads after choosing which shards to target and a chosen shard is no longer in the
+            // cluster. This error should be transient, so it can be retried on.
+            if (ErrorCodes.isRetriableError(e.code) || ErrorCodes.isInterruption(e.code) ||
+                e.code === ErrorCodes.ShardNotFound) {
                 jsTest.log(`Aborted metadata consistency check due to retriable error: ${e}`);
             } else {
                 throw e;
