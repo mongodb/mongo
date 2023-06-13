@@ -658,13 +658,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     // COUNT_SCAN node doesn't expected to return index info.
-    tassert(8423394, "buildCountScan() does not support kReturnKey", !reqs.has(kReturnKey));
-    tassert(8423393, "buildCountScan() does not support kSnapshotId", !reqs.has(kSnapshotId));
-    tassert(8423392, "buildCountScan() does not support kIndexIdent", !reqs.has(kIndexIdent));
-    tassert(8423391, "buildCountScan() does not support kIndexKey", !reqs.has(kIndexKey));
+    tassert(5295800, "buildCountScan() does not support kReturnKey", !reqs.has(kReturnKey));
+    tassert(5295801, "buildCountScan() does not support kSnapshotId", !reqs.has(kSnapshotId));
+    tassert(5295802, "buildCountScan() does not support kIndexIdent", !reqs.has(kIndexIdent));
+    tassert(5295803, "buildCountScan() does not support kIndexKey", !reqs.has(kIndexKey));
     tassert(
-        8423390, "buildCountScan() does not support kIndexKeyPattern", !reqs.has(kIndexKeyPattern));
-    tassert(8423389, "buildCountScan() does not support kSortKey", !reqs.hasSortKeys());
+        5295804, "buildCountScan() does not support kIndexKeyPattern", !reqs.has(kIndexKeyPattern));
+    tassert(5295805, "buildCountScan() does not support kSortKey", !reqs.hasSortKeys());
 
     auto csn = static_cast<const CountScanNode*>(root);
 
@@ -673,28 +673,47 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(_state.opCtx, indexName);
     auto indexAccessMethod =
         collection->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
-    auto [lowKey, highKey] =
-        makeKeyStringPair(csn->startKey,
-                          csn->startKeyInclusive,
-                          csn->endKey,
-                          csn->endKeyInclusive,
-                          indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
-                          indexAccessMethod->getSortedDataInterface()->getOrdering(),
-                          true /* forward */);
 
-    auto [stage, planStageSlots, _] = generateSingleIntervalIndexScan(_state,
-                                                                      collection,
-                                                                      indexName,
-                                                                      indexDescriptor->keyPattern(),
-                                                                      true /* forward */,
-                                                                      std::move(lowKey),
-                                                                      std::move(highKey),
-                                                                      {} /* indexKeysToInclude */,
-                                                                      {} /* indexKeySlots */,
-                                                                      reqs,
-                                                                      _yieldPolicy,
-                                                                      csn->nodeId(),
-                                                                      false /* lowPriority */);
+    std::unique_ptr<KeyString::Value> lowKey, highKey;
+    if (csn->iets.empty()) {
+        std::tie(lowKey, highKey) =
+            makeKeyStringPair(csn->startKey,
+                              csn->startKeyInclusive,
+                              csn->endKey,
+                              csn->endKeyInclusive,
+                              indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
+                              indexAccessMethod->getSortedDataInterface()->getOrdering(),
+                              true /* forward */);
+    }
+
+    auto [stage, planStageSlots, indexScanBoundsSlots] =
+        generateSingleIntervalIndexScan(_state,
+                                        collection,
+                                        indexName,
+                                        indexDescriptor->keyPattern(),
+                                        true /* forward */,
+                                        std::move(lowKey),
+                                        std::move(highKey),
+                                        {} /* indexKeysToInclude */,
+                                        {} /* indexKeySlots */,
+                                        reqs,
+                                        _yieldPolicy,
+                                        csn->nodeId(),
+                                        false /* lowPriority */);
+
+    if (!csn->iets.empty()) {
+        tassert(7681500,
+                "lowKey and highKey runtime environment slots must be present",
+                indexScanBoundsSlots);
+        _state.data->indexBoundsEvaluationInfos.emplace_back(IndexBoundsEvaluationInfo{
+            csn->index,
+            indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
+            indexAccessMethod->getSortedDataInterface()->getOrdering(),
+            1 /* direction */,
+            std::move(csn->iets),
+            {ParameterizedIndexScanSlots::SingleIntervalPlan{indexScanBoundsSlots->first,
+                                                             indexScanBoundsSlots->second}}});
+    }
 
     if (csn->index.multikey ||
         (indexDescriptor->getIndexType() == IndexType::INDEX_WILDCARD &&

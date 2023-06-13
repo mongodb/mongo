@@ -74,9 +74,8 @@ void updatePlanCache(OperationContext* opCtx,
                      const QuerySolution& solution,
                      const sbe::PlanStage& root,
                      stage_builder::PlanStageData& stageData) {
-    // TODO: SERVER-76815 enable caching the COUNT_SCAN queries for SBE.
     const CollectionPtr& collection = collections.getMainCollection();
-    if (collection && shouldCacheQuery(query) && !solution.hasNode(STAGE_COUNT_SCAN)) {
+    if (collection && shouldCacheQuery(query)) {
         sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), stageData);
         plan->indexFilterApplied = solution.indexFilterApplied;

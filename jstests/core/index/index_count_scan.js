@@ -60,13 +60,17 @@ const runTest = function(indexPattern, indexOption = {}) {
         const [queryPlan, sbePlan] = getQueryPlan(explain);
         let countScan = getPlanStage(queryPlan, "COUNT_SCAN");
         assert.neq(null, countScan, explain);
-        // assert.eq(indexPattern, countScan.keyPattern, countScan);
         if (sbePlan) {
             assert.eq(true, sbePlan.stages.includes("ixseek"), sbePlan);
         }
     };
 
     runAndVerify(2, [{$match: {a: 1}}, {$count: "count"}]);
+    // Run more times to ensure the query is cached.
+    runAndVerify(2, [{$match: {a: 1}}, {$count: "count"}]);
+    runAndVerify(2, [{$match: {a: 1}}, {$count: "count"}]);
+    // Make sure query is parameterized correctly for count scan index keys.
+    runAndVerify(1, [{$match: {a: 2}}, {$count: "count"}]);
     if (indexPattern.b) {
         runAndVerify(1, [{$match: {a: 1, b: 1}}, {$count: "count"}]);
     }

@@ -1321,6 +1321,11 @@ struct CountScanNode : public QuerySolutionNodeWithSortSet {
 
     BSONObj endKey;
     bool endKeyInclusive;
+
+    /**
+     * A vector of Interval Evaluation Trees (IETs) with the same ordering as the index key pattern.
+     */
+    std::vector<interval_evaluation_tree::IET> iets;
 };
 
 struct EofNode : public QuerySolutionNodeWithSortSet {

@@ -2267,7 +2267,8 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     auto makeCountScan = [&isn](BSONObj& csnStartKey,
                                 bool startKeyInclusive,
                                 BSONObj& csnEndKey,
-                                bool endKeyInclusive) {
+                                bool endKeyInclusive,
+                                std::vector<interval_evaluation_tree::IET> iets) {
         // Since count scans return no data, they are always forward scans. Index scans, on the
         // other hand, may need to scan the index in reverse order in order to obtain a sort. If the
         // index scan direction is backwards, then we need to swap the start and end of the count
@@ -2282,6 +2283,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
         csn->startKeyInclusive = startKeyInclusive;
         csn->endKey = csnEndKey;
         csn->endKeyInclusive = endKeyInclusive;
+        csn->iets = std::move(iets);
         return csn;
     };
 
@@ -2294,13 +2296,14 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
         // quickly explode to a point where it would just be more efficient to use a single index
         // scan. Consequently, we draw the line at one such interval.
         if (auto nullFieldNo = boundsHasExactlyOneNullOrNullAndEmptyInterval(isn)) {
-            OrderedIntervalList undefinedPointOil, nullPointOil;
-            undefinedPointOil.intervals.push_back(IndexBoundsBuilder::kUndefinedPointInterval);
-            nullPointOil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
-
             tassert(5506501,
                     "The index of the null interval is invalid",
                     *nullFieldNo < isn->bounds.fields.size());
+            auto nullFieldName = isn->bounds.fields[*nullFieldNo].name;
+            OrderedIntervalList undefinedPointOil(nullFieldName), nullPointOil(nullFieldName);
+            undefinedPointOil.intervals.push_back(IndexBoundsBuilder::kUndefinedPointInterval);
+            nullPointOil.intervals.push_back(IndexBoundsBuilder::kNullPointInterval);
+
             auto makeNullBoundsCountScan =
                 [&](OrderedIntervalList& oil) -> std::unique_ptr<QuerySolutionNode> {
                 std::swap(isn->bounds.fields[*nullFieldNo], oil);
@@ -2310,7 +2313,17 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
                 bool startKeyInclusive, endKeyInclusive;
                 if (IndexBoundsBuilder::isSingleInterval(
                         isn->bounds, &startKey, &startKeyInclusive, &endKey, &endKeyInclusive)) {
-                    return makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive);
+                    // Build a new IET list based on the rewritten index bounds.
+                    std::vector<interval_evaluation_tree::IET> iets = isn->iets;
+                    if (!isn->iets.empty()) {
+                        tassert(8423396,
+                                "IETs and index bounds field must have same size.",
+                                iets.size() == isn->bounds.fields.size());
+                        iets[*nullFieldNo] = interval_evaluation_tree::IET::make<
+                            interval_evaluation_tree::ConstNode>(isn->bounds.fields[*nullFieldNo]);
+                    }
+                    return makeCountScan(
+                        startKey, startKeyInclusive, endKey, endKeyInclusive, std::move(iets));
                 }
 
                 return nullptr;
@@ -2330,7 +2343,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
 
                 if (isn->index.multikey) {
                     // For a multikey index, add the third COUNT_SCAN stage for empty array values.
-                    OrderedIntervalList emptyArrayPointOil;
+                    OrderedIntervalList emptyArrayPointOil(nullFieldName);
                     emptyArrayPointOil.intervals.push_back(
                         IndexBoundsBuilder::kEmptyArrayPointInterval);
                     auto emptyArrayCsn = makeNullBoundsCountScan(emptyArrayPointOil);
@@ -2351,7 +2364,7 @@ bool turnIxscanIntoCount(QuerySolution* soln) {
     }
 
     // Make the count node that we replace the fetch + ixscan with.
-    auto csn = makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive);
+    auto csn = makeCountScan(startKey, startKeyInclusive, endKey, endKeyInclusive, isn->iets);
     // Takes ownership of 'cn' and deletes the old root.
     soln->setRoot(std::move(csn));
     return true;
