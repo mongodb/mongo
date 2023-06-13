@@ -755,7 +755,7 @@ public:
      * @param ns - a full namespace (a.b)
      * @return if db.coll is an allowed collection name
      */
-    static bool validCollectionComponent(StringData ns);
+    static bool validCollectionComponent(const NamespaceString& ns);
 
     /**
      * Takes a collection name and returns true if it is a valid collection name.
@@ -1121,12 +1121,13 @@ inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior b
     return true;
 }
 
-inline bool NamespaceString::validCollectionComponent(StringData ns) {
-    size_t idx = ns.find('.');
+inline bool NamespaceString::validCollectionComponent(const NamespaceString& ns) {
+    const auto nsStr = ns.ns();
+    size_t idx = nsStr.find('.');
     if (idx == std::string::npos)
         return false;
 
-    return validCollectionName(ns.substr(idx + 1)) || oplog(ns);
+    return validCollectionName(nsStr.substr(idx + 1)) || oplog(nsStr);
 }
 
 inline bool NamespaceString::validCollectionName(StringData coll) {

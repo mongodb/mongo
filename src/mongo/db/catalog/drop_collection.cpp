@@ -173,8 +173,11 @@ Status _dropView(OperationContext* opCtx,
 
     WriteUnitOfWork wunit(opCtx);
 
-    audit::logDropView(
-        opCtx->getClient(), collectionName, view->viewOn().ns(), view->pipeline(), ErrorCodes::OK);
+    audit::logDropView(opCtx->getClient(),
+                       collectionName,
+                       NamespaceStringUtil::serialize(view->viewOn()),
+                       view->pipeline(),
+                       ErrorCodes::OK);
 
     Status status = db->dropView(opCtx, collectionName);
     if (!status.isOK()) {

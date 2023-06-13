@@ -710,10 +710,8 @@ Collection* DatabaseImpl::createVirtualCollection(OperationContext* opCtx,
  * it.
  */
 bool doesCollectionModificationsUpdateIndexes(const NamespaceString& nss) {
-    const auto& collName = nss.ns();
-    return collName != "config.transactions" &&
-        collName !=
-        repl::ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
+    return nss != NamespaceString::kSessionTransactionsTableNamespace &&
+        nss != NamespaceString::kDefaultOplogTruncateAfterPointNamespace;
 }
 
 Collection* DatabaseImpl::_createCollection(
@@ -915,7 +913,7 @@ Status DatabaseImpl::userCreateNS(OperationContext* opCtx,
                 "create collection {namespace} {collectionOptions}",
                 logAttrs(nss),
                 "collectionOptions"_attr = collectionOptions.toBSON());
-    if (!NamespaceString::validCollectionComponent(nss.ns()))
+    if (!NamespaceString::validCollectionComponent(nss))
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 
@@ -1015,7 +1013,7 @@ Status DatabaseImpl::userCreateVirtualNS(OperationContext* opCtx,
                 "create collection {namespace} {collectionOptions}",
                 logAttrs(nss),
                 "collectionOptions"_attr = opts.toBSON());
-    if (!NamespaceString::validCollectionComponent(nss.ns()))
+    if (!NamespaceString::validCollectionComponent(nss))
         return Status(ErrorCodes::InvalidNamespace,
                       str::stream() << "invalid ns: " << nss.toStringForErrorMsg());
 

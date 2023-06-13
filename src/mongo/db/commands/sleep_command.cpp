@@ -114,7 +114,7 @@ public:
         // Need to acquire DBLock before attempting to acquire a collection lock.
         uassert(50962,
                 "lockTarget is not a valid namespace",
-                NamespaceString::validCollectionComponent(ns));
+                NamespaceString::validCollectionComponent(nss));
         Lock::CollectionLock collLock(opCtx, nss, mode, Date_t::max());
         LOGV2(6001603,
               "Collection lock acquired by sleep command.",

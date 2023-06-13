@@ -48,7 +48,6 @@ namespace mongo {
 namespace repl {
 
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace;
-constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace;
 constexpr StringData ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace;
 
 namespace {
@@ -62,8 +61,7 @@ ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
     : ReplicationConsistencyMarkersImpl(
           storageInterface,
           NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultMinValidNamespace),
-          NamespaceString(
-              ReplicationConsistencyMarkersImpl::kDefaultOplogTruncateAfterPointNamespace),
+          NamespaceString::kDefaultOplogTruncateAfterPointNamespace,
           NamespaceString(ReplicationConsistencyMarkersImpl::kDefaultInitialSyncIdNamespace)) {}
 
 ReplicationConsistencyMarkersImpl::ReplicationConsistencyMarkersImpl(
@@ -279,7 +277,8 @@ void ReplicationConsistencyMarkersImpl::ensureFastCountOnOplogTruncateAfterPoint
         fassert(51265,
                 {result.getStatus().code(),
                  str::stream() << "More than one document was found in the '"
-                               << kDefaultOplogTruncateAfterPointNamespace
+                               << NamespaceString::kDefaultOplogTruncateAfterPointNamespace
+                                      .toStringForErrorMsg()
                                << "' collection. Users should not write to this collection. Please "
                                   "delete the excess documents"});
     }

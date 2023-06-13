@@ -282,9 +282,9 @@ StatusWith<std::pair<long long, long long>> IndexBuildsManager::startBuildingInd
 
     if (recordsRemoved > 0) {
         StorageRepairObserver::get(opCtx->getServiceContext())
-            ->invalidatingModification(str::stream()
-                                       << "Moved " << recordsRemoved
-                                       << " records to lost and found: " << lostAndFoundNss.ns());
+            ->invalidatingModification(str::stream() << "Moved " << recordsRemoved
+                                                     << " records to lost and found: "
+                                                     << toStringForLogging(lostAndFoundNss));
 
         LOGV2(3956200,
               "Moved records to lost and found.",

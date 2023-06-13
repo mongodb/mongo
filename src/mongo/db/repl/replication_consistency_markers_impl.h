@@ -51,8 +51,6 @@ class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
 
 public:
     static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;
-    static constexpr StringData kDefaultOplogTruncateAfterPointNamespace =
-        "local.replset.oplogTruncateAfterPoint"_sd;
     static constexpr StringData kDefaultInitialSyncIdNamespace = "local.replset.initialSyncId"_sd;
 
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);

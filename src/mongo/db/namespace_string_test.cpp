@@ -247,12 +247,17 @@ TEST(NamespaceStringTest, GetDropPendingNamespaceOpTime) {
         NamespaceString{"test.system.drop.1234i111taaa.foo"}.getDropPendingNamespaceOpTime());
 }
 
-TEST(NamespaceStringTest, CollectionComponentValidNames) {
-    ASSERT(NamespaceString::validCollectionComponent("a.b"));
-    ASSERT(NamespaceString::validCollectionComponent("a.b"));
-    ASSERT(!NamespaceString::validCollectionComponent("a."));
-    ASSERT(!NamespaceString::validCollectionComponent("a..foo"));
-    ASSERT(NamespaceString::validCollectionComponent("a.b."));  // TODO: should this change?
+TEST(NamespaceStringTest, CollectionComponentValidNamesWithNamespaceString) {
+    ASSERT(NamespaceString::validCollectionComponent(
+        NamespaceString::createNamespaceString_forTest("a.b")));
+    ASSERT(!NamespaceString::validCollectionComponent(
+        NamespaceString::createNamespaceString_forTest("a.")));
+    ASSERT_THROWS_CODE(NamespaceString::validCollectionComponent(
+                           NamespaceString::createNamespaceString_forTest("a..foo")),
+                       AssertionException,
+                       ErrorCodes::InvalidNamespace);
+    ASSERT(NamespaceString::validCollectionComponent(
+        NamespaceString::createNamespaceString_forTest("a.b.")));
 }
 
 TEST(NamespaceStringTest, CollectionValidNames) {

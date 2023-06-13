@@ -185,8 +185,7 @@ Status insertDocumentsImpl(OperationContext* opCtx,
         // SERVER-21646. On the other hand, capped clustered collections with a monotonically
         // increasing cluster key natively guarantee preservation of the insertion order, and don't
         // need serialisation. We allow concurrent inserts for clustered capped collections.
-        Lock::ResourceLock heldUntilEndOfWUOW{
-            opCtx, ResourceId(RESOURCE_METADATA, nss.ns()), MODE_X};
+        Lock::ResourceLock heldUntilEndOfWUOW{opCtx, ResourceId(RESOURCE_METADATA, nss), MODE_X};
     }
 
     std::vector<Record> records;
