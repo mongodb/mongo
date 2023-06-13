@@ -515,7 +515,8 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
-                                    Lock::InterruptBehavior::kThrow);
+                                    Lock::InterruptBehavior::kThrow,
+                                    Lock::GlobalLockSkipOptions{.skipRSTLLock = true});
                 _debug.storageStats =
                     opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
             } catch (const DBException& ex) {
