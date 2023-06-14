@@ -362,7 +362,7 @@ StatusWith<ChunkType> ConfigServerTestFixture::getChunkDoc(OperationContext* opC
 StatusWith<ChunkVersion> ConfigServerTestFixture::getCollectionPlacementVersion(
     OperationContext* opCtx, const NamespaceString& nss) {
     auto collectionDoc = findOneOnConfigCollection(
-        opCtx, CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << nss.ns()));
+        opCtx, CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << nss.ns_forTest()));
     if (!collectionDoc.isOK())
         return collectionDoc.getStatus();
 

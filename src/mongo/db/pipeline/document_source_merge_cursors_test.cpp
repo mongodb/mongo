@@ -155,8 +155,9 @@ TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectEmptyArray) {
 
 TEST_F(DocumentSourceMergeCursorsTest, ShouldRejectLegacySerializationFormats) {
     // Formats like this were used in old versions of the server but are no longer supported.
-    auto spec = BSON("$mergeCursors" << BSON_ARRAY(BSON("ns" << getTenantIdNss().ns() << "id" << 0LL
-                                                             << "host" << kTestHost.toString())));
+    auto spec =
+        BSON("$mergeCursors" << BSON_ARRAY(BSON("ns" << getTenantIdNss().ns_forTest() << "id" << 0LL
+                                                     << "host" << kTestHost.toString())));
     ASSERT_THROWS_CODE(DocumentSourceMergeCursors::createFromBson(spec.firstElement(), getExpCtx()),
                        AssertionException,
                        17026);

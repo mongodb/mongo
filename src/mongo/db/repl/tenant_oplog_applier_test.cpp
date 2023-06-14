@@ -926,7 +926,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << uuid);
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -964,12 +964,12 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
         _dbName.toStringWithTenantId_forTest(), "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss2);
-    auto op =
-        BSON("op"
-             << "c"
-             << "ns" << nss1.getCommandNS().ns() << "wall" << Date_t() << "o"
-             << BSON("renameCollection" << nss1.ns() << "to" << nss2.ns() << "stayTemp" << false)
-             << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss1.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
+                   << BSON("renameCollection" << nss1.ns_forTest() << "to" << nss2.ns_forTest()
+                                              << "stayTemp" << false)
+                   << "ts" << Timestamp(1, 1) << "ui" << uuid);
     bool applyCmdCalled = false;
     _opObserver->onRenameCollectionFn = [&](OperationContext* opCtx,
                                             const NamespaceString& fromColl,
@@ -1009,7 +1009,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1051,7 +1051,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("createIndexes" << nss.coll() << "v" << 2 << "key" << BSON("a" << 1) << "name"
                                      << "a_1")
              << "ts" << Timestamp(1, 1) << "ui" << uuid);
@@ -1098,7 +1098,7 @@ TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("startIndexBuild" << nss.coll() << "v" << 2 << "key" << BSON("a" << 1)
                                              << "name"
                                              << "a_1")
@@ -1129,7 +1129,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1166,7 +1166,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS_Merge) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1202,7 +1202,7 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("dropIndexes" << nss.coll() << "index"
                                          << "a_1")
                    << "ts" << Timestamp(1, 1) << "ui" << uuid);
@@ -1243,7 +1243,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("collMod" << nss.coll() << "index"
                                      << BSON("name"
                                              << "data_1"
@@ -1288,7 +1288,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
     UUID uuid(UUID::gen());
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("collMod" << nss.coll() << "index"
                                      << BSON("name"
                                              << "data_1"

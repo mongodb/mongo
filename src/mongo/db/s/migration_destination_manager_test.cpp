@@ -218,8 +218,9 @@ TEST_F(MigrationDestinationManagerNetworkTest,
             const std::vector<BSONObj> indexes = {BSON("v" << 2 << "key" << BSON("_id" << 1)
                                                            << "name"
                                                            << "_id_")};
-            return BSON("ok" << 1 << "cursor"
-                             << BSON("id" << 0LL << "ns" << nss.ns() << "firstBatch" << indexes));
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch" << indexes));
         });
     });
 

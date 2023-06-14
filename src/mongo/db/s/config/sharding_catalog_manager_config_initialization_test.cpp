@@ -447,7 +447,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         const auto generatedEntryForColl1 = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << coll1.getNss().ns()));
+            BSON("nss" << coll1.getNss().ns_forTest()));
 
         assertSamePlacementInfo(expectedEntryForColl1, generatedEntryForColl1);
 
@@ -458,7 +458,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         const auto generatedEntryForColl2 = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << coll2.getNss().ns()));
+            BSON("nss" << coll2.getNss().ns_forTest()));
 
         assertSamePlacementInfo(expectedEntryForColl2, generatedEntryForColl2);
 
@@ -470,7 +470,7 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
             findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON("nss" << corruptedColl.getNss().ns()));
+                BSON("nss" << corruptedColl.getNss().ns_forTest()));
 
         assertSamePlacementInfo(expectedEntryForCorruptedColl, generatedEntryForCorruptedColl);
 
@@ -483,8 +483,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
         const auto generatedMarkerForDawnOfTime = findOneOnConfigCollection<NamespacePlacementType>(
             operationContext(),
             NamespaceString::kConfigsvrPlacementHistoryNamespace,
-            BSON("nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
-                       << "timestamp" << Timestamp(0, 1)));
+            BSON("nss"
+                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns_forTest()
+                 << "timestamp" << Timestamp(0, 1)));
 
         assertSamePlacementInfo(expectedMarkerForDawnOfTime, generatedMarkerForDawnOfTime);
 
@@ -498,9 +499,9 @@ TEST_F(ConfigInitializationTest, InizializePlacementHistory) {
             findOneOnConfigCollection<NamespacePlacementType>(
                 operationContext(),
                 NamespaceString::kConfigsvrPlacementHistoryNamespace,
-                BSON(
-                    "nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
-                          << "timestamp" << timeAtInitialization));
+                BSON("nss" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker
+                                  .ns_forTest()
+                           << "timestamp" << timeAtInitialization));
 
         assertSamePlacementInfo(expectedMarkerForInitializationTime,
                                 generatedMarkerForInitializationTime);

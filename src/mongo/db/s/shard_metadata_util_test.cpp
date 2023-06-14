@@ -59,7 +59,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
     ShardCollectionType setUpCollection() {
         ShardCollectionType shardCollectionType(
             BSON(ShardCollectionType::kNssFieldName
-                 << kNss.ns() << ShardCollectionType::kEpochFieldName
+                 << kNss.ns_forTest() << ShardCollectionType::kEpochFieldName
                  << maxCollPlacementVersion.epoch() << ShardCollectionType::kTimestampFieldName
                  << maxCollPlacementVersion.getTimestamp() << ShardCollectionType::kUuidFieldName
                  << uuid << ShardCollectionType::kKeyPatternFieldName << keyPattern.toBSON()
@@ -67,10 +67,11 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                  << ShardCollectionType::kUniqueFieldName << kUnique));
         shardCollectionType.setRefreshing(true);
 
-        ASSERT_OK(updateShardCollectionsEntry(operationContext(),
-                                              BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
-                                              shardCollectionType.toBSON(),
-                                              true /*upsert*/));
+        ASSERT_OK(updateShardCollectionsEntry(
+            operationContext(),
+            BSON(ShardCollectionType::kNssFieldName << kNss.ns_forTest()),
+            shardCollectionType.toBSON(),
+            true /*upsert*/));
 
         return shardCollectionType;
     }
@@ -196,7 +197,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
         assertGet(readShardCollectionsEntry(operationContext(), kNss));
 
     ASSERT_EQUALS(shardCollectionsEntry.getUuid(), uuid);
-    ASSERT_EQUALS(shardCollectionsEntry.getNss().ns(), kNss.ns());
+    ASSERT_EQUALS(shardCollectionsEntry.getNss().ns_forTest(), kNss.ns_forTest());
     ASSERT_EQUALS(shardCollectionsEntry.getEpoch(), maxCollPlacementVersion.epoch());
     ASSERT_EQUALS(shardCollectionsEntry.getTimestamp(), maxCollPlacementVersion.getTimestamp());
     ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getKeyPattern().toBSON(), keyPattern.toBSON());
@@ -208,7 +209,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     // Signal refresh start again to make sure nothing changes
     ASSERT_OK(updateShardCollectionsEntry(
         operationContext(),
-        BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
+        BSON(ShardCollectionType::kNssFieldName << kNss.ns_forTest()),
         BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
         false));
 

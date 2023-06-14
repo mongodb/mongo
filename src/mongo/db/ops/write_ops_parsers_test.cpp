@@ -212,7 +212,7 @@ TEST(CommandWriteOpsParsers, SingleInsert) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 1u);
@@ -237,7 +237,7 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 2u);
@@ -257,7 +257,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtId) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 2u);
@@ -277,7 +277,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtIdsArray) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 2u);
@@ -304,7 +304,7 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
             for (bool seq : {false, true}) {
                 auto request = toOpMsg(ns.db(), cmd, seq);
                 auto op = UpdateOp::parse(request);
-                ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+                ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
                 ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
                 ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
                 ASSERT_EQ(op.getUpdates().size(), 1u);
@@ -341,7 +341,7 @@ TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
             for (bool seq : {false, true}) {
                 auto request = toOpMsg(ns.db(), cmd, seq);
                 auto op = UpdateOp::parse(request);
-                ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+                ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
                 ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
                 ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
                 ASSERT_EQ(op.getUpdates().size(), 1u);
@@ -374,7 +374,7 @@ TEST(CommandWriteOpsParsers, Remove) {
         for (bool seq : {false, true}) {
             auto request = toOpMsg(ns.db(), cmd, seq);
             auto op = DeleteOp::parse(request);
-            ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+            ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
             ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
             ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
             ASSERT_EQ(op.getDeletes().size(), 1u);
@@ -407,7 +407,7 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
         auto message = makeUnsupportedOpInsertMessage(
             ns, &obj, 1, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
-        ASSERT_EQ(op.getNamespace().ns(), ns);
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT_EQ(!op.getWriteCommandRequestBase().getOrdered(), continueOnError);
         ASSERT_EQ(op.getDocuments().size(), 1u);
@@ -435,7 +435,7 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
         auto message = makeUnsupportedOpInsertMessage(
             ns, objs.data(), objs.size(), continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
-        ASSERT_EQ(op.getNamespace().ns(), ns);
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT_EQ(!op.getWriteCommandRequestBase().getOrdered(), continueOnError);
         ASSERT_EQ(op.getDocuments().size(), 2u);

@@ -826,11 +826,11 @@ TEST_F(ReshardingOplogApplierTest, UnsupportedCommandOpsShouldError) {
                             repl::OpTypeEnum::kInsert,
                             BSON("_id" << 1),
                             boost::none));
-    ops.push_back(
-        makeOplog(repl::OpTime(Timestamp(6, 3), 1),
-                  repl::OpTypeEnum::kCommand,
-                  BSON("renameCollection" << appliedToNs().ns() << "to" << stashNs().ns()),
-                  boost::none));
+    ops.push_back(makeOplog(
+        repl::OpTime(Timestamp(6, 3), 1),
+        repl::OpTypeEnum::kCommand,
+        BSON("renameCollection" << appliedToNs().ns_forTest() << "to" << stashNs().ns_forTest()),
+        boost::none));
     ops.push_back(makeOplog(repl::OpTime(Timestamp(7, 3), 1),
                             repl::OpTypeEnum::kInsert,
                             BSON("_id" << 2),
@@ -870,7 +870,7 @@ TEST_F(ReshardingOplogApplierTest, DropSourceCollectionCmdShouldError) {
     std::deque<repl::OplogEntry> ops;
     ops.push_back(makeOplog(repl::OpTime(Timestamp(5, 3), 1),
                             repl::OpTypeEnum::kCommand,
-                            BSON("drop" << appliedToNs().ns()),
+                            BSON("drop" << appliedToNs().ns_forTest()),
                             boost::none));
 
     auto iterator = std::make_unique<OplogIteratorMock>(std::move(ops), 1 /* batchSize */);

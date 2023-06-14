@@ -719,7 +719,7 @@ TEST_F(StorageInterfaceImplTest, CreateCollectionFailsIfCollectionExists) {
     auto status = storage.createCollection(opCtx, nss, generateOptionsWithUuid());
     ASSERT_EQUALS(ErrorCodes::NamespaceExists, status);
     ASSERT_STRING_CONTAINS(status.reason(),
-                           str::stream() << "Collection " << nss.ns() << " already exists");
+                           str::stream() << "Collection " << nss.ns_forTest() << " already exists");
 }
 
 TEST_F(StorageInterfaceImplTest, DropCollectionWorksWithExistingWithDataCollection) {
@@ -2981,7 +2981,7 @@ TEST_F(StorageInterfaceImplTest, DeleteByFilterReturnsNamespaceNotFoundWhenColle
     ASSERT_EQUALS(std::string(
                       str::stream()
                       << "Collection [mydb.wrongColl] not found. Unable to delete documents in "
-                      << wrongColl.ns() << " using filter " << filter),
+                      << wrongColl.ns_forTest() << " using filter " << filter),
                   status.reason());
 }
 

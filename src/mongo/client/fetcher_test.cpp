@@ -271,7 +271,7 @@ TEST_F(FetcherTest, FetcherCompletionFutureBecomesReadyAfterCompletingWork) {
                            FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
 
@@ -304,7 +304,7 @@ TEST_F(FetcherTest, FetcherCompletionFutureBecomesReadyEvenWhenWorkIsInterrupted
                            FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
 
@@ -675,7 +675,7 @@ TEST_F(FetcherTest, FirstBatchEmptyArray) {
                            FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_TRUE(documents.empty());
 }
 
@@ -690,7 +690,7 @@ TEST_F(FetcherTest, FetchOneDocument) {
                            FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
 }
@@ -716,7 +716,7 @@ TEST_F(FetcherTest, SetNextActionToContinueWhenNextBatchIsNotAvailable) {
                            FetcherState::kInactive);
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
 }
@@ -749,7 +749,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_EQUALS(elapsedMillis, Milliseconds(100));
@@ -768,7 +768,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_EQUALS(elapsedMillis, Milliseconds(200));
@@ -787,7 +787,7 @@ TEST_F(FetcherTest, FetchMultipleBatches) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(0, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc3, documents.front());
     ASSERT_EQUALS(elapsedMillis, Milliseconds(300));
@@ -811,7 +811,7 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -826,7 +826,7 @@ TEST_F(FetcherTest, ScheduleGetMoreAndCancel) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -889,7 +889,7 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -905,7 +905,7 @@ TEST_F(FetcherTest, ScheduleGetMoreButShutdown) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -943,7 +943,7 @@ TEST_F(FetcherTest, EmptyGetMoreRequestAfterFirstBatchMakesFetcherInactiveAndKil
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -1002,7 +1002,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -1020,7 +1020,7 @@ TEST_F(FetcherTest, UpdateNextActionAfterSecondBatch) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc2, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kNoAction == nextAction);
@@ -1100,7 +1100,7 @@ TEST_F(FetcherTest, ShutdownDuringSecondBatch) {
 
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);
@@ -1163,7 +1163,7 @@ TEST_F(FetcherTest, FetcherAppliesRetryPolicyToFirstCommandButNotToGetMoreReques
                            FetcherState::kActive);
     ASSERT_OK(status);
     ASSERT_EQUALS(1LL, cursorId);
-    ASSERT_EQUALS("db.coll", nss.ns());
+    ASSERT_EQUALS("db.coll", nss.ns_forTest());
     ASSERT_EQUALS(1U, documents.size());
     ASSERT_BSONOBJ_EQ(doc, documents.front());
     ASSERT_TRUE(Fetcher::NextAction::kGetMore == nextAction);

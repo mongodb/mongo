@@ -217,7 +217,7 @@ OpTime _logOpNoopWithMsg(OperationContext* opCtx,
     MutableOplogEntry oplogEntry;
     oplogEntry.setOpType(repl::OpTypeEnum::kNoop);
     oplogEntry.setNss(nss);
-    oplogEntry.setObject(BSON("msg" << nss.ns()));
+    oplogEntry.setObject(BSON("msg" << nss.ns_forTest()));
     oplogEntry.setWallClockTime(Date_t::now());
     auto opTime = logOp(opCtx, &oplogEntry);
     ASSERT_FALSE(opTime.isNull());

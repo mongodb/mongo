@@ -47,11 +47,11 @@ const BSONObj kDefaultCollation = BSON("locale"
 TEST(ShardCollectionType, FromBSONEmptyShardKeyFails) {
     ASSERT_THROWS_CODE(
         ShardCollectionType(BSON(ShardCollectionType::kNssFieldName
-                                 << kNss.ns() << ShardCollectionType::kEpochFieldName << OID::gen()
-                                 << ShardCollectionType::kTimestampFieldName << Timestamp(1, 1)
-                                 << ShardCollectionType::kUuidFieldName << UUID::gen()
-                                 << ShardCollectionType::kKeyPatternFieldName << BSONObj()
-                                 << ShardCollectionType::kUniqueFieldName << true)),
+                                 << kNss.ns_forTest() << ShardCollectionType::kEpochFieldName
+                                 << OID::gen() << ShardCollectionType::kTimestampFieldName
+                                 << Timestamp(1, 1) << ShardCollectionType::kUuidFieldName
+                                 << UUID::gen() << ShardCollectionType::kKeyPatternFieldName
+                                 << BSONObj() << ShardCollectionType::kUniqueFieldName << true)),
         DBException,
         ErrorCodes::ShardKeyNotFound);
 }
@@ -63,7 +63,7 @@ TEST(ShardCollectionType,
 
     ShardCollectionType shardCollType(
         BSON(ShardCollectionType::kNssFieldName
-             << kNss.ns() << ShardCollectionType::kEpochFieldName << epoch
+             << kNss.ns_forTest() << ShardCollectionType::kEpochFieldName << epoch
              << ShardCollectionType::kTimestampFieldName << timestamp
              << ShardCollectionType::kUuidFieldName << UUID::gen()
              << ShardCollectionType::kKeyPatternFieldName << kKeyPattern

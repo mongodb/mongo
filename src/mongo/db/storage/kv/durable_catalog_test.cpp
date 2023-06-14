@@ -754,26 +754,28 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     auto idxIdentObj = BSON("_id_" << idxIdent);
 
     // Import should fail with missing "md" field.
-    ASSERT_THROWS_CODE(importCollectionTest(
-                           nss,
-                           BSON("idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident),
-                           storageMetadata),
-                       AssertionException,
-                       ErrorCodes::BadValue);
-
-    // Import should fail with missing "ident" field.
     ASSERT_THROWS_CODE(
-        importCollectionTest(nss,
-                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns()),
-                             storageMetadata),
+        importCollectionTest(
+            nss,
+            BSON("idxIdent" << idxIdentObj << "ns" << nss.ns_forTest() << "ident" << ident),
+            storageMetadata),
         AssertionException,
         ErrorCodes::BadValue);
 
+    // Import should fail with missing "ident" field.
+    ASSERT_THROWS_CODE(importCollectionTest(nss,
+                                            BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
+                                                      << nss.ns_forTest()),
+                                            storageMetadata),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+
     // Import should success with validate inputs.
-    auto swImportResult = importCollectionTest(
-        nss,
-        BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns" << nss.ns() << "ident" << ident),
-        storageMetadata);
+    auto swImportResult =
+        importCollectionTest(nss,
+                             BSON("md" << mdObj << "idxIdent" << idxIdentObj << "ns"
+                                       << nss.ns_forTest() << "ident" << ident),
+                             storageMetadata);
     ASSERT_OK(swImportResult.getStatus());
     DurableCatalog::ImportResult importResult = std::move(swImportResult.getValue());
 
@@ -792,8 +794,8 @@ TEST_F(ImportCollectionTest, ImportCollection) {
     // match.
     md->options.uuid = importResult.uuid;
     ASSERT_BSONOBJ_EQ(getCatalog()->getCatalogEntry(operationContext(), importResult.catalogId),
-                      BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns" << nss.ns()
-                                << "ident" << ident));
+                      BSON("md" << md->toBSON() << "idxIdent" << idxIdentObj << "ns"
+                                << nss.ns_forTest() << "ident" << ident));
 
     // Since there was not a collision, the rand should not have changed.
     ASSERT_EQ(rand, getCatalog()->getRand_forTest());
@@ -829,7 +831,7 @@ TEST_F(ImportCollectionTest, ImportCollectionRandConflict) {
         auto swImportResult =
             importCollectionTest(nss,
                                  BSON("md" << md->toBSON() << "idxIdent" << BSON("_id_" << idxIdent)
-                                           << "ns" << nss.ns() << "ident" << ident),
+                                           << "ns" << nss.ns_forTest() << "ident" << ident),
                                  storageMetadata);
         ASSERT_OK(swImportResult.getStatus());
     }

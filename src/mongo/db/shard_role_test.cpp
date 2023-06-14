@@ -1388,8 +1388,9 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
         ASSERT_TRUE(client.runCommand(
             DatabaseName::createDatabaseName_forTest(boost::none, dbNameTestDb.db()),
             BSON("renameCollection"
-                 << nss.ns() << "to"
-                 << NamespaceString::createNamespaceString_forTest(dbNameTestDb, "foo2").ns()),
+                 << nss.ns_forTest() << "to"
+                 << NamespaceString::createNamespaceString_forTest(dbNameTestDb, "foo2")
+                        .ns_forTest()),
             info));
     }
 

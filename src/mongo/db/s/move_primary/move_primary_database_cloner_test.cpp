@@ -107,17 +107,17 @@ protected:
         for (auto& c : sourceCollectionParams) {
             auto ns = c.first;
             auto uuid = c.second;
-            BSONObj b =
-                BSON("db" << _dbName << "name" << ns.coll() << "type"
-                          << "collection"
-                          << "shard"
-                          << "shard1"
-                          << "md" << BSON("ns" << ns.ns() << "options" << BSON("uuid" << uuid))
-                          << "idxIdent"
-                          << BSON("_id_"
-                                  << "index1")
-                          << "ns" << ns.ns() << "ident"
-                          << "xyz");
+            BSONObj b = BSON(
+                "db" << _dbName << "name" << ns.coll() << "type"
+                     << "collection"
+                     << "shard"
+                     << "shard1"
+                     << "md" << BSON("ns" << ns.ns_forTest() << "options" << BSON("uuid" << uuid))
+                     << "idxIdent"
+                     << BSON("_id_"
+                             << "index1")
+                     << "ns" << ns.ns_forTest() << "ident"
+                     << "xyz");
 
             result.emplace_back(b);
         }
@@ -211,10 +211,10 @@ TEST_F(MovePrimaryDatabaseClonerTest, ListCollectionsOnSourceFailsOnMissingUUID)
                   << "collection"
                   << "shard"
                   << "shard1"
-                  << "md" << BSON("ns" << aNss.ns() << "options" << BSONObj()) << "idxIdent"
+                  << "md" << BSON("ns" << aNss.ns_forTest() << "options" << BSONObj()) << "idxIdent"
                   << BSON("_id_"
                           << "index2")
-                  << "ns" << aNss.ns() << "ident"
+                  << "ns" << aNss.ns_forTest() << "ident"
                   << "xyz")};
 
     _mockServer->setCommandReply("aggregate",

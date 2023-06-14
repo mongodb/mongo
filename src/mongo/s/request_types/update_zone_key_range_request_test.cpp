@@ -49,7 +49,7 @@ TEST(UpdateZoneKeyRangeRequest, BasicValidMongosAssignCommand) {
     ASSERT_OK(requestStatus.getStatus());
 
     auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns());
+    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_FALSE(request.isRemove());
@@ -66,7 +66,7 @@ TEST(UpdateZoneKeyRangeRequest, BasicValidMongosRemoveCommand) {
     ASSERT_OK(requestStatus.getStatus());
 
     auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns());
+    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_TRUE(request.isRemove());
@@ -227,7 +227,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosAssignCommand) {
     ASSERT_OK(requestStatus.getStatus());
 
     auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns());
+    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_FALSE(request.isRemove());
@@ -244,7 +244,7 @@ TEST(CfgAssignKeyRangeToZoneRequest, BasicValidMongosRemoveCommand) {
     ASSERT_OK(requestStatus.getStatus());
 
     auto request = requestStatus.getValue();
-    ASSERT_EQ("foo.bar", request.getNS().ns());
+    ASSERT_EQ("foo.bar", request.getNS().ns_forTest());
     ASSERT_BSONOBJ_EQ(BSON("x" << 1), request.getRange().getMin());
     ASSERT_BSONOBJ_EQ(BSON("x" << 100), request.getRange().getMax());
     ASSERT_TRUE(request.isRemove());

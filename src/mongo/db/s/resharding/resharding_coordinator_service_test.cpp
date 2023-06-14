@@ -881,7 +881,7 @@ TEST_F(ReshardingCoordinatorServiceTest, StepDownStepUpEachTransition) {
         std::vector<ChunkType> foundCollections;
         auto collection =
             client.findOne(CollectionType::ConfigNS,
-                           BSON(CollectionType::kNssFieldName << doc.getSourceNss().ns()));
+                           BSON(CollectionType::kNssFieldName << doc.getSourceNss().ns_forTest()));
 
         ASSERT_EQUALS(collection.isEmpty(), false);
         ASSERT_EQUALS(
@@ -915,7 +915,7 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
     {
         DBDirectClient client(opCtx);
         client.update(CollectionType::ConfigNS,
-                      BSON(CollectionType::kNssFieldName << _originalNss.ns()),
+                      BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest()),
                       BSON("$set" << BSON(CollectionType::kAllowMigrationsFieldName << false)));
     }
 
@@ -925,8 +925,9 @@ TEST_F(ReshardingCoordinatorServiceTest, ReshardingCoordinatorFailsIfMigrationNo
     // Check that reshardCollection keeps allowMigrations setting intact.
     {
         DBDirectClient client(opCtx);
-        CollectionType collDoc(client.findOne(
-            CollectionType::ConfigNS, BSON(CollectionType::kNssFieldName << _originalNss.ns())));
+        CollectionType collDoc(
+            client.findOne(CollectionType::ConfigNS,
+                           BSON(CollectionType::kNssFieldName << _originalNss.ns_forTest())));
         ASSERT_FALSE(collDoc.getAllowMigrations());
     }
 }

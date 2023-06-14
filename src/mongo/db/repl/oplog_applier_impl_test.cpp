@@ -533,7 +533,7 @@ TEST_F(OplogApplierImplTest, CreateCollectionCommand) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1317,8 +1317,8 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
-                                               << BSON("_id" << 1)))
+                                               << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                               << "o" << BSON("_id" << 1)))
                             << "partialTxn" << true),
             _lsid,
             _txnNum,
@@ -1329,8 +1329,8 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << _nss2.ns() << "ui" << *_uuid2 << "o"
-                                               << BSON("_id" << 2)))
+                                               << "ns" << _nss2.ns_forTest() << "ui" << *_uuid2
+                                               << "o" << BSON("_id" << 2)))
                             << "partialTxn" << true),
             _lsid,
             _txnNum,
@@ -1341,8 +1341,8 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << _nss2.ns() << "ui" << *_uuid2 << "o"
-                                               << BSON("_id" << 3)))),
+                                               << "ns" << _nss2.ns_forTest() << "ui" << *_uuid2
+                                               << "o" << BSON("_id" << 3)))),
             _lsid,
             _txnNum,
             {StmtId(2)},
@@ -1509,8 +1509,9 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyUnpreparedTransactionTwoBa
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << (i == 1 ? _nss2.ns() : _nss1.ns()) << "ui"
-                                               << (i == 1 ? *_uuid2 : *_uuid1) << "o"
+                                               << "ns"
+                                               << (i == 1 ? _nss2.ns_forTest() : _nss1.ns_forTest())
+                                               << "ui" << (i == 1 ? *_uuid2 : *_uuid1) << "o"
                                                << insertDocs.back()))
                             << "partialTxn" << true),
             _lsid,
@@ -1587,7 +1588,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
+                                           << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 1)))
                         << "partialTxn" << true),
         _lsid,
@@ -1599,7 +1600,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
+                                           << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 2)))
                         << "partialTxn" << true),
 
@@ -1612,7 +1613,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
+                                           << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 3)))
                         << "partialTxn" << true),
         _lsid,
@@ -1624,7 +1625,7 @@ TEST_F(MultiOplogEntryOplogApplierImplTest, MultiApplyTwoTransactionsOneBatch) {
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
+                                           << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1 << "o"
                                            << BSON("_id" << 4)))
                         << "partialTxn" << true),
         _lsid,
@@ -1772,11 +1773,12 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
     ops.push_back(makeCommandOplogEntryWithSessionInfoAndStmtIds(
         {Timestamp(Seconds(1), 1), 1LL},
         _cmdNss,
-        BSON("applyOps" << BSON_ARRAY(BSON("op"
-                                           << "c"
-                                           << "tid" << _tenantId << "ns" << _nss.ns() << "ui"
-                                           << *_uuid << "o" << BSON("create" << _nss.coll())))
-                        << "partialTxn" << true),
+        BSON(
+            "applyOps" << BSON_ARRAY(BSON("op"
+                                          << "c"
+                                          << "tid" << _tenantId << "ns" << _nss.ns_forTest() << "ui"
+                                          << *_uuid << "o" << BSON("create" << _nss.coll())))
+                       << "partialTxn" << true),
         _lsid,
         _txnNum,
         {StmtId(0)},
@@ -1787,8 +1789,8 @@ TEST_F(MultiOplogEntryOplogApplierImplTestMultitenant,
         _cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "tid" << _tenantId << "ns" << _nss.ns() << "ui"
-                                           << *_uuid << "o" << BSON("_id" << 1)))
+                                           << "tid" << _tenantId << "ns" << _nss.ns_forTest()
+                                           << "ui" << *_uuid << "o" << BSON("_id" << 1)))
                         << "partialTxn" << true),
         _lsid,
         _txnNum,
@@ -1912,8 +1914,8 @@ protected:
             _nss1,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << _nss2.ns() << "ui" << *_uuid2 << "o"
-                                               << BSON("_id" << 3)))
+                                               << "ns" << _nss2.ns_forTest() << "ui" << *_uuid2
+                                               << "o" << BSON("_id" << 3)))
                             << "prepare" << true),
             _lsid,
             _txnNum,
@@ -1924,8 +1926,8 @@ protected:
             _nss1,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
-                                               << BSON("_id" << 0)))
+                                               << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                               << "o" << BSON("_id" << 0)))
                             << "prepare" << true),
             _lsid,
             _txnNum,
@@ -2479,12 +2481,12 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "i"
-                                               << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
-                                               << BSON("_id" << 1))
+                                               << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                               << "o" << BSON("_id" << 1))
                                           << BSON("op"
                                                   << "i"
-                                                  << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
-                                                  << BSON("_id" << 2)))
+                                                  << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                                  << "o" << BSON("_id" << 2)))
                             << "prepare" << true),
             _lsid1,
             _txnNum1,
@@ -2499,12 +2501,12 @@ protected:
             cmdNss,
             BSON("applyOps" << BSON_ARRAY(BSON("op"
                                                << "d"
-                                               << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
-                                               << BSON("_id" << 3))
+                                               << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                               << "o" << BSON("_id" << 3))
                                           << BSON("op"
                                                   << "d"
-                                                  << "ns" << _nss1.ns() << "ui" << *_uuid1 << "o"
-                                                  << BSON("_id" << 4)))
+                                                  << "ns" << _nss1.ns_forTest() << "ui" << *_uuid1
+                                                  << "o" << BSON("_id" << 4)))
                             << "prepare" << true),
             _lsid2,
             _txnNum2,
@@ -3517,9 +3519,10 @@ TEST_F(IdempotencyTest, CreateCollectionWithView) {
     ASSERT_OK(
         runOpInitialSync(makeCreateCollectionOplogEntry(nextOpTime(), viewNss, options.toBSON())));
 
-    auto viewDoc = BSON(
-        "_id" << NamespaceString::createNamespaceString_forTest(_nss.db(), "view").ns() << "viewOn"
-              << _nss.coll() << "pipeline" << fromjson("[ { '$project' : { 'x' : 1 } } ]"));
+    auto viewDoc =
+        BSON("_id" << NamespaceString::createNamespaceString_forTest(_nss.db(), "view").ns_forTest()
+                   << "viewOn" << _nss.coll() << "pipeline"
+                   << fromjson("[ { '$project' : { 'x' : 1 } } ]"));
     auto insertViewOp = makeInsertDocumentOplogEntry(nextOpTime(), viewNss, viewDoc);
     auto dropColl = makeCommandOplogEntry(nextOpTime(), _nss, BSON("drop" << _nss.coll()));
 
@@ -3998,7 +4001,7 @@ TEST_F(OplogApplierImplTxnTableTest, RetryableWriteThenMultiStatementTxnWriteOnS
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << nss().ns() << "ui" << uuid << "o"
+                                           << "ns" << nss().ns_forTest() << "ui" << uuid << "o"
                                            << BSON("_id" << 2)))
                         << "partialTxn" << true),
         sessionId,
@@ -4057,7 +4060,7 @@ TEST_F(OplogApplierImplTxnTableTest, MultiStatementTxnWriteThenRetryableWriteOnS
         cmdNss,
         BSON("applyOps" << BSON_ARRAY(BSON("op"
                                            << "i"
-                                           << "ns" << nss().ns() << "ui" << uuid << "o"
+                                           << "ns" << nss().ns_forTest() << "ui" << uuid << "o"
                                            << BSON("_id" << 2)))
                         << "partialTxn" << true),
         sessionId,
@@ -5149,10 +5152,11 @@ TEST_F(PreparedTxnSplitTest, MultiplePrepareTxnsInSameBatch) {
     for (int i = 0; i < kNumEntries; i++) {
         cruds1.push_back(BSON("op"
                               << "i"
-                              << "ns" << _nss.ns() << "ui" << *_uuid << "o" << BSON("_id" << i)));
+                              << "ns" << _nss.ns_forTest() << "ui" << *_uuid << "o"
+                              << BSON("_id" << i)));
         cruds2.push_back(BSON("op"
                               << "i"
-                              << "ns" << _nss.ns() << "ui" << *_uuid << "o"
+                              << "ns" << _nss.ns_forTest() << "ui" << *_uuid << "o"
                               << BSON("_id" << i + kNumEntries)));
     }
 

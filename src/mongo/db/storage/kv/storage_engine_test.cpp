@@ -315,7 +315,7 @@ TEST_F(StorageEngineTest, ReconcileUnfinishedBackgroundSecondaryIndex) {
     // require it to be rebuilt.
     ASSERT_EQUALS(1UL, reconcileResult.indexesToRebuild.size());
     StorageEngine::IndexIdentifier& toRebuild = reconcileResult.indexesToRebuild[0];
-    ASSERT_EQUALS(ns.ns(), toRebuild.nss.ns());
+    ASSERT_EQUALS(ns.ns_forTest(), toRebuild.nss.ns_forTest());
     ASSERT_EQUALS(indexName, toRebuild.indexName);
 
     // There are no two-phase builds to restart or resume.
@@ -456,7 +456,7 @@ TEST_F(StorageEngineRepairTest, LoadCatalogRecoversOrphansInCatalog) {
     // the actual drop in storage engine.
     {
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns(), _storageEngine->getCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getCatalog()));
         wuow.commit();
     }
 
@@ -490,7 +490,7 @@ TEST_F(StorageEngineTest, LoadCatalogDropsOrphans) {
     {
         AutoGetDb db(opCtx.get(), collNs.dbName(), LockMode::MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
-        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns(), _storageEngine->getCatalog()));
+        ASSERT_OK(removeEntry(opCtx.get(), collNs.ns_forTest(), _storageEngine->getCatalog()));
         wuow.commit();
     }
     ASSERT(!collectionExists(opCtx.get(), collNs));

@@ -53,7 +53,8 @@ public:
 
     inline static const NamespaceString dbName =
         NamespaceString::createNamespaceString_forTest("TestDB");
-    inline static const BSONObj dbOpReason = BSON("Dummy operation on database" << dbName.ns());
+    inline static const BSONObj dbOpReason =
+        BSON("Dummy operation on database" << dbName.ns_forTest());
 
     inline static const BSONObj differentOpReason = BSON("Yet another dummy operation" << true);
 

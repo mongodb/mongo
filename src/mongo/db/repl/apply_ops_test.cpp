@@ -143,10 +143,10 @@ TEST_F(ApplyOpsTest, CommandInNestedApplyOpsReturnsSuccess) {
     auto innerCmdObj =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "o" << BSON("create" << nss.coll()));
+             << "ns" << nss.getCommandNS().ns_forTest() << "o" << BSON("create" << nss.coll()));
     auto innerApplyOpsObj = BSON("op"
                                  << "c"
-                                 << "ns" << nss.getCommandNS().ns() << "o"
+                                 << "ns" << nss.getCommandNS().ns_forTest() << "o"
                                  << BSON("applyOps" << BSON_ARRAY(innerCmdObj)));
     auto cmdObj = BSON("applyOps" << BSON_ARRAY(innerApplyOpsObj));
 
@@ -162,10 +162,11 @@ BSONObj makeApplyOpsWithInsertOperation(const NamespaceString& nss,
                                         const BSONObj& documentToInsert) {
     auto insertOp = uuid ? BSON("op"
                                 << "i"
-                                << "ns" << nss.ns() << "o" << documentToInsert << "ui" << *uuid)
+                                << "ns" << nss.ns_forTest() << "o" << documentToInsert << "ui"
+                                << *uuid)
                          : BSON("op"
                                 << "i"
-                                << "ns" << nss.ns() << "o" << documentToInsert);
+                                << "ns" << nss.ns_forTest() << "o" << documentToInsert);
     return BSON("applyOps" << BSON_ARRAY(insertOp));
 }
 
@@ -308,20 +309,20 @@ TEST_F(ApplyOpsTest, ExtractOperationsReturnsOperationsWithSameOpTimeAsApplyOps)
     auto ui1 = UUID::gen();
     auto op1 = BSON("op"
                     << "i"
-                    << "ns" << ns1.ns() << "ui" << ui1 << "o" << BSON("_id" << 1));
+                    << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o" << BSON("_id" << 1));
 
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
     auto op2 = BSON("op"
                     << "i"
-                    << "ns" << ns2.ns() << "ui" << ui2 << "o" << BSON("_id" << 2));
+                    << "ns" << ns2.ns_forTest() << "ui" << ui2 << "o" << BSON("_id" << 2));
 
     NamespaceString ns3 = NamespaceString::createNamespaceString_forTest("test.c");
     auto ui3 = UUID::gen();
     auto op3 = BSON("op"
                     << "u"
-                    << "ns" << ns3.ns() << "ui" << ui3 << "b" << true << "o" << BSON("x" << 1)
-                    << "o2" << BSON("_id" << 3));
+                    << "ns" << ns3.ns_forTest() << "ui" << ui3 << "b" << true << "o"
+                    << BSON("x" << 1) << "o2" << BSON("_id" << 3));
 
     auto oplogEntry =
         makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2 << op3)));
@@ -383,14 +384,14 @@ TEST_F(ApplyOpsTest, ExtractOperationsFromApplyOpsMultiStmtIds) {
     auto ui1 = UUID::gen();
     auto op1 = BSON("op"
                     << "i"
-                    << "ns" << ns1.ns() << "ui" << ui1 << "o" << BSON("_id" << 1));
+                    << "ns" << ns1.ns_forTest() << "ui" << ui1 << "o" << BSON("_id" << 1));
 
     NamespaceString ns2 = NamespaceString::createNamespaceString_forTest("test.b");
     auto ui2 = UUID::gen();
     auto op2 = BSON("op"
                     << "u"
-                    << "ns" << ns2.ns() << "ui" << ui2 << "b" << true << "o" << BSON("x" << 1)
-                    << "o2" << BSON("_id" << 2));
+                    << "ns" << ns2.ns_forTest() << "ui" << ui2 << "b" << true << "o"
+                    << BSON("x" << 1) << "o2" << BSON("_id" << 2));
 
     auto oplogEntry =
         makeOplogEntry(OpTypeEnum::kCommand, BSON("applyOps" << BSON_ARRAY(op1 << op2)), {0, 1});
@@ -446,7 +447,7 @@ TEST_F(ApplyOpsTest, ApplyOpsFailsToDropAdmin) {
 
     auto dropDatabaseOp = BSON("op"
                                << "c"
-                               << "ns" << nss.getCommandNS().ns() << "o"
+                               << "ns" << nss.getCommandNS().ns_forTest() << "o"
                                << BSON("dropDatabase" << 1));
 
     auto dropDatabaseCmdObj = BSON("applyOps" << BSON_ARRAY(dropDatabaseOp));

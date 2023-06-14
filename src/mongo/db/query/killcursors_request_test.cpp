@@ -46,7 +46,7 @@ TEST(KillCursorsRequestTest, parseSuccess) {
                         << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)) << "$db"
                         << "db");
     KillCursorsCommandRequest request = KillCursorsCommandRequest::parse(ctxt, bsonObj);
-    ASSERT_EQ(request.getNamespace().ns(), "db.coll");
+    ASSERT_EQ(request.getNamespace().ns_forTest(), "db.coll");
     ASSERT_EQ(request.getCursorIds().size(), 2U);
     ASSERT_EQ(request.getCursorIds()[0], CursorId(123));
     ASSERT_EQ(request.getCursorIds()[1], CursorId(456));

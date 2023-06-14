@@ -225,25 +225,26 @@ TEST(ResolvedViewTest, FromBSONFailsOnInvalidViewNsType) {
 }
 
 TEST(ResolvedViewTest, FromBSONFailsIfMissingPipeline) {
-    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns()));
+    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest()));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40251);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidPipelineType) {
     BSONObj badCmdResponse =
-        BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << 7));
+        BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline" << 7));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40251);
 }
 
 TEST(ResolvedViewTest, FromBSONFailsOnInvalidCollationType) {
-    BSONObj badCmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline"
-                                                              << BSONArray() << "collation" << 1));
+    BSONObj badCmdResponse =
+        BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline" << BSONArray()
+                                         << "collation" << 1));
     ASSERT_THROWS_CODE(ResolvedView::fromBSON(badCmdResponse), AssertionException, 40639);
 }
 
 TEST(ResolvedViewTest, FromBSONSuccessfullyParsesEmptyBSONArrayIntoEmptyVector) {
     BSONObj cmdResponse =
-        BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
+        BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline" << BSONArray()));
     const ResolvedView result = ResolvedView::fromBSON(cmdResponse);
     ASSERT_EQ(result.getNamespace(), backingNss);
     ASSERT(std::equal(emptyPipeline.begin(),
@@ -253,7 +254,7 @@ TEST(ResolvedViewTest, FromBSONSuccessfullyParsesEmptyBSONArrayIntoEmptyVector) 
 }
 
 TEST(ResolvedViewTest, FromBSONSuccessfullyParsesCollation) {
-    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns() << "pipeline"
+    BSONObj cmdResponse = BSON("resolvedView" << BSON("ns" << backingNss.ns_forTest() << "pipeline"
                                                            << BSONArray() << "collation"
                                                            << BSON("locale"
                                                                    << "fil")));
@@ -292,7 +293,8 @@ TEST(ResolvedViewTest, IsResolvedViewErrorResponseDetectsKickbackErrorCodeSucces
     BSONObj errorResponse =
         BSON("ok" << 0 << "code" << ErrorCodes::CommandOnShardedViewNotSupportedOnMongod << "errmsg"
                   << "This view is sharded and cannot be run on mongod"
-                  << "resolvedView" << BSON("ns" << backingNss.ns() << "pipeline" << BSONArray()));
+                  << "resolvedView"
+                  << BSON("ns" << backingNss.ns_forTest() << "pipeline" << BSONArray()));
     auto status = getStatusFromCommandResult(errorResponse);
     ASSERT_EQ(status, ErrorCodes::CommandOnShardedViewNotSupportedOnMongod);
     ASSERT(status.extraInfo<ResolvedView>());

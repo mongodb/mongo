@@ -78,7 +78,7 @@ TEST(StartChunkCloneRequest, CreateAsCommandComplete) {
         NamespaceString::createNamespaceString_forTest(cmdObj["_recvChunkStart"].String()),
         cmdObj));
 
-    ASSERT_EQ("TestDB.TestColl", request.getNss().ns());
+    ASSERT_EQ("TestDB.TestColl", request.getNss().ns_forTest());
     ASSERT_EQ(sessionId.toString(), request.getSessionId().toString());
     ASSERT_EQ(migrationId, request.getMigrationId());
     ASSERT_EQ(lsid, request.getLsid());

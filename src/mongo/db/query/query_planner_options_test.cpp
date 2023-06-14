@@ -847,7 +847,7 @@ TEST_F(QueryPlannerTest, TagAccordingToCacheFailsOnBadInput) {
 }
 
 TEST_F(QueryPlannerTest, DollarResumeAfterFieldPropagatedFromQueryRequestToStageBuilder) {
-    BSONObj cmdObj = BSON("find" << nss.ns() << "hint" << BSON("$natural" << 1) << "sort"
+    BSONObj cmdObj = BSON("find" << nss.ns_forTest() << "hint" << BSON("$natural" << 1) << "sort"
                                  << BSON("$natural" << 1) << "$_requestResumeToken" << true
                                  << "$_resumeAfter" << BSON("$recordId" << 42LL));
 

@@ -695,8 +695,8 @@ TEST_F(OpObserverTest, OnRenameCollectionReturnsRenameOpTime) {
     ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntry["ui"])));
     auto o = oplogEntry.getObjectField("o");
     auto oExpected =
-        BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns() << "stayTemp"
-                                << stayTemp << "dropTarget" << dropTargetUuid);
+        BSON("renameCollection" << sourceNss.ns_forTest() << "to" << targetNss.ns_forTest()
+                                << "stayTemp" << stayTemp << "dropTarget" << dropTargetUuid);
     ASSERT_BSONOBJ_EQ(oExpected, o);
 
     // Ensure that the rename optime returned is the same as the last optime in the ReplClientInfo.
@@ -813,8 +813,8 @@ TEST_F(OpObserverTest, OnRenameCollectionOmitsDropTargetFieldIfDropTargetUuidIsN
     // Ensure that renameCollection fields were properly added to oplog entry.
     ASSERT_EQUALS(uuid, unittest::assertGet(UUID::parse(oplogEntry["ui"])));
     auto o = oplogEntry.getObjectField("o");
-    auto oExpected = BSON("renameCollection" << sourceNss.ns() << "to" << targetNss.ns()
-                                             << "stayTemp" << stayTemp);
+    auto oExpected = BSON("renameCollection" << sourceNss.ns_forTest() << "to"
+                                             << targetNss.ns_forTest() << "stayTemp" << stayTemp);
     ASSERT_BSONOBJ_EQ(oExpected, o);
 }
 
@@ -842,7 +842,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntry) {
     long long numRecords = 1;
     long long dataSize = 2;
     // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
-    auto catalogEntry = BSON("ns" << nss.ns() << "ident"
+    auto catalogEntry = BSON("ns" << nss.ns_forTest() << "ident"
                                   << "collection-7-1792004489479993697");
     auto storageMetadata = BSON("storage"
                                 << "metadata");
@@ -885,7 +885,7 @@ TEST_F(OpObserverTest, ImportCollectionOplogEntryIncludesTenantId) {
     long long numRecords = 1;
     long long dataSize = 2;
     // A dummy invalid catalog entry. We do not need a valid catalog entry for this test.
-    auto catalogEntry = BSON("ns" << nss.ns() << "ident"
+    auto catalogEntry = BSON("ns" << nss.ns_forTest() << "ident"
                                   << "collection-7-1792004489479993697");
     auto storageMetadata = BSON("storage"
                                 << "metadata");

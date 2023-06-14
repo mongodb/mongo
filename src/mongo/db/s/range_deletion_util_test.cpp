@@ -237,7 +237,8 @@ TEST_F(RenameRangeDeletionsTest, BasicRenameRangeDeletionsTest) {
     restoreRangeDeletionTasksForRename(_opCtx, kToNss);
     deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
 
-    const auto targetRangeDeletionsQuery = BSON(RangeDeletionTask::kNssFieldName << kToNss.ns());
+    const auto targetRangeDeletionsQuery =
+        BSON(RangeDeletionTask::kNssFieldName << kToNss.ns_forTest());
 
     // Make sure range deletions for the TO collection are found
     ASSERT_EQ(10, rangeDeletionsStore.count(_opCtx, targetRangeDeletionsQuery));
@@ -299,7 +300,8 @@ TEST_F(RenameRangeDeletionsTest, IdempotentRenameRangeDeletionsTest) {
         deleteRangeDeletionTasksForRename(_opCtx, kNss, kToNss);
     }
 
-    const auto targetRangeDeletionsQuery = BSON(RangeDeletionTask::kNssFieldName << kToNss.ns());
+    const auto targetRangeDeletionsQuery =
+        BSON(RangeDeletionTask::kNssFieldName << kToNss.ns_forTest());
 
     // Make sure range deletions for the TO collection are found
     ASSERT_EQ(10, rangeDeletionsStore.count(_opCtx, targetRangeDeletionsQuery));

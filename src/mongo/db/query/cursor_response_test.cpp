@@ -51,7 +51,7 @@ TEST(CursorResponseTest, parseFromBSONFirstBatch) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -67,7 +67,7 @@ TEST(CursorResponseTest, parseFromBSONNextBatch) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -83,7 +83,7 @@ TEST(CursorResponseTest, parseFromBSONCursorIdZero) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(0));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -99,7 +99,7 @@ TEST(CursorResponseTest, parseFromBSONEmptyBatch) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 0U);
 }
 
@@ -195,7 +195,7 @@ TEST(CursorResponseTest, parseFromBSONPartialResultsReturnedField) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -223,7 +223,7 @@ TEST(CursorResponseTest, parseFromBSONVarsFieldCorrect) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -251,7 +251,7 @@ TEST(CursorResponseTest, parseFromBSONMultipleVars) {
 
     CursorResponse response = std::move(result.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], BSON("_id" << 1));
     ASSERT_BSONOBJ_EQ(response.getBatch()[1], BSON("_id" << 2));
@@ -290,7 +290,7 @@ TEST(CursorResponseTest, roundTripThroughCursorResponseBuilderWithPartialResults
     // Confirm the CursorReponse parsed from CursorResponseBuilder output has the correct content.
     CursorResponse response = std::move(swCursorResponse.getValue());
     ASSERT_EQ(response.getCursorId(), CursorId(123));
-    ASSERT_EQ(response.getNSS().ns(), "db.coll");
+    ASSERT_EQ(response.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(response.getBatch().size(), 1U);
     ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
     ASSERT_EQ(response.getPartialResultsReturned(), true);
@@ -517,7 +517,7 @@ TEST(CursorResponseTest, serializePostBatchResumeToken) {
     ASSERT_OK(reparsed.getStatus());
     CursorResponse reparsedResponse = std::move(reparsed.getValue());
     ASSERT_EQ(reparsedResponse.getCursorId(), CursorId(123));
-    ASSERT_EQ(reparsedResponse.getNSS().ns(), "db.coll");
+    ASSERT_EQ(reparsedResponse.getNSS().ns_forTest(), "db.coll");
     ASSERT_EQ(reparsedResponse.getBatch().size(), 2U);
     ASSERT_BSONOBJ_EQ(*reparsedResponse.getPostBatchResumeToken(), postBatchResumeToken);
 }

@@ -48,7 +48,7 @@ TEST(BatchedCommandRequest, BasicInsert) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
         const auto insertRequest(BatchedCommandRequest::parseInsert(opMsgRequest));
 
-        ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
+        ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns_forTest());
         ASSERT(!insertRequest.hasShardVersion());
     }
 }
@@ -71,7 +71,7 @@ TEST(BatchedCommandRequest, InsertWithShardVersion) {
         const auto opMsgRequest(toOpMsg("TestDB", origInsertRequestObj, docSeq));
         const auto insertRequest(BatchedCommandRequest::parseInsert(opMsgRequest));
 
-        ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns());
+        ASSERT_EQ("TestDB.test", insertRequest.getInsertRequest().getNamespace().ns_forTest());
         ASSERT(insertRequest.hasShardVersion());
         ASSERT_EQ(ShardVersionFactory::make(ChunkVersion({epoch, timestamp}, {1, 2}),
                                             boost::optional<CollectionIndexes>(boost::none))
@@ -97,7 +97,7 @@ TEST(BatchedCommandRequest, InsertCloneWithIds) {
 
     const auto clonedRequest(BatchedCommandRequest::cloneInsertWithIds(std::move(batchedRequest)));
 
-    ASSERT_EQ("xyz.abc", clonedRequest.getNS().ns());
+    ASSERT_EQ("xyz.abc", clonedRequest.getNS().ns_forTest());
     ASSERT(clonedRequest.getWriteCommandRequestBase().getOrdered());
     ASSERT(clonedRequest.getWriteCommandRequestBase().getBypassDocumentValidation());
     ASSERT_BSONOBJ_EQ(BSON("w" << 2), clonedRequest.getWriteConcern());

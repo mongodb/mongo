@@ -137,8 +137,9 @@ public:
                                    << "local"
                                    << "afterClusterTime" << kDefaultFetchTimestamp));
 
-            return BSON("ok" << 1 << "cursor"
-                             << BSON("id" << 0LL << "ns" << nss.ns() << "firstBatch" << indexDocs));
+            return BSON(
+                "ok" << 1 << "cursor"
+                     << BSON("id" << 0LL << "ns" << nss.ns_forTest() << "firstBatch" << indexDocs));
         });
     }
 

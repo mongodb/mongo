@@ -95,7 +95,7 @@ TEST_F(MoveChunkRegistration, GetActiveMigrationNamespace) {
     auto originalScopedDonateChunk =
         assertGet(_registry.registerDonateChunk(operationContext(), createMoveRangeRequest(nss)));
 
-    ASSERT_EQ(nss.ns(), _registry.getActiveDonateChunkNss()->ns());
+    ASSERT_EQ(nss.ns_forTest(), _registry.getActiveDonateChunkNss()->ns());
 
     // Need to signal the registered migration so the destructor doesn't invariant
     originalScopedDonateChunk.signalComplete(Status::OK());

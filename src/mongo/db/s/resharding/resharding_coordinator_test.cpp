@@ -250,7 +250,7 @@ protected:
         OperationContext* opCtx, ReshardingCoordinatorDocument expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace,
-                                  BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
+                                  BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns_forTest()));
 
         auto coordinatorDoc = ReshardingCoordinatorDocument::parse(
             IDLParserContext("ReshardingCoordinatorTest"), doc);
@@ -332,7 +332,7 @@ protected:
         const ReshardingCoordinatorDocument& expectedCoordinatorDoc) {
         DBDirectClient client(opCtx);
         CollectionType onDiskEntry(
-            client.findOne(CollectionType::ConfigNS, BSON("_id" << _originalNss.ns())));
+            client.findOne(CollectionType::ConfigNS, BSON("_id" << _originalNss.ns_forTest())));
 
         ASSERT_EQUALS(onDiskEntry.getAllowMigrations(), expectedCollType.getAllowMigrations());
 
@@ -391,7 +391,7 @@ protected:
     void assertTemporaryCollectionCatalogEntryMatchesExpected(
         OperationContext* opCtx, boost::optional<CollectionType> expectedCollType) {
         DBDirectClient client(opCtx);
-        auto doc = client.findOne(CollectionType::ConfigNS, BSON("_id" << _tempNss.ns()));
+        auto doc = client.findOne(CollectionType::ConfigNS, BSON("_id" << _tempNss.ns_forTest()));
         if (!expectedCollType) {
             ASSERT(doc.isEmpty());
             return;
@@ -465,7 +465,7 @@ protected:
 
         DBDirectClient client(opCtx);
         FindCommandRequest findRequest{TagsType::ConfigNS};
-        findRequest.setFilter(BSON("ns" << nss.ns()));
+        findRequest.setFilter(BSON("ns" << nss.ns_forTest()));
         auto cursor = client.find(std::move(findRequest));
 
         std::vector<TagsType> foundZones;
@@ -555,7 +555,7 @@ protected:
 
         FindCommandRequest reshardedCollPlacementReq(
             NamespaceString::kConfigsvrPlacementHistoryNamespace);
-        reshardedCollPlacementReq.setFilter(BSON("nss" << nss.ns()));
+        reshardedCollPlacementReq.setFilter(BSON("nss" << nss.ns_forTest()));
         reshardedCollPlacementReq.setSort(BSON("timestamp" << -1));
         const auto placementDoc = client.findOne(reshardedCollPlacementReq);
         ASSERT(!placementDoc.isEmpty());
@@ -677,10 +677,10 @@ protected:
 
         // Check that chunks and tags under the temp namespace have been removed
         DBDirectClient client(opCtx);
-        auto chunkDoc = client.findOne(ChunkType::ConfigNS, BSON("ns" << _tempNss.ns()));
+        auto chunkDoc = client.findOne(ChunkType::ConfigNS, BSON("ns" << _tempNss.ns_forTest()));
         ASSERT(chunkDoc.isEmpty());
 
-        auto tagDoc = client.findOne(TagsType::ConfigNS, BSON("ns" << _tempNss.ns()));
+        auto tagDoc = client.findOne(TagsType::ConfigNS, BSON("ns" << _tempNss.ns_forTest()));
         ASSERT(tagDoc.isEmpty());
 
         assertCatalogPlacementHistoryEntryMatchExpected(
@@ -710,7 +710,7 @@ protected:
         // Check that the entry is removed from config.reshardingOperations
         DBDirectClient client(opCtx);
         auto doc = client.findOne(NamespaceString::kConfigReshardingOperationsNamespace,
-                                  BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns()));
+                                  BSON("ns" << expectedCoordinatorDoc.getSourceNss().ns_forTest()));
         ASSERT(doc.isEmpty());
 
         // Check that the resharding fields are removed from the config.collections entry and

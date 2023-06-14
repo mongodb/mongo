@@ -183,7 +183,7 @@ TEST(BatchedCommandResponseTest, CompatibilityFromWriteErrorToBatchCommandRespon
     ASSERT_EQ(ErrorCodes::StaleConfig, response.getErrDetailsAt(0).getStatus().code());
     ASSERT_EQ("Test stale config", response.getErrDetailsAt(0).getStatus().reason());
     auto staleInfo = response.getErrDetailsAt(0).getStatus().extraInfo<StaleConfigInfo>();
-    ASSERT_EQ("TestDB.TestColl", staleInfo->getNss().ns());
+    ASSERT_EQ("TestDB.TestColl", staleInfo->getNss().ns_forTest());
     ASSERT_EQ(versionReceived, staleInfo->getVersionReceived());
     ASSERT(!staleInfo->getVersionWanted());
     ASSERT_EQ(ShardId("TestShard"), staleInfo->getShardId());

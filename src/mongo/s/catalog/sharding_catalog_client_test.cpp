@@ -106,8 +106,9 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             // Ensure the query is correct
             ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
                       CollectionType::ConfigNS);
-            ASSERT_BSONOBJ_EQ(query->getFilter(),
-                              BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns()));
+            ASSERT_BSONOBJ_EQ(
+                query->getFilter(),
+                BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns_forTest()));
             ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
             ASSERT_EQ(query->getLimit().value(), 1);
 

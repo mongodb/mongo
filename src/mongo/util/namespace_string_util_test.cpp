@@ -84,7 +84,7 @@ TEST(NamespaceStringUtilTest,
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     NamespaceString nss = NamespaceStringUtil::deserialize(tenantId, "foo.bar");
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT(nss.tenantId());
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar"));
 }
@@ -111,7 +111,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequire
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, tenantNsStr);
     NamespaceString nss1 = NamespaceStringUtil::deserialize(tenantId, tenantNsStr);
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT(nss.tenantId());
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar"));
     ASSERT_EQ(nss, nss1);
@@ -143,7 +143,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequir
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, "foo.bar");
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT(!nss.tenantId());
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar"));
 }
