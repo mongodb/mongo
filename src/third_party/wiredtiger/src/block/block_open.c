@@ -37,7 +37,14 @@ __wt_block_manager_drop_object(
 
     /* Generate the name of the shared object file with the bucket prefix. */
     WT_ERR(__wt_buf_fmt(session, tmp, "%s%s", bstorage->bucket_prefix, filename));
-    WT_WITH_BUCKET_STORAGE(bstorage, session, ret = __wt_fs_remove(session, tmp->data, false));
+    /*
+     * Call directly into the bucket file system rather than wt_fs_remove because wt_fs_remove will
+     * prepend the home directory and then send an incorrect path into the storage layer. The bucket
+     * and cache directory should just get the prefixed name and it will do its own path management.
+     */
+    WT_WITH_BUCKET_STORAGE(bstorage, session,
+      ret = bstorage->file_system->fs_remove(
+        bstorage->file_system, (WT_SESSION *)session, tmp->data, 0));
     WT_ERR(ret);
 
 err:
