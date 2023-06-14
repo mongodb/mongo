@@ -10,10 +10,10 @@ load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
 
 function makeAnalyzeShardKeyAggregateCmdObj(collName, key, splitPointsShardId) {
-    const analyzeShardKeyId = UUID();
+    const commandId = UUID();
     const spec = {
         key,
-        splitPointsFilter: {"_id.analyzeShardKeyId": analyzeShardKeyId},
+        splitPointsFilter: {"_id.commandId": commandId},
         splitPointsAfterClusterTime: new Timestamp(100, 1),
     };
     if (splitPointsShardId) {
@@ -26,7 +26,7 @@ function makeAnalyzeShardKeyAggregateCmdObj(collName, key, splitPointsShardId) {
             cursor: {}
         },
         makeSplitPointIdFunc: () => {
-            return {analyzeShardKeyId, splitPointId: UUID()};
+            return {commandId, splitPointId: UUID()};
         }
     };
 }

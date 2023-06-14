@@ -41,7 +41,6 @@ namespace analyze_shard_key {
  * and monotonicity).
  */
 KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
-                                                             const UUID& analyzeShardKeyId,
                                                              const NamespaceString& nss,
                                                              const UUID& collUuid,
                                                              const KeyPattern& shardKey);
@@ -51,7 +50,6 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
  */
 std::pair<ReadDistributionMetrics, WriteDistributionMetrics> calculateReadWriteDistributionMetrics(
     OperationContext* opCtx,
-    const UUID& analyzeShardKeyId,
     const NamespaceString& nss,
     const UUID& collUuid,
     const KeyPattern& shardKey);

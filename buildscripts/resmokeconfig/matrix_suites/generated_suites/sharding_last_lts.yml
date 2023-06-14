@@ -25,7 +25,6 @@ selector:
   - jstests/sharding/max_time_ms_enforced_on_shard.js
   - jstests/sharding/drop_indexes_with_stale_config_error.js
   - jstests/sharding/query/merge_write_concern.js
-  - jstests/sharding/analyze_shard_key/**/*.js
   exclude_with_any_tags:
   - multiversion_incompatible
   - backport_required_multiversion
