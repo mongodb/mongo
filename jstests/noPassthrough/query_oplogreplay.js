@@ -97,28 +97,30 @@ assert(!cursor.hasNext());
 let res = oplog.find({ns: collNs, ts: {$eq: timestamps[10]}}).explain("executionStats");
 assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 10.
-assert.lte(res.executionStats.totalDocsExamined, 2, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, 2, res);
 let collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), res);
 
 // An AND with an $lt predicate stops scanning after passing the max timestamp.
-res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[1]}}, {ts: {$lt: timestamps[10]}}]})
+res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lt: timestamps[60]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
-assert.lte(res.executionStats.totalDocsExamined, 11, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, res.executionStats.nReturned + 2, res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(timestamps[60], longToTs(collScanStage.maxRecord), res);
+assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
 
 // An AND with an $lte predicate stops scanning after passing the max timestamp.
-res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[1]}}, {ts: {$lte: timestamps[10]}}]})
+res = oplog.find({$and: [{ts: {$gte: timestamps[51]}}, {ts: {$lte: timestamps[60]}}]})
           .explain("executionStats");
 assert.commandWorked(res);
-assert.lte(res.executionStats.totalDocsExamined, 12, tojson(res));
+assert.lte(res.executionStats.totalDocsExamined, res.executionStats.nReturned + 2, res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(timestamps[60], longToTs(collScanStage.maxRecord), res);
+assert.eq(timestamps[51], longToTs(collScanStage.minRecord), res);
 
 // The max timestamp is respected even when the min timestamp is smaller than the lowest
 // timestamp in the collection.
@@ -127,7 +129,7 @@ res = oplog.find({$and: [{ns: collNs}, {ts: {$gte: timestamps[0]}}, {ts: {$lte: 
 assert.commandWorked(res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(timestamps[10], longToTs(collScanStage.maxRecord), res);
 
 // An AND with redundant $eq/$lt/$lte predicates stops scanning after passing the max
 // timestamp.
@@ -146,8 +148,8 @@ assert.commandWorked(res);
 // We expect to be able to seek directly to the entry with a 'ts' of 5.
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[5], longToTs(collScanStage.maxRecord), tojson(res));
-assert.eq(timestamps[5], longToTs(collScanStage.minRecord), tojson(res));
+assert.eq(timestamps[5], longToTs(collScanStage.maxRecord), res);
+assert.eq(timestamps[5], longToTs(collScanStage.minRecord), res);
 
 // An $eq query for a non-existent timestamp scans a single oplog document.
 res = oplog.find({ns: collNs, ts: {$eq: makeTS(200)}}).explain("executionStats");
@@ -155,7 +157,7 @@ assert.commandWorked(res);
 // We expect to be able to seek directly to the end of the oplog.
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(makeTS(200), longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(makeTS(200), longToTs(collScanStage.maxRecord), res);
 
 // When the filter matches the last document within the timestamp range, the collection scan
 // examines at most one more document.
@@ -165,7 +167,7 @@ assert.commandWorked(res);
 // We expect to be able to seek directly to the start of the 'ts' range.
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[8], longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(timestamps[8], longToTs(collScanStage.maxRecord), res);
 
 // A filter with only an upper bound predicate on 'ts' stops scanning after
 // passing the max timestamp.
@@ -173,7 +175,7 @@ res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}}).explain("executionStats
 assert.commandWorked(res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
-assert.eq(timestamps[4], longToTs(collScanStage.maxRecord), tojson(res));
+assert.eq(timestamps[4], longToTs(collScanStage.maxRecord), res);
 
 // Oplog replay optimization should work with projection.
 res = oplog.find({ns: collNs, ts: {$lte: timestamps[4]}}).projection({op: 0});
@@ -230,7 +232,7 @@ res = oplog.find({ns: collNs, ts: {$lt: timestamps[4]}})
           .sort({$natural: -1})
           .explain("executionStats");
 assert.commandWorked(res);
-assert.gte(res.executionStats.totalDocsExamined, 100, tojson(res));
+assert.gte(res.executionStats.totalDocsExamined, 100, res);
 collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 
