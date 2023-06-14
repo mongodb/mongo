@@ -52,9 +52,7 @@ def _make_polyfill_regex():
 
 _RE_LINT = re.compile("//.*NOLINT")
 _RE_COMMENT_STRIP = re.compile("//.*")
-
 _RE_PATTERN_MONGO_POLYFILL = _make_polyfill_regex()
-_RE_RAND = re.compile(r'\b(srand\(|rand\(\))')
 
 _RE_GENERIC_FCV_COMMENT = re.compile(r'\(Generic FCV reference\):')
 GENERIC_FCV = [
@@ -147,7 +145,6 @@ class Linter:
                 continue
 
             self._check_for_mongo_polyfill(linenum)
-            self._check_for_rand(linenum)
             self._check_for_c_stdlib_headers(linenum)
 
             # Relax the rule of commenting generic FCV references for files directly related to FCV
@@ -214,12 +211,6 @@ class Linter:
                 linenum, 'mongodb/polyfill',
                 'Illegal use of banned name from std::/boost:: for "%s", use mongo::stdx:: variant instead'
                 % (match.group(0)))
-
-    def _check_for_rand(self, linenum):
-        line = self.clean_lines[linenum]
-        if _RE_RAND.search(line):
-            self._error(linenum, 'mongodb/rand',
-                        'Use of rand or srand, use <random> or PseudoRandom instead.')
 
     def _license_error(self, linenum, msg, category='legal/license'):
         style_url = 'https://github.com/mongodb/mongo/wiki/Server-Code-Style'

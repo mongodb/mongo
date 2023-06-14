@@ -338,6 +338,20 @@ class MongoTidyTests(unittest.TestCase):
         self.run_clang_tidy()
 
 
+    def test_MongoRandCheck(self):
+        self.write_config(
+            textwrap.dedent("""\
+                Checks: '-*,mongo-rand-check'
+                WarningsAsErrors: '*'
+                """))
+
+        self.expected_output =[
+            "error: Use of rand or srand, use <random> or PseudoRandom instead. [mongo-rand-check,-warnings-as-errors]\n    srand(time(0));",
+            "error: Use of rand or srand, use <random> or PseudoRandom instead. [mongo-rand-check,-warnings-as-errors]\n    int random_number = rand();",
+        ]
+
+        self.run_clang_tidy()
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
