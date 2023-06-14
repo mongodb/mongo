@@ -120,6 +120,8 @@ last-continuous:
     ticket: SERVER-6491
   - test_file: jstests/sharding/merge_let_params_size_estimation.js
     ticket: SERVER-74806
+  - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+    ticket: SERVER-78050
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
@@ -334,6 +336,8 @@ last-lts:
     ticket: SERVER-6491
   - test_file: jstests/sharding/merge_let_params_size_estimation.js
     ticket: SERVER-74806
+  - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+    ticket: SERVER-78050
   suites:
     change_streams_multiversion_passthrough: null
     change_streams_sharded_collections_multiversion_passthrough: null
