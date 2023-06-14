@@ -1,6 +1,6 @@
 /**
  * Tests running the multi:true update command on a time-series collection.
- * TODO SERVER-73454 Remove this file.
+ * TODO SERVER-77132 Remove this file.
  *
  * @tags: [
  *   # Specifically testing multi-updates.
