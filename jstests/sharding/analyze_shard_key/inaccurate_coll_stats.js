@@ -17,8 +17,6 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
 const numMostCommonValues = 5;
 const setParameterOpts = {
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"}),
     analyzeShardKeyNumMostCommonValues: numMostCommonValues
 };
 
@@ -72,7 +70,13 @@ function runTest(conn, {rst, st}) {
 
     jsTest.log("Verify that the analyzeShardKey metrics prior to the unclean shutdown");
 
-    const resXBefore = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {x: 1}}));
+    const resXBefore = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {x: 1},
+        // Skip calculating the read and write distribution metrics since there are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore, {
         numDocs: docs.length,
         isUnique: false,
@@ -82,7 +86,13 @@ function runTest(conn, {rst, st}) {
     });
     assert.eq(resXBefore.avgDocSizeBytes, Object.bsonsize(docs[0]));
 
-    const resYBefore = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {y: 1}}));
+    const resYBefore = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {y: 1},
+        // Skip calculating the read and write distribution metrics since there are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYBefore, {
         numDocs: docs.length,
         isUnique: true,
@@ -131,7 +141,13 @@ function runTest(conn, {rst, st}) {
     // calculation for a shard key that is not unique does not depend on fast count. However, the
     // average document size should be set to the size of an empty document since that information
     // is not available from $collStats.
-    const resXAfter = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {x: 1}}));
+    const resXAfter = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {x: 1},
+        // Skip calculating the read and write distribution metrics since there are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore, {
         numDocs: docs.length,
         isUnique: false,
@@ -148,7 +164,13 @@ function runTest(conn, {rst, st}) {
     // be zero and instead should be equal to the number of most common values returned. Similar to
     // previous case, the average document size should be set to the size of an empty document since
     // that information is not available from $collStats.
-    const resYAfter = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {y: 1}}));
+    const resYAfter = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {y: 1},
+        // Skip calculating the read and write distribution metrics since there are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYAfter, {
         numDocs: numMostCommonValues,
         isUnique: true,

@@ -318,6 +318,18 @@ commands:
         description: "The shard key to evaluate."
         validator:
           callback: validateShardKeyPattern
+      keyCharacteristics:
+        type: bool
+        cpp_name: analyzeKeyCharacteristics
+        description: "The boolean specifying whether the command should calculate the metrics about
+                     the characteristics of the shard key."
+        default: true
+      readWriteDistribution:
+        type: bool
+        cpp_name: analyzeReadWriteDistribution
+        description: "The boolean specifying whether the command should calculate the metrics about
+                     the read and write distribution."
+        default: true
       $readPreference:
         type: readPreference
         cpp_name: readPreference

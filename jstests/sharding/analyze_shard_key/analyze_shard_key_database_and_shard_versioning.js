@@ -23,14 +23,7 @@ const st = new ShardingTest({
     shards: 2,
     rs: {
         nodes: numNodesPerRS,
-        setParameter: {
-            // The calculation of the read and write distribution metrics involves generating split
-            // points which requires the shard key to have sufficient cardinality. To avoid needing
-            // to insert a lot of documents, just skip the calculation.
-            "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-                tojson({mode: "alwaysOn"}),
-            analyzeShardKeyNumMostCommonValues: numMostCommonValues
-        }
+        setParameter: {analyzeShardKeyNumMostCommonValues: numMostCommonValues}
     }
 });
 
@@ -51,7 +44,11 @@ function runTest(readPreference) {
     const analyzeShardKeyCmdObj = {
         analyzeShardKey: ns,
         key: {x: 1},
-        $readPreference: readPreference
+        $readPreference: readPreference,
+        // The calculation of the read and write distribution metrics involves generating split
+        // points which requires the shard key to have sufficient cardinality. To avoid needing
+        // to insert a lot of documents, just skip the calculation.
+        readWriteDistribution: false,
     };
     const expectedMetrics = {
         numDocs: 2,
