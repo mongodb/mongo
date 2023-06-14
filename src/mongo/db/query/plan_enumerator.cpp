@@ -84,7 +84,7 @@ bool isPathOutsideElemMatch(const RelevantTag* rt, size_t component) {
     }
 
     const size_t elemMatchRootLength = getPathLength(rt->elemMatchExpr);
-    invariant(elemMatchRootLength > 0);
+    tassert(6811401, "Failed procondition in query plan enumerator", elemMatchRootLength > 0);
     return component < elemMatchRootLength;
 }
 
@@ -93,7 +93,9 @@ using PossibleFirstAssignment = std::vector<MatchExpression*>;
 void getPossibleFirstAssignments(const IndexEntry& thisIndex,
                                  const vector<MatchExpression*>& predsOverLeadingField,
                                  std::vector<PossibleFirstAssignment>* possibleFirstAssignments) {
-    invariant(thisIndex.multikey && !thisIndex.multikeyPaths.empty());
+    tassert(6811402,
+            "Failed procondition in query plan enumerator",
+            thisIndex.multikey && !thisIndex.multikeyPaths.empty());
 
     if (thisIndex.multikeyPaths[0].empty()) {
         // No prefix of the leading index field causes the index to be multikey. In other words, the
@@ -108,7 +110,7 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
     // $elemMatch.
     std::map<MatchExpression*, std::vector<MatchExpression*>> predsByElemMatchExpr;
     for (auto* pred : predsOverLeadingField) {
-        invariant(pred->getTag());
+        tassert(6811403, "Failed procondition in query plan enumerator", pred->getTag());
         RelevantTag* rt = static_cast<RelevantTag*>(pred->getTag());
 
         if (rt->elemMatchExpr == nullptr) {
@@ -129,15 +131,18 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
     // leaf expressions inside the $elemMatch can match distinct elements. We are therefore unable
     // to assign both to the index and intersect the bounds.
     for (const auto& elemMatchExprIt : predsByElemMatchExpr) {
-        invariant(!elemMatchExprIt.second.empty());
+        tassert(6811404,
+                "Failed procondition in query plan enumerator",
+                !elemMatchExprIt.second.empty());
         const auto* pred = elemMatchExprIt.second.front();
 
-        invariant(pred->getTag());
+        tassert(6811405, "Failed procondition in query plan enumerator", pred->getTag());
         RelevantTag* rt = static_cast<RelevantTag*>(pred->getTag());
-        invariant(rt->elemMatchExpr != nullptr);
+        tassert(
+            6811406, "Failed procondition in query plan enumerator", rt->elemMatchExpr != nullptr);
 
         const size_t elemMatchRootLength = getPathLength(elemMatchExprIt.first);
-        invariant(elemMatchRootLength > 0);
+        tassert(6811407, "Failed procondition in query plan enumerator", elemMatchRootLength > 0);
 
         // Since the multikey path components are 0-indexed, 'elemMatchRootLength' actually
         // corresponds to the path component immediately following the root of the $elemMatch.
@@ -171,7 +176,7 @@ void getPossibleFirstAssignments(const IndexEntry& thisIndex,
 bool canAssignPredToIndex(const RelevantTag* rt,
                           const MultikeyComponents& multikeyComponents,
                           StringMap<MatchExpression*>* used) {
-    invariant(used);
+    tassert(6811408, "Failed procondition in query plan enumerator", used);
     const FieldRef path(rt->path);
 
     // We start by checking with the shortest prefix of the queried path to avoid needing to undo
@@ -187,7 +192,9 @@ bool canAssignPredToIndex(const RelevantTag* rt,
                 // 'pathPrefix' is outside the innermost $elemMatch, so we record its $elemMatch
                 // context to ensure that we don't assign another predicate to 'thisIndex' along
                 // this path unless they are part of the same $elemMatch.
-                invariant(rt->elemMatchExpr != nullptr);
+                tassert(6811409,
+                        "Failed procondition in query plan enumerator",
+                        rt->elemMatchExpr != nullptr);
                 (*used)[pathPrefix] = rt->elemMatchExpr;
             } else {
                 // 'pathPrefix' is either inside the innermost $elemMatch or not inside an
@@ -562,7 +569,9 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
         for (size_t i = 0; i < indexedPreds.size(); ++i) {
             MatchExpression* child = indexedPreds[i];
 
-            invariant(Indexability::nodeCanUseIndexOnOwnField(child));
+            tassert(6811410,
+                    "Failed procondition in query plan enumerator",
+                    Indexability::nodeCanUseIndexOnOwnField(child));
 
             RelevantTag* rt = static_cast<RelevantTag*>(child->getTag());
 
@@ -571,14 +580,20 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
                 // This should include only TEXT and GEO_NEAR preds.
 
                 // We expect either 0 or 1 mandatory predicates.
-                invariant(nullptr == mandatoryPred);
+                tassert(6811411,
+                        "Failed procondition in query plan enumerator",
+                        nullptr == mandatoryPred);
 
                 // Mandatory predicates are TEXT or GEO_NEAR.
-                invariant(MatchExpression::TEXT == child->matchType() ||
-                          MatchExpression::GEO_NEAR == child->matchType());
+                tassert(6811412,
+                        "Failed procondition in query plan enumerator",
+                        MatchExpression::TEXT == child->matchType() ||
+                            MatchExpression::GEO_NEAR == child->matchType());
 
                 // The mandatory predicate must have a corresponding "mandatory index".
-                invariant(rt->first.size() != 0 || rt->notFirst.size() != 0);
+                tassert(6811413,
+                        "Failed procondition in query plan enumerator",
+                        rt->first.size() != 0 || rt->notFirst.size() != 0);
 
                 mandatoryPred = child;
 
@@ -622,7 +637,8 @@ bool PlanEnumerator::prepMemo(MatchExpression* node, PrepMemoContext context) {
 
         if (nullptr != mandatoryPred) {
             // We must have at least one index which can be used to answer 'mandatoryPred'.
-            invariant(!mandatoryIndices.empty());
+            tassert(
+                6811414, "Failed procondition in query plan enumerator", !mandatoryIndices.empty());
             return enumerateMandatoryIndex(
                 idxToFirst, idxToNotFirst, mandatoryPred, mandatoryIndices, andAssignment);
         }
@@ -650,7 +666,9 @@ void PlanEnumerator::assignToNonMultikeyMandatoryIndex(
     // source text. However, the leading and trailing non-text fields of the index cannot be
     // multikey. As a result, we should use non-multikey predicate assignment rules for such
     // indexes.
-    invariant(!index.multikey || index.type == IndexType::INDEX_TEXT);
+    tassert(6811415,
+            "Failed procondition in query plan enumerator",
+            !index.multikey || index.type == IndexType::INDEX_TEXT);
 
     // Since the index is not multikey, all predicates over the leading field can be assigned.
     indexAssign->preds = predsOverLeadingField;
@@ -685,8 +703,10 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
 
         // Only text, 2d, and 2dsphere index types should be able to satisfy
         // mandatory predicates.
-        invariant(INDEX_TEXT == thisIndex.type || INDEX_2D == thisIndex.type ||
-                  INDEX_2DSPHERE == thisIndex.type);
+        tassert(6811416,
+                "Failed procondition in query plan enumerator",
+                INDEX_TEXT == thisIndex.type || INDEX_2D == thisIndex.type ||
+                    INDEX_2DSPHERE == thisIndex.type);
 
         OneIndexAssignment indexAssign;
         indexAssign.index = *indexIt;
@@ -709,7 +729,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
         } else if (thisIndex.multikey && !thisIndex.multikeyPaths.empty()) {
             // 2dsphere indexes are the only special index type that should ever have path-level
             // multikey information.
-            invariant(INDEX_2DSPHERE == thisIndex.type);
+            tassert(6811417,
+                    "Failed procondition in query plan enumerator",
+                    INDEX_2DSPHERE == thisIndex.type);
 
             if (predsOverLeadingField.end() !=
                 std::find(
@@ -752,7 +774,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
                     auto mandIt = std::find(predsOverNonLeadingFields.begin(),
                                             predsOverNonLeadingFields.end(),
                                             mandatoryPred);
-                    invariant(mandIt != predsOverNonLeadingFields.end());
+                    tassert(6811418,
+                            "Failed procondition in query plan enumerator",
+                            mandIt != predsOverNonLeadingFields.end());
 
                     predsOverNonLeadingFields.erase(mandIt);
 
@@ -775,7 +799,9 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
             } else {
                 // The mandatory pred is notFirst. Assign an arbitrary predicate
                 // over the first position.
-                invariant(!predsOverLeadingField.empty());
+                tassert(6811419,
+                        "Failed procondition in query plan enumerator",
+                        !predsOverLeadingField.empty());
                 indexAssign.preds.push_back(predsOverLeadingField[0]);
                 indexAssign.positions.push_back(0);
 
@@ -824,8 +850,10 @@ bool PlanEnumerator::enumerateMandatoryIndex(const IndexToPredMap& idxToFirst,
         }
 
         // The mandatory predicate must be assigned.
-        invariant(indexAssign.preds.end() !=
-                  std::find(indexAssign.preds.begin(), indexAssign.preds.end(), mandatoryPred));
+        tassert(6811420,
+                "Failed procondition in query plan enumerator",
+                indexAssign.preds.end() !=
+                    std::find(indexAssign.preds.begin(), indexAssign.preds.end(), mandatoryPred));
 
         // Output the assignments for this index.
         AndEnumerableState state;
@@ -864,12 +892,12 @@ void PlanEnumerator::assignPredicate(
 }
 
 void PlanEnumerator::markTraversedThroughElemMatchObj(PrepMemoContext* context) {
-    invariant(context);
+    tassert(6811421, "Failed procondition in query plan enumerator", context);
     for (auto&& pred : context->outsidePreds) {
         auto relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
         // Only indexed predicates should ever be considered as outside predicates eligible for
         // pushdown.
-        invariant(relevantTag);
+        tassert(6811422, "Failed procondition in query plan enumerator", relevantTag);
 
         // Check whether the current $elemMatch through which we are traversing is the same as the
         // outside predicate's $elemMatch context. If so, then that outside predicate hasn't
@@ -910,7 +938,7 @@ void PlanEnumerator::enumerateOneIndex(
     // assigned to the index, but we will ensure that any OneIndexAssignment contains some
     // predicates from the current node.
     for (const auto& pred : outsidePreds) {
-        invariant(pred.first->getTag());
+        tassert(6811423, "Failed procondition in query plan enumerator", pred.first->getTag());
         RelevantTag* relevantTag = static_cast<RelevantTag*>(pred.first->getTag());
         for (auto index : relevantTag->first) {
             if (idxToFirst.find(index) != idxToFirst.end() ||
@@ -1027,7 +1055,9 @@ void PlanEnumerator::enumerateOneIndex(
             }
 
             // Output the assignment.
-            invariant(!indexAssign.preds.empty());
+            tassert(6811424,
+                    "Failed procondition in query plan enumerator",
+                    !indexAssign.preds.empty());
             AndEnumerableState state;
             state.assignments.push_back(std::move(indexAssign));
             andAssignment->choices.push_back(std::move(state));
@@ -1397,7 +1427,9 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
     // initializing the top-level scope with the prefix of the full path.
     for (size_t i = 0; i < assigned.size(); i++) {
         const MatchExpression* assignedPred = assigned[i];
-        invariant(nullptr != assignedPred->getTag());
+        tassert(6811425,
+                "Failed procondition in query plan enumerator",
+                nullptr != assignedPred->getTag());
         RelevantTag* usedRt = static_cast<RelevantTag*>(assignedPred->getTag());
         set<string> usedPrefixes;
         usedPrefixes.insert(getPathPrefix(usedRt->path));
@@ -1421,12 +1453,16 @@ void PlanEnumerator::getMultikeyCompoundablePreds(const vector<MatchExpression*>
     }
 
     for (size_t i = 0; i < couldCompound.size(); ++i) {
-        invariant(Indexability::nodeCanUseIndexOnOwnField(couldCompound[i]));
+        tassert(6811426,
+                "Failed procondition in query plan enumerator",
+                Indexability::nodeCanUseIndexOnOwnField(couldCompound[i]));
         RelevantTag* rt = static_cast<RelevantTag*>(couldCompound[i]->getTag());
 
         if (used.end() == used.find(rt->elemMatchExpr)) {
             // This is a new $elemMatch that we haven't seen before.
-            invariant(used.end() != used.find(nullptr));
+            tassert(6811427,
+                    "Failed procondition in query plan enumerator",
+                    used.end() != used.find(nullptr));
             set<string>& topLevelUsed = used.find(nullptr)->second;
 
             // If the top-level path prefix of the $elemMatch hasn't been
@@ -1461,11 +1497,14 @@ void PlanEnumerator::assignMultikeySafePredicates(
     const std::vector<MatchExpression*>& couldAssign,
     const stdx::unordered_map<MatchExpression*, OutsidePredRoute>& outsidePreds,
     OneIndexAssignment* indexAssignment) {
-    invariant(indexAssignment);
-    invariant(indexAssignment->preds.size() == indexAssignment->positions.size());
+    tassert(6811428, "Failed procondition in query plan enumerator", indexAssignment);
+    tassert(6811429,
+            "Failed procondition in query plan enumerator",
+            indexAssignment->preds.size() == indexAssignment->positions.size());
 
     const IndexEntry& thisIndex = (*_indices)[indexAssignment->index];
-    invariant(!thisIndex.multikeyPaths.empty());
+    tassert(
+        6811430, "Failed procondition in query plan enumerator", !thisIndex.multikeyPaths.empty());
 
     // 'used' is a map from each prefix of a queried path that causes 'thisIndex' to be multikey to
     // the 'elemMatchExpr' of the associated leaf expression's RelevantTag. We use it to ensure that
@@ -1478,7 +1517,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
         const auto* assignedPred = indexAssignment->preds[i];
         const auto posInIdx = indexAssignment->positions[i];
 
-        invariant(assignedPred->getTag());
+        tassert(6811431, "Failed procondition in query plan enumerator", assignedPred->getTag());
         RelevantTag* rt = static_cast<RelevantTag*>(assignedPred->getTag());
 
         // 'assignedPred' has already been assigned to 'thisIndex', so canAssignPredToIndex() ought
@@ -1491,13 +1530,16 @@ void PlanEnumerator::assignMultikeySafePredicates(
             // be multikey can be shared with the leading index field. The predicates cannot
             // possibly be joined by an $elemMatch because $near predicates must be specified at the
             // top-level of the query.
-            invariant(assignedPred->matchType() == MatchExpression::GEO_NEAR);
+            tassert(6811432,
+                    "Failed procondition in query plan enumerator",
+                    assignedPred->matchType() == MatchExpression::GEO_NEAR);
         }
     }
 
     // Update 'used' with all outside predicates already assigned to 'thisIndex';
     for (const auto& orPushdown : indexAssignment->orPushdowns) {
-        invariant(orPushdown.first->getTag());
+        tassert(
+            6811433, "Failed procondition in query plan enumerator", orPushdown.first->getTag());
         RelevantTag* rt = static_cast<RelevantTag*>(orPushdown.first->getTag());
 
         // Any outside predicates already assigned to 'thisIndex' were assigned in the first
@@ -1505,7 +1547,7 @@ void PlanEnumerator::assignMultikeySafePredicates(
         const size_t position = 0;
         const bool shouldHaveAssigned =
             canAssignPredToIndex(rt, thisIndex.multikeyPaths[position], &used);
-        invariant(shouldHaveAssigned);
+        tassert(6811434, "Failed procondition in query plan enumerator", shouldHaveAssigned);
     }
 
     size_t posInIdx = 0;
@@ -1514,7 +1556,9 @@ void PlanEnumerator::assignMultikeySafePredicates(
         // Attempt to assign the predicates to 'thisIndex' according to their position in the index
         // key pattern.
         for (auto* couldAssignPred : couldAssign) {
-            invariant(Indexability::nodeCanUseIndexOnOwnField(couldAssignPred));
+            tassert(6811435,
+                    "Failed procondition in query plan enumerator",
+                    Indexability::nodeCanUseIndexOnOwnField(couldAssignPred));
             RelevantTag* rt = static_cast<RelevantTag*>(couldAssignPred->getTag());
 
             if (keyElem.fieldNameStringData() != rt->path) {
@@ -1585,7 +1629,7 @@ bool PlanEnumerator::alreadyCompounded(const set<MatchExpression*>& ixisectAssig
 }
 
 size_t PlanEnumerator::getPosition(const IndexEntry& indexEntry, MatchExpression* predicate) {
-    invariant(predicate->getTag());
+    tassert(6811436, "Failed procondition in query plan enumerator", predicate->getTag());
     RelevantTag* relevantTag = static_cast<RelevantTag*>(predicate->getTag());
     size_t position = 0;
     for (auto&& element : indexEntry.keyPattern) {
