@@ -57,7 +57,7 @@ MONGO_FAIL_POINT_DEFINE(externalClientsNeverAuthorizedToAdvanceLogicalClock);
 MONGO_FAIL_POINT_DEFINE(throwClientDisconnectInSignLogicalTimeForExternalClients);
 
 const auto getLogicalTimeValidator =
-    ServiceContext::declareDecoration<std::unique_ptr<LogicalTimeValidator>>();
+    ServiceContext::declareDecoration<std::shared_ptr<LogicalTimeValidator>>();
 
 Mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
 
@@ -73,12 +73,12 @@ Milliseconds kRefreshIntervalIfErrored(200);
 
 }  // unnamed namespace
 
-LogicalTimeValidator* LogicalTimeValidator::get(ServiceContext* service) {
+std::shared_ptr<LogicalTimeValidator> LogicalTimeValidator::get(ServiceContext* service) {
     stdx::lock_guard<Latch> lk(validatorMutex);
-    return getLogicalTimeValidator(service).get();
+    return getLogicalTimeValidator(service);
 }
 
-LogicalTimeValidator* LogicalTimeValidator::get(OperationContext* ctx) {
+std::shared_ptr<LogicalTimeValidator> LogicalTimeValidator::get(OperationContext* ctx) {
     return get(ctx->getClient()->getServiceContext());
 }
 

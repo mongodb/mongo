@@ -50,8 +50,8 @@ class KeysCollectionManager;
 class LogicalTimeValidator {
 public:
     // Decorate ServiceContext with LogicalTimeValidator instance.
-    static LogicalTimeValidator* get(ServiceContext* service);
-    static LogicalTimeValidator* get(OperationContext* ctx);
+    static std::shared_ptr<LogicalTimeValidator> get(ServiceContext* service);
+    static std::shared_ptr<LogicalTimeValidator> get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalTimeValidator> validator);
 
     /**
