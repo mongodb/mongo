@@ -104,6 +104,7 @@ boost::optional<Status> maybeTcpFastOpenStatus;
 
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectTimesOut);
 MONGO_FAIL_POINT_DEFINE(transportLayerASIOhangBeforeAccept);
+MONGO_FAIL_POINT_DEFINE(transportLayerASIOasyncConnectReturnsConnectionError);
 
 #ifdef MONGO_CONFIG_SSL
 SSLConnectionContext::~SSLConnectionContext() = default;
@@ -739,6 +740,9 @@ Future<SessionHandle> TransportLayerASIO::asyncConnect(
     const ReactorHandle& reactor,
     Milliseconds timeout,
     std::shared_ptr<const SSLConnectionContext> transientSSLContext) {
+    if (MONGO_unlikely(transportLayerASIOasyncConnectReturnsConnectionError.shouldFail()))
+        return Status{ErrorCodes::ConnectionError, "Failing asyncConnect due to fail-point"};
+
     if (transientSSLContext) {
         uassert(ErrorCodes::InvalidSSLConfiguration,
                 "Specified transient SSL context but connection SSL mode is not set",
