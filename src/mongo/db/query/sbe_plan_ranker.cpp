@@ -64,7 +64,7 @@ protected:
         auto numReads{calculateNumberOfReads(root)};
         StringBuilder sb;
 
-        sb << "(" << (root->common.advances + 1) << " advances)/(" << numReads << " numReads)";
+        sb << "(" << (root->common.advances + 1) << " advances + 1)/(" << numReads << " numReads + 1)";
 
         return sb.str();
     }
