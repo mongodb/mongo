@@ -2607,9 +2607,10 @@ tasks:
       - func: "truncated log test"
 
       # format test
-      - func: "format test"
-        vars:
-          extra_args: file_type=fix
+      # FIXME-WT-8287: timestamping and history for FLCS.
+      # - func: "format test"
+      #   vars:
+      #     extra_args: file_type=fix
       - func: "format test"
         vars:
           extra_args: file_type=row
