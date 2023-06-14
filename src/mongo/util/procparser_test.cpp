@@ -957,7 +957,8 @@ TEST(FTDCProcPressure, TestLocalPressureInfo) {
         ASSERT(obj["cpu"]["some"]);
         ASSERT(obj["cpu"]["some"]["totalMicros"]);
 
-        ASSERT(!obj["cpu"]["full"]);
+        // After linux kernel 5.13, /proc/pressure/cpu includes 'full' filled with 0.
+        ASSERT(!obj["cpu"]["full"] || obj["cpu"]["full"]["totalMicros"].Double() == 0);
     }
 
     if (boost::filesystem::exists("/proc/pressure/memory")) {
