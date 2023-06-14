@@ -94,6 +94,12 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
         coordinatorDocDiffType.setConfigsvrCoordinatorMetadata({cid2});
         coordinatorDocDiffType.setBlock(true);
 
+        // Initially, all instances of coordinators are finished.
+        ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+        ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
+
         // Trying to create a second coordinator with exact same fields will just get current
         // coordinator.
         auto coord1 = service->getOrCreateService(opCtx.get(), coordinatorDoc.toBSON());
@@ -101,6 +107,12 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
         ASSERT(coord1);
         // Note that this is pointer equality, so there is only one real instance.
         ASSERT_EQUALS(coord1, coord1_copy);
+
+        // Now, setClusterParameter is not finished while setUserWriteBlockMode is.
+        ASSERT_FALSE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+        ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
 
         // Trying to create a second coordinator with same type and subId but different fields will
         // fail due to conflict.
@@ -111,12 +123,20 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
         auto coord2 = service->getOrCreateService(opCtx.get(), coordinatorDocDiffSubId.toBSON());
         ASSERT(coord2);
         ASSERT_NOT_EQUALS(coord1, coord2);
+        ASSERT_FALSE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+        ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
 
         // We can create a coordinator with different type and same (or different) subId.
         auto coord3 = service->getOrCreateService(opCtx.get(), coordinatorDocDiffType.toBSON());
         ASSERT(coord3);
         ASSERT_NOT_EQUALS(coord1, coord3);
         ASSERT_NOT_EQUALS(coord2, coord3);
+        ASSERT_FALSE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+        ASSERT_FALSE(service->areAllCoordinatorsOfTypeFinished(
+            opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
 
         // Ensure all instances start before we disable the failpoint.
         fp->waitForTimesEntered(fp.initialTimesEntered() + 5);
@@ -126,6 +146,12 @@ TEST_F(ConfigsvrCoordinatorServiceTest, CoordinatorsOfSameTypeCanExist) {
     for (const auto& instance : instances) {
         instance->getCompletionFuture().wait();
     }
+
+    // All coordinators of both types should have finished.
+    ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
+        opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+    ASSERT_TRUE(service->areAllCoordinatorsOfTypeFinished(
+        opCtx.get(), ConfigsvrCoordinatorTypeEnum::kSetUserWriteBlockMode));
 }
 
 }  // namespace

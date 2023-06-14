@@ -70,6 +70,9 @@ public:
 
     bool areAllCoordinatorsOfTypeFinished(OperationContext* opCtx,
                                           ConfigsvrCoordinatorTypeEnum coordinatorType);
+
+    void waitForAllOngoingCoordinatorsOfType(OperationContext* opCtx,
+                                             ConfigsvrCoordinatorTypeEnum coordinatorType);
 };
 
 }  // namespace mongo

@@ -46,6 +46,7 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
 
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -87,6 +88,11 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
                             repl::ReplicationCoordinator::modeNone);
             }
+
+            // setClusterParameter is serialized against setFeatureCompatibilityVersion.
+            FixedFCVRegion fcvRegion(opCtx);
+
+            hangInSetClusterParameter.pauseWhileSet();
 
             std::unique_ptr<ServerParameterService> parameterService =
                 std::make_unique<ClusterParameterService>();

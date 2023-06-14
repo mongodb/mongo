@@ -119,4 +119,20 @@ bool ConfigsvrCoordinatorService::areAllCoordinatorsOfTypeFinished(
     return !client.find(std::move(findStateDocs))->more();
 }
 
+void ConfigsvrCoordinatorService::waitForAllOngoingCoordinatorsOfType(
+    OperationContext* opCtx, ConfigsvrCoordinatorTypeEnum coordinatorType) {
+    const auto& instances = getAllInstances(opCtx);
+    std::vector<SharedSemiFuture<void>> futuresToWait;
+    for (const auto& instance : instances) {
+        auto typedInstance = checked_pointer_cast<ConfigsvrCoordinator>(instance);
+        if (typedInstance->coordinatorType() == coordinatorType) {
+            futuresToWait.push_back(typedInstance->getCompletionFuture());
+        }
+    }
+
+    for (const auto& inProgressCoordinator : futuresToWait) {
+        inProgressCoordinator.wait(opCtx);
+    }
+}
+
 }  // namespace mongo

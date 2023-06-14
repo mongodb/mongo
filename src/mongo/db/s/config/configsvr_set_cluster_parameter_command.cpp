@@ -62,6 +62,10 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
+                // configsvrSetClusterParameter must serialize against
+                // setFeatureCompatibilityVersion.
+                FixedFCVRegion fcvRegion(opCtx);
+
                 std::unique_ptr<ServerParameterService> sps =
                     std::make_unique<ClusterParameterService>();
                 DBDirectClient dbClient(opCtx);

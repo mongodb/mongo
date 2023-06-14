@@ -101,10 +101,8 @@ const UserWriteBlockHelpers = (function() {
             assert.eq(expectedUserWriteBlockMode, status.repl.userWriteBlockMode);
         }
 
-        _hangTransition(targetConn, failpoint, awaitShell) {
-            let hangFailPoint = configureFailPoint(targetConn, failpoint);
-            hangFailPoint.wait();
-            return {waiter: awaitShell, failpoint: hangFailPoint};
+        _hangTransition(targetConn, failpoint) {
+            return configureFailPoint(targetConn, failpoint);
         }
 
         setFailPoint(failpointName) {
@@ -120,6 +118,10 @@ const UserWriteBlockHelpers = (function() {
         }
 
         setProfilingLevel(level) {
+            throw "UNIMPLEMENTED";
+        }
+
+        assertFCV(expectedFCV) {
             throw "UNIMPLEMENTED";
         }
     }
@@ -213,6 +215,14 @@ const UserWriteBlockHelpers = (function() {
             return assert.commandWorked(
                 this.adminConn.getDB(jsTestName()).setProfilingLevel(level));
         }
+
+        assertFCV(expectedFCV) {
+            const actualFCV = assert
+                                  .commandWorked(this.adminConn.getDB('admin').runCommand(
+                                      {getParameter: 1, featureCompatibilityVersion: 1}))
+                                  .featureCompatibilityVersion.version;
+            assert.eq(expectedFCV, actualFCV);
+        }
     }
 
     class ShardingFixture extends Fixture {
@@ -231,13 +241,16 @@ const UserWriteBlockHelpers = (function() {
         }
 
         hangTransition(command, failpoint) {
+            const configuredFp = this._hangTransition(this.st.shard0, failpoint);
             const awaitShell =
                 startParallelShell(funWithArgs((username, password, command) => {
                                        let admin = db.getSiblingDB("admin");
                                        admin.auth(username, password);
                                        assert.commandWorked(admin.runCommand(command));
                                    }, bypassUser, password, command), this.conn.port);
-            return this._hangTransition(this.st.shard0, failpoint, awaitShell);
+            configuredFp.wait();
+
+            return {waiter: awaitShell, failpoint: configuredFp};
         }
 
         restartConfigPrimary() {
@@ -264,6 +277,16 @@ const UserWriteBlockHelpers = (function() {
             const backend = this.st.rs0.getPrimary();
             return authutil.asCluster(
                 backend, keyfile, () => backend.getDB(jsTestName()).setProfilingLevel(level));
+        }
+
+        assertFCV(expectedFCV) {
+            const configAdminDB = this.st.c0.getDB('admin');
+            assert(configAdminDB.auth(bypassUser, password));
+            const actualFCV = assert
+                                  .commandWorked(configAdminDB.runCommand(
+                                      {getParameter: 1, featureCompatibilityVersion: 1}))
+                                  .featureCompatibilityVersion.version;
+            assert.eq(actualFCV, expectedFCV);
         }
     }
 
