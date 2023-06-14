@@ -11,5 +11,5 @@ and follow these guidelines:
 
 To improve the chances of the c-ares maintainers responding to your request:
 
- - Also send an email to the mailing list at `c-ares@cool.haxx.se` describing your change.
- - To follow any associated discussion, please subscribe to the [mailing list](http://cool.haxx.se/mailman/listinfo/c-ares).
+ - Also send an email to the mailing list at `c-ares@lists.haxx.se` describing your change.
+ - To follow any associated discussion, please subscribe to the [mailing list](http://lists.haxx.se/listinfo/c-ares).

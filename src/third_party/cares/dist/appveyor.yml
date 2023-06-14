@@ -35,6 +35,11 @@ environment:
       BUILDTOOL: CMAKE
       PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
 
+    # MinGW, 32-bit x86 (cmake static only)
+    - COMPILER: MINGW
+      BUILDTOOL: CMAKESTATIC
+      PATH: C:\mingw-w64\i686-5.3.0-posix-dwarf-rt_v4-rev0\mingw32\bin;%PATH%
+
     # MSVC 2015, 32-bit x86 (nmake)
     - COMPILER: MSVC
       BUILDTOOL: NMAKE
@@ -66,7 +71,11 @@ build_script:
   - if "%BUILDTOOL%" == "CMAKE" mkdir C:\projects\build-cares
   - if "%BUILDTOOL%" == "CMAKE" cd C:\projects\build-cares
   - if "%BUILDTOOL%" == "CMAKE" cmake -GNinja -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:\projects\build-cares\test_install -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON -DCARES_BUILD_TESTS=ON %CMAKE_EXTRA_OPTIONS% %APPVEYOR_BUILD_FOLDER%
-  - if "%BUILDTOOL%" == "CMAKE" ninja install
+  - if "%BUILDTOOL%" == "CMAKE" ninja -v install
+  - if "%BUILDTOOL%" == "CMAKESTATIC" mkdir C:\projects\build-cares
+  - if "%BUILDTOOL%" == "CMAKESTATIC" cd C:\projects\build-cares
+  - if "%BUILDTOOL%" == "CMAKESTATIC" cmake -GNinja -DCMAKE_BUILD_TYPE=%configuration% -DCMAKE_INSTALL_PREFIX=C:\projects\build-cares\test_install -DCARES_SHARED=OFF -DCARES_STATIC=ON -DCARES_STATIC_PIC=ON -DCARES_BUILD_TESTS=ON %CMAKE_EXTRA_OPTIONS% %APPVEYOR_BUILD_FOLDER%
+  - if "%BUILDTOOL%" == "CMAKESTATIC" ninja -v install
   - if "%BUILDTOOL%" == "MAKE" copy .\include\ares_build.h.dist .\include\ares_build.h
   - if "%BUILDTOOL%" == "MAKE" mingw32-make.exe -f Makefile.m32 demos
 
@@ -85,10 +94,13 @@ test_script:
   - if "%BUILDTOOL%" == "CMAKE" .\acountry.exe www.google.com
   - if "%BUILDTOOL%" == "CMAKE" .\ahost.exe www.google.com
   - if "%BUILDTOOL%" == "CMAKE" .\arestest.exe -4 -v
-# Windows cant do shell expansion
-#  - if "%BUILDTOOL%" == "CMAKE" .\aresfuzz.exe %APPVEYOR_BUILD_FOLDER%\test\fuzzinput\*
-#  - if "%BUILDTOOL%" == "CMAKE" .\aresfuzzname.exe %APPVEYOR_BUILD_FOLDER%\test\fuzznames\*
   - if "%BUILDTOOL%" == "CMAKE" .\dnsdump.exe "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_a" "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_aaaa"
+  - if "%BUILDTOOL%" == "CMAKESTATIC" cd C:\projects\build-cares\bin
+  - if "%BUILDTOOL%" == "CMAKESTATIC" .\adig.exe www.google.com
+  - if "%BUILDTOOL%" == "CMAKESTATIC" .\acountry.exe www.google.com
+  - if "%BUILDTOOL%" == "CMAKESTATIC" .\ahost.exe www.google.com
+  - if "%BUILDTOOL%" == "CMAKESTATIC" .\arestest.exe -4 -v
+  - if "%BUILDTOOL%" == "CMAKESTATIC" .\dnsdump.exe "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_a" "%APPVEYOR_BUILD_FOLDER%\test\fuzzinput\answer_aaaa"
 
 #on_finish:
 #  - cd C:\projects\build-cares\test
