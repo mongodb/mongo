@@ -382,7 +382,8 @@ int64_t WiredTigerIndex::numEntries(OperationContext* opCtx) const {
 
     LOGV2_TRACE_INDEX(20094, "numEntries");
 
-    auto requestedInfo = TRACING_ENABLED ? Cursor::kKeyAndLoc : Cursor::kJustExistance;
+    auto keyInclusion =
+        TRACING_ENABLED ? Cursor::KeyInclusion::kInclude : Cursor::KeyInclusion::kExclude;
     KeyString::Value keyStringForSeek =
         IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(BSONObj(),
                                                               getKeyStringVersion(),
@@ -392,7 +393,7 @@ int64_t WiredTigerIndex::numEntries(OperationContext* opCtx) const {
         );
 
     auto cursor = newCursor(opCtx);
-    for (auto kv = cursor->seek(keyStringForSeek, requestedInfo); kv; kv = cursor->next()) {
+    for (auto kv = cursor->seek(keyStringForSeek, keyInclusion); kv; kv = cursor->next()) {
         LOGV2_TRACE_INDEX(20095, "numEntries", "kv"_attr = kv);
         count++;
     }
@@ -994,9 +995,9 @@ public:
         _cursor.emplace(_uri, _tableId, false, _opCtx);
     }
 
-    boost::optional<IndexKeyEntry> next(RequestedInfo parts) override {
+    boost::optional<IndexKeyEntry> next(KeyInclusion keyInclusion) override {
         advanceNext();
-        return curr(parts);
+        return curr(keyInclusion);
     }
 
     boost::optional<KeyStringEntry> nextKeyString() override {
@@ -1024,10 +1025,11 @@ public:
         _endPosition->resetToKey(BSONObj::stripFieldNames(key), _ordering, discriminator);
     }
 
-    boost::optional<IndexKeyEntry> seek(const KeyString::Value& keyString,
-                                        RequestedInfo parts = kKeyAndLoc) override {
+    boost::optional<IndexKeyEntry> seek(
+        const KeyString::Value& keyString,
+        KeyInclusion keyInclusion = KeyInclusion::kInclude) override {
         seekForKeyStringInternal(keyString);
-        return curr(parts);
+        return curr(keyInclusion);
     }
 
     boost::optional<KeyStringEntry> seekForKeyString(
@@ -1133,7 +1135,7 @@ protected:
         _typeBits.resetFromBuffer(&br);
     }
 
-    boost::optional<IndexKeyEntry> curr(RequestedInfo parts) const {
+    boost::optional<IndexKeyEntry> curr(KeyInclusion keyInclusion) const {
         if (_eof)
             return {};
 
@@ -1141,7 +1143,7 @@ protected:
         dassert(!_id.isNull());
 
         BSONObj bson;
-        if (TRACING_ENABLED || (parts & kWantKey)) {
+        if (TRACING_ENABLED || keyInclusion == KeyInclusion::kInclude) {
             bson = KeyString::toBson(_key.getBuffer(), _key.getSize(), _ordering, _typeBits);
 
             LOGV2_TRACE_CURSOR(20000, "returning {bson} {id}", "bson"_attr = bson, "id"_attr = _id);
@@ -1508,7 +1510,7 @@ private:
         _typeBits.resetFromBuffer(&br);
 
         if (!br.atEof()) {
-            const auto bsonKey = redact(curr(kWantKey)->key);
+            const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
             const auto collectionNamespace = getCollectionNamespace(_opCtx);
             addDataCorruptionEntryToHealthLog(
                 _opCtx,
@@ -1556,7 +1558,7 @@ public:
             WTIndexUassertDuplicateRecordForIdIndex.shouldFail();
 
         if (!br.atEof() || MONGO_unlikely(failWithDataCorruptionForTest)) {
-            const auto bsonKey = redact(curr(kWantKey)->key);
+            const auto bsonKey = redact(curr(KeyInclusion::kInclude)->key);
             const auto collectionNamespace = getCollectionNamespace(_opCtx);
 
             addDataCorruptionEntryToHealthLog(

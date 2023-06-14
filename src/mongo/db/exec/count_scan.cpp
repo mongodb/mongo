@@ -120,9 +120,6 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
         expCtx(),
         "CountScan",
         [&] {
-            // We don't care about the keys.
-            const auto kWantLoc = SortedDataInterface::Cursor::kWantLoc;
-
             if (needInit) {
                 // First call to work().  Perform cursor init.
                 _cursor = indexAccessMethod()->newCursor(opCtx());
@@ -136,7 +133,7 @@ PlanStage::StageState CountScan::doWork(WorkingSetID* out) {
                     _startKeyInclusive);
                 entry = _cursor->seek(keyStringForSeek);
             } else {
-                entry = _cursor->next(kWantLoc);
+                entry = _cursor->next(SortedDataInterface::Cursor::KeyInclusion::kExclude);
             }
             return PlanStage::ADVANCED;
         },
