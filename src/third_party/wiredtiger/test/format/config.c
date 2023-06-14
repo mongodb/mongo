@@ -252,9 +252,19 @@ config_table(TABLE *table, void *arg)
      * Keep the number of rows and keys/values small for in-memory runs (overflow items aren't an
      * issue for in-memory configurations and it helps prevents cache overflow).
      */
-    if (GV(RUNS_IN_MEMORY)) {
-        if (!config_explicit(table, "runs.rows") && TV(RUNS_ROWS) > 1000000)
+    if (GV(RUNS_IN_MEMORY) || GV(DISK_DIRECT_IO)) {
+        /*
+         * Always limit the row count if its greater that 1,000,000 and in memory wasn't explicitly
+         * set. Direct IO is always explicitly set, never limit the row count because the user has
+         * taken control.
+         */
+        if (GV(RUNS_IN_MEMORY) && TV(RUNS_ROWS) > WT_MILLION &&
+          config_explicit(NULL, "runs.in_memory")) {
+            WARN("limiting table%" PRIu32
+                 ".runs.rows to 1,000,000 as runs.in_memory has been automatically enabled",
+              table->id)
             config_single(table, "runs.rows=1000000", false);
+        }
         if (!config_explicit(table, "btree.key_max"))
             config_single(table, "btree.key_max=32", false);
         if (!config_explicit(table, "btree.key_min"))
@@ -843,8 +853,15 @@ config_in_memory(void)
     if (config_explicit(NULL, "ops.verify"))
         return;
 
-    if (!config_explicit(NULL, "runs.in_memory") && mmrand(NULL, 1, 20) == 1)
+    if (!config_explicit(NULL, "runs.in_memory") && mmrand(NULL, 1, 20) == 1) {
         config_single(NULL, "runs.in_memory=1", false);
+        /* Use table[0] to access the global value (RUNS_ROWS is a table value). */
+        if ((tables[0]->v[V_TABLE_RUNS_ROWS].v) > WT_MILLION) {
+            WARN("%s",
+              "limiting runs.rows to 1,000,000 as runs.in_memory has been automatically enabled");
+            config_single(NULL, "runs.rows=1000000", true);
+        }
+    }
 }
 
 /*
