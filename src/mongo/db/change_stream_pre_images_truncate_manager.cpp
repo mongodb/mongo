@@ -239,11 +239,11 @@ void distributeUnaccountedBytesAndRecords(
         return;
     }
 
-    if (totalLeftoverRecords == 0 || totalLeftoverBytes == 0) {
+    auto numNsUUIDs = tenantTruncateMarkers.size();
+    if (totalLeftoverRecords == 0 || totalLeftoverBytes == 0 || numNsUUIDs == 0) {
         return;
     }
 
-    auto numNsUUIDs = tenantTruncateMarkers.size();
     auto leftoverRecordsPerNsUUID = totalLeftoverRecords / numNsUUIDs;
     auto leftoverBytesPerNsUUID = totalLeftoverBytes / numNsUUIDs;
 
