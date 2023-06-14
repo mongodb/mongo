@@ -116,21 +116,23 @@ let testCases = {
     },
     analyze: {skip: "primary only"},
     analyzeShardKey: {
-        setUp: function(mongosConn) {
-            const docs = [];
-            for (let i = 1; i <= 1000; i++) {
-                docs.push({x: i});
-            }
-            assert.commandWorked(mongosConn.getCollection(nss).insert(docs));
-        },
-        command: {analyzeShardKey: nss, key: {x: 1}},
-        runsAgainstAdminDb: true,
-        checkResults: function(res) {
-            // The command should work and return correct results.
-            assert.commandWorked(res);
-            assert.eq(res.numDocs, 1000, res);
-        },
-        behavior: "versioned"
+        // TODO: Re-enable multiversion testing for PM-1858.
+        skip: "not implemented"
+        // setUp: function(mongosConn) {
+        //     const docs = [];
+        //     for (let i = 1; i <= 1000; i++) {
+        //         docs.push({x: i});
+        //     }
+        //     assert.commandWorked(mongosConn.getCollection(nss).insert(docs));
+        // },
+        // command: {analyzeShardKey: nss, key: {x: 1}},
+        // runsAgainstAdminDb: true,
+        // checkResults: function(res) {
+        //     // The command should work and return correct results.
+        //     assert.commandWorked(res);
+        //     assert.eq(res.numDocs, 1000, res);
+        // },
+        // behavior: "versioned"
     },
     appendOplogNote: {skip: "primary only"},
     applyOps: {skip: "primary only"},

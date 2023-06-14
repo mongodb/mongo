@@ -33,7 +33,7 @@ function runTest(primary) {
     // $_analyzeShardKeyReadWriteDistribution spec
     const stageSpec = {
         key: {x: 1},
-        splitPointsFilter: {"_id.commandId": UUID()},
+        splitPointsFilter: {"_id.analyzeShardKeyId": UUID()},
         splitPointsAfterClusterTime: new Timestamp(100, 1),
         // The use of "dummyShard" for splitPointsShardId will cause the aggregation to fail on
         // a sharded cluster with error code ShardNotFound.
