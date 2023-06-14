@@ -65,7 +65,7 @@ protected:
         StringBuilder sb;
 
         //in calculateProductivity func, add 1 to both the numerator and denominator, So we need to keep the results consistent 
-        sb << "(" << (root->common.advances + 1) << " advances + 1)/(" << numReads << " numReads + 1)";
+        sb << "(" << (root->common.advances) << " advances + 1)/(" << numReads << " numReads + 1)";
 
         return sb.str();
     }
