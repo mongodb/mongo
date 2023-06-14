@@ -99,8 +99,14 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-    const res = assert.commandWorked(
-        conn.adminCommand({analyzeShardKey: ns, key: candidateShardKey, comment}));
+    const res = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateShardKey,
+        comment,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
         numDocs,
         isUnique: false,
@@ -159,8 +165,14 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
     AnalyzeShardKeyUtil.enableProfiler(mongodConns, dbName);
 
-    const res = assert.commandWorked(
-        st.s.adminCommand({analyzeShardKey: ns, key: candidateShardKey, comment}));
+    const res = assert.commandWorked(st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateShardKey,
+        comment,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
         numDocs,
         isUnique: false,
@@ -177,11 +189,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
 
 const setParameterOpts = {
     internalDocumentSourceGroupMaxMemoryBytes,
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"}),
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues
 };
 
 {

@@ -31,7 +31,13 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
     const docs = [{candidateKey: 1}];
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
-    const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: candidateKey}));
+    const res = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateKey,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
         numDocs: 1,
         isUnique: false,
@@ -74,7 +80,13 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 0}}));
     assert.commandWorked(st.s.adminCommand(
         {moveChunk: ns, find: {currentKey: 0}, to: st.shard1.shardName, _waitForDelete: true}));
-    let res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
+    let res = assert.commandWorked(st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateKey,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
         numDocs: 5,
         isUnique: false,
@@ -101,7 +113,13 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: -5}}));
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: -5}, to: st.shard1.shardName}));
-    res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
+    res = assert.commandWorked(st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateKey,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
         numDocs: 6,
         isUnique: false,
@@ -124,7 +142,13 @@ function testAnalyzeShardKeyShardedCollection(st) {
     assert.commandWorked(st.s.adminCommand({split: ns, middle: {currentKey: 5}}));
     assert.commandWorked(
         st.s.adminCommand({moveChunk: ns, find: {currentKey: 5}, to: st.shard0.shardName}));
-    res = assert.commandWorked(st.s.adminCommand({analyzeShardKey: ns, key: candidateKey}));
+    res = assert.commandWorked(st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateKey,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
         numDocs: 8,
         isUnique: false,
@@ -148,11 +172,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
 }
 
 const setParameterOpts = {
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"})
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues
 };
 
 {

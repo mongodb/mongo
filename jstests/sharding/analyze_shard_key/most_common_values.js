@@ -83,7 +83,13 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
                     {writeConcern}));
 
     // Verify the analyzeShardKey command truncates large primitive type fields.
-    const res0 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {"a.y.ii": 1}}));
+    const res0 = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {"a.y.ii": 1},
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, {
         numDocs: 5,
         isUnique,
@@ -108,7 +114,13 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
     });
 
     // Verify the analyzeShardKey command truncates large primitive type subfields.
-    const res1 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {"a.y": 1}}));
+    const res1 = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {"a.y": 1},
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, {
         numDocs: 5,
         isUnique,
@@ -151,7 +163,13 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
     });
 
     // Verify the analyzeShardKey command truncates large object type subfields.
-    const res2 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {a: 1}}));
+    const res2 = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {a: 1},
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
     AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, {
         numDocs: 5,
         isUnique,
@@ -183,10 +201,6 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
 
 const setParameterOpts = {
     analyzeShardKeyNumMostCommonValues: numMostCommonValues,
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"})
 };
 
 {

@@ -47,8 +47,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingKeyCharactericsMetrics);
-MONGO_FAIL_POINT_DEFINE(analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics);
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyFailBeforeMetricsCalculation);
 
 const std::string kOrphanDocsWarningMessage = "If \"" +
     KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
@@ -77,10 +76,21 @@ public:
                     "analyzeShardKey command is not supported on a configsvr mongod",
                     !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot skip analyzing all metrics",
+                    request().getAnalyzeKeyCharacteristics() ||
+                        request().getAnalyzeReadWriteDistribution());
+
             const auto& nss = ns();
             const auto& key = request().getKey();
             uassertStatusOK(validateNamespace(nss));
             const auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
+
+            if (MONGO_unlikely(analyzeShardKeyFailBeforeMetricsCalculation.shouldFail())) {
+                uasserted(
+                    ErrorCodes::InternalError,
+                    "Failing analyzeShardKey command before metrics calculation via a fail point");
+            }
 
             const auto analyzeShardKeyId = UUID::gen();
             LOGV2(7790010,
@@ -92,8 +102,7 @@ public:
             Response response;
 
             // Calculate metrics about the characteristics of the shard key.
-            if (!MONGO_unlikely(
-                    analyzeShardKeySkipCalcalutingKeyCharactericsMetrics.shouldFail())) {
+            if (request().getAnalyzeKeyCharacteristics()) {
                 auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
                     opCtx, analyzeShardKeyId, nss, collUuid, key);
                 response.setKeyCharacteristics(keyCharacteristics);
@@ -104,9 +113,7 @@ public:
 
             // Calculate metrics about the read and write distribution from sampled queries. Query
             // sampling is not supported on multitenant replica sets.
-            if (!gMultitenancySupport &&
-                !MONGO_unlikely(
-                    analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics.shouldFail())) {
+            if (!gMultitenancySupport && request().getAnalyzeReadWriteDistribution()) {
                 auto [readDistribution, writeDistribution] =
                     analyze_shard_key::calculateReadWriteDistributionMetrics(
                         opCtx, analyzeShardKeyId, nss, collUuid, key);

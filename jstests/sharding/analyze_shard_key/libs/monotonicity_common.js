@@ -252,8 +252,13 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
             currIndex = endIndex;
         }
 
-        const res =
-            assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: testCase.shardKey}));
+        const res = assert.commandWorked(conn.adminCommand({
+            analyzeShardKey: ns,
+            key: testCase.shardKey,
+            // Skip calculating the read and write distribution metrics since there are not needed
+            // by this test.
+            readWriteDistribution: false
+        }));
 
         const listCollectionRes =
             assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
