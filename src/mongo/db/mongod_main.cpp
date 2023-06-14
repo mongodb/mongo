@@ -110,6 +110,8 @@
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/query/stats/stats_cache_loader_impl.h"
 #include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mongod.h"
@@ -945,6 +947,10 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     auto catalog = std::make_unique<stats::StatsCatalog>(serviceContext, std::move(cacheLoader));
     stats::StatsCatalog::set(serviceContext, std::move(catalog));
 
+    // Startup options are written to the audit log at the end of startup so that cluster server
+    // parameters are guaranteed to have been initialized from disk at this point.
+    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
+
     // MessageServer::run will return when exit code closes its socket and we don't need the
     // operation context anymore
     startupOpCtx.reset();
@@ -972,10 +978,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     if (!initialize_server_global_state::writePidFile()) {
         quickExit(ExitCode::fail);
     }
-
-    // Startup options are written to the audit log at the end of startup so that cluster server
-    // parameters are guaranteed to have been initialized from disk at this point.
-    audit::logStartupOptions(Client::getCurrent(), serverGlobalParams.parsedOpts);
 
     serviceContext->notifyStartupComplete();
 
@@ -1777,6 +1779,8 @@ int mongod_main(int argc, char* argv[]) {
     if (change_stream_serverless_helpers::canInitializeServices()) {
         ChangeStreamChangeCollectionManager::create(service);
     }
+
+    query_settings::QuerySettingsManager::create(service);
 
 #if defined(_WIN32)
     if (ntservice::shouldStartService()) {

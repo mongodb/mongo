@@ -2492,6 +2492,7 @@ env.Library(
         'periodic_runner_job_abort_expired_transactions',
         'pipeline/change_stream_expired_pre_image_remover',
         'pipeline/process_interface/mongod_process_interface_factory',
+        'query/query_settings_manager',
         'query/stats/query_stats',
         'repl/drop_pending_collection_reaper',
         'repl/initial_syncer',

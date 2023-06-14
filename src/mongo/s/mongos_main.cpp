@@ -55,6 +55,8 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongos.h"
@@ -766,6 +768,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
+    query_settings::QuerySettingsManager::create(serviceContext);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
