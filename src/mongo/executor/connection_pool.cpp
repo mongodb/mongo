@@ -959,6 +959,16 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
         return;
     }
 
+    // If the host and port were dropped, let this lapse and spawn new connections
+    if (!conn || conn->getGeneration() != _generation) {
+        LOGV2_DEBUG(22564,
+                    kDiagnosticLogLevel,
+                    "Dropping late refreshed connection to {hostAndPort}",
+                    "Dropping late refreshed connection",
+                    "hostAndPort"_attr = _hostAndPort);
+        return;
+    }
+
     // Pass a failure on through
     if (!status.isOK()) {
         LOGV2_DEBUG(22563,
@@ -968,16 +978,6 @@ void ConnectionPool::SpecificPool::finishRefresh(ConnectionInterface* connPtr, S
                     "hostAndPort"_attr = _hostAndPort,
                     "error"_attr = redact(status));
         processFailure(status);
-        return;
-    }
-
-    // If the host and port were dropped, let this lapse and spawn new connections
-    if (!conn || conn->getGeneration() != _generation) {
-        LOGV2_DEBUG(22564,
-                    kDiagnosticLogLevel,
-                    "Dropping late refreshed connection to {hostAndPort}",
-                    "Dropping late refreshed connection",
-                    "hostAndPort"_attr = _hostAndPort);
         return;
     }
 
@@ -1010,7 +1010,29 @@ void ConnectionPool::SpecificPool::returnConnection(ConnectionInterface* connPtr
     }
 
     if (auto status = conn->getStatus(); !status.isOK()) {
-        // TODO: alert via some callback if the host is bad
+        // Our error handling here is determined by the MongoDB SDAM specification for handling
+        // application errors on established connections. In particular, if a network error occurs,
+        // we must close all idle sockets in the connection pool for the server: "if one socket is
+        // bad, it is likely that all are." However, if the error is just a network _timeout_ error,
+        // we don't drop the connections because the timeout may indicate a slow operation rather
+        // than an unavailable server. Additionally, if we can isolate the error to a single
+        // socket/connection based on it's type, we won't drop other connections/sockets.
+        //
+        // See the spec for additional details:
+        // https://github.com/mongodb/specifications/blob/master/source/server-discovery-and-monitoring/server-discovery-and-monitoring.rst#application-errors
+        bool isSingleConnectionError = status.code() == ErrorCodes::ConnectionError;
+        if (ErrorCodes::isNetworkError(status) && !isSingleConnectionError &&
+            !ErrorCodes::isNetworkTimeoutError(status)) {
+            LOGV2_DEBUG(7719500,
+                        kDiagnosticLogLevel,
+                        "Connection failed to {hostAndPort} due to {error}",
+                        "Connection failed",
+                        "hostAndPort"_attr = _hostAndPort,
+                        "error"_attr = redact(status));
+            processFailure(status);
+            return;
+        }
+        // Otherwise, drop the one connection.
         LOGV2(22566,
               "Ending connection to host {hostAndPort} due to bad connection status: {error}; "
               "{numOpenConns} connections to that host remain open",
