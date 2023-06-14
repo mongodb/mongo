@@ -38,7 +38,6 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
-#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/hex.h"
 

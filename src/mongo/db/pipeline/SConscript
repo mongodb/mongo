@@ -448,6 +448,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/pipeline/sharded_agg_helpers',
         '$BUILD_DIR/mongo/db/update/update_driver',
         '$BUILD_DIR/mongo/s/query/router_exec_stage',
+        'change_stream_helpers',
         'change_stream_preimage',
     ],
 )
@@ -529,6 +530,17 @@ env.Library(
         '$BUILD_DIR/mongo/db/dbhelpers',
         '$BUILD_DIR/mongo/db/namespace_string',
     ]
+)
+
+env.Library(
+    target="change_stream_helpers",
+    source=[
+        "change_stream_helpers.cpp",
+    ],
+    LIBDEPS=[
+        "document_sources_idl",
+    ],
+    LIBDEPS_PRIVATE=[],
 )
 
 env.Library(

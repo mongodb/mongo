@@ -31,6 +31,8 @@
 
 #include "mongo/db/pipeline/change_stream_document_diff_parser.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers.h"
+#include "mongo/db/pipeline/change_stream_helpers_legacy.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/document_path_support.h"
 #include "mongo/db/pipeline/document_source_change_stream_add_post_image.h"
@@ -43,6 +45,7 @@
 namespace mongo {
 namespace {
 constexpr auto checkValueType = &DocumentSourceChangeStream::checkValueType;
+constexpr auto resolveResumeToken = &change_stream::resolveResumeTokenFromSpec;
 
 Document copyDocExceptFields(const Document& source, const std::set<StringData>& fieldNames) {
     MutableDocument doc(source);
@@ -79,8 +82,7 @@ ChangeStreamEventTransformation::ChangeStreamEventTransformation(
     const DocumentSourceChangeStreamSpec& spec)
     : _changeStreamSpec(spec), _expCtx(expCtx) {
     // Extract the resume token from the spec and store it.
-    _resumeToken =
-        DocumentSourceChangeStream::resolveResumeTokenFromSpec(_expCtx, _changeStreamSpec);
+    _resumeToken = resolveResumeToken(_expCtx, _changeStreamSpec);
 
     // Determine whether the user requested a point-in-time pre-image, which will affect this
     // stage's output.
