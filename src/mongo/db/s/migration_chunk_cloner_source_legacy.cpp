@@ -85,6 +85,7 @@ const int kMaxObjectPerChunk{250000};
 const Hours kMaxWaitToCommitCloneForJumboChunk(6);
 
 MONGO_FAIL_POINT_DEFINE(failTooMuchMemoryUsed);
+MONGO_FAIL_POINT_DEFINE(hangAfterProcessingDeferredXferMods);
 
 /**
  * Returns true if the given BSON object in the shard key value pair format is within the given
@@ -879,6 +880,12 @@ void MigrationChunkClonerSourceLegacy::_processDeferredXferMods(OperationContext
             CollectionMetadata::extractDocumentKey(&_shardKeyPattern, newerVersionDoc);
         static_cast<void>(_processUpdateForXferMod(preImageDocKey, postImageDocKey));
     }
+
+    hangAfterProcessingDeferredXferMods.execute([&](const auto& data) {
+        if (!deferredReloadOrDeletePreImageDocKeys.empty()) {
+            hangAfterProcessingDeferredXferMods.pauseWhileSet();
+        }
+    });
 }
 
 Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
@@ -905,6 +912,11 @@ Status MigrationChunkClonerSourceLegacy::nextModsBatch(OperationContext* opCtx,
         deleteList.splice(deleteList.cbegin(), _deleted);
         updateList.splice(updateList.cbegin(), _reload);
     }
+
+    // It's important to abandon any open snapshots before processing updates so that we are sure
+    // that our snapshot is at least as new as those updates. It's possible for a stale snapshot to
+    // still be open from reads performed by _processDeferredXferMods(), above.
+    opCtx->recoveryUnit()->abandonSnapshot();
 
     StringData ns = nss().ns().c_str();
     BSONArrayBuilder arrDel(builder->subarrayStart("deleted"));
