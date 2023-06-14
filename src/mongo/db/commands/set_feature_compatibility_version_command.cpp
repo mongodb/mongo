@@ -99,6 +99,7 @@
 #include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
+#include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -438,6 +439,16 @@ public:
 
                 ScopedPostFCVDocumentUpdateActions postUpdateAction =
                     _prepareTransitionalState(opCtx, actualVersion, requestedVersion);
+
+                // If this is a config server, then there must be no active
+                // SetClusterParameterCoordinator instances active when downgrading.
+                if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
+                    uassert(ErrorCodes::CannotDowngrade,
+                            "Cannot downgrade while cluster server parameters are being set",
+                            ConfigsvrCoordinatorService::getService(opCtx)
+                                ->areAllCoordinatorsOfTypeFinished(
+                                    opCtx, ConfigsvrCoordinatorTypeEnum::kSetClusterParameter));
+                }
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV

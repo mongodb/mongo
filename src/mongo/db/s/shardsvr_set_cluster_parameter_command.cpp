@@ -45,6 +45,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"

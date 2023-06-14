@@ -46,6 +46,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -86,6 +87,10 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
 
             const auto coordinatorCompletionFuture = [&]() -> SharedSemiFuture<void> {
+                // configsvrSetClusterParameter must serialize against
+                // setFeatureCompatibilityVersion.
+                FixedFCVRegion fcvRegion(opCtx);
+
                 std::unique_ptr<ServerParameterService> sps =
                     std::make_unique<ClusterParameterService>();
                 DBDirectClient dbClient(opCtx);

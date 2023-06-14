@@ -45,6 +45,7 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
+#include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_cluster_parameter_invocation.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
@@ -66,6 +67,7 @@
 namespace mongo {
 
 namespace {
+MONGO_FAIL_POINT_DEFINE(hangInSetClusterParameter);
 
 const WriteConcernOptions kMajorityWriteConcern{WriteConcernOptions::kMajority,
                                                 WriteConcernOptions::SyncMode::UNSET,
@@ -84,6 +86,11 @@ void setClusterParameterImpl(OperationContext* opCtx, const SetClusterParameter&
                 repl::ReplicationCoordinator::get(opCtx)->getReplicationMode() !=
                     repl::ReplicationCoordinator::modeNone);
     }
+
+    // setClusterParameter is serialized against setFeatureCompatibilityVersion.
+    FixedFCVRegion fcvRegion(opCtx);
+
+    hangInSetClusterParameter.pauseWhileSet();
 
     std::unique_ptr<ServerParameterService> parameterService =
         std::make_unique<ClusterParameterService>();
