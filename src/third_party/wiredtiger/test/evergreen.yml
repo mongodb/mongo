@@ -5584,7 +5584,7 @@ buildvariants:
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0:unmap_shadow_on_exit=1"
       LSAN_OPTIONS="print_suppressions=0:suppressions=$WT_TOPDIR/test/evergreen/asan_leaks.supp"
-      ASAN_SYMBOLIZER_PATH=/usr/lib/llvm-10/bin/llvm-symbolizer
+      ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
       TESTUTIL_BYPASS_ASAN=1
       LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so:$WT_TOPDIR/TCMALLOC_LIB/lib/libtcmalloc.so
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
@@ -5653,7 +5653,7 @@ buildvariants:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
     test_env_vars:
-      UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/usr/lib/llvm-10/bin/llvm-symbolizer:abort_on_error=1:print_stacktrace=1"
+      UBSAN_OPTIONS="detect_leaks=1:disable_coredump=0:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer:abort_on_error=1:print_stacktrace=1"
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
