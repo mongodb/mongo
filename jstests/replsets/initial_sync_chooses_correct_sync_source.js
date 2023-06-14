@@ -48,6 +48,11 @@ const restartAndWaitForHeartbeats = (rst, initialSyncNode, setParameterOpts = {}
         setParameter: setParameterOpts,
     });
 
+    // Wait for the restarted node to hit initial sync, then wait for heartbeats. This is to
+    // prevent a potential race where we wait for heartbeats in startup recovery, which satisfies
+    // the JS test, but then restart heartbeats and treat the other nodes as DOWN when entering
+    // initial sync.
+    rst.waitForState(initialSyncNode, ReplSetTest.State.STARTUP_2);
     waitForHeartbeats(initialSyncNode);
 };
 
