@@ -6029,8 +6029,10 @@ env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'
 
 def isSupportedStreamsPlatform(thisEnv):
     # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
-    return thisEnv.TargetOSIs(
-        'linux') and thisEnv['TARGET_ARCH'] == 'x86_64' and ssl_provider == 'openssl'
+    # linux x86 and ARM64 are supported.
+    return thisEnv.TargetOSIs('linux') and \
+        thisEnv['TARGET_ARCH'] in ('x86_64', 'aarch64') \
+        and ssl_provider == 'openssl'
 
 
 def shouldBuildStreams(thisEnv):

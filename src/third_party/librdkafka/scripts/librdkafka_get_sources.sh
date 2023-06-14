@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # This script creates a copy of sources for librdkafka and librdkafka++.
-# This script currently only works on Linux x86_64 platforms.
+# This script currently only works on Linux x86_64 and aarch64 platforms.
 
 set -euo pipefail
 IFS=$'\n\t'
