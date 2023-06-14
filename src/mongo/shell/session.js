@@ -97,6 +97,16 @@ var {
         this.toString = function toString() {
             return "SessionOptions(" + this.tojson() + ")";
         };
+
+        this.getRawOpts = function getRawOpts() {
+            return {
+                readPreference: _readPreference,
+                readConcern: _readConcern,
+                writeConcern: _writeConcern,
+                causalConsistency: _causalConsistency,
+                retryWrites: _retryWrites
+            };
+        };
     }
 
     const kWireVersionSupportingCausalConsistency = 6;
