@@ -105,9 +105,10 @@ public:
     virtual void closeAll(OperationContext* opCtx) = 0;
 
     /**
-     * Returns the set of existing database names that differ only in casing.
+     * Returns the name of the database with conflicting casing if one exists.
      */
-    virtual std::set<DatabaseName> getNamesWithConflictingCasing(const DatabaseName& dbName) = 0;
+    virtual boost::optional<DatabaseName> getNameWithConflictingCasing(
+        const DatabaseName& dbName) = 0;
 
     /**
      * Returns all the database names (including those which are empty).

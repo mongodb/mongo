@@ -839,13 +839,11 @@ const StringMap<ApplyOpMetadata> kOpsMap = {
           // after closing its own in-memory database state. In this case, the primary may accept
           // creating a new database with a conflicting name to what the secondary still has open.
           // It is okay to simply close the empty database on the secondary in this case.
-          auto duplicates = DatabaseHolder::get(opCtx)->getNamesWithConflictingCasing(nss.dbName());
-          if (duplicates.size() == 1) {
-              auto dupDatabaseIt = duplicates.begin();
-              if (CollectionCatalog::get(opCtx)
-                      ->getAllCollectionUUIDsFromDb(*dupDatabaseIt)
-                      .size() == 0) {
-                  fassert(7727801, dropDatabaseForApplyOps(opCtx, *dupDatabaseIt).isOK());
+          if (auto duplicate =
+                  DatabaseHolder::get(opCtx)->getNameWithConflictingCasing(nss.dbName())) {
+              if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(*duplicate).size() ==
+                  0) {
+                  fassert(7727801, dropDatabaseForApplyOps(opCtx, *duplicate).isOK());
               }
           }
 

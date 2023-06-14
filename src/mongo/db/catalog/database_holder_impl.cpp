@@ -73,22 +73,21 @@ bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, const DatabaseName& d
     return it != _dbs.end() && it->second != nullptr;
 }
 
-std::set<DatabaseName> DatabaseHolderImpl::_getNamesWithConflictingCasing_inlock(
+boost::optional<DatabaseName> DatabaseHolderImpl::_getNameWithConflictingCasing_inlock(
     const DatabaseName& dbName) {
-    std::set<DatabaseName> duplicates;
-
     for (const auto& nameAndPointer : _dbs) {
-        // A name that's equal with case-insensitive match must be identical, or it's a duplicate.
+        // A case insensitive match indicates that 'dbName' is a duplicate of an existing database.
         if (dbName.equalCaseInsensitive(nameAndPointer.first) && dbName != nameAndPointer.first)
-            duplicates.insert(nameAndPointer.first);
+            return nameAndPointer.first;
     }
-    return duplicates;
+
+    return boost::none;
 }
 
-std::set<DatabaseName> DatabaseHolderImpl::getNamesWithConflictingCasing(
+boost::optional<DatabaseName> DatabaseHolderImpl::getNameWithConflictingCasing(
     const DatabaseName& dbName) {
     stdx::lock_guard<SimpleMutex> lk(_m);
-    return _getNamesWithConflictingCasing_inlock(dbName);
+    return _getNameWithConflictingCasing_inlock(dbName);
 }
 
 std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
@@ -115,7 +114,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     stdx::unique_lock<SimpleMutex> lk(_m);
 
     // The following will insert a nullptr for dbname, which will treated the same as a non-
-    // existant database by the get method, yet still counts in getNamesWithConflictingCasing.
+    // existant database by the get method, yet still counts in getNameWithConflictingCasing.
     if (auto db = _dbs[dbName])
         return db;
 
@@ -131,12 +130,12 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     });
 
     // Check casing in lock to avoid transient duplicates.
-    auto duplicates = _getNamesWithConflictingCasing_inlock(dbName);
+    auto duplicate = _getNameWithConflictingCasing_inlock(dbName);
     uassert(ErrorCodes::DatabaseDifferCase,
             str::stream() << "db already exists with different case already have: ["
-                          << (*duplicates.cbegin()).toStringForErrorMsg() << "] trying to create ["
+                          << duplicate->toStringForErrorMsg() << "] trying to create ["
                           << dbName.toStringForErrorMsg() << "]",
-            duplicates.empty());
+            !duplicate);
 
     // Do the catalog lookup and database creation outside of the scoped lock, because these may
     // block.

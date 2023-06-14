@@ -55,12 +55,12 @@ public:
 
     void closeAll(OperationContext* opCtx) override;
 
-    std::set<DatabaseName> getNamesWithConflictingCasing(const DatabaseName& dbName) override;
+    boost::optional<DatabaseName> getNameWithConflictingCasing(const DatabaseName& dbName) override;
 
     std::vector<DatabaseName> getNames() override;
 
 private:
-    std::set<DatabaseName> _getNamesWithConflictingCasing_inlock(const DatabaseName& dbName);
+    boost::optional<DatabaseName> _getNameWithConflictingCasing_inlock(const DatabaseName& dbName);
 
     typedef stdx::unordered_map<DatabaseName, Database*> DBs;
     mutable SimpleMutex _m;
