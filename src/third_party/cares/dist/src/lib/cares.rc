@@ -1,5 +1,5 @@
 
-/* Copyright (C) 2009-2016 by Daniel Stenberg
+/* Copyright (C) 2009-2021 by Daniel Stenberg
  *
  * Permission to use, copy, modify, and distribute this
  * software and its documentation for any purpose and without
@@ -39,7 +39,7 @@ BEGIN
   BEGIN
     BLOCK "040904b0"
     BEGIN
-      VALUE "CompanyName",      "The c-ares library, https://c-ares.haxx.se/\0"
+      VALUE "CompanyName",      "The c-ares library, https://c-ares.org/\0"
 #if defined(DEBUGBUILD) || defined(_DEBUG)
       VALUE "FileDescription",  "c-ares Debug Shared Library\0"
       VALUE "FileVersion",      ARES_VERSION_STR "\0"
@@ -54,7 +54,7 @@ BEGIN
       VALUE "ProductName",      "The c-ares library\0"
       VALUE "ProductVersion",   ARES_VERSION_STR "\0"
       VALUE "LegalCopyright",   "© " ARES_COPYRIGHT "\0"
-      VALUE "License",          "https://c-ares.haxx.se/license.html\0"
+      VALUE "License",          "https://c-ares.org/license.html\0"
     END
   END
 

@@ -54,6 +54,9 @@
 /* Define to 1 if you have AF_INET6. */
 #undef HAVE_AF_INET6
 
+/* Define to 1 if you have the arc4random_buf function. */
+#undef HAVE_ARC4RANDOM_BUF
+
 /* Define to 1 if you have the <arpa/inet.h> header file. */
 #undef HAVE_ARPA_INET_H
 
@@ -451,7 +454,8 @@
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS
 
-/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. */
+/* Define to 1 if you can safely include both <sys/time.h> and <time.h>. This
+   macro is obsolete. */
 #undef TIME_WITH_SYS_TIME
 
 /* Define to disable non-blocking sockets. */

@@ -1,9 +1,9 @@
-AC_PREREQ(2.57)
+AC_PREREQ([2.60])
 
-AC_INIT([c-ares], [1.17.2],
-  [c-ares mailing list: http://cool.haxx.se/mailman/listinfo/c-ares])
+AC_INIT([c-ares], [1.19.1],
+  [c-ares mailing list: http://lists.haxx.se/listinfo/c-ares])
 
-CARES_VERSION_INFO="6:3:4"
+CARES_VERSION_INFO="8:1:6"
 dnl This flag accepts an argument of the form current[:revision[:age]]. So,
 dnl passing -version-info 3:12:1 sets current to 3, revision to 12, and age to
 dnl 1.
@@ -33,15 +33,13 @@ dnl set age to 0. (c:r:a=0)
 dnl
 AC_SUBST([CARES_VERSION_INFO])
 
-XC_OVR_ZZ50
-XC_OVR_ZZ60
-CARES_OVERRIDE_AUTOCONF
-
 AC_CONFIG_SRCDIR([src/lib/ares_ipv6.h])
 AC_CONFIG_HEADERS([src/lib/ares_config.h include/ares_build.h])
 AC_CONFIG_MACRO_DIR([m4])
 AM_MAINTAINER_MODE
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
+AX_REQUIRE_DEFINED([AX_CXX_COMPILE_STDCXX_11])
 
 CARES_CHECK_OPTION_DEBUG
 CARES_CHECK_OPTION_OPTIMIZE
@@ -406,6 +404,11 @@ if test "$ac_cv_lib_resolve_strcasecmp" = "$ac_cv_func_strcasecmp"; then
 fi
 ac_cv_func_strcasecmp="no"
 
+dnl Windows builds require linking to iphlpapi
+if test "$ac_cv_header_winsock2_h" = "yes"; then
+  LIBS="$LIBS -liphlpapi"
+fi
+
 CARES_CHECK_LIBS_CONNECT
 
 dnl iOS 10?
@@ -467,7 +470,7 @@ fi
 
 AC_MSG_CHECKING([whether to use libgcc])
 AC_ARG_ENABLE(libgcc,
-AC_HELP_STRING([--enable-libgcc],[use libgcc when linking]),
+AS_HELP_STRING([--enable-libgcc],[use libgcc when linking]),
 [ case "$enableval" in
   yes)
         LIBS="$LIBS -lgcc"
@@ -491,6 +494,9 @@ dnl **********************************************************************
 
 dnl Checks for header files.
 AC_HEADER_STDC
+
+AC_PROG_EGREP
+
 
 CURL_CHECK_HEADER_MALLOC
 CURL_CHECK_HEADER_MEMORY
@@ -547,10 +553,37 @@ dnl *Sigh* these are needed in order for net/if.h to get properly detected.
 ]
 )
 
+dnl Test and set CARES_HAVE_ARPA_NAMESER_H / CARES_HAVE_ARPA_NAMESER_COMPAT_H
+AC_CHECK_DECL([HAVE_ARPA_NAMESER_H],
+[
+CARES_DEFINE_UNQUOTED([CARES_HAVE_ARPA_NAMESER_H])
+],
+[]
+)
+AC_CHECK_DECL([HAVE_ARPA_NAMESER_COMPAT_H],
+[
+CARES_DEFINE_UNQUOTED([CARES_HAVE_ARPA_NAMESER_COMPAT_H])
+],
+[]
+)
+
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_TYPE_SIZE_T
-AC_HEADER_TIME
+m4_warn([obsolete],
+[Update your code to rely only on HAVE_SYS_TIME_H,
+then remove this warning and the obsolete code below it.
+All current systems provide time.h; it need not be checked for.
+Not all systems provide sys/time.h, but those that do, all allow
+you to include it and time.h simultaneously.])dnl
+AC_CHECK_HEADERS_ONCE([sys/time.h])
+# Obsolete code to be removed.
+if test $ac_cv_header_sys_time_h = yes; then
+  AC_DEFINE([TIME_WITH_SYS_TIME],[1],[Define to 1 if you can safely include both <sys/time.h>
+	     and <time.h>.  This macro is obsolete.])
+fi
+# End of obsolete code.
+
 CURL_CHECK_STRUCT_TIMEVAL
 
 AC_CHECK_TYPE(long long,
@@ -604,7 +637,19 @@ TYPE_SOCKADDR_STORAGE
 
 TYPE_SIG_ATOMIC_T
 
-AC_TYPE_SIGNAL
+m4_warn([obsolete],
+[your code may safely assume C89 semantics that RETSIGTYPE is void.
+Remove this warning and the `AC_CACHE_CHECK' when you adjust the code.])dnl
+AC_CACHE_CHECK([return type of signal handlers],[ac_cv_type_signal],[AC_COMPILE_IFELSE(
+[AC_LANG_PROGRAM([#include <sys/types.h>
+#include <signal.h>
+],
+		 [return *(signal (0, 0)) (0) == 1;])],
+		   [ac_cv_type_signal=int],
+		   [ac_cv_type_signal=void])])
+AC_DEFINE_UNQUOTED([RETSIGTYPE],[$ac_cv_type_signal],[Define as the return type of signal handlers
+		    (`int' or `void').])
+
 
 CURL_CHECK_FUNC_RECV
 CURL_CHECK_FUNC_RECVFROM
@@ -638,6 +683,7 @@ CARES_CHECK_FUNC_STRNCASECMP
 CARES_CHECK_FUNC_STRNCMPI
 CARES_CHECK_FUNC_STRNICMP
 CARES_CHECK_FUNC_WRITEV
+CARES_CHECK_FUNC_ARC4RANDOM_BUF
 
 
 dnl check for AF_INET6
@@ -848,20 +894,10 @@ AC_C_BIGENDIAN(
 
 dnl Check for user-specified random device
 AC_ARG_WITH(random,
-AC_HELP_STRING([--with-random=FILE],
+AS_HELP_STRING([--with-random=FILE],
                [read randomness from FILE (default=/dev/urandom)]),
     [ CARES_RANDOM_FILE="$withval" ],
-    [
-        dnl Check for random device.  If we're cross compiling, we can't
-        dnl check, and it's better to assume it doesn't exist than it is
-        dnl to fail on AC_CHECK_FILE or later.
-        if test "$cross_compiling" = "no"; then
-          AC_CHECK_FILE("/dev/urandom", [ CARES_RANDOM_FILE="/dev/urandom"] )
-        else
-          AC_MSG_WARN([cannot check for /dev/urandom while cross compiling; assuming none])
-        fi
-
-    ]
+    [ CARES_RANDOM_FILE="/dev/urandom" ]
 )
 if test -n "$CARES_RANDOM_FILE" && test X"$CARES_RANDOM_FILE" != Xno ; then
         AC_SUBST(CARES_RANDOM_FILE)
@@ -897,7 +933,7 @@ XC_CHECK_BUILD_FLAGS
 
 AC_MSG_CHECKING([whether to build tests])
 AC_ARG_ENABLE(tests,
-	AC_HELP_STRING([--enable-tests], [build test suite]),
+	AS_HELP_STRING([--enable-tests], [build test suite]),
 	[ build_tests="$enableval" ],
 	[ if test "x$HAVE_CXX11" = "x1" && test "x$cross_compiling" = "xno" ; then
 	    build_tests="yes"
