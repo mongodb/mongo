@@ -166,7 +166,8 @@ bool validShardKeyIndexExists(OperationContext* opCtx,
 
     // 3. If proposed key is required to be unique, additionally check for exact match.
     if (hasUsefulIndexForKey && requiresUnique) {
-        BSONObj eqQuery = BSON("ns" << nss.ns() << "key" << shardKeyPattern.toBSON());
+        BSONObj eqQuery =
+            BSON("ns" << NamespaceStringUtil::serialize(nss) << "key" << shardKeyPattern.toBSON());
         BSONObj eqQueryResult;
 
         for (const auto& idx : indexes) {
@@ -288,10 +289,11 @@ std::vector<BSONObj> ValidationBehaviorsShardCollection::loadIndexes(
 void ValidationBehaviorsShardCollection::verifyUsefulNonMultiKeyIndex(
     const NamespaceString& nss, const BSONObj& proposedKey) const {
     BSONObj res;
-    auto success = _localClient->runCommand(
-        DatabaseName::kAdmin,
-        BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-        res);
+    auto success = _localClient->runCommand(DatabaseName::kAdmin,
+                                            BSON(kCheckShardingIndexCmdName
+                                                 << NamespaceStringUtil::serialize(nss)
+                                                 << kKeyPatternField << proposedKey),
+                                            res);
     uassert(ErrorCodes::InvalidOptions, res["errmsg"].str(), success);
 }
 
@@ -347,9 +349,9 @@ void ValidationBehaviorsRefineShardKey::verifyUsefulNonMultiKeyIndex(
         _opCtx,
         ReadPreferenceSetting(ReadPreference::PrimaryOnly),
         "admin",
-        appendShardVersion(
-            BSON(kCheckShardingIndexCmdName << nss.ns() << kKeyPatternField << proposedKey),
-            _cri.getShardVersion(_indexShard->getId())),
+        appendShardVersion(BSON(kCheckShardingIndexCmdName << NamespaceStringUtil::serialize(nss)
+                                                           << kKeyPatternField << proposedKey),
+                           _cri.getShardVersion(_indexShard->getId())),
         Shard::RetryPolicy::kIdempotent));
     if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
         // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,

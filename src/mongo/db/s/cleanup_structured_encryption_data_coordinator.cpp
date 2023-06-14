@@ -457,13 +457,13 @@ boost::optional<BSONObj> CleanupStructuredEncryptionDataCoordinator::reportForCu
     auto bob = basicReportBuilder();
 
     stdx::lock_guard lg{_docMutex};
-    bob.append("escNss", _doc.getEscNss().ns());
-    bob.append("ecocNss", _doc.getEcocNss().ns());
+    bob.append("escNss", NamespaceStringUtil::serialize(_doc.getEscNss()));
+    bob.append("ecocNss", NamespaceStringUtil::serialize(_doc.getEcocNss()));
     bob.append("ecocUuid", _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none");
-    bob.append("ecocRenameNss", _doc.getEcocRenameNss().ns());
+    bob.append("ecocRenameNss", NamespaceStringUtil::serialize(_doc.getEcocRenameNss()));
     bob.append("ecocRenameUuid",
                _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
-    bob.append("escDeletesNss", _doc.getEscDeletesNss().ns());
+    bob.append("escDeletesNss", NamespaceStringUtil::serialize(_doc.getEscDeletesNss()));
     bob.append("escDeletesUuid",
                _doc.getEscDeletesUuid() ? _doc.getEscDeletesUuid().value().toString() : "none");
     return bob.obj();

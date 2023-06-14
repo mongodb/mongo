@@ -73,9 +73,9 @@ void dropIndexInTransaction(OperationContext* opCtx,
         std::make_shared<write_ops::UpdateCommandRequest>(CollectionType::ConfigNS);
     updateCollectionOp->setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kNssFieldName << userCollectionNss.ns()
-                                                      << CollectionType::kUuidFieldName
-                                                      << collectionUUID));
+        entry.setQ(BSON(CollectionType::kNssFieldName
+                        << NamespaceStringUtil::serialize(userCollectionNss)
+                        << CollectionType::kUuidFieldName << collectionUUID));
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$set" << BSON(CollectionType::kUuidFieldName
                                 << collectionUUID << CollectionType::kIndexVersionFieldName

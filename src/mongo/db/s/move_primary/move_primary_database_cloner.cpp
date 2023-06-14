@@ -169,15 +169,12 @@ MovePrimaryDatabaseCloner::listExistingCollectionsOnDonorStage() {
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             continue;
         }
-        LOGV2_DEBUG(7307501,
-                    2,
-                    "Allowing cloning of collection",
-                    "namespace"_attr = collectionNamespace.ns());
+        LOGV2_DEBUG(7307501, 2, "Allowing cloning of collection", logAttrs(collectionNamespace));
 
         bool canInsert = seen.insert(collectionNamespace).second;
         uassert(7307502,
                 str::stream() << "Donor collection list contains duplicate collection name "
-                              << "'" << collectionNamespace.ns(),
+                              << "'" << collectionNamespace.toStringForErrorMsg(),
                 canInsert);
     }
     return kContinueNormally;
@@ -196,15 +193,15 @@ MovePrimaryDatabaseCloner::listExistingCollectionsOnRecipientStage() {
         // Ensure no unsharded collection exists on the recipient if
         // the operation is not being resumed.
         uassert(7307503,
-                str::stream() << "Unsharded collection " << info.ns.ns()
+                str::stream() << "Unsharded collection " << info.ns.toStringForErrorMsg()
                               << " exists prior to data cloning on recipient",
                 (info.shardedColl || getSharedData()->getResumePhase() == ResumePhase::kDataSync));
 
         // Verify that the recipient collection exists on the donor with the same Namespace & UUID.
         auto donorColl = std::lower_bound(_donorCollections.begin(), _donorCollections.end(), info);
         uassert(7307504,
-                str::stream() << "Collection " << info.ns.ns() << " with UUID " << info.uuid
-                              << " exists on recipient but not on donor",
+                str::stream() << "Collection " << info.ns.toStringForErrorMsg() << " with UUID "
+                              << info.uuid << " exists on recipient but not on donor",
                 ((donorColl != _donorCollections.end()) && (donorColl->uuid == info.uuid) &&
                  (donorColl->ns == info.ns)));
 

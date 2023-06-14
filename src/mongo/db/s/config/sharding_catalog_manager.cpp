@@ -532,8 +532,8 @@ void setInitializationTimeOnPlacementHistory(
             NamespaceString::kConfigsvrPlacementHistoryNamespace);
         write_ops::DeleteOpEntry entryDelMarker;
         entryDelMarker.setQ(
-            BSON(NamespacePlacementType::kNssFieldName
-                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()));
+            BSON(NamespacePlacementType::kNssFieldName << NamespaceStringUtil::serialize(
+                     ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker)));
         entryDelMarker.setMulti(true);
         deleteRequest.setDeletes({entryDelMarker});
 
@@ -1411,8 +1411,8 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
              << BSON("$max"
                      << "$" + NamespacePlacementType::kTimestampFieldName)));
     pipeline.addStage<DocumentSourceMatch>(BSON(
-        "_id" << BSON(
-            "$ne" << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns())));
+        "_id" << BSON("$ne" << NamespaceStringUtil::serialize(
+                          ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker))));
 
     auto aggRequest = pipeline.buildAsAggregateCommandRequest();
 
@@ -1433,7 +1433,8 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
 
             const auto minTimeToPreserve = std::min(timeOfMostRecentDoc, earliestClusterTime);
             stmt.setQ(BSON(NamespacePlacementType::kNssFieldName
-                           << nss.ns() << NamespacePlacementType::kTimestampFieldName
+                           << NamespaceStringUtil::serialize(nss)
+                           << NamespacePlacementType::kTimestampFieldName
                            << BSON("$lt" << minTimeToPreserve)));
             stmt.setMulti(true);
             deleteStatements.emplace_back(std::move(stmt));

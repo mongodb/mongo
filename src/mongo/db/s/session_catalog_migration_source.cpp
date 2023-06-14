@@ -282,7 +282,8 @@ void SessionCatalogMigrationSource::init(OperationContext* opCtx,
             "session migration initialization majority commit barrier",
             NamespaceString::kRsOplogNamespace,
             [&] {
-                const auto message = BSON("sessionMigrateCloneStart" << _ns.ns());
+                const auto message =
+                    BSON("sessionMigrateCloneStart" << NamespaceStringUtil::serialize(_ns));
 
                 WriteUnitOfWork wuow(opCtx);
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onInternalOpMessage(

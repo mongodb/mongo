@@ -211,7 +211,7 @@ ScopedSetShardRole::~ScopedSetShardRole() {
     auto& oss = OperationShardingState::get(_opCtx);
 
     if (_shardVersion) {
-        auto it = oss._shardVersions.find(_nss.ns());
+        auto it = oss._shardVersions.find(NamespaceStringUtil::serialize(_nss));
         invariant(it != oss._shardVersions.end());
         auto& tracker = it->second;
         invariant(--tracker.recursion >= 0);

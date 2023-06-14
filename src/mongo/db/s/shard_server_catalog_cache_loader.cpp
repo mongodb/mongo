@@ -110,11 +110,11 @@ Status persistCollectionAndChangedChunks(OperationContext* opCtx,
     update.setAllowMigrations(collAndChunks.allowMigrations);
     update.setRefreshing(true);  // Mark as refreshing so secondaries are aware of it.
 
-    Status status =
-        updateShardCollectionsEntry(opCtx,
-                                    BSON(ShardCollectionType::kNssFieldName << nss.ns()),
-                                    update.toBSON(),
-                                    true /*upsert*/);
+    Status status = updateShardCollectionsEntry(
+        opCtx,
+        BSON(ShardCollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+        update.toBSON(),
+        true /*upsert*/);
     if (!status.isOK()) {
         return status;
     }
@@ -320,7 +320,7 @@ void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
         opCtx,
         ReadPreferenceSetting{ReadPreference::PrimaryOnly},
         "admin",
-        BSON("_flushRoutingTableCacheUpdates" << nss.ns()),
+        BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)),
         Seconds{30},
         Shard::RetryPolicy::kIdempotent));
 

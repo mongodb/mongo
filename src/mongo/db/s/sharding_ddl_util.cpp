@@ -152,8 +152,9 @@ void deleteCollection(OperationContext* opCtx,
         // Remove config.collection entry. Query by 'ns' AND 'uuid' so that the remove can be
         // resolved with an IXSCAN (thanks to the index on '_id') and is idempotent (thanks to the
         // 'uuid')
-        const auto deleteCollectionQuery = BSON(
-            CollectionType::kNssFieldName << nss.ns() << CollectionType::kUuidFieldName << uuid);
+        const auto deleteCollectionQuery =
+            BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)
+                                               << CollectionType::kUuidFieldName << uuid);
 
         write_ops::DeleteCommandRequest deleteOp(CollectionType::ConfigNS);
         deleteOp.setDeletes({[&]() {
@@ -365,7 +366,7 @@ void linearizeCSRSReads(OperationContext* opCtx) {
     uassertStatusOK(ShardingLogging::get(opCtx)->logChangeChecked(
         opCtx,
         "Linearize CSRS reads",
-        NamespaceString::kServerConfigurationNamespace.ns(),
+        NamespaceStringUtil::serialize(NamespaceString::kServerConfigurationNamespace),
         {},
         ShardingCatalogClient::kMajorityWriteConcern));
 }
@@ -585,14 +586,15 @@ void resumeMigrations(OperationContext* opCtx,
 
 bool checkAllowMigrations(OperationContext* opCtx, const NamespaceString& nss) {
     auto collDoc =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
-                            opCtx,
-                            ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
-                            repl::ReadConcernLevel::kMajorityReadConcern,
-                            CollectionType::ConfigNS,
-                            BSON(CollectionType::kNssFieldName << nss.ns()),
-                            BSONObj(),
-                            1))
+        uassertStatusOK(
+            Grid::get(opCtx)->shardRegistry()->getConfigShard()->exhaustiveFindOnConfig(
+                opCtx,
+                ReadPreferenceSetting(ReadPreference::PrimaryOnly, TagSet{}),
+                repl::ReadConcernLevel::kMajorityReadConcern,
+                CollectionType::ConfigNS,
+                BSON(CollectionType::kNssFieldName << NamespaceStringUtil::serialize(nss)),
+                BSONObj(),
+                1))
             .docs;
 
     uassert(ErrorCodes::NamespaceNotFound,

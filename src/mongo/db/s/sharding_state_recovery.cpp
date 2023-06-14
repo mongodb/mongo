@@ -274,7 +274,7 @@ Status ShardingStateRecovery_DEPRECATED::recover(OperationContext* opCtx) {
         status = ShardingLogging::get(opCtx)->logChangeChecked(
             opCtx,
             "Sharding minOpTime recovery",
-            NamespaceString::kServerConfigurationNamespace.ns(),
+            NamespaceStringUtil::serialize(NamespaceString::kServerConfigurationNamespace),
             recoveryDocBSON,
             ShardingCatalogClient::kMajorityWriteConcern);
         if (!status.isOK())

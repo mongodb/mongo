@@ -188,7 +188,7 @@ public:
             const auto& req = request();
 
             const auto service = RenameCollectionParticipantService::getService(opCtx);
-            const auto id = BSON("_id" << fromNss.ns());
+            const auto id = BSON("_id" << NamespaceStringUtil::serialize(fromNss));
             const auto optRenameCollectionParticipant =
                 RenameParticipantInstance::lookup(opCtx, service, id);
             if (optRenameCollectionParticipant) {

@@ -95,7 +95,8 @@ public:
 
         if (nss.coll().empty()) {
             // Return the database's information.
-            auto cachedDbInfo = uassertStatusOK(catalogCache->getDatabase(opCtx, nss.ns()));
+            auto cachedDbInfo = uassertStatusOK(
+                catalogCache->getDatabase(opCtx, NamespaceStringUtil::serialize(nss)));
             result.append("primaryShard", cachedDbInfo->getPrimary().toString());
             result.append("version", cachedDbInfo->getVersion().toBSON());
         } else {

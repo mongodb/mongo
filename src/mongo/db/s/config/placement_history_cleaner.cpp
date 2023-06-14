@@ -127,7 +127,8 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
         // The clean-up must always move the new initialization time forward.
         const auto match =
             BSON(NamespacePlacementType::kNssFieldName
-                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
+                 << NamespaceStringUtil::serialize(
+                        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker)
                  << NamespacePlacementType::kTimestampFieldName
                  << BSON("$gte" << earliestOplogTime->toBSON()));
 
