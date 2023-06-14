@@ -580,8 +580,8 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     invariant(index->descriptor());
 
     std::vector<int64_t> recordIds;
-    BSONObj prevKey;
-    int64_t numKeys = 0;
+    bool scannedMultipleShardKeys = false;
+    BSONObj firstShardKey;
 
     KeyPattern indexKeyPattern(index->keyPattern());
     auto exec = InternalPlanner::indexScan(opCtx,
@@ -596,11 +596,15 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         BSONObj recordVal;
         while (PlanExecutor::ADVANCED == exec->getNext(&recordVal, &recordId)) {
             recordIds.push_back(recordId.getLong());
-            auto currentKey = dotted_path_support::extractElementsBasedOnTemplate(
-                recordVal.replaceFieldNames(shardKey), shardKey);
-            if (SimpleBSONObjComparator::kInstance.evaluate(prevKey != currentKey)) {
-                prevKey = currentKey;
-                numKeys++;
+            if (!scannedMultipleShardKeys) {
+                auto currentShardKey = dotted_path_support::extractElementsBasedOnTemplate(
+                    recordVal.replaceFieldNames(shardKey), shardKey);
+                if (recordIds.size() == 1) {
+                    firstShardKey = currentShardKey;
+                } else if (SimpleBSONObjComparator::kInstance.evaluate(firstShardKey !=
+                                                                       currentShardKey)) {
+                    scannedMultipleShardKeys = true;
+                }
             }
         }
     } catch (DBException& ex) {
@@ -623,7 +627,7 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
           "indexKey"_attr = indexKeyPattern,
           "numRecords"_attr = recordIds.size());
 
-    if (numKeys == 1) {
+    if (!scannedMultipleShardKeys) {
         metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
         metrics.setRecordIdCorrelationCoefficient(0);
         return metrics;
