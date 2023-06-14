@@ -1149,7 +1149,7 @@ OldClientContext::~OldClientContext() {
     auto currentOp = CurOp::get(_opCtx);
     Top::get(_opCtx->getClient()->getServiceContext())
         .record(_opCtx,
-                currentOp->getNSS(),
+                currentOp->getNS(),
                 currentOp->getLogicalOp(),
                 _opCtx->lockState()->isWriteLocked() ? Top::LockType::WriteLocked
                                                      : Top::LockType::ReadLocked,

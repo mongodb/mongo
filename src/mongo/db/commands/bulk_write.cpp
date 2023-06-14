@@ -339,7 +339,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         recordCurOpMetrics(opCtx);
         Top::get(opCtx->getServiceContext())
             .record(opCtx,
-                    curOp->getNSS(),
+                    curOp->getNS(),
                     curOp->getLogicalOp(),
                     Top::LockType::WriteLocked,
                     durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),

@@ -172,7 +172,7 @@ void recordStatsForTopCommand(OperationContext* opCtx) {
     auto curOp = CurOp::get(opCtx);
     Top::get(opCtx->getClient()->getServiceContext())
         .record(opCtx,
-                curOp->getNSS(),
+                curOp->getNS(),
                 curOp->getLogicalOp(),
                 Top::LockType::WriteLocked,
                 durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
