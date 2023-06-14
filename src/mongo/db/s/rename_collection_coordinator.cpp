@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
@@ -739,6 +740,11 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                                                       ShardingCatalogClient::kMajorityWriteConcern,
                                                       **executor,
                                                       osi);
+
+                // Checkpoint the configTime to ensure that, in the case of a stepdown, the new
+                // primary will start-up from a configTime that is inclusive of the renamed
+                // metadata.
+                VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
             }))
         .then(_buildPhaseHandler(
             Phase::kUnblockCRUD,

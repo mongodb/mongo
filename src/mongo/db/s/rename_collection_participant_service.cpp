@@ -41,6 +41,7 @@
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_recovery_service.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -378,6 +379,11 @@ SemiFuture<void> RenameParticipantInstance::_runImpl(
             if (_doc.getPhase() < Phase::kUnblockCRUD) {
                 return _canUnblockCRUDPromise.getFuture();
             }
+
+            // Checkpoint the vector clock to ensure causality in the event of a crash or shutdown.
+            auto opCtxHolder = cc().makeOperationContext();
+            auto* opCtx = opCtxHolder.get();
+            VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
             return SemiFuture<void>::makeReady().share();
         })
