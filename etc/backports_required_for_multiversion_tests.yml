@@ -390,6 +390,8 @@ last-continuous:
     ticket: SERVER-76988
   - test_file: jstests/replsets/tenant_migration_retryable_internal_transaction.js
     ticket: SERVER-77237
+  - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+    ticket: SERVER-78050
   suites: null
 last-lts:
   all:
@@ -863,4 +865,6 @@ last-lts:
     ticket: SERVER-76988
   - test_file: jstests/replsets/tenant_migration_retryable_internal_transaction.js
     ticket: SERVER-77237
+  - test_file: jstests/sharding/move_chunk_deferred_lookup.js
+    ticket: SERVER-78050
   suites: null
