@@ -56,7 +56,10 @@ if (TestData.configShard) {
 }
 const rst = new ReplSetTest(rstOpts);
 
-rst.startSet();
+// If testing config shard, specify "wiredTiger" as the storage engine so that when this test runs
+// in the inMemory variant this replica set doesn't get started with the "inMemory" storage engine
+// and fail since the config server cannot use the "inMemory" storage engine.
+rst.startSet(TestData.configShard ? {storageEngine: "wiredTiger"} : {});
 rst.initiate();
 const primary = rst.getPrimary();
 
@@ -102,17 +105,16 @@ const upgradeOpts = {
 if (isShardSvrRst) {
     // Restart the replica set as a shardsvr.
     withTemporaryTestData(() => {
-        rst.upgradeSet(Object.assign({"shardsvr": ""}, upgradeOpts));
+        rst.upgradeSet(Object.assign({shardsvr: ""}, upgradeOpts));
     }, tmpTestData);
 } else {
     // Restart the replica set as a configsvr.
     withTemporaryTestData(() => {
         const cfg = rst.getReplSetConfigFromNode();
-        cfg.configsvr = true;
+        cfg["configsvr"] = true;
         reconfig(rst, cfg);
-        rst.upgradeSet(
-            Object.assign({"configsvr": "", setParameter: {skipShardingConfigurationChecks: false}},
-                          upgradeOpts));
+        rst.upgradeSet(Object.assign(
+            {configsvr: "", setParameter: {skipShardingConfigurationChecks: false}}, upgradeOpts));
     }, tmpTestData);
 }
 
