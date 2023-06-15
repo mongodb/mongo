@@ -57,16 +57,23 @@ public:
      */
     Status refreshParameters(OperationContext* opCtx);
 
+    // What the actual refresh job runs to do a refresh.
+    Status _refreshParameters(OperationContext* opCtx);
+
     /**
      * Set the period of the background job. This should only be used internally (by the
      * setParameter).
      */
     void setPeriod(Milliseconds period);
 
+    // Public for testing.
+    std::unique_ptr<SharedPromise<void>> _refreshPromise;
+
 private:
     void run();
 
     std::unique_ptr<PeriodicJobAnchor> _job;
+    Mutex _mutex = MONGO_MAKE_LATCH("ClusterServerParameterRefresher::_mutex");
 };
 
 Status clusterServerParameterRefreshIntervalSecsNotify(const int& newValue);

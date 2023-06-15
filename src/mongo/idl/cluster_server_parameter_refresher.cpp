@@ -41,6 +41,10 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
+MONGO_FAIL_POINT_DEFINE(blockAndFailClusterParameterRefresh);
+MONGO_FAIL_POINT_DEFINE(blockAndSucceedClusterParameterRefresh);
+MONGO_FAIL_POINT_DEFINE(countPromiseWaitersClusterParameterRefresh);
+
 namespace mongo {
 namespace {
 
@@ -121,6 +125,49 @@ void ClusterServerParameterRefresher::setPeriod(Milliseconds period) {
 }
 
 Status ClusterServerParameterRefresher::refreshParameters(OperationContext* opCtx) {
+    stdx::unique_lock<Latch> lk(_mutex);
+    if (_refreshPromise) {
+        // We expect the future to never be ready here, because we complete the promise and then
+        // delete it under a lock, meaning new futures taken out on the current promise under a lock
+        // are always on active promises. If the future is ready here, the below logic will still
+        // work, but this is unexpected.
+        auto future = _refreshPromise->getFuture();
+        if (MONGO_unlikely(future.isReady())) {
+            LOGV2_DEBUG(7782200,
+                        3,
+                        "Cluster parameter refresh request unexpectedly joining on "
+                        "already-fulfilled refresh call");
+        }
+        countPromiseWaitersClusterParameterRefresh.shouldFail();
+        // Wait for the job to finish and return its result with getNoThrow.
+        lk.unlock();
+        return future.getNoThrow();
+    }
+    // No active job; make a new promise and run the job ourselves.
+    _refreshPromise = std::make_unique<SharedPromise<void>>();
+    lk.unlock();
+    // Run _refreshParameters unlocked to allow new futures to be gotten from our promise.
+    Status status = _refreshParameters(opCtx);
+    lk.lock();
+    // Complete the promise and detach it from the object, allowing a new job to be created the
+    // next time refreshParameters is run. Note that the futures of this promise hold references to
+    // it which will still be valid after we detach it from the object.
+    _refreshPromise->setFrom(status);
+    _refreshPromise = nullptr;
+    return status;
+}
+
+Status ClusterServerParameterRefresher::_refreshParameters(OperationContext* opCtx) {
+    if (MONGO_unlikely(blockAndFailClusterParameterRefresh.shouldFail())) {
+        blockAndFailClusterParameterRefresh.pauseWhileSet();
+        return Status(ErrorCodes::FailPointEnabled, "failClusterParameterRefresh was enabled");
+    }
+
+    if (MONGO_unlikely(blockAndSucceedClusterParameterRefresh.shouldFail())) {
+        blockAndSucceedClusterParameterRefresh.pauseWhileSet();
+        return Status::OK();
+    }
+
     // Query the config servers for all cluster parameter documents.
     auto swClusterParameterDocs = getClusterParametersFromConfigServer(opCtx);
     if (!swClusterParameterDocs.isOK()) {
