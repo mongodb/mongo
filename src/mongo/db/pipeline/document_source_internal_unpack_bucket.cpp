@@ -1291,6 +1291,14 @@ Pipeline::SourceContainer::iterator DocumentSourceInternalUnpackBucket::doOptimi
         }
     }
 
+    // If there is a $limit stage right after $_internalUnpackBucket, add a $limit stage above the
+    // _internalUnpackBucket stage so that we don't fetch buckets that are not necessary
+    if (auto limitPtr = dynamic_cast<DocumentSourceLimit*>(std::next(itr)->get());
+        limitPtr && !_eventFilter) {
+        container->insert(itr, DocumentSourceLimit::create(getContext(), limitPtr->getLimit()));
+        return std::next(itr);
+    }
+
     // Optimize the pipeline after this stage to merge $match stages and push them forward, and to
     // take advantage of $expr rewrite optimizations.
     if (!_optimizedEndOfPipeline) {
