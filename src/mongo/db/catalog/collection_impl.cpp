@@ -304,22 +304,14 @@ CollectionImpl::SharedState::~SharedState() {
 CollectionImpl::CollectionImpl(OperationContext* opCtx,
                                const NamespaceString& nss,
                                RecordId catalogId,
-                               const CollectionOptions& options,
+                               std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
                                std::unique_ptr<RecordStore> recordStore)
     : _ns(nss),
       _catalogId(std::move(catalogId)),
-      _uuid(options.uuid.value()),
-      _shared(std::make_shared<SharedState>(this, std::move(recordStore), options)),
+      _uuid(metadata->options.uuid.value()),
+      _shared(std::make_shared<SharedState>(this, std::move(recordStore), metadata->options)),
+      _metadata(std::move(metadata)),
       _indexCatalog(std::make_unique<IndexCatalogImpl>()) {}
-
-CollectionImpl::CollectionImpl(OperationContext* opCtx,
-                               const NamespaceString& nss,
-                               RecordId catalogId,
-                               std::shared_ptr<BSONCollectionCatalogEntry::MetaData> metadata,
-                               std::unique_ptr<RecordStore> recordStore)
-    : CollectionImpl(opCtx, nss, std::move(catalogId), metadata->options, std::move(recordStore)) {
-    _metadata = std::move(metadata);
-}
 
 CollectionImpl::~CollectionImpl() = default;
 
@@ -327,16 +319,6 @@ void CollectionImpl::onDeregisterFromCatalog(OperationContext* opCtx) {
     if (ns().isOplog()) {
         repl::clearLocalOplogPtr(opCtx->getServiceContext());
     }
-}
-
-std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
-    OperationContext* opCtx,
-    const NamespaceString& nss,
-    RecordId catalogId,
-    const CollectionOptions& options,
-    std::unique_ptr<RecordStore> rs) const {
-    return std::make_shared<CollectionImpl>(
-        opCtx, nss, std::move(catalogId), options, std::move(rs));
 }
 
 std::shared_ptr<Collection> CollectionImpl::FactoryImpl::make(
@@ -358,9 +340,6 @@ SharedCollectionDecorations* CollectionImpl::getSharedDecorations() const {
 }
 
 void CollectionImpl::init(OperationContext* opCtx) {
-    const auto catalogEntry =
-        DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, getCatalogId());
-    _metadata = catalogEntry->metadata;
     const auto& collectionOptions = _metadata->options;
 
     _initShared(opCtx, collectionOptions);

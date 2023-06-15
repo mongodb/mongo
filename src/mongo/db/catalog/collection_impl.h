@@ -43,12 +43,6 @@ public:
                                                              const NamespaceString& nss,
                                                              BSONObj collationSpec);
 
-    // TODO SERVER-56999: We should just need one API to create Collections
-    explicit CollectionImpl(OperationContext* opCtx,
-                            const NamespaceString& nss,
-                            RecordId catalogId,
-                            const CollectionOptions& options,
-                            std::unique_ptr<RecordStore> recordStore);
 
     explicit CollectionImpl(OperationContext* opCtx,
                             const NamespaceString& nss,
@@ -62,13 +56,6 @@ public:
 
     class FactoryImpl : public Factory {
     public:
-        // TODO SERVER-56999: We should just need one API to create Collections
-        std::shared_ptr<Collection> make(OperationContext* opCtx,
-                                         const NamespaceString& nss,
-                                         RecordId catalogId,
-                                         const CollectionOptions& options,
-                                         std::unique_ptr<RecordStore> rs) const final;
-
         std::shared_ptr<Collection> make(
             OperationContext* opCtx,
             const NamespaceString& nss,

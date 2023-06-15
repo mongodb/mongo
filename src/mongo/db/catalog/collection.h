@@ -132,17 +132,6 @@ public:
         static Factory* get(ServiceContext* service);
         static Factory* get(OperationContext* opCtx);
         static void set(ServiceContext* service, std::unique_ptr<Factory> factory);
-
-        /**
-         * Constructs a Collection object. This does not persist any state to the storage engine,
-         * only constructs an in-memory representation of what already exists on disk.
-         */
-        virtual std::shared_ptr<Collection> make(OperationContext* opCtx,
-                                                 const NamespaceString& nss,
-                                                 RecordId catalogId,
-                                                 const CollectionOptions& options,
-                                                 std::unique_ptr<RecordStore> rs) const = 0;
-
         /**
          * Constructs a Collection object. This does not persist any state to the storage engine,
          * only constructs an in-memory representation of what already exists on disk.

@@ -801,8 +801,12 @@ Collection* DatabaseImpl::_createCollection(
                 uassertStatusOK(storageEngine->getCatalog()->createCollection(
                     opCtx, nss, optionsWithUUID, true /*allocateDefaultSpace*/));
             auto& catalogId = catalogIdRecordStorePair.first;
+
+            auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+            auto metadata = catalogEntry->metadata;
+
             return Collection::Factory::get(opCtx)->make(
-                opCtx, nss, catalogId, optionsWithUUID, std::move(catalogIdRecordStorePair.second));
+                opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         } else {
             // Virtual collection stays only in memory and its metadata need not persist on disk and
             // therefore we bypass DurableCatalog.

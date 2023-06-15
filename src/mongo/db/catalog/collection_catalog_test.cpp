@@ -1037,8 +1037,10 @@ private:
             uassertStatusOK(storageEngine->getCatalog()->createCollection(
                 opCtx, nss, options, /*allocateDefaultSpace=*/true));
         auto& catalogId = catalogIdRecordStorePair.first;
+        auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+        auto metadata = catalogEntry->metadata;
         std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-            opCtx, nss, catalogId, options, std::move(catalogIdRecordStorePair.second));
+            opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         ownedCollection->init(opCtx);
 
         // Adds the collection to the in-memory catalog.

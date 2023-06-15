@@ -262,6 +262,10 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
     CollectionOptions options;
     options.uuid = UUID::gen();
 
+    auto mdPtr = std::make_shared<BSONCollectionCatalogEntry::MetaData>();
+    mdPtr->nss = nss;
+    mdPtr->options = options;
+
     std::unique_ptr<RecordStore> rs;
     {
         auto opCtx = _makeOperationContext(engine);
@@ -276,7 +280,7 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
         auto opCtx = _makeOperationContext(engine);
         WriteUnitOfWork uow(opCtx.get());
         collection =
-            std::make_unique<CollectionImpl>(opCtx.get(), nss, RecordId(0), options, std::move(rs));
+            std::make_unique<CollectionImpl>(opCtx.get(), nss, RecordId(0), mdPtr, std::move(rs));
         uow.commit();
     }
 
@@ -1433,6 +1437,10 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
     CollectionOptions options;
     options.uuid = UUID::gen();
 
+    auto mdPtr = std::make_shared<BSONCollectionCatalogEntry::MetaData>();
+    mdPtr->nss = nss;
+    mdPtr->options = options;
+
     std::unique_ptr<RecordStore> rs;
     {
         auto clientAndCtx = makeClientAndCtx("opCtx");
@@ -1451,7 +1459,7 @@ DEATH_TEST_REGEX_F(DurableCatalogTest,
         auto opCtx = clientAndCtx.opCtx();
         WriteUnitOfWork uow(opCtx);
         collection =
-            std::make_unique<CollectionImpl>(opCtx, nss, RecordId(0), options, std::move(rs));
+            std::make_unique<CollectionImpl>(opCtx, nss, RecordId(0), mdPtr, std::move(rs));
         uow.commit();
     }
 
