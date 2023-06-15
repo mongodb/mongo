@@ -401,6 +401,9 @@ public:
     // cause this value to be increased.
     size_t works = 0;
 
+    //the query count that use this plan to run the sql
+    uint64_t queryCounters = 0;
+
     // Optional debug info containing detailed statistics. Includes a description of the query which
     // resulted in this plan cache's creation as well as runtime stats from the multi-planner trial
     // period that resulted in this cache entry.
@@ -518,6 +521,12 @@ public:
      * perform even worse than the one already in the cache may not easily take its place.
      */
     void deactivate(const CanonicalQuery& query);
+
+    /**
+     * increase the query counters that hit this cached plan.
+     * through this counters, we can get the hot query
+     */
+    void increaseCacheQueryCounters(const CanonicalQuery& query);
 
     /**
      * Look up the cached data access for the provided 'query'.  Used by the query planner
