@@ -423,7 +423,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "A {multi:false} update on a sharded timeseries collection is disallowed.",
-                isMulti);
+                feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                    isMulti);
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
@@ -487,12 +489,15 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         return endPoints;
     }
 
+    auto isShardedTimeseriesCollection = isShardedTimeSeriesBucketsNamespace();
+
     // Targeting by replacement document is no longer necessary when an updateOne without shard key
     // is allowed, since we're able to decisively select a document to modify with the two phase
     // write without shard key protocol.
     if (!feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
             serverGlobalParams.featureCompatibility) ||
-        isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
+        (isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) &&
+         !isShardedTimeseriesCollection)) {
         // Replacement-style updates must always target a single shard. If we were unable to do so
         // using the query, we attempt to extract the shard key from the replacement and target
         // based on it.
@@ -506,7 +511,8 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
     }
 
     // If we are here then this is an op-style update and we were not able to target a single shard.
-    // Non-multi updates must target a single shard or an exact _id.
+    // Non-multi updates must target a single shard or an exact _id. Time-series single updates must
+    // target a single shard.
     uassert(ErrorCodes::InvalidOptions,
             str::stream()
                 << "A {multi:false} update on a sharded collection must contain an "
@@ -514,14 +520,18 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
                    "single shard (and have the simple collation), but this update targeted "
                 << endPoints.size() << " shards. Update request: " << updateOp.toBSON()
                 << ", shard key pattern: " << shardKeyPattern.toString(),
-            isMulti || isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) ||
+            isMulti ||
+                (isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) &&
+                 !isShardedTimeseriesCollection) ||
                 feature_flags::gFeatureFlagUpdateOneWithoutShardKey.isEnabled(
                     serverGlobalParams.featureCompatibility));
 
     // If the request is {multi:false} and it's not a write without shard key, then this is a single
     // op-style update which we are broadcasting to multiple shards by exact _id. Record this event
     // in our serverStatus metrics.
-    if (!isMulti && isExactIdQuery(opCtx, _nss, query, collation, _cri.cm)) {
+    if (!isMulti &&
+        (isExactIdQuery(opCtx, _nss, query, collation, _cri.cm) &&
+         !isShardedTimeseriesCollection)) {
         updateOneTargetedShardedCount.increment(1);
         updateOneOpStyleBroadcastWithExactIDCount.increment(1);
     }

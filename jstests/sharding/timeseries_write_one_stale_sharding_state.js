@@ -136,6 +136,14 @@ setUpShardedCluster({nMongos: 2});
     });
 })();
 
+(function testUpdateOneOnCollectionWithStaleShardingState() {
+    testWriteOneOnCollectionWithStaleShardingState({
+        writeCmd: {update: "$$$", updates: [{q: {f: 106}, u: {$set: {f: 107}}, multi: false}]},
+        nAffected: 1,
+        resultDoc: doc7_c_f106,
+    });
+})();
+
 // TODO SERVER-77132: Add tests for updateOne / findAndModify upsert.
 
 tearDownShardedCluster();

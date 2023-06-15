@@ -334,7 +334,7 @@ void insertChunks(OperationContext* opCtx,
 
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
-        cluster::write(newOpCtx.get(), insertRequest, &stats, &response);
+        cluster::write(newOpCtx.get(), insertRequest, nullptr /* nss */, &stats, &response);
         uassertStatusOK(response.toStatus());
     }
 }

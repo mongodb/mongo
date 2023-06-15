@@ -198,6 +198,10 @@ function expectFailedUpdate(initialDocList) {
 //
 
 function testCaseMultiFalseUpdateFails({testUpdate}) {
+    if (arbitraryUpdatesEnabled) {
+        return;
+    }
+
     testUpdate({updates: [{q: {[metaField]: {b: "B"}}, u: {$set: {[metaField]: {b: "C"}}}}]},
                expectFailedUpdate([doc1]));
 }

@@ -64,7 +64,7 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse deleteResponse;
     BatchWriteExecStats deleteStats;
-    cluster::write(opCtx, deleteRequest, &deleteStats, &deleteResponse);
+    cluster::write(opCtx, deleteRequest, nullptr /* nss */, &deleteStats, &deleteResponse);
     uassertStatusOKWithContext(deleteResponse.toStatus(),
                                "During delete stage of updating a shard key");
 
@@ -90,7 +90,7 @@ bool executeOperationsAsPartOfShardKeyUpdate(OperationContext* opCtx,
 
     BatchedCommandResponse insertResponse;
     BatchWriteExecStats insertStats;
-    cluster::write(opCtx, insertRequest, &insertStats, &insertResponse);
+    cluster::write(opCtx, insertRequest, nullptr, &insertStats, &insertResponse);
     uassertStatusOKWithContext(insertResponse.toStatus(),
                                "During insert stage of updating a shard key");
 

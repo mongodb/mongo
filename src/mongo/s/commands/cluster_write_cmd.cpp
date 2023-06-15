@@ -302,6 +302,7 @@ void updateHostsTargetedMetrics(OperationContext* opCtx,
 
 bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                                                         BatchedCommandRequest* request,
+                                                        const NamespaceString& nss,
                                                         BatchedCommandResponse* response,
                                                         BatchWriteExecStats stats) {
     auto txnRouter = TransactionRouter::get(opCtx);
@@ -360,7 +361,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                 // Clear the error details from the response object before sending the write again
                 response->unsetErrDetails();
 
-                cluster::write(opCtx, *request, &stats, response);
+                cluster::write(opCtx, *request, nullptr /* nss */, &stats, response);
                 wouldChangeOwningShardErrorInfo = getWouldChangeOwningShardErrorInfo(
                     opCtx, *request, response, !isRetryableWrite);
                 if (!wouldChangeOwningShardErrorInfo)
@@ -371,7 +372,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
                 // insert a new one.
                 updatedShardKey = wouldChangeOwningShardErrorInfo &&
                     documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                                      opCtx, request->getNS(), *wouldChangeOwningShardErrorInfo);
+                                      opCtx, nss, *wouldChangeOwningShardErrorInfo);
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -416,7 +417,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
             try {
                 // Delete the original document and insert the new one
                 updatedShardKey = documentShardKeyUpdateUtil::updateShardKeyForDocumentLegacy(
-                    opCtx, request->getNS(), *wouldChangeOwningShardErrorInfo);
+                    opCtx, nss, *wouldChangeOwningShardErrorInfo);
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
@@ -531,12 +532,15 @@ bool ClusterWriteCmd::InvocationBase::runImpl(OperationContext* opCtx,
         batchedRequest.unsetWriteConcern();
     }
 
-    cluster::write(opCtx, batchedRequest, &stats, &response);
+    // Record the namespace that the write must be run on. It may differ from the request if this is
+    // a timeseries collection.
+    NamespaceString nss = batchedRequest.getNS();
+    cluster::write(opCtx, batchedRequest, &nss, &stats, &response);
 
     bool updatedShardKey = false;
     if (_batchedRequest.getBatchType() == BatchedCommandRequest::BatchType_Update) {
         updatedShardKey =
-            handleWouldChangeOwningShardError(opCtx, &batchedRequest, &response, stats);
+            handleWouldChangeOwningShardError(opCtx, &batchedRequest, nss, &response, stats);
     }
 
     // Populate the 'NotPrimaryErrorTracker' object based on the write response

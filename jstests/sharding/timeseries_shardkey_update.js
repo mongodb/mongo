@@ -57,37 +57,35 @@ setUpShardedCluster();
     assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
 })();
 
-// TODO SERVER-77607 This test case should succeed without the error and be enabled.
-/*
 (function testUpdateOneModifyingShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
     // MaxKey).
     const coll = prepareShardedCollection(
         {collName: getCallerName(1), initialDocList: docs, includeMeta: true});
 
-    // This update command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The owning
-    // shard would be the shard that owns (MinKey, meta: "A"].
-    const updateOneCmd = {
-        update: coll.getName(),
-        updates: [{
-            q: {[metaFieldName]: "B", f: {$gt: 103}},
-            u: {$set: {[metaFieldName]: "A"}},
-            multi: false
-        }]
-    };
-    jsTestLog(`Running update one: ${tojson(updateOneCmd)}`);
-
-    // Retryable update one command can modify the shard key.
-    const session = testDB.getMongo().startSession({retryWrites: true});
+    // TODO SERVER-76432 Run this as a retryable write instead of inside a transaction.
+    // Update one command in a transaction can modify the shard key.
+    const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());
 
-    // For now, we don't allow update one to modify the shard key at all.
-    const res = assert.commandFailedWithCode(
-        sessionDB.runCommand(updateOneCmd), 7717801, `cmd = ${tojson(updateOneCmd)}`);
+    session.startTransaction();
 
-    assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
+    // This update command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The owning
+    // shard would be the shard that owns (MinKey, meta: "A"].
+    const query = {[metaFieldName]: "B", f: {$gt: 103}};
+    const update = {$set: {[metaFieldName]: "A"}};
+
+    jsTestLog(`Running updateOne: {q: ${tojson(query)}, u: ${tojson(update)}}`);
+
+    const result = assert.commandWorked(sessionDB[coll.getName()].updateOne(query, update));
+    assert.eq(1, result.modifiedCount, tojson(result));
+
+    session.commitTransaction();
+
+    assert.docEq({_id: 5, [metaFieldName]: "A", f: 104, [timeFieldName]: generateTimeValue(5)},
+                 coll.findOne({_id: 5}),
+                 "Document was not updated correctly " + tojson(coll.find().toArray()));
 })();
-*/
 
 (function testFindOneAndUpdateModifyingMetaShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",

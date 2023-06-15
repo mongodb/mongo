@@ -47,6 +47,7 @@ namespace cluster {
 
 void write(OperationContext* opCtx,
            const BatchedCommandRequest& request,
+           NamespaceString* nss,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch) {
@@ -63,6 +64,9 @@ void write(OperationContext* opCtx,
         &NotPrimaryErrorTracker::get(opCtx->getClient()));
 
     CollectionRoutingInfoTargeter targeter(opCtx, request.getNS(), targetEpoch);
+    if (nss) {
+        *nss = targeter.getNS();
+    }
 
     LOGV2_DEBUG_OPTIONS(
         4817400, 2, {logv2::LogComponent::kShardMigrationPerf}, "Starting batch write");

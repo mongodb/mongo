@@ -136,7 +136,8 @@ Status ShardServerProcessInterface::insert(
 
     batchInsertCommand.setWriteConcern(wc.toBSON());
 
-    cluster::write(expCtx->opCtx, batchInsertCommand, &stats, &response, targetEpoch);
+    cluster::write(
+        expCtx->opCtx, batchInsertCommand, nullptr /* nss */, &stats, &response, targetEpoch);
 
     return response.toStatus();
 }
@@ -155,7 +156,8 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     BatchedCommandRequest batchUpdateCommand(std::move(updateCommand));
     batchUpdateCommand.setWriteConcern(wc.toBSON());
 
-    cluster::write(expCtx->opCtx, batchUpdateCommand, &stats, &response, targetEpoch);
+    cluster::write(
+        expCtx->opCtx, batchUpdateCommand, nullptr /* nss */, &stats, &response, targetEpoch);
 
     if (auto status = response.toStatus(); status != Status::OK()) {
         return status;
