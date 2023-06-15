@@ -2685,7 +2685,8 @@ buildvariants:
   - name: .causally_consistent !.sharding
   - name: .change_streams
   - name: .misc_js
-  - name: .concurrency !.ubsan !.no_txns !.kill_terminate
+    # TODO(SERVER-78135): remove !.cursor_sweeps once WT-11133 is resolved
+  - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.cursor_sweeps
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
