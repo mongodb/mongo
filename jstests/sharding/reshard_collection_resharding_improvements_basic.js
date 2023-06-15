@@ -2,7 +2,7 @@
  * Tests for basic functionality of the resharding improvements feature.
  *
  * @tags: [
- *  require_fcv_71,
+ *  requires_fcv_71,
  *  featureFlagReshardingImprovements
  * ]
  */
@@ -228,7 +228,32 @@ const testForceRedistribution = (mongos) => {
         additionalSetup);
 };
 
+const testReshardingWithIndex = (mongos) => {
+    if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
+        jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
+        return;
+    }
+
+    jsTest.log(
+        "When there is no index on the new shard-key, we should create one during resharding.");
+
+    const additionalSetup = function(test) {
+        assert.commandWorked(
+            test._mongos.getDB(test._dbName).getCollection(test._collName).createIndex({
+                oldKey: 1
+            }));
+    };
+
+    reshardCmdTest.assertReshardCollOk(
+        {reshardCollection: ns, key: {newKey: 1}, numInitialChunks: 2},
+        2,
+        undefined,
+        undefined,
+        additionalSetup);
+};
+
 testShardDistribution(mongos);
 testForceRedistribution(mongos);
+testReshardingWithIndex(mongos);
 st.stop();
 })();

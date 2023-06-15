@@ -72,6 +72,7 @@ enums:
             kAwaitingFetchTimestamp: "awaiting-fetch-timestamp"
             kCreatingCollection: "creating-collection"
             kCloning: "cloning"
+            kBuildingIndex: "building-index"
             kApplying: "applying"
             kError: "error"
             kStrictConsistency: "strict-consistency"

@@ -37,6 +37,7 @@
 #include "mongo/db/hasher.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/s/migration_destination_manager.h"
 #include "mongo/db/s/shard_key_index_util.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/cluster_commands_helpers.h"
@@ -50,13 +51,12 @@ constexpr StringData kCheckShardingIndexCmdName = "checkShardingIndex"_sd;
 constexpr StringData kKeyPatternField = "keyPattern"_sd;
 
 /**
- * Constructs the BSON specification document for the create indexes command using the given
- * namespace, index key and options.
+ * Create an index specification used for create index command.
  */
-BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
-                             const BSONObj& keys,
-                             const BSONObj& collation,
-                             bool unique) {
+BSONObj makeIndexSpec(const NamespaceString& nss,
+                      const BSONObj& keys,
+                      const BSONObj& collation,
+                      bool unique) {
     BSONObjBuilder index;
 
     // Required fields for an index.
@@ -93,10 +93,22 @@ BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
         index.appendBool("unique", unique);
     }
 
+    return index.obj();
+}
+
+/**
+ * Constructs the BSON specification document for the create indexes command using the given
+ * namespace, index key and options.
+ */
+BSONObj makeCreateIndexesCmd(const NamespaceString& nss,
+                             const BSONObj& keys,
+                             const BSONObj& collation,
+                             bool unique) {
+    auto indexSpec = makeIndexSpec(nss, keys, collation, unique);
     // The outer createIndexes command.
     BSONObjBuilder createIndexes;
     createIndexes.append("createIndexes", nss.coll());
-    createIndexes.append("indexes", BSON_ARRAY(index.obj()));
+    createIndexes.append("indexes", BSON_ARRAY(indexSpec));
     createIndexes.append("writeConcern", WriteConcernOptions::Majority);
     return createIndexes.obj();
 }
@@ -425,6 +437,65 @@ void ValidationBehaviorsLocalRefineShardKey::createShardKeyIndex(
     MONGO_UNREACHABLE;
 }
 
+ValidationBehaviorsReshardingBulkIndex::ValidationBehaviorsReshardingBulkIndex()
+    : _opCtx(nullptr), _cloneTimestamp(), _shardKeyIndexSpec() {}
+
+std::vector<BSONObj> ValidationBehaviorsReshardingBulkIndex::loadIndexes(
+    const NamespaceString& nss) const {
+    invariant(_opCtx);
+    auto catalogCache = Grid::get(_opCtx)->catalogCache();
+    auto cri = catalogCache->getShardedCollectionRoutingInfo(_opCtx, nss);
+    auto [indexSpecs, _] = MigrationDestinationManager::getCollectionIndexes(
+        _opCtx, nss, cri.cm.getMinKeyShardIdWithSimpleCollation(), cri, _cloneTimestamp);
+    return indexSpecs;
+}
+
+void ValidationBehaviorsReshardingBulkIndex::verifyUsefulNonMultiKeyIndex(
+    const NamespaceString& nss, const BSONObj& proposedKey) const {
+    invariant(_opCtx);
+    auto catalogCache = Grid::get(_opCtx)->catalogCache();
+    auto cri = catalogCache->getShardedCollectionRoutingInfo(_opCtx, nss);
+    auto shard = uassertStatusOK(Grid::get(_opCtx)->shardRegistry()->getShard(
+        _opCtx, cri.cm.getMinKeyShardIdWithSimpleCollation()));
+    auto checkShardingIndexRes = uassertStatusOK(
+        shard->runCommand(_opCtx,
+                          ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                          "admin",
+                          appendShardVersion(BSON(kCheckShardingIndexCmdName
+                                                  << nss.ns() << kKeyPatternField << proposedKey),
+                                             cri.getShardVersion(shard->getId())),
+                          Shard::RetryPolicy::kIdempotent));
+    if (checkShardingIndexRes.commandStatus == ErrorCodes::UnknownError) {
+        // CheckShardingIndex returns UnknownError if a compatible shard key index cannot be found,
+        // but we return InvalidOptions to correspond with the shardCollection behavior.
+        uasserted(ErrorCodes::InvalidOptions, checkShardingIndexRes.response["errmsg"].str());
+    }
+    // Rethrow any other error to allow retries on retryable errors.
+    uassertStatusOK(checkShardingIndexRes.commandStatus);
+}
+
+void ValidationBehaviorsReshardingBulkIndex::verifyCanCreateShardKeyIndex(
+    const NamespaceString& nss, std::string* errMsg) const {}
+
+void ValidationBehaviorsReshardingBulkIndex::createShardKeyIndex(
+    const NamespaceString& nss,
+    const BSONObj& proposedKey,
+    const boost::optional<BSONObj>& defaultCollation,
+    bool unique) const {
+    BSONObj collation =
+        defaultCollation && !defaultCollation->isEmpty() ? CollationSpec::kSimpleSpec : BSONObj();
+    _shardKeyIndexSpec = makeIndexSpec(nss, proposedKey, collation, unique);
+}
+
+void ValidationBehaviorsReshardingBulkIndex::setOpCtxAndCloneTimestamp(OperationContext* opCtx,
+                                                                       Timestamp cloneTimestamp) {
+    _opCtx = opCtx;
+    _cloneTimestamp = cloneTimestamp;
+}
+
+boost::optional<BSONObj> ValidationBehaviorsReshardingBulkIndex::getShardKeyIndexSpec() const {
+    return _shardKeyIndexSpec;
+}
 
 }  // namespace shardkeyutil
 }  // namespace mongo

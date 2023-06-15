@@ -36,6 +36,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/s/shard_key_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/concurrency/thread_pool.h"
@@ -213,7 +214,12 @@ private:
     void _createTemporaryReshardingCollectionThenTransitionToCloning(
         const CancelableOperationContextFactory& factory);
 
-    ExecutorFuture<void> _cloneThenTransitionToApplying(
+    ExecutorFuture<void> _cloneThenTransitionToBuildingIndex(
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        const CancellationToken& abortToken,
+        const CancelableOperationContextFactory& factory);
+
+    ExecutorFuture<void> _buildIndexThenTransitionToApplying(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
         const CancellationToken& abortToken,
         const CancelableOperationContextFactory& factory);
@@ -245,6 +251,8 @@ private:
                                          const CancelableOperationContextFactory& factory);
 
     void _transitionToCloning(const CancelableOperationContextFactory& factory);
+
+    void _transitionToBuildingIndex(const CancelableOperationContextFactory& factory);
 
     void _transitionToApplying(const CancelableOperationContextFactory& factory);
 

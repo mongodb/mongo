@@ -141,6 +141,37 @@ private:
 };
 
 /**
+ * Implementation of steps for validating a shard key for resharding building indexes after cloning.
+ */
+class ValidationBehaviorsReshardingBulkIndex final : public ShardKeyValidationBehaviors {
+public:
+    class RecipientStateMachineExternalState;
+    ValidationBehaviorsReshardingBulkIndex();
+
+    std::vector<BSONObj> loadIndexes(const NamespaceString& nss) const override;
+
+    void verifyUsefulNonMultiKeyIndex(const NamespaceString& nss,
+                                      const BSONObj& proposedKey) const override;
+
+    void verifyCanCreateShardKeyIndex(const NamespaceString& nss,
+                                      std::string* errMsg) const override;
+
+    void createShardKeyIndex(const NamespaceString& nss,
+                             const BSONObj& proposedKey,
+                             const boost::optional<BSONObj>& defaultCollation,
+                             bool unique) const override;
+
+    void setOpCtxAndCloneTimestamp(OperationContext* opCtx, Timestamp cloneTimestamp);
+
+    boost::optional<BSONObj> getShardKeyIndexSpec() const;
+
+private:
+    OperationContext* _opCtx;
+    Timestamp _cloneTimestamp;
+    mutable boost::optional<BSONObj> _shardKeyIndexSpec;
+};
+
+/**
  * Compares the proposed shard key with the collection's existing indexes to ensure they are a legal
  * combination.
  *

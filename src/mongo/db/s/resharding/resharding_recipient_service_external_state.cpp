@@ -33,12 +33,14 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 
@@ -82,13 +84,18 @@ void ReshardingRecipientService::RecipientStateMachineExternalState::
     // Set the temporary resharding collection's UUID to the resharding UUID. Note that
     // BSONObj::addFields() replaces any fields that already exist.
     collOptions = collOptions.addFields(BSON("uuid" << metadata.getReshardingUUID()));
+    CollectionOptionsAndIndexes collOptionsAndIndexes{metadata.getReshardingUUID(),
+                                                      std::move(indexes),
+                                                      std::move(idIndex),
+                                                      std::move(collOptions)};
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // The indexSpecs are cleared here so we don't create those indexes when creating temp
+        // collections. These indexes will be fetched and built during building-index stage.
+        collOptionsAndIndexes.indexSpecs = {};
+    }
     MigrationDestinationManager::cloneCollectionIndexesAndOptions(
-        opCtx,
-        metadata.getTempReshardingNss(),
-        CollectionOptionsAndIndexes{metadata.getReshardingUUID(),
-                                    std::move(indexes),
-                                    std::move(idIndex),
-                                    std::move(collOptions)});
+        opCtx, metadata.getTempReshardingNss(), collOptionsAndIndexes);
 
     if (feature_flags::gGlobalIndexesShardingCatalog.isEnabled(
             serverGlobalParams.featureCompatibility)) {

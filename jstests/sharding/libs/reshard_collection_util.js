@@ -168,6 +168,16 @@ class ReshardCollectionCmdTest {
         }
     }
 
+    _verifyIndexesCreated(oldIndexes, shardKey) {
+        const indexes = this._mongos.getDB(this._dbName).getCollection(this._collName).getIndexes();
+        const indexKeySet = new Set();
+        indexes.forEach(index => indexKeySet.add(tojson(index.key)));
+        assert.eq(indexKeySet.has(tojson(shardKey)), true);
+        oldIndexes.forEach(index => {
+            assert.eq(indexKeySet.has(tojson(index.key)), true);
+        });
+    }
+
     assertReshardCollOkWithPreset(commandObj, presetReshardedChunks) {
         assert.commandWorked(
             this._mongos.adminCommand({shardCollection: this._ns, key: {oldKey: 1}}));
@@ -221,6 +231,7 @@ class ReshardCollectionCmdTest {
             additionalSetup(this);
         }
 
+        const indexes = this._mongos.getDB(this._dbName).getCollection(this._collName).getIndexes();
         const tempReshardingCollName =
             this._constructTemporaryReshardingCollName(this._dbName, this._collName);
 
@@ -235,6 +246,8 @@ class ReshardCollectionCmdTest {
             this._ns, Object.keys(commandObj.key), expectedZones);
 
         this._verifyChunksMatchExpected(expectedChunkNum, expectedChunks);
+
+        this._verifyIndexesCreated(indexes, commandObj.key);
 
         this._mongos.getDB(this._dbName)[this._collName].drop();
         this._verifyAllShardingCollectionsRemoved(tempReshardingCollName);
