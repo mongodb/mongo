@@ -64,6 +64,7 @@ roles:
                 - remove
                 - renameCollectionSameDB # db admin gets this also
                 - update
+                - updateSearchIndex
             - matchType: exact_namespace
               collection: 'system.js'
               actions: *readWriteRoleActions
