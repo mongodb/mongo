@@ -40,8 +40,10 @@ const shard0RoutingValues = {
 };
 const shard1RoutingValues = {
     shardNumber: 1,
-    timestamp: ISODate("2010-05-18T08:00:00.000Z")
+    timestamp1: ISODate("2010-05-18T08:00:00.000Z"),
+    timestamp2: ISODate("2010-05-19T08:00:00.000Z")
 };
+
 const data = [
     // Cork.
     {
@@ -67,23 +69,23 @@ const data = [
     },
     {
         location: {city: "Dublin", shardNumber: shard1RoutingValues.shardNumber},
-        time: shard1RoutingValues.timestamp,
+        time: shard1RoutingValues.timestamp1,
         temperature: 12.5,
     },
     {
         location: {city: "Dublin", shardNumber: shard1RoutingValues.shardNumber},
-        time: shard1RoutingValues.timestamp,
+        time: shard1RoutingValues.timestamp1,
         temperature: 13,
     },
     // Galway.
     {
         location: {city: "Galway", shardNumber: shard1RoutingValues.shardNumber},
-        time: shard1RoutingValues.timestamp,
+        time: shard1RoutingValues.timestamp1,
         temperature: 20,
     },
     {
         location: {city: "Galway", shardNumber: shard1RoutingValues.shardNumber},
-        time: shard1RoutingValues.timestamp,
+        time: shard1RoutingValues.timestamp1,
         temperature: 20,
     },
     // New York City.
@@ -95,13 +97,13 @@ const data = [
     },
     {
         location: {city: "New York City", shardNumber: shard1RoutingValues.shardNumber},
-        time: shard1RoutingValues.timestamp,
+        time: shard1RoutingValues.timestamp2,
         temperature: 39,
     },
     {
         _id: 100,
         location: {city: "New York City", shardNumber: shard1RoutingValues.shardNumber},
-        time: shard1RoutingValues.timestamp,
+        time: shard1RoutingValues.timestamp2,
         temperature: 20,
     },
 ];
@@ -196,7 +198,7 @@ const runTests = function(collName) {
 
     // We expect 'deleteOne' on the time field to succeed.
     runDeleteOneWithQuery(collName, {"time": shard0RoutingValues.timestamp}, 1);
-    runDeleteOneWithQuery(collName, {"time": shard1RoutingValues.timestamp}, 1);
+    runDeleteOneWithQuery(collName, {"time": shard1RoutingValues.timestamp1}, 1);
 
     // We expect 'deleteOne' on the _id field to succeed.
     runDeleteOneWithQuery(collName, {"_id": 100}, 1);

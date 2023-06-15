@@ -118,17 +118,6 @@ void finishWriteBatch(WriteBatch& batch, const CommitInfo& info) {
     invariant(batch.commitRights.load());
     batch.promise.emplaceValue(info);
 }
-
-/**
- * Abandons the write batch and notifies any waiters that the bucket has been cleared.
- */
-void abortWriteBatch(WriteBatch& batch, const Status& status) {
-    if (batch.promise.getFuture().isReady()) {
-        return;
-    }
-
-    batch.promise.setError(status);
-}
 }  // namespace
 
 BucketCatalog& BucketCatalog::get(ServiceContext* svcCtx) {

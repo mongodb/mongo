@@ -129,7 +129,7 @@ assert.commandFailedWithCode(coll.createIndex({a: 1}, {partialFilterExpression: 
         const result = coll.aggregate([{$match: predicate}], {hint: {a: 1}}).toArray();
         const unindexed =
             coll.aggregate([{$_internalInhibitOptimization: {}}, {$match: predicate}]).toArray();
-        assert.docEq(result, unindexed);
+        assert.sameMembers(result, unindexed);
     }
     function checkPlanAndResults(predicate) {
         checkPlan(predicate);
