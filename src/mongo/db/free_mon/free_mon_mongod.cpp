@@ -241,7 +241,8 @@ public:
         for (auto& nss : _namespaces) {
             auto optUUID = catalog->lookupUUIDByNSS(opCtx, nss);
             if (optUUID) {
-                builder << nss.toString() << optUUID.get();
+                // Always include tenant id in nss for FTDC collector.
+                builder << toStringForLogging(nss) << optUUID.get();
             }
         }
     }

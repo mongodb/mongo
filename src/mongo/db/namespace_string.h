@@ -431,10 +431,6 @@ public:
         return toString();
     }
 
-    std::string toString() const {
-        return ns().toString();
-    }
-
     /**
      * Gets a namespace string with tenant id.
      *
@@ -852,6 +848,10 @@ private:
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
         : _data(makeData(tenantId, db, collectionName)) {}
+
+    std::string toString() const {
+        return ns().toString();
+    }
 
     std::string toStringWithTenantId() const {
         if (_hasTenantId()) {

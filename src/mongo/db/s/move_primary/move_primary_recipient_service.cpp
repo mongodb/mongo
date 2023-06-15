@@ -310,7 +310,7 @@ void MovePrimaryRecipientService::MovePrimaryRecipient::_cloneDataFromDonor(
     const auto fromShard =
         uassertStatusOK(shardRegistry->getShard(opCtx, _metadata.getFromShardName().toString()));
     uassertStatusOK(_cloner->copyDb(opCtx,
-                                    _metadata.getDatabaseName().toString(),
+                                    NamespaceStringUtil::serialize(_metadata.getDatabaseName()),
                                     fromShard->getConnString().toString(),
                                     _shardedColls,
                                     &clonedCollections));
@@ -625,7 +625,8 @@ MovePrimaryRecipientService::MovePrimaryRecipient::_getUnshardedCollections(
         for (const auto& collInfo : collectionsToClone) {
             std::string collName;
             uassertStatusOK(bsonExtractStringField(collInfo, "name", &collName));
-            const NamespaceString nss(getDatabaseName().toString(), collName);
+            const NamespaceString nss =
+                NamespaceStringUtil::parseNamespaceFromDoc(getDatabaseName().dbName(), collName);
             if (!nss.isSystem() ||
                 nss.isLegalClientSystemNS(serverGlobalParams.featureCompatibility)) {
                 colls.push_back(nss);
@@ -920,11 +921,11 @@ std::vector<NamespaceString>
 MovePrimaryRecipientService::MovePrimaryRecipient::_getShardedCollectionsFromConfigSvr(
     OperationContext* opCtx) const {
     auto catalogClient = Grid::get(opCtx)->catalogClient();
-    auto shardedColls =
-        catalogClient->getAllShardedCollectionsForDb(opCtx,
-                                                     getDatabaseName().toString(),
-                                                     repl::ReadConcernLevel::kMajorityReadConcern,
-                                                     BSON("ns" << 1));
+    auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
+        opCtx,
+        NamespaceStringUtil::serialize(getDatabaseName()),
+        repl::ReadConcernLevel::kMajorityReadConcern,
+        BSON("ns" << 1));
     return shardedColls;
 }
 

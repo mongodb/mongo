@@ -1375,7 +1375,7 @@ WriteResult performUpdates(OperationContext* opCtx,
                     fmt::format(
                         "Cannot perform a multi update inside of a multi-document transaction on a "
                         "time-series collection: {}",
-                        ns.toString()),
+                        ns.toStringForErrorMsg()),
                     !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti());
         }
         const auto currentOpIndex = nextOpIndex++;

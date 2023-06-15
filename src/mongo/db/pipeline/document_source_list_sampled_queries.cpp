@@ -71,7 +71,8 @@ DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
     if (_cursor == nullptr) {
         FindCommandRequest findRequest{NamespaceString::kConfigSampledQueriesNamespace};
         if (ns) {
-            findRequest.setFilter(BSON(SampledQueryDocument::kNsFieldName << ns->toString()));
+            findRequest.setFilter(BSON(SampledQueryDocument::kNsFieldName
+                                       << NamespaceStringUtil::serialize(ns.get())));
         }
 
         DBDirectClient client(pExpCtx->opCtx);

@@ -330,7 +330,8 @@ private:
             return;
         }
 
-        const std::string curOpMessage = "Scanning namespace " + info.nss.toString();
+        const std::string curOpMessage =
+            "Scanning namespace " + NamespaceStringUtil::serialize(info.nss);
         ProgressMeterHolder progress;
         {
             AutoGetCollection coll(opCtx, info.nss, MODE_IS);

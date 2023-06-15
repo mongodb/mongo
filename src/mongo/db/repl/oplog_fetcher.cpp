@@ -240,7 +240,7 @@ std::string OplogFetcher::toString() {
     output << "OplogFetcher -";
     output << " last optime fetched: " << _lastFetched.toString();
     output << " source: " << _config.source.toString();
-    output << " namespace: " << _nss.toString();
+    output << " namespace: " << toStringForLogging(_nss);
     output << " active: " << _isActive_inlock();
     output << " shutting down?:" << _isShuttingDown_inlock();
     output << " first batch: " << _firstBatch;

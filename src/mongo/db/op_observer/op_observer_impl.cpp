@@ -2156,7 +2156,8 @@ void OpObserverImpl::onModifyCollectionShardingIndexCatalog(OperationContext* op
                                                             const UUID& uuid,
                                                             BSONObj opDoc) {
     repl::MutableOplogEntry oplogEntry;
-    auto obj = BSON(kShardingIndexCatalogOplogEntryName << nss.toString()).addFields(opDoc);
+    auto obj = BSON(kShardingIndexCatalogOplogEntryName << NamespaceStringUtil::serialize(nss))
+                   .addFields(opDoc);
     oplogEntry.setOpType(repl::OpTypeEnum::kCommand);
     oplogEntry.setNss(nss);
     oplogEntry.setUuid(uuid);

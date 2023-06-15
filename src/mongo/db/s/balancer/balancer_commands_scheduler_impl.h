@@ -158,7 +158,7 @@ public:
         boundsArrayBuilder.append(_lowerBoundKey).append(_upperBoundKey);
 
         BSONObjBuilder commandBuilder;
-        commandBuilder.append(kCommandName, getNameSpace().toString())
+        commandBuilder.append(kCommandName, NamespaceStringUtil::serialize(getNameSpace()))
             .appendArray(kBounds, boundsArrayBuilder.arr())
             .append(kShardName, getTarget().toString())
             .append(kEpoch, _version.epoch())
@@ -201,7 +201,7 @@ public:
 
     BSONObj serialise() const override {
         BSONObjBuilder commandBuilder;
-        commandBuilder.append(kCommandName, getNameSpace().toString())
+        commandBuilder.append(kCommandName, NamespaceStringUtil::serialize(getNameSpace()))
             .append(kKeyPattern, _shardKeyPattern)
             .append(kMinValue, _lowerBoundKey)
             .append(kMaxValue, _upperBoundKey)

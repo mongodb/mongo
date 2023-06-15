@@ -78,7 +78,7 @@ Document convertFromLegacyOplogFormat(const Document& o2Entry, const NamespaceSt
 
     // This field would be the first field in the new format, but the current change stream code
     // does not depend on the field order.
-    doc.addField(type.getString(), Value(nss.toString()));
+    doc.addField(type.getString(), Value(NamespaceStringUtil::serialize(nss)));
     return doc.freeze();
 }
 

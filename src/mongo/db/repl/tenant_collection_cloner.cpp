@@ -98,7 +98,8 @@ TenantCollectionCloner::TenantCollectionCloner(const NamespaceString& sourceNss,
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
                      "documents copied",
-                     str::stream() << _sourceNss.toString() << " tenant collection clone progress"),
+                     str::stream() << NamespaceStringUtil::serialize(_sourceNss)
+                                   << " tenant collection clone progress"),
       _tenantId(tenantId) {
     invariant(sourceNss.isValid());
     invariant(ClonerUtils::isNamespaceForTenant(sourceNss, tenantId));
@@ -523,7 +524,7 @@ void TenantCollectionCloner::handleNextBatch(DBClientCursor& cursor) {
 void TenantCollectionCloner::insertDocuments(std::vector<BSONObj> docsToInsert) {
     invariant(docsToInsert.size(),
               "Document size can't be non-zero:: namespace: {}, tenantId: {}"_format(
-                  _sourceNss.toString(), _tenantId));
+                  toStringForLogging(_sourceNss), _tenantId));
 
     {
         stdx::lock_guard<Latch> lk(_mutex);

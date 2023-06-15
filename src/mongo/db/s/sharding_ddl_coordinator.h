@@ -247,7 +247,7 @@ protected:
             stdx::lock_guard lk{_docMutex};
             if (const auto& bucketNss = _doc.getBucketNss()) {
                 // Bucket namespace is only present in case the collection is a sharded timeseries
-                bob.append("bucketNamespace", bucketNss.get().toString());
+                bob.append("bucketNamespace", NamespaceStringUtil::serialize(bucketNss.get()));
             }
         }
 

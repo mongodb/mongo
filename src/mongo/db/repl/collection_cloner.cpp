@@ -88,7 +88,8 @@ CollectionCloner::CollectionCloner(const NamespaceString& sourceNss,
                      kProgressMeterSecondsBetween,
                      kProgressMeterCheckInterval,
                      "documents copied",
-                     str::stream() << _sourceNss.toString() << " collection clone progress"),
+                     str::stream() << NamespaceStringUtil::serialize(_sourceNss)
+                                   << " collection clone progress"),
       _scheduleDbWorkFn([this](executor::TaskExecutor::CallbackFn work) {
           auto task = [this, work = std::move(work)](
                           OperationContext* opCtx,

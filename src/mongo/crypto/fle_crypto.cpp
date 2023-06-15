@@ -4032,7 +4032,11 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
     EncryptionInformation ei;
     ei.setType(kEncryptionInformationSchemaVersion);
 
-    ei.setSchema(BSON(nss.toString() << encryptedFields));
+    // Do not include tenant id in nss in the schema as the command request has "$tenant".
+    SerializationContext serializationCtx = SerializationContext::stateCommandRequest();
+    serializationCtx.setPrefixState(false);
+    ei.setSchema(
+        BSON(NamespaceStringUtil::serializeForCommands(nss, serializationCtx) << encryptedFields));
 
     return ei.toBSON();
 }
@@ -4041,7 +4045,11 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     const NamespaceString& nss, const EncryptionInformation& ei) {
     BSONObj schema = ei.getSchema();
 
-    auto element = schema.getField(nss.toString());
+    // Do not include tenant id in nss in the schema as the command request has "$tenant".
+    SerializationContext serializationCtx = SerializationContext::stateCommandRequest();
+    serializationCtx.setPrefixState(false);
+    auto element =
+        schema.getField(NamespaceStringUtil::serializeForCommands(nss, serializationCtx));
 
     uassert(6371205,
             "Expected an object for schema in EncryptionInformation",

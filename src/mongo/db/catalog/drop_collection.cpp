@@ -94,7 +94,7 @@ void checkForCollection(std::shared_ptr<const CollectionCatalog> collectionCatal
         auto nss = NamespaceString(baseNss.db(), collName.value());
 
         if (collectionCatalog->lookupCollectionByNamespace(opCtx, nss)) {
-            pLeaked->push_back(nss.toString());
+            pLeaked->push_back(toStringForLogging(nss));
         }
     }
 }

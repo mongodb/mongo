@@ -102,7 +102,8 @@ public:
 
         const auto cloneCatalogDataRequest =
             CloneCatalogData::parse(IDLParserContext("_shardsvrCloneCatalogData"), cmdObj);
-        const auto dbname = cloneCatalogDataRequest.getCommandParameter().toString();
+        const auto dbname =
+            NamespaceStringUtil::serialize(cloneCatalogDataRequest.getCommandParameter());
 
         uassert(
             ErrorCodes::InvalidNamespace,

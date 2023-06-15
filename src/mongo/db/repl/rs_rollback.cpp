@@ -1527,9 +1527,9 @@ void syncFixUp(OperationContext* opCtx,
                 opCtx, options.validator, options.validationLevel, options.validationAction);
             if (!validatorStatus.isOK()) {
                 throw RSFatalException(str::stream()
-                                       << "Failed to update validator for " << nss->toString()
-                                       << " (" << uuid << ") with " << redact(info)
-                                       << ". Got: " << validatorStatus.toString());
+                                       << "Failed to update validator for "
+                                       << nss->toStringForErrorMsg() << " (" << uuid << ") with "
+                                       << redact(info) << ". Got: " << validatorStatus.toString());
             }
 
             wuow.commit();

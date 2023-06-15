@@ -101,7 +101,7 @@ public:
         MONGO_UNREACHABLE;
     }
     std::shared_ptr<Ident> getSharedIdent() const {
-        return std::make_shared<Ident>(_nss.toString());
+        return std::make_shared<Ident>(_nss.toString_forTest());
     }
     void setIdent(std::shared_ptr<Ident> newIdent) {
         MONGO_UNREACHABLE;

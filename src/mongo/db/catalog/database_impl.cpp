@@ -663,7 +663,8 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
     auto status = Status::OK();
     if (viewName.isOplog()) {
         status = {ErrorCodes::InvalidNamespace,
-                  str::stream() << "invalid namespace name for a view: " + viewName.toString()};
+                  str::stream() << "invalid namespace name for a view: " +
+                          viewName.toStringForErrorMsg()};
     } else {
         status = CollectionCatalog::get(opCtx)->createView(opCtx,
                                                            viewName,
@@ -673,8 +674,11 @@ Status DatabaseImpl::createView(OperationContext* opCtx,
                                                            options.collation);
     }
 
-    audit::logCreateView(
-        opCtx->getClient(), viewName, viewOnNss.toString(), pipeline, status.code());
+    audit::logCreateView(opCtx->getClient(),
+                         viewName,
+                         NamespaceStringUtil::serialize(viewOnNss),
+                         pipeline,
+                         status.code());
     return status;
 }
 

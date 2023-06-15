@@ -986,7 +986,7 @@ Status _updateWithQuery(OperationContext* opCtx,
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
                           str::stream()
-                              << "Collection [" << nss.toString() << "] not found. "
+                              << "Collection [" << nss.toStringForErrorMsg() << "] not found. "
                               << "Unable to update documents in " << nss.toStringForErrorMsg()
                               << " using query " << request.getQuery()};
         }
@@ -1149,9 +1149,10 @@ Status StorageInterfaceImpl::deleteByFilter(OperationContext* opCtx,
             MODE_IX);
         if (!collection.exists()) {
             return Status{ErrorCodes::NamespaceNotFound,
-                          str::stream() << "Collection [" << nss.toString() << "] not found. "
-                                        << "Unable to delete documents in "
-                                        << nss.toStringForErrorMsg() << " using filter " << filter};
+                          str::stream()
+                              << "Collection [" << nss.toStringForErrorMsg() << "] not found. "
+                              << "Unable to delete documents in " << nss.toStringForErrorMsg()
+                              << " using filter " << filter};
         }
 
         // ParsedDelete needs to be inside the write conflict retry loop because it may create a

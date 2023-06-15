@@ -669,7 +669,8 @@ void sendDropCollectionParticipantCommandToShards(OperationContext* opCtx,
 BSONObj getCriticalSectionReasonForRename(const NamespaceString& from, const NamespaceString& to) {
     return BSON("command"
                 << "rename"
-                << "from" << from.toString() << "to" << to.toString());
+                << "from" << NamespaceStringUtil::serialize(from) << "to"
+                << NamespaceStringUtil::serialize(to));
 }
 
 void runTransactionOnShardingCatalog(OperationContext* opCtx,

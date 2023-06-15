@@ -204,7 +204,7 @@ Status repairCollection(OperationContext* opCtx,
     // to run an expensive collection validation.
     if (status.code() == ErrorCodes::DataModifiedByRepair) {
         invariant(StorageRepairObserver::get(opCtx->getServiceContext())->isDataInvalidated(),
-                  "Collection '{}' ({})"_format(collection->ns().toString(),
+                  "Collection '{}' ({})"_format(toStringForLogging(collection->ns()),
                                                 collection->uuid().toString()));
 
         // If we are a replica set member in standalone mode and we have unfinished indexes,

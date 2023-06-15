@@ -42,7 +42,8 @@ const auto kTimedPhaseNamesMap = [] {
 }();
 
 BSONObj createOriginalCommand(const NamespaceString& database, const StringData& shard) {
-    return Document{{"movePrimary", database.toString()}, {"to", shard}}.toBson();
+    return Document{{"movePrimary", NamespaceStringUtil::serialize(database)}, {"to", shard}}
+        .toBson();
 }
 }  // namespace
 
