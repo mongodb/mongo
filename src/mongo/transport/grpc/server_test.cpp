@@ -59,10 +59,6 @@ public:
                                       ::grpc::StatusCode validCertResult,
                                       ::grpc::StatusCode noClientCertResult,
                                       ::grpc::StatusCode selfSignedClientCertResult) {
-        auto callback = [](IngressSession& session) {
-            return ::grpc::Status::OK;
-        };
-
         auto clientThread = [&](Server&, unittest::ThreadAssertionMonitor& monitor) {
             {
                 auto stub = CommandServiceTestFixtures::makeStub();
@@ -85,7 +81,7 @@ public:
             }
         };
 
-        CommandServiceTestFixtures::runWithServer(callback, clientThread, options);
+        CommandServiceTestFixtures::runWithServer([](auto) {}, clientThread, options);
     }
 };
 
@@ -93,12 +89,11 @@ TEST_F(ServerTest, MaxThreads) {
     unittest::Barrier waitForWorkerThreads(CommandServiceTestFixtures::kMaxThreads);
     Notification<void> okayToReturn;
 
-    auto callback = [&](IngressSession& session) {
+    auto callback = [&](auto session) {
         waitForWorkerThreads.countDownAndWait();
-        ASSERT_OK(session.sinkMessage(makeUniqueMessage()));
+        ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
         // Block this thread until the test thread notifies it to return.
         okayToReturn.get();
-        return ::grpc::Status::OK;
     };
 
     auto clientThread = [&](Server&, unittest::ThreadAssertionMonitor& monitor) {
@@ -145,12 +140,8 @@ TEST_F(ServerTest, ECDSACertificates) {
     options.tlsPEMKeyFile = "jstests/libs/ecdsa-server.pem";
     options.tlsCAFile = kECDSACAFile;
 
-    auto callback = [](auto&) {
-        return ::grpc::Status::OK;
-    };
-
     CommandServiceTestFixtures::runWithServer(
-        callback,
+        [](auto) {},
         [&](auto&, auto&) {
             auto stubOptions = CommandServiceTestFixtures::Stub::Options{};
             stubOptions.tlsCAFile = kECDSACAFile;
@@ -166,12 +157,8 @@ TEST_F(ServerTest, IntermediateCA) {
     auto options = CommandServiceTestFixtures::makeServerOptions();
     options.tlsPEMKeyFile = "jstests/libs/server-intermediate-ca.pem";
 
-    auto callback = [](auto&) {
-        return ::grpc::Status::OK;
-    };
-
     CommandServiceTestFixtures::runWithServer(
-        callback,
+        [](auto) {},
         [&](auto&, auto&) {
             auto stub = CommandServiceTestFixtures::makeStub();
             ASSERT_EQ(stub.connect().error_code(), ::grpc::StatusCode::OK);
@@ -184,10 +171,7 @@ TEST_F(ServerTest, InvalidServerCertificateOptions) {
     const std::string kNonExistentPath = "non_existent_path";
 
     auto runInvalidCertTest = [&](Server::Options options) {
-        auto callback = [](auto session) {
-            return ::grpc::Status::OK;
-        };
-        auto server = CommandServiceTestFixtures::makeServer(callback, options);
+        auto server = CommandServiceTestFixtures::makeServer({}, options);
         ASSERT_THROWS(server.start(), DBException);
     };
 
@@ -259,12 +243,8 @@ TEST_F(ServerTest, MultipleAddresses) {
     // addresses being tested here.
     options.tlsPEMKeyFile = "jstests/libs/server_SAN.pem";
 
-    auto callback = [](IngressSession& session) {
-        return ::grpc::Status::OK;
-    };
-
     CommandServiceTestFixtures::runWithServer(
-        callback,
+        [](auto) {},
         [&addresses](auto&, auto&) {
             for (auto& address : addresses) {
                 std::string fullAddress;

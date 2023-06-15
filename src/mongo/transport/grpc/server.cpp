@@ -73,7 +73,7 @@ std::shared_ptr<::grpc::ServerCredentials> _makeServerCredentials(const Server::
 
     ::grpc::SslServerCredentialsOptions sslOps{clientCertPolicy};
     ::grpc::SslServerCredentialsOptions::PemKeyCertPair certPair;
-    sslOps.pem_key_cert_pairs = {parsePEMKeyFile(options.tlsPEMKeyFile)};
+    sslOps.pem_key_cert_pairs = {util::parsePEMKeyFile(options.tlsPEMKeyFile)};
     if (options.tlsCAFile) {
         sslOps.pem_root_certs = uassertStatusOK(ssl_util::readPEMFile(*options.tlsCAFile));
     }

@@ -29,19 +29,24 @@
 
 #pragma once
 
-#include <boost/optional.hpp>
 #include <memory>
+
+#include <boost/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/compiler.h"
+#include "mongo/transport/grpc/client_context.h"
+#include "mongo/transport/grpc/client_stream.h"
 #include "mongo/transport/grpc/server_context.h"
 #include "mongo/transport/grpc/server_stream.h"
+#include "mongo/transport/grpc/util.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/uuid.h"
 
@@ -54,42 +59,84 @@ namespace mongo::transport::grpc {
  */
 class GRPCSession : public Session {
 public:
-    explicit GRPCSession(TransportLayer* tl) : _tl(tl) {}
+    explicit GRPCSession(TransportLayer* tl, HostAndPort remote, boost::optional<UUID> clientId)
+        : _tl(tl), _remote(std::move(remote)), _clientId(std::move(clientId)) {}
 
-    virtual ~GRPCSession() {
-        invariant(terminationStatus(), "gRPC sessions must always be terminated");
-    }
+    virtual ~GRPCSession() = default;
 
     /**
      * Returns the unique identifier used for the underlying gRPC stream.
      */
-    virtual boost::optional<UUID> clientId() const = 0;
+    boost::optional<UUID> clientId() const {
+        return _clientId;
+    };
+
+    const HostAndPort& remote() const {
+        return _remote;
+    }
 
     /**
-     * Cancels the underlying gRPC stream and updates the termination status of the session.
-     * If this session is already terminated, this has no effect.
+     * Cancels the RPC associated with the underlying gRPC stream and updates the termination status
+     * of the session to include the provided reason.
      *
-     * It is an error to terminate a session with an OK status. Instead, provide a status that
-     * explains the reason for the cancellation or use end() if the intention is to mark the session
-     * as successfully terminated without cancelling the underlying stream.
+     * In-progress reads and writes to this session will be interrupted, and future reads and writes
+     * will fail with an error.
+     *
+     * If this session is already terminated, this has no effect.
      */
-    void terminate(Status status) {
-        tassert(7401590,
-                "gRPC sessions should only be manually terminated with non-OK statuses",
-                !status.isOK());
-
+    void cancel(StringData reason) {
         // Need to update terminationStatus before cancelling so that when the RPC caller/handler is
-        // interrupted, the it will be guaranteed to have access to the reason for cancellation.
-        if (_setTerminationStatus(std::move(status))) {
+        // interrupted, it will be guaranteed to have access to the reason for cancellation.
+        if (_setTerminationStatus({ErrorCodes::CallbackCanceled, std::move(reason)})) {
             _tryCancel();
         }
     }
 
     /**
-     * Returns the termination status (always set at termination). Remains unset until termination.
+     * Mark the session as gracefully terminated.
+     *
+     * In-progress reads and writes to this session will not be interrupted, but future ones will
+     * fail with an error.
+     *
+     * If this session is already terminated, this has no effect.
+     */
+    void end() final {
+        _setTerminationStatus(Status::OK());
+    }
+
+    StatusWith<Message> sourceMessage() noexcept override {
+        if (MONGO_likely(isConnected())) {
+            if (auto maybeBuffer = _readFromStream()) {
+                return Message(std::move(*maybeBuffer));
+            }
+        }
+        return Status(ErrorCodes::StreamTerminated, "Unable to read from gRPC stream");
+    }
+
+    Status sinkMessage(Message message) noexcept override {
+        if (MONGO_likely(isConnected() && _writeToStream(message.sharedBuffer()))) {
+            return Status::OK();
+        }
+        return Status(ErrorCodes::StreamTerminated, "Unable to write to gRPC stream");
+    }
+
+    /**
+     * Returns the reason for which this stream was terminated, if any. "Termination" includes
+     * cancellation events (e.g. network interruption, explicit cancellation, or
+     * exceeding the deadline) as well as graceful closing of the session via end().
+     *
+     * Remains unset until termination.
      */
     boost::optional<Status> terminationStatus() const {
-        return *_terminationStatus;
+        auto status = _terminationStatus.synchronize();
+        // If the RPC was cancelled, return a status reflecting that, including in the case where
+        // the RPC was cancelled after the session was already locally ended (i.e. after the
+        // termination status was set to OK).
+        if (_isCancelled() && (!status->has_value() || (*status)->isOK())) {
+            return Status(ErrorCodes::CallbackCanceled,
+                          "gRPC session was terminated due to the associated RPC being cancelled");
+        }
+        return *status;
     }
 
     TransportLayer* getTransportLayer() const final {
@@ -97,10 +144,11 @@ public:
     }
 
     /**
-     * Marks the session as having terminated successfully.
+     * The following inspects the logical state of the underlying stream: the session is considered
+     * not connected when the user has terminated the session (either with or without an error).
      */
-    void end() final {
-        _setTerminationStatus(Status::OK());
+    bool isConnected() final {
+        return !_terminationStatus->has_value();
     }
 
     /**
@@ -109,6 +157,10 @@ public:
      */
     bool isFromLoadBalancer() const final {
         return false;
+    }
+
+    std::string clientIdStr() const {
+        return _clientId ? _clientId->toString() : "N/A";
     }
 
     /**
@@ -157,23 +209,33 @@ public:
         MONGO_UNIMPLEMENTED;
     }
 
-private:
+protected:
     /**
      * Sets the termination status if it hasn't been set already.
      * Returns whether the termination status was updated or not.
      */
     bool _setTerminationStatus(Status status) {
         auto ts = _terminationStatus.synchronize();
-        if (MONGO_unlikely(ts->has_value()))
+        if (MONGO_unlikely(ts->has_value() || _isCancelled()))
             return false;
         ts->emplace(std::move(status));
         return true;
     }
 
+private:
     virtual void _tryCancel() = 0;
+
+    virtual bool _isCancelled() const = 0;
+
+    virtual boost::optional<SharedBuffer> _readFromStream() = 0;
+
+    virtual bool _writeToStream(ConstSharedBuffer msg) = 0;
 
     // TODO SERVER-74020: replace this with `GRPCTransportLayer`.
     TransportLayer* const _tl;
+
+    const HostAndPort _remote;
+    const boost::optional<UUID> _clientId;
 
     synchronized_value<boost::optional<Status>> _terminationStatus;
 };
@@ -191,67 +253,37 @@ public:
                    ServerContext* ctx,
                    ServerStream* stream,
                    boost::optional<UUID> clientId)
-        : GRPCSession(tl),
-          _ctx(ctx),
-          _stream(stream),
-          _clientId(std::move(clientId)),
-          _remote(ctx->getRemote()) {
+        : GRPCSession(tl, ctx->getRemote(), std::move(clientId)), _ctx(ctx), _stream(stream) {
         LOGV2_DEBUG(7401101,
                     2,
                     "Constructed a new gRPC ingress session",
                     "id"_attr = id(),
                     "remoteClientId"_attr = clientIdStr(),
-                    "remote"_attr = _remote);
+                    "remote"_attr = remote());
     }
 
     ~IngressSession() {
         auto ts = terminationStatus();
-        LOGV2_DEBUG(7401102,
+        tassert(
+            7401491, "gRPC sessions must be terminated before being destructed", ts.has_value());
+        LOGV2_DEBUG(7401402,
                     2,
                     "Finished cleaning up a gRPC ingress session",
                     "id"_attr = id(),
                     "remoteClientId"_attr = clientIdStr(),
-                    "remote"_attr = _remote,
-                    "status"_attr = ts);
-        if (MONGO_unlikely(!ts)) {
-            terminate({ErrorCodes::StreamTerminated, "Terminating session through destructor"});
-        }
+                    "remote"_attr = remote(),
+                    "status"_attr = *ts);
     }
 
-    boost::optional<UUID> clientId() const override {
-        return _clientId;
-    }
     /**
-     * The following inspects the logical state of the underlying stream: the session is considered
-     * not connected when: the underlying stream is closed/canceled, or the user has terminated the
-     * session (either with or without an error).
+     * Mark the session as logically terminated with the provided status. In-progress reads and
+     * writes to this session will not be interrupted, but future attempts to read or write to this
+     * session will fail.
+     *
+     * This has no effect if the stream is already terminated.
      */
-    bool isConnected() override {
-        return !(terminationStatus() || _ctx->isCancelled());
-    }
-
-    StatusWith<Message> sourceMessage() noexcept override {
-        if (MONGO_likely(isConnected())) {
-            if (auto maybeBuffer = _stream->read()) {
-                return Message(std::move(*maybeBuffer));
-            }
-        }
-        return Status(ErrorCodes::StreamTerminated, "Unable to read from ingress session");
-    }
-
-    Status sinkMessage(Message message) noexcept override {
-        if (MONGO_likely(isConnected() && _stream->write(message.sharedBuffer()))) {
-            return Status::OK();
-        }
-        return Status(ErrorCodes::StreamTerminated, "Unable to write to ingress session");
-    }
-
-    const HostAndPort& remote() const override {
-        return _remote;
-    }
-
-    std::string clientIdStr() const {
-        return _clientId ? _clientId->toString() : "N/A";
+    void terminate(Status status) {
+        _setTerminationStatus(std::move(status));
     }
 
 private:
@@ -259,12 +291,94 @@ private:
         _ctx->tryCancel();
     }
 
-    // _ctx and _stream are only valid while the RPC handler is still running. They should not be
+    bool _isCancelled() const override {
+        return _ctx->isCancelled();
+    }
+
+    boost::optional<SharedBuffer> _readFromStream() override {
+        return _stream->read();
+    }
+
+    bool _writeToStream(ConstSharedBuffer msg) override {
+        return _stream->write(msg);
+    }
+
+    // _stream is only valid while the RPC handler is still running. It should not be
     // accessed after the stream has been terminated.
     ServerContext* const _ctx;
     ServerStream* const _stream;
-    const boost::optional<UUID> _clientId;
-    const HostAndPort _remote;
+};
+
+/**
+ * Represents the client side of a gRPC stream.
+ */
+class EgressSession final : public GRPCSession {
+public:
+    EgressSession(TransportLayer* tl,
+                  std::shared_ptr<ClientContext> ctx,
+                  std::shared_ptr<ClientStream> stream,
+                  boost::optional<UUID> clientId)
+        : GRPCSession(tl, ctx->getRemote(), std::move(clientId)),
+          _ctx(std::move(ctx)),
+          _stream(std::move(stream)) {
+        LOGV2_DEBUG(7401401,
+                    2,
+                    "Constructed a new gRPC egress session",
+                    "id"_attr = id(),
+                    "remoteClientId"_attr = clientIdStr(),
+                    "remote"_attr = remote());
+    }
+
+    ~EgressSession() {
+        auto ts = terminationStatus();
+        tassert(
+            7401411, "gRPC sessions must be terminated before being destructed", ts.has_value());
+        LOGV2_DEBUG(7401403,
+                    2,
+                    "Finished cleaning up a gRPC egress session",
+                    "id"_attr = id(),
+                    "localClientId"_attr = clientIdStr(),
+                    "remote"_attr = remote(),
+                    "status"_attr = *ts);
+    }
+
+    /**
+     * Indicates to the server side that the client will not be sending any further messages, then
+     * blocks until all messages from the server have been read and the server has returned a final
+     * status. Once a status has been received, this session's termination status is updated
+     * accordingly.
+     *
+     * Returns the termination status.
+     *
+     * This method should only be called once.
+     * This method should be used instead of end() in most cases, since it retrieves the server's
+     * return status for the RPC.
+     */
+    Status finish() {
+        _setTerminationStatus(util::convertStatus(_stream->finish()));
+        return *terminationStatus();
+    }
+
+private:
+    void _tryCancel() override {
+        _ctx->tryCancel();
+    }
+
+    bool _isCancelled() const override {
+        // There is no way of determining this client-side outside of finish().
+        return false;
+    }
+
+    boost::optional<SharedBuffer> _readFromStream() override {
+        return _stream->read();
+    }
+
+    bool _writeToStream(ConstSharedBuffer msg) override {
+        return _stream->write(msg);
+    }
+
+    const std::shared_ptr<ClientContext> _ctx;
+    const std::shared_ptr<ClientStream> _stream;
 };
 
 }  // namespace mongo::transport::grpc

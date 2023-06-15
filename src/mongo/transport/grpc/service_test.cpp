@@ -56,242 +56,358 @@
 #include "mongo/unittest/thread_assertion_monitor.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/notification.h"
-#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 namespace mongo::transport::grpc {
+namespace {
 
 class CommandServiceTest : public unittest::Test {
 public:
-    void setUp() override {
-        _wvProvider = std::make_shared<WireVersionProvider>();
-    }
+    using ClientContextType = ::grpc::ClientContext;
+    using StubType = CommandServiceTestFixtures::Stub;
+    using StreamFactoryType =
+        std::function<std::shared_ptr<StubType::ClientStream>(ClientContextType&, StubType&)>;
 
-    WireVersionProvider& getWireVersionProvider() {
-        return *_wvProvider;
-    }
-
-    using MethodCallback =
-        std::function<std::shared_ptr<CommandServiceTestFixtures::Stub::ClientStream>(
-            ::grpc::ClientContext&)>;
+    /**
+     * Provides the client-side implementation for a gRPC client. `runTestWithBothMethods` will
+     * invoke this callback and provide it with its arguments.
+     */
+    using ClientCallbackType = std::function<void(
+        Server&, StubType, StreamFactoryType, unittest::ThreadAssertionMonitor&)>;
 
     /**
      * Runs a test twice: once for each method provided by CommandService.
      *
-     * On each run of the test, this creates a new CommandService instance using
-     * the provided handler, starts a new server instance, and then spawns a client thread that
-     * constructs a stub towards the server and runs clientThreadBody. A callback that invokes the
-     * method being tested is passed into clientThreadBody.
+     * On each run of the test, this creates a new CommandService instance that uses the provided
+     * handler, starts a new server instance, and then spawns a client thread that constructs a stub
+     * towards the server and runs `callback`. The client may use the provided factory to make new
+     * streams based on the method (e.g., unauthenticated) being tested.
      */
-    void runTestWithBothMethods(std::function<::grpc::Status(IngressSession&)> serverStreamHandler,
-                                std::function<void(Server& server,
-                                                   unittest::ThreadAssertionMonitor& monitor,
-                                                   MethodCallback makeStream)> clientThreadBody) {
-        CommandServiceTestFixtures::runWithServer(
-            serverStreamHandler, [&](Server& server, unittest::ThreadAssertionMonitor& monitor) {
-                auto stub = CommandServiceTestFixtures::makeStub();
-                clientThreadBody(server, monitor, [&stub](::grpc::ClientContext& ctx) {
-                    return stub.unauthenticatedCommandStream(&ctx);
-                });
-            });
-
-        CommandServiceTestFixtures::runWithServer(
-            serverStreamHandler, [&](Server& server, unittest::ThreadAssertionMonitor& monitor) {
-                auto stub = CommandServiceTestFixtures::makeStub();
-                clientThreadBody(server, monitor, [&stub](::grpc::ClientContext& ctx) {
-                    return stub.authenticatedCommandStream(&ctx);
-                });
-            });
-    }
-
-    void runMetadataValidationTest(::grpc::StatusCode expectedStatus,
-                                   std::function<void(::grpc::ClientContext&)> makeCtx) {
-        auto serverHandler = [](IngressSession&) {
-            return ::grpc::Status::OK;
+    void runTestWithBothMethods(CommandService::RPCHandler serverStreamHandler,
+                                ClientCallbackType callback) {
+        StreamFactoryType unauthCmdStreamFactory = [](auto& ctx, auto& stub) {
+            return stub.unauthenticatedCommandStream(&ctx);
+        };
+        StreamFactoryType authCmdStreamFactory = [](auto& ctx, auto& stub) {
+            return stub.authenticatedCommandStream(&ctx);
         };
 
-        runTestWithBothMethods(serverHandler, [&](auto&, auto&, MethodCallback methodCallback) {
-            ::grpc::ClientContext ctx;
-            makeCtx(ctx);
-            auto stream = methodCallback(ctx);
-            ASSERT_EQ(stream->Finish().error_code(), expectedStatus);
-
-            // The server should always respond with the cluster's max wire version, regardless
-            // of whether metadata validation failed. The one exception is for authentication
-            // failures.
-            auto serverMetadata = ctx.GetServerInitialMetadata();
-            auto it = serverMetadata.find(CommandService::kClusterMaxWireVersionKey);
-            ASSERT_NE(it, serverMetadata.end());
-            ASSERT_EQ(it->second,
-                      std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
-        });
+        for (auto& factory : {unauthCmdStreamFactory, authCmdStreamFactory}) {
+            CommandServiceTestFixtures::runWithServer(
+                serverStreamHandler,
+                [&](Server& server, unittest::ThreadAssertionMonitor& monitor) {
+                    callback(server, CommandServiceTestFixtures::makeStub(), factory, monitor);
+                });
+        }
     }
 
-    void runMetadataLogTest(std::function<void(::grpc::ClientContext&)> makeCtx,
+    using ContextInitializerType = std::function<void(::grpc::ClientContext&)>;
+
+    /**
+     * Fixture used to test the error codes returned to the client as the result of metadata
+     * validation. Each test provides its own logic for initializing the client context, and
+     * compares the returned gRPC status code against an expected value.
+     */
+    void runMetadataValidationTest(::grpc::StatusCode expectedStatusCode,
+                                   ContextInitializerType initContext) {
+        runTestWithBothMethods(
+            [](auto) {},
+            [&](auto&, auto stub, auto streamFactory, auto&) {
+                ::grpc::ClientContext ctx;
+                initContext(ctx);
+                auto stream = streamFactory(ctx, stub);
+                ASSERT_EQ(stream->Finish().error_code(), expectedStatusCode);
+
+                // The server should always respond with the cluster's max wire version, regardless
+                // of whether metadata validation failed. The one exception is for authentication
+                // failures.
+                auto serverMetadata = ctx.GetServerInitialMetadata();
+                auto it = serverMetadata.find(CommandService::kClusterMaxWireVersionKey);
+                ASSERT_NE(it, serverMetadata.end());
+                ASSERT_EQ(it->second,
+                          std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
+            });
+    }
+
+    /**
+     * Verifies the number and the severity of logs, concerning client-metadata, that are emitted in
+     * response to accepting gRPC streams on the server side.
+     */
+    void runMetadataLogTest(ContextInitializerType initContext,
                             size_t nStreamsToCreate,
                             size_t nExpectedLogLines,
                             logv2::LogSeverity expectedSeverity) {
-        unittest::MinimumLoggedSeverityGuard severityGuard{
-            logv2::LogComponent::kNetwork,
-            logv2::LogSeverity::Debug(logv2::LogSeverity::kMaxDebugLevel)};
+        stdx::unordered_set<int> clientMetadataLogIds = {7401301, 7401302, 7401303};
+        runTestWithBothMethods(
+            [](auto) {},
+            [&](auto&, auto stub, auto streamFactory, auto&) {
+                // Temporarily maximize verbosity for networking logs.
+                unittest::MinimumLoggedSeverityGuard severityGuard{
+                    logv2::LogComponent::kNetwork,
+                    logv2::LogSeverity::Debug(logv2::LogSeverity::kMaxDebugLevel)};
 
-        stdx::unordered_set<int> kLogMessageIds = {7401301, 7401302, 7401303};
+                startCapturingLogMessages();
+                for (size_t i = 0; i < nStreamsToCreate; i++) {
+                    ::grpc::ClientContext ctx;
+                    initContext(ctx);
+                    auto stream = streamFactory(ctx, stub);
+                    ASSERT_EQ(stream->Finish().error_code(), ::grpc::OK);
+                }
+                stopCapturingLogMessages();
 
-        auto serverHandler = [](IngressSession& session) {
-            return ::grpc::Status::OK;
+                auto logLines = getCapturedBSONFormatLogMessages();
+                auto observed =
+                    std::count_if(logLines.cbegin(), logLines.cend(), [&](const BSONObj& line) {
+                        return line.getStringField(logv2::constants::kSeverityFieldName) ==
+                            expectedSeverity.toStringDataCompact() &&
+                            clientMetadataLogIds.contains(
+                                line.getIntField(logv2::constants::kIdFieldName));
+                    });
+
+                ASSERT_EQ(observed, nExpectedLogLines);
+            });
+    }
+
+    using TerminationCallbackType = std::function<void(IngressSession&)>;
+
+    /**
+     * Creates a stream against each command stream method, and then uses the provided callback to
+     * terminate the stream. The goal is to verify the termination status (and potentially the
+     * reason) that is visible to the client-side of the stream.
+     */
+    void runTerminationTest(TerminationCallbackType terminationCallback,
+                            ::grpc::StatusCode expectedStatus,
+                            boost::optional<std::string> expectedReason = boost::none) {
+        const size_t kMessageCount = 5;
+        std::unique_ptr<Notification<void>> terminated;
+
+        CommandService::RPCHandler serverHandler = [&](auto session) {
+            for (size_t i = 0; i < kMessageCount; i++) {
+                ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
+            }
+            terminationCallback(*session);
+            terminated->set();
+            ASSERT_NOT_OK(session->sinkMessage(makeUniqueMessage()));
         };
 
-        runTestWithBothMethods(serverHandler, [&](auto&, auto& monitor, auto methodCallback) {
-            startCapturingLogMessages();
-            for (size_t i = 0; i < nStreamsToCreate; i++) {
-                ::grpc::ClientContext ctx;
-                makeCtx(ctx);
-                auto stream = methodCallback(ctx);
-                ASSERT_TRUE(stream->Finish().ok());
+        runTestWithBothMethods(serverHandler, [&](auto&, auto stub, auto streamFactory, auto&) {
+            // Initialize the termination notification for this run.
+            terminated = std::make_unique<Notification<void>>();
+
+            ::grpc::ClientContext ctx;
+            CommandServiceTestFixtures::addAllClientMetadata(ctx);
+            auto stream = streamFactory(ctx, stub);
+
+            terminated->get();
+
+            // We should be able to read messages sent before the RPC was cancelled.
+            for (size_t i = 0; i < kMessageCount; i++) {
+                SharedBuffer buffer;
+                ASSERT_TRUE(stream->Read(&buffer));
             }
-            stopCapturingLogMessages();
 
-            auto logLines = getCapturedBSONFormatLogMessages();
-            auto n = std::count_if(logLines.cbegin(), logLines.cend(), [&](const BSONObj& line) {
-                return line.getStringField(logv2::constants::kSeverityFieldName) ==
-                    expectedSeverity.toStringDataCompact() &&
-                    kLogMessageIds.contains(line.getIntField(logv2::constants::kIdFieldName));
-            });
+            SharedBuffer buffer;
+            ASSERT_FALSE(stream->Read(&buffer));
 
-            ASSERT_EQ(n, nExpectedLogLines);
+            auto status = stream->Finish();
+            ASSERT_EQ(status.error_code(), expectedStatus);
+            if (expectedReason) {
+                ASSERT_EQ(status.error_message(), *expectedReason);
+            }
         });
     }
 
+    WireVersionProvider& wireVersionProvider() const {
+        return *_wvProvider;
+    }
+
 private:
-    std::shared_ptr<WireVersionProvider> _wvProvider;
+    std::shared_ptr<WireVersionProvider> _wvProvider = std::make_shared<WireVersionProvider>();
 };
 
 TEST_F(CommandServiceTest, Echo) {
-    auto echoHandler = [](IngressSession& session) {
+    CommandService::RPCHandler echoHandler = [](auto session) {
         while (true) {
-            auto swMsg = session.sourceMessage();
-            if (!swMsg.isOK()) {
-                ASSERT_EQ(swMsg.getStatus(), ErrorCodes::StreamTerminated);
-                return ::grpc::Status::OK;
+            try {
+                auto msg = uassertStatusOK(session->sourceMessage());
+                ASSERT_OK(session->sinkMessage(std::move(msg)));
+            } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
+                // Continues to serve the echo commands until the stream is terminated.
+                return;
             }
-            ASSERT_OK(session.sinkMessage(swMsg.getValue()));
         }
-        return ::grpc::Status::OK;
     };
 
-    runTestWithBothMethods(echoHandler, [&](auto&, auto& monitor, auto methodCallback) {
-        auto maxWireVersion =
-            std::to_string(WireSpec::instance().get()->incomingExternalClient.maxWireVersion);
+    runTestWithBothMethods(echoHandler, [&](auto&, auto stub, auto streamFactory, auto&) {
         ::grpc::ClientContext ctx;
         CommandServiceTestFixtures::addAllClientMetadata(ctx);
-        auto stream = methodCallback(ctx);
 
-        auto message = makeUniqueMessage();
-        ASSERT_TRUE(stream->Write(message.sharedBuffer()));
-        SharedBuffer readMsg;
-        ASSERT_TRUE(stream->Read(&readMsg)) << stream->Finish().error_message();
-        ASSERT_EQ_MSG(Message{readMsg}, message);
+        auto stream = streamFactory(ctx, stub);
+        auto toWrite = makeUniqueMessage();
+        ASSERT_TRUE(stream->Write(toWrite.sharedBuffer()));
+        SharedBuffer toRead;
+        ASSERT_TRUE(stream->Read(&toRead)) << stream->Finish().error_message();
+        ASSERT_EQ_MSG(Message{toRead}, toWrite);
     });
 }
 
-TEST_F(CommandServiceTest, SessionTerminate) {
-    const int kMessageCount = 5;
-    auto termination = std::make_unique<Notification<void>>();
+TEST_F(CommandServiceTest, CancelSession) {
+    runTerminationTest([](auto& session) { session.cancel("some reason"); }, ::grpc::CANCELLED);
+}
 
-    auto handler = [&termination](IngressSession& session) {
-        for (int i = 0; i < kMessageCount; i++) {
-            auto status = session.sinkMessage(makeUniqueMessage());
-            ASSERT_OK(status);
-        }
-        session.terminate(Status(ErrorCodes::StreamTerminated, "dummy error"));
-        termination->set();
-        ASSERT_NOT_OK(session.sinkMessage(makeUniqueMessage()));
-        return ::grpc::Status::CANCELLED;
+TEST_F(CommandServiceTest, TerminateSessionWithShutdownError) {
+    Status shutdownError(ErrorCodes::ShutdownInProgress, "shutdown error");
+    runTerminationTest([&](auto& session) { session.terminate(shutdownError); },
+                       util::errorToStatusCode(shutdownError.code()),
+                       shutdownError.reason());
+}
+
+TEST_F(CommandServiceTest, TerminateSessionWithCancellationError) {
+    Status cancellationError(ErrorCodes::CallbackCanceled, "cancelled");
+    runTerminationTest([&](auto& session) { session.terminate(cancellationError); },
+                       util::errorToStatusCode(cancellationError.code()),
+                       cancellationError.reason());
+}
+
+TEST_F(CommandServiceTest, EndSession) {
+    runTerminationTest([](auto& session) { session.end(); }, ::grpc::OK);
+}
+
+TEST_F(CommandServiceTest, TooLowWireVersionIsRejected) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(), "-1");
+        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
     };
+    runMetadataValidationTest(::grpc::StatusCode::FAILED_PRECONDITION, initContext);
+}
 
-    runTestWithBothMethods(handler, [&](auto&, auto& monitor, auto methodCallback) {
-        ::grpc::ClientContext ctx;
-        CommandServiceTestFixtures::addAllClientMetadata(ctx);
-        auto stream = methodCallback(ctx);
+TEST_F(CommandServiceTest, InvalidWireVersionIsRejected) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(), "foo");
+        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+    };
+    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, initContext);
+}
 
-        // Messages sent before the RPC was cancelled should be able to be read.
-        termination->get();
-        ON_BLOCK_EXIT([&] {
-            // Reset the termination notification for the next test run.
-            termination = std::make_unique<Notification<void>>();
-        });
-        for (int i = 0; i < kMessageCount; i++) {
-            SharedBuffer b;
-            ASSERT_TRUE(stream->Read(&b));
-        }
+TEST_F(CommandServiceTest, InvalidClientIdIsRejected) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientIdKey.toString(), "not a valid UUID");
+    };
+    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, initContext);
+}
 
-        SharedBuffer b;
-        ASSERT_FALSE(stream->Read(&b));
-        ASSERT_EQ(stream->Finish().error_code(), ::grpc::StatusCode::CANCELLED);
-    });
+TEST_F(CommandServiceTest, MissingWireVersionIsRejected) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
+    };
+    runMetadataValidationTest(::grpc::StatusCode::FAILED_PRECONDITION, initContext);
+}
+
+TEST_F(CommandServiceTest, ClientMetadataDocumentIsOptional) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientIdKey.toString(), UUID::gen().toString());
+    };
+    runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
+}
+
+TEST_F(CommandServiceTest, ClientIdIsOptional) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+    };
+    runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
+}
+
+TEST_F(CommandServiceTest, InvalidMetadataDocumentBase64Encoding) {
+    // The MongoDB gRPC Protocol doesn't specify how an invalid metadata document should be handled,
+    // and since invalid metadata doesn't affect the server's ability to execute the operation, it
+    // was decided the server should just continue with the command and log a warning rather than
+    // returning an error in such cases.
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(), "notvalidbase64:l;;?");
+    };
+    runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
+}
+
+TEST_F(CommandServiceTest, InvalidMetadataDocumentBSON) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(), base64::encode("Not BSON"));
+    };
+    runMetadataValidationTest(::grpc::StatusCode::OK, initContext);
+}
+
+TEST_F(CommandServiceTest, UnrecognizedReservedKey) {
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata("mongodb-not-recognized", "some value");
+    };
+    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, initContext);
 }
 
 TEST_F(CommandServiceTest, NewClientsAreLogged) {
-    runMetadataLogTest(
-        [clientId = UUID::gen().toString()](::grpc::ClientContext& ctx) {
-            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-            CommandServiceTestFixtures::addClientMetadataDocument(ctx);
-            ctx.AddMetadata(CommandService::kClientIdKey.toString(), clientId);
-        },
-        /* nStreamsToCreate */ 3,
-        /* nExpectedLogLines */ 1,
-        logv2::LogSeverity::Info());
+    ContextInitializerType initContext = [clientId = UUID::gen().toString()](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+        ctx.AddMetadata(CommandService::kClientIdKey.toString(), clientId);
+    };
+    runMetadataLogTest(initContext,
+                       5,  // nStreamsToCreate
+                       1,  // nExpectedLogLines
+                       logv2::LogSeverity::Info());
 }
 
 TEST_F(CommandServiceTest, OmittedClientIdIsLogged) {
-    runMetadataLogTest(
-        [](::grpc::ClientContext& ctx) {
-            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-            CommandServiceTestFixtures::addClientMetadataDocument(ctx);
-        },
-        /* nStreamsToCreate */ 3,
-        /* nExpectedLogLines */ 3,
-        logv2::LogSeverity::Debug(2));
+    ContextInitializerType initContext = [](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+    };
+    runMetadataLogTest(initContext,
+                       3,  // nStreamsToCreate
+                       3,  // nExpectedLogLines
+                       logv2::LogSeverity::Debug(2));
 }
 
-TEST_F(CommandServiceTest, NoMetadataDocumentNoLogs) {
-    runMetadataLogTest(
-        [clientId = UUID::gen().toString()](::grpc::ClientContext& ctx) {
-            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-            ctx.AddMetadata(CommandService::kClientIdKey.toString(), clientId);
-        },
-        /* nStreamsToCreate */ 3,
-        /* nExpectedLogLines */ 0,
-        logv2::LogSeverity::Info());
+TEST_F(CommandServiceTest, NoLogsForMissingMetadataDocument) {
+    ContextInitializerType initContext = [clientId = UUID::gen().toString()](auto& ctx) {
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        ctx.AddMetadata(CommandService::kClientIdKey.toString(), clientId);
+    };
+    runMetadataLogTest(initContext,
+                       7,  // nStreamsToCreate
+                       0,  // nExpectedLogLines
+                       logv2::LogSeverity::Info());
 }
 
 TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
-    auto serverHandler = [](IngressSession& session) {
-        int32_t nReceived = 0;
-        while (true) {
-            auto swMsg = session.sourceMessage();
-            if (!swMsg.isOK()) {
-                ASSERT_EQ(swMsg.getStatus(), ErrorCodes::StreamTerminated);
-                break;
+    CommandService::RPCHandler serverHandler = [](auto session) {
+        int nReceived = 0;
+        try {
+            while (true) {
+                uassertStatusOK(session->sourceMessage());
+                nReceived++;
             }
-            nReceived++;
+        } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
+            // Continue to receive client messages until the stream is terminated.
         }
 
         OpMsg response;
         response.body = BSON("nReceived" << nReceived);
-        ASSERT_OK(session.sinkMessage(response.serialize()));
-        return ::grpc::Status::OK;
+        ASSERT_OK(session->sinkMessage(response.serialize()));
     };
 
-    runTestWithBothMethods(serverHandler, [&](auto&, auto& monitor, auto methodCallback) {
+    ClientCallbackType clientCallback = [&](auto&, auto stub, auto streamFactory, auto&) {
         ::grpc::ClientContext ctx;
         CommandServiceTestFixtures::addAllClientMetadata(ctx);
-        auto stream = methodCallback(ctx);
+        auto stream = streamFactory(ctx, stub);
 
-        size_t nSent = 12;
-        auto msg = makeUniqueMessage();
-        for (size_t i = 0; i < nSent; i++) {
+        const int kMessages = 13;
+        for (auto i = 0; i < kMessages; i++) {
+            auto msg = makeUniqueMessage();
             ASSERT_TRUE(stream->Write(msg.sharedBuffer()));
         }
         ASSERT_TRUE(stream->WritesDone());
@@ -301,41 +417,39 @@ TEST_F(CommandServiceTest, ClientSendsMultipleMessages) {
 
         auto responseMsg = OpMsg::parse(Message{serverResponse});
         int32_t nReceived = responseMsg.body.getIntField("nReceived");
-        ASSERT_EQ(nReceived, nSent);
-    });
+        ASSERT_EQ(nReceived, kMessages);
+    };
+
+    runTestWithBothMethods(serverHandler, clientCallback);
 }
 
 TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
-    auto serverHandler = [&](IngressSession& session) {
-        int32_t nSent = 13;
-        for (int32_t i = 0; i < nSent - 1; i++) {
+    CommandService::RPCHandler serverHandler = [](auto session) {
+        const int kMessages = 17;
+        for (auto i = 0; i < kMessages - 1; i++) {
             auto msg = makeUniqueMessage();
             OpMsg::setFlag(&msg, OpMsg::kMoreToCome);
-            ASSERT_OK(session.sinkMessage(msg));
+            ASSERT_OK(session->sinkMessage(msg));
         }
-        ASSERT_OK(session.sinkMessage(makeUniqueMessage()));
+        ASSERT_OK(session->sinkMessage(makeUniqueMessage()));
 
-        auto swResponse = session.sourceMessage();
-        ASSERT_OK(swResponse.getStatus());
-
-        auto responseMsg = OpMsg::parse(swResponse.getValue());
-        int32_t nReceived = responseMsg.body.getIntField("nReceived");
-        ASSERT_EQ(nReceived, nSent);
-        return ::grpc::Status::OK;
+        auto response = OpMsg::parse(uassertStatusOK(session->sourceMessage()));
+        int32_t nReceived = response.body.getIntField("nReceived");
+        ASSERT_EQ(nReceived, kMessages);
     };
 
-    runTestWithBothMethods(serverHandler, [&](auto&, auto&, auto methodCallback) {
+    ClientCallbackType clientCallback = [](auto&, auto stub, auto streamFactory, auto&) {
         ::grpc::ClientContext ctx;
         CommandServiceTestFixtures::addAllClientMetadata(ctx);
-        auto stream = methodCallback(ctx);
+        auto stream = streamFactory(ctx, stub);
 
-        int32_t nReceived = 0;
+        int nReceived = 0;
         while (true) {
-            SharedBuffer buf;
-            ASSERT_TRUE(stream->Read(&buf));
+            SharedBuffer buffer;
+            ASSERT_TRUE(stream->Read(&buffer));
             nReceived++;
 
-            if (!OpMsg::isFlagSet(Message{buf}, OpMsg::kMoreToCome)) {
+            if (!OpMsg::isFlagSet(Message{buffer}, OpMsg::kMoreToCome)) {
                 break;
             }
         }
@@ -343,284 +457,201 @@ TEST_F(CommandServiceTest, ServerSendsMultipleMessages) {
         OpMsg response;
         response.body = BSON("nReceived" << nReceived);
         ASSERT_TRUE(stream->Write(response.serialize().sharedBuffer()));
-    });
-}
-
-TEST_F(CommandServiceTest, TooLowWireVersionIsRejected) {
-    runMetadataValidationTest(
-        ::grpc::StatusCode::FAILED_PRECONDITION, [](::grpc::ClientContext& ctx) {
-            ctx.AddMetadata(CommandService::kWireVersionKey.toString(), "-1");
-            ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
-        });
-}
-
-TEST_F(CommandServiceTest, InvalidWireVersionIsRejected) {
-    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, [](::grpc::ClientContext& ctx) {
-        ctx.AddMetadata(CommandService::kWireVersionKey.toString(), "foo");
-        ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
-    });
-}
-
-TEST_F(CommandServiceTest, InvalidClientIdIsRejected) {
-    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, [](::grpc::ClientContext& ctx) {
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(CommandService::kClientIdKey.toString(), "not a valid UUID");
-    });
-}
-
-TEST_F(CommandServiceTest, MissingWireVersionIsRejected) {
-    runMetadataValidationTest(
-        ::grpc::StatusCode::FAILED_PRECONDITION, [](::grpc::ClientContext& ctx) {
-            ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
-        });
-}
-
-TEST_F(CommandServiceTest, ClientMetadataDocumentIsOptional) {
-    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(CommandService::kClientIdKey.toString(), UUID::gen().toString());
-    });
-}
-
-TEST_F(CommandServiceTest, ClientIdIsOptional) {
-    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        CommandServiceTestFixtures::addClientMetadataDocument(ctx);
-    });
-}
-
-TEST_F(CommandServiceTest, InvalidMetadataDocumentBase64Encoding) {
-    // The MongoDB gRPC Protocol doesn't specify how an invalid metadata document should be handled,
-    // and since invalid metadata doesn't affect the server's ability to execute the operation, it
-    // was decided the server should just continue with the command and log a warning rather than
-    // returning an error in such cases.
-    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(), "notvalidbase64:l;;?");
-    });
-}
-
-TEST_F(CommandServiceTest, InvalidMetadataDocumentBSON) {
-    runMetadataValidationTest(::grpc::StatusCode::OK, [](::grpc::ClientContext& ctx) {
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata(CommandService::kClientMetadataKey.toString(),
-                        base64::encode("not valid BSON"));
-    });
-}
-
-TEST_F(CommandServiceTest, UnrecognizedReservedKey) {
-    runMetadataValidationTest(::grpc::StatusCode::INVALID_ARGUMENT, [](::grpc::ClientContext& ctx) {
-        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-        ctx.AddMetadata("mongodb-not-recognized", "some value");
-    });
-}
-
-TEST_F(CommandServiceTest, MissingAuthTokenIsRejected) {
-    auto serverHandler = [](IngressSession&) {
-        return ::grpc::Status::OK;
     };
 
-    CommandServiceTestFixtures::runWithServer(serverHandler, [&](auto&, auto&) {
-        auto stub = CommandServiceTestFixtures::makeStub();
-
-        ::grpc::ClientContext ctx;
-        ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
-                        std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
-
-        auto stream = stub.authenticatedCommandStream(&ctx);
-        ASSERT_EQ(stream->Finish().error_code(), ::grpc::StatusCode::UNAUTHENTICATED);
-    });
+    runTestWithBothMethods(serverHandler, clientCallback);
 }
 
-TEST_F(CommandServiceTest, MissingAuthTokenIsAccepted) {
-    auto serverHandler = [](IngressSession&) {
-        return ::grpc::Status::OK;
+TEST_F(CommandServiceTest, MissingAuthToken) {
+    auto makeStreamWithoutAuthToken = [&](bool useAuth) {
+        ::grpc::ClientContext ctx;
+        auto stub = CommandServiceTestFixtures::makeStub();
+        ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
+                        std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
+        auto stream = useAuth ? stub.authenticatedCommandStream(&ctx)
+                              : stub.unauthenticatedCommandStream(&ctx);
+        return stream->Finish();
     };
 
-    CommandServiceTestFixtures::runWithServer(serverHandler, [&](auto&, auto&) {
-        auto stub = CommandServiceTestFixtures::makeStub();
+    CommandServiceTestFixtures::runWithServer(
+        [](auto) {},
+        [&](auto&, auto&) {
+            ASSERT_TRUE(makeStreamWithoutAuthToken(false /* Don't use Auth */).ok());
+        });
 
-        ::grpc::ClientContext ctx;
-        ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
-                        std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
-
-        auto stream = stub.unauthenticatedCommandStream(&ctx);
-        ASSERT_TRUE(stream->Finish().ok());
-    });
+    CommandServiceTestFixtures::runWithServer(
+        [](auto) {},
+        [&](auto&, auto&) {
+            ASSERT_EQ(makeStreamWithoutAuthToken(true /* Use Auth */).error_code(),
+                      ::grpc::StatusCode::UNAUTHENTICATED);
+        });
 }
 
 TEST_F(CommandServiceTest, ServerProvidesClusterMaxWireVersion) {
-    auto serverHandler = [](IngressSession& session) {
-        auto swMessage = session.sourceMessage();
-        ASSERT_OK(swMessage.getStatus());
-        ASSERT_OK(session.sinkMessage(swMessage.getValue()));
-        return ::grpc::Status::OK;
+    auto serverHandler = [](auto session) {
+        auto message = uassertStatusOK(session->sourceMessage());
+        ASSERT_OK(session->sinkMessage(message));
     };
 
-    runTestWithBothMethods(serverHandler, [&](auto&, auto&, MethodCallback methodCallback) {
+    ClientCallbackType clientCallback = [&](auto&, auto stub, auto streamFactory, auto&) {
         ::grpc::ClientContext ctx;
         ctx.AddMetadata(CommandService::kAuthenticationTokenKey.toString(), "my-token");
         ctx.AddMetadata(CommandService::kWireVersionKey.toString(),
                         std::to_string(WireVersion::WIRE_VERSION_50));
 
-        auto stream = methodCallback(ctx);
+        auto stream = streamFactory(ctx, stub);
         ASSERT_TRUE(stream->Write(makeUniqueMessage().sharedBuffer()));
-        SharedBuffer m;
-        ASSERT_TRUE(stream->Read(&m));
+
+        SharedBuffer buffer;
+        ASSERT_TRUE(stream->Read(&buffer));
 
         auto serverMetadata = ctx.GetServerInitialMetadata();
         auto it = serverMetadata.find(CommandService::kClusterMaxWireVersionKey);
         ASSERT_NE(it, serverMetadata.end());
-        ASSERT_EQ(it->second, std::to_string(getWireVersionProvider().getClusterMaxWireVersion()));
-    });
+        ASSERT_EQ(it->second, std::to_string(wireVersionProvider().getClusterMaxWireVersion()));
+    };
+
+    runTestWithBothMethods(serverHandler, clientCallback);
 }
 
 TEST_F(CommandServiceTest, ServerHandlesMultipleClients) {
-    auto serverHandler = [](IngressSession& session) {
+    CommandService::RPCHandler serverHandler = [](auto session) {
         while (true) {
-            auto swMsg = session.sourceMessage();
-            if (!swMsg.isOK()) {
-                ASSERT_EQ(swMsg.getStatus(), ErrorCodes::StreamTerminated);
-                break;
+            try {
+                auto msg = uassertStatusOK(session->sourceMessage());
+                auto response = OpMsg::parseOwned(msg);
+                response.body = response.body.addFields(
+                    BSON(CommandService::kClientIdKey << session->clientId()->toString()));
+                ASSERT_OK(session->sinkMessage(response.serialize()));
+            } catch (ExceptionFor<ErrorCodes::StreamTerminated>&) {
+                // Continues to serve the echo commands until the stream is terminated.
+                return;
             }
-
-            auto clientId = session.clientId();
-            ASSERT_TRUE(clientId);
-            auto response = OpMsg::parseOwned(swMsg.getValue());
-            response.body =
-                response.body.addFields(BSON(CommandService::kClientIdKey << clientId->toString()));
-            ASSERT_OK(session.sinkMessage(response.serialize()));
         }
-        return ::grpc::Status::OK;
     };
 
-    runTestWithBothMethods(
-        serverHandler,
-        [&](auto&, unittest::ThreadAssertionMonitor& monitor, MethodCallback methodCallback) {
-            std::vector<stdx::thread> threads;
-            for (int32_t i = 0; i < 10; i++) {
-                auto clientId = UUID::gen().toString();
-                threads.push_back(monitor.spawn([&methodCallback, clientId, i] {
-                    ::grpc::ClientContext ctx;
-                    CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-                    ctx.AddMetadata(std::string{CommandService::kClientIdKey}, clientId);
-                    CommandServiceTestFixtures::addClientMetadataDocument(ctx);
+    ClientCallbackType clientCallback = [](auto&, auto stub, auto streamFactory, auto& monitor) {
+        const auto kNumClients = 10;
+        std::vector<stdx::thread> threads;
+        for (auto i = 0; i < kNumClients; i++) {
+            threads.push_back(monitor.spawn([&, i] {
+                const auto clientId = UUID::gen().toString();
 
-                    auto stream = methodCallback(ctx);
+                ::grpc::ClientContext ctx;
+                CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+                ctx.AddMetadata(std::string{CommandService::kClientIdKey}, clientId);
+                CommandServiceTestFixtures::addClientMetadataDocument(ctx);
 
-                    OpMsg msg;
-                    msg.body = BSON("thread" << i);
-                    ASSERT_TRUE(stream->Write(msg.serialize().sharedBuffer()));
+                auto stream = streamFactory(ctx, stub);
 
-                    SharedBuffer receivedMsg;
-                    ASSERT_TRUE(stream->Read(&receivedMsg));
+                OpMsg msg;
+                msg.body = BSON("thread" << i);
+                ASSERT_TRUE(stream->Write(msg.serialize().sharedBuffer()));
 
-                    auto response = OpMsg::parse(Message{receivedMsg});
-                    ASSERT_EQ(response.body.getIntField("thread"), i);
-                    ASSERT_EQ(response.body.getStringField(CommandService::kClientIdKey), clientId);
-                }));
-            }
+                SharedBuffer receivedMsg;
+                ASSERT_TRUE(stream->Read(&receivedMsg));
 
-            for (auto& t : threads) {
-                t.join();
-            }
-        });
+                auto response = OpMsg::parse(Message{receivedMsg});
+                ASSERT_EQ(response.body.getIntField("thread"), i);
+                ASSERT_EQ(response.body.getStringField(CommandService::kClientIdKey), clientId);
+            }));
+        }
+
+        for (auto& t : threads) {
+            t.join();
+        }
+    };
+
+    runTestWithBothMethods(serverHandler, clientCallback);
 }
 
-TEST_F(CommandServiceTest, HandleException) {
-    auto serverHandler = [](IngressSession&) -> ::grpc::Status {
+TEST_F(CommandServiceTest, ServerHandlerThrows) {
+    CommandService::RPCHandler serverHandler = [](auto) {
         iasserted(Status{ErrorCodes::StreamTerminated, "test error"});
     };
 
-    auto clientThread =
-        [&](Server&, unittest::ThreadAssertionMonitor& monitor, MethodCallback methodCallback) {
-            ::grpc::ClientContext ctx;
-            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-            auto stream = methodCallback(ctx);
-            ASSERT_NE(stream->Finish().error_code(), ::grpc::StatusCode::OK);
-        };
+    ClientCallbackType clientCallback = [](auto&, auto stub, auto streamFactory, auto&) {
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        auto stream = streamFactory(ctx, stub);
+        ASSERT_NE(stream->Finish().error_code(), ::grpc::StatusCode::OK);
+    };
 
-    runTestWithBothMethods(serverHandler, clientThread);
+    runTestWithBothMethods(serverHandler, clientCallback);
 }
 
 TEST_F(CommandServiceTest, Shutdown) {
-    Notification<void> rpcStarted;
+    std::unique_ptr<Notification<void>> rpcStarted;
+    std::unique_ptr<Notification<Status>> rpcTerminated;
 
-    auto serverHandler = [&rpcStarted](IngressSession& session) {
-        rpcStarted.set();
-        ASSERT_NOT_OK(session.sourceMessage());
+    ClientCallbackType clientCallback = [&](auto& server, auto stub, auto streamFactory, auto&) {
+        // Initialize the notifications for this run.
+        rpcStarted = std::make_unique<Notification<void>>();
+        rpcTerminated = std::make_unique<Notification<Status>>();
 
-        auto ts = session.terminationStatus();
-        ASSERT_TRUE(ts);
-        ASSERT_EQ(ts->code(), ErrorCodes::ShutdownInProgress);
+        ::grpc::ClientContext ctx;
+        CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
+        auto stream = streamFactory(ctx, stub);
 
-        // This RPC is cancelled via shutdown, so the client will get an UNAVAILABLE or CANCELLED
-        // status before this OK return can happen.
-        return ::grpc::Status::OK;
-    };
-
-    auto clientThread = [&](Server& server,
-                            unittest::ThreadAssertionMonitor& monitor,
-                            MethodCallback methodCallback) {
-        auto client = monitor.spawn([&methodCallback]() {
-            ::grpc::ClientContext ctx;
-            CommandServiceTestFixtures::addRequiredClientMetadata(ctx);
-            auto stream = methodCallback(ctx);
-            SharedBuffer buf;
-            ASSERT_FALSE(stream->Read(&buf));
-            ASSERT_NE(stream->Finish().error_code(), ::grpc::StatusCode::OK);
-        });
-
-        rpcStarted.get();
+        rpcStarted->get();
         server.shutdown();
-        client.join();
+        auto serverTerminationStatus = rpcTerminated->get();
+
+        SharedBuffer buffer;
+        ASSERT_FALSE(stream->Read(&buffer));
+        ASSERT_EQ(stream->Finish().error_code(),
+                  util::errorToStatusCode(serverTerminationStatus.code()));
     };
 
-    runTestWithBothMethods(serverHandler, clientThread);
+    CommandService::RPCHandler serverHandler = [&](auto session) {
+        rpcStarted->set();
+        ASSERT_NOT_OK(session->sourceMessage());
+
+        auto ts = session->terminationStatus();
+        ASSERT_TRUE(ts);
+        ASSERT_NOT_OK(*ts);
+        rpcTerminated->set(*ts);
+    };
+
+    runTestWithBothMethods(serverHandler, clientCallback);
 }
 
-class GRPCInteropTest : public unittest::Test {};
-
-TEST_F(GRPCInteropTest, SharedBufferDeserialize) {
-    std::string_view expected{"foobar"};
-
-    auto deserializationTest = [&](std::vector<::grpc::Slice> slices) {
-        ::grpc::ByteBuffer buffer(&slices[0], slices.size());
-
+TEST(GRPCInteropTest, SharedBufferDeserialize) {
+    auto deserializationTest = [](std::vector<::grpc::Slice> slices, std::string_view expected) {
         SharedBuffer out;
+        ::grpc::ByteBuffer buffer(&slices[0], slices.size());
         auto status = ::grpc::SerializationTraits<SharedBuffer>::Deserialize(&buffer, &out);
-        ASSERT_TRUE(status.ok()) << "expected deserialization to succed but got error: "
+        ASSERT_TRUE(status.ok()) << "expected deserialization to succeed: "
                                  << status.error_message();
         ASSERT_EQ((std::string_view{out.get(), expected.length()}), expected);
     };
 
-    deserializationTest({std::string{"foo"}, std::string{"bar"}});
-    deserializationTest({std::string{"foobar"}});
+    std::string_view expected{"foobar"};
+    deserializationTest({std::string{"foobar"}}, expected);
+    deserializationTest({std::string{"foo"}, std::string{"bar"}}, expected);
 }
 
-TEST_F(GRPCInteropTest, SerializationRoundTrip) {
-    ::grpc::ByteBuffer grpcBuf;
+TEST(GRPCInteropTest, SerializationRoundTrip) {
+    ::grpc::ByteBuffer grpcBuffer;
     auto message = makeUniqueMessage();
 
     {
-        bool own_buf;
-        auto newBuf = SharedBuffer::allocate(message.capacity());
-        std::memcpy(newBuf.get(), message.buf(), newBuf.capacity());
-        auto status =
-            ::grpc::SerializationTraits<ConstSharedBuffer>::Serialize(newBuf, &grpcBuf, &own_buf);
+        auto buffer = SharedBuffer::allocate(message.capacity());
+        std::memcpy(buffer.get(), message.buf(), buffer.capacity());
+        bool ownsBuffer;
+        auto status = ::grpc::SerializationTraits<ConstSharedBuffer>::Serialize(
+            buffer, &grpcBuffer, &ownsBuffer);
         ASSERT_TRUE(status.ok()) << "expected serialization to succeed: " << status.error_message();
     }
 
-    // Even though the source buffer is out of scope, the serialized gRPC ByteBuffer should
-    // still be valid.
-    SharedBuffer outputBuffer;
-    auto status = ::grpc::SerializationTraits<SharedBuffer>::Deserialize(&grpcBuf, &outputBuffer);
+    // The source buffer is out of scope, but the serialized gRPC ByteBuffer should still be valid.
+    SharedBuffer buffer;
+    auto status = ::grpc::SerializationTraits<SharedBuffer>::Deserialize(&grpcBuffer, &buffer);
     ASSERT_TRUE(status.ok()) << "expected deserialization to succeed: " << status.error_message();
-
-    ASSERT_EQ_MSG(Message{outputBuffer}, message);
+    ASSERT_EQ_MSG(Message{buffer}, message);
 }
 
-TEST_F(GRPCInteropTest, URIParsing) {
+TEST(GRPCInteropTest, URIParsing) {
     {
         HostAndPort hp = GRPCServerContext::parseURI("ipv4:127.0.0.1");
         ASSERT_TRUE(hp.isLocalHost());
@@ -646,4 +677,5 @@ TEST_F(GRPCInteropTest, URIParsing) {
     }
 }
 
+}  // namespace
 }  // namespace mongo::transport::grpc

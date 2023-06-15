@@ -72,11 +72,11 @@ public:
     }
 
     MockServerStream& getServerStream() {
-        return *_fixtures->serverStream;
+        return *_fixtures->rpc->serverStream;
     }
 
     MockServerContext& getServerContext() {
-        return *_fixtures->serverCtx;
+        return *_fixtures->rpc->serverCtx;
     }
 
     ClientStream& getClientStream() {

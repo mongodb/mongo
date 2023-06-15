@@ -74,8 +74,7 @@ inline Message makeUniqueMessage() {
 struct MockStreamTestFixtures {
     std::shared_ptr<MockClientStream> clientStream;
     std::shared_ptr<MockClientContext> clientCtx;
-    std::shared_ptr<MockServerStream> serverStream;
-    std::shared_ptr<MockServerContext> serverCtx;
+    std::unique_ptr<MockRPC> rpc;
 };
 
 class MockStubTestFixtures {
@@ -97,8 +96,7 @@ public:
 
     std::unique_ptr<MockStreamTestFixtures> makeStreamTestFixtures(
         Date_t deadline, const MetadataView& clientMetadata) {
-        MockStreamTestFixtures fixtures{
-            nullptr, std::make_shared<MockClientContext>(), nullptr, nullptr};
+        MockStreamTestFixtures fixtures{nullptr, std::make_shared<MockClientContext>(), nullptr};
 
         auto clientThread = stdx::thread([&] {
             fixtures.clientCtx->setDeadline(deadline);
@@ -111,8 +109,7 @@ public:
 
         auto rpc = getServer().acceptRPC();
         ASSERT_TRUE(rpc);
-        fixtures.serverCtx = std::move(rpc->serverCtx);
-        fixtures.serverStream = std::move(rpc->serverStream);
+        fixtures.rpc = std::make_unique<MockRPC>(std::move(*rpc));
         clientThread.join();
 
         return std::make_unique<MockStreamTestFixtures>(std::move(fixtures));
@@ -215,7 +212,7 @@ public:
         return options;
     }
 
-    static Server makeServer(CommandService::RpcHandler handler, Server::Options options) {
+    static Server makeServer(CommandService::RPCHandler handler, Server::Options options) {
         std::vector<std::unique_ptr<Service>> services;
         services.push_back(std::make_unique<CommandService>(
             /* GRPCTransportLayer */ nullptr,
@@ -229,15 +226,18 @@ public:
      * Starts up a gRPC server with a CommandService registered that uses the provided handler for
      * both RPC methods. Executes the clientThreadBody in a separate thread and then waits for it to
      * exit before shutting down the server.
+     *
+     * The IngressSession passed to the provided RPC handler is automatically ended after the
+     * handler is returned.
      */
     static void runWithServer(
-        std::function<::grpc::Status(IngressSession&)> callback,
+        CommandService::RPCHandler callback,
         std::function<void(Server&, unittest::ThreadAssertionMonitor&)> clientThreadBody,
         Server::Options options = makeServerOptions()) {
         unittest::threadAssertionMonitoredTest([&](unittest::ThreadAssertionMonitor& monitor) {
             auto handler = [callback](auto session) {
                 ON_BLOCK_EXIT([&] { session->end(); });
-                return callback(*session);
+                callback(session);
             };
             auto server = makeServer(std::move(handler), std::move(options));
             server.start();
@@ -264,7 +264,7 @@ public:
 
         ::grpc::SslCredentialsOptions sslOps;
         if (options->tlsCertificateKeyFile) {
-            auto certKeyPair = parsePEMKeyFile(*options->tlsCertificateKeyFile);
+            auto certKeyPair = util::parsePEMKeyFile(*options->tlsCertificateKeyFile);
             sslOps.pem_cert_chain = std::move(certKeyPair.cert_chain);
             sslOps.pem_private_key = std::move(certKeyPair.private_key);
         }

@@ -29,11 +29,15 @@
 
 #pragma once
 
-#include <grpcpp/security/server_credentials.h>
+#include <type_traits>
 
+#include <grpcpp/security/server_credentials.h>
+#include <grpcpp/support/status_code_enum.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 
-namespace mongo::transport::grpc {
+namespace mongo::transport::grpc::util {
 
 /**
  * Parse a PEM-encoded file that contains a single certificate and its associated private key
@@ -41,4 +45,31 @@ namespace mongo::transport::grpc {
  */
 ::grpc::SslServerCredentialsOptions::PemKeyCertPair parsePEMKeyFile(StringData filePath);
 
-}  // namespace mongo::transport::grpc
+/**
+ * Converts a gRPC status code into its corresponding MongoDB error code.
+ */
+ErrorCodes::Error statusToErrorCode(::grpc::StatusCode statusCode);
+
+/**
+ * Converts a MongoDB error code into its corresponding gRPC status code.
+ * Note that the mapping between gRPC status codes and MongoDB errors codes is not 1 to 1, so the
+ * following does not have to evaluate to true:
+ * `errorToStatusCode(statusToErrorCode(sc)) == sc`
+ */
+::grpc::StatusCode errorToStatusCode(ErrorCodes::Error errorCode);
+
+/**
+ * Converts a MongoDB status to its gRPC counterpart, and vice versa.
+ * Prefer using this over direct invocations of `errorToStatusCode` and `statusToErrorCode`.
+ */
+template <typename StatusType>
+inline auto convertStatus(StatusType status) {
+    if constexpr (std::is_same<StatusType, Status>::value) {
+        return ::grpc::Status(errorToStatusCode(status.code()), status.reason());
+    } else {
+        static_assert(std::is_same<StatusType, ::grpc::Status>::value == true);
+        return Status(statusToErrorCode(status.error_code()), status.error_message());
+    }
+}
+
+}  // namespace mongo::transport::grpc::util
