@@ -71,7 +71,7 @@ const validateDeleteIndex = (docsToInsert,
                 : assert.commandWorked(
                       testDB.runCommand({delete: coll.getName(), deletes: deleteQuery}));
             assert.eq(res["n"], expectedNRemoved);
-            assert.docEq(coll.find({}, {_id: 0}).toArray(), expectedRemainingDocs);
+            assert.sameMembers(coll.find({}, {_id: 0}).toArray(), expectedRemainingDocs);
             assert(coll.drop());
         },
         docsToInsert,

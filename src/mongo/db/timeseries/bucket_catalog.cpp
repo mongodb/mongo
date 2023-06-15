@@ -53,6 +53,10 @@ const auto getBucketCatalog = ServiceContext::declareDecoration<BucketCatalog>()
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesDirectModificationBeforeWriteConflict);
 MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
 
+Mutex _bucketIdGenLock =
+    MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "bucket_catalog_internal::_bucketIdGenLock");
+PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
+
 uint8_t numDigits(uint32_t num) {
     uint8_t numDigits = 0;
     while (num) {
@@ -156,7 +160,7 @@ BSONObj buildControlMinTimestampDoc(StringData timeField, Date_t roundedTime) {
 }
 
 std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOptions& options) {
-    OID bucketId = OID::gen();
+    OID oid;
 
     // We round the measurement timestamp down to the nearest minute, hour, or day depending on the
     // granularity. We do this for two reasons. The first is so that if measurements come in
@@ -166,32 +170,33 @@ std::pair<OID, Date_t> generateBucketId(const Date_t& time, const TimeseriesOpti
     // what the bucket timestamp will be, so we can route measurements to the right shard chunk.
     auto roundedTime = timeseries::roundTimestampToGranularity(time, options.getGranularity());
     int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
-    bucketId.setTimestamp(roundedSeconds);
+    oid.setTimestamp(roundedSeconds);
 
-    // Now, if we stopped here we could end up with bucket OID collisions. Consider the case where
-    // we have the granularity set to 'Hours'. This means we will round down to the nearest day, so
-    // any bucket generated on the same machine on the same day will have the same timestamp portion
-    // and unique instance portion of the OID. Only the increment will differ. Since we only use 3
-    // bytes for the increment portion, we run a serious risk of overflow if we are generating lots
-    // of buckets.
+    // Now, if we used the standard OID generation method for the remaining bytes we could end up
+    // with lots of bucket OID collisions. Consider the case where we have the granularity set to
+    // 'Hours'. This means we will round down to the nearest day, so any bucket generated on the
+    // same machine on the same day will have the same timestamp portion and unique instance portion
+    // of the OID. Only the increment would differ. Since we only use 3 bytes for the increment
+    // portion, we run a serious risk of overflow if we are generating lots of buckets.
     //
-    // To address this, we'll take the difference between the actual timestamp and the rounded
-    // timestamp and add it to the instance portion of the OID to ensure we can't have a collision.
-    // for timestamps generated on the same machine.
-    //
-    // This leaves open the possibility that in the case of step-down/step-up, we could get a
-    // collision if the old primary and the new primary have unique instance bits that differ by
-    // less than the maximum rounding difference. This is quite unlikely though, and can be resolved
-    // by restarting the new primary. It remains an open question whether we can fix this in a
-    // better way.
-    // TODO (SERVER-61412): Avoid time-series bucket OID collisions after election
-    auto instance = bucketId.getInstanceUnique();
-    uint32_t sum = DataView(reinterpret_cast<char*>(instance.bytes)).read<uint32_t>(1) +
-        (durationCount<Seconds>(time.toDurationSinceEpoch()) - roundedSeconds);
-    DataView(reinterpret_cast<char*>(instance.bytes)).write<uint32_t>(sum, 1);
-    bucketId.setInstanceUnique(instance);
+    // To address this, we'll instead use a PRNG to generate the rest of the bytes. With 8 bytes of
+    // randomness, we should have a pretty low chance of collisions. The limit of the birthday
+    // paradox converges to roughly the square root of the size of the space, so we would need a few
+    // billion buckets with the same timestamp to expect collisions. In the rare case that we do get
+    // a collision, we can (and do) simply regenerate the bucket _id at a higher level.
+    OID::InstanceUnique instance;
+    OID::Increment increment;
+    {
+        // We need to serialize access to '_bucketIdGenPRNG' since this instance is shared between
+        // all bucket_catalog operations, and not protected by the catalog or stripe locks.
+        stdx::unique_lock lk{_bucketIdGenLock};
+        _bucketIdGenPRNG.fill(instance.bytes, OID::kInstanceUniqueSize);
+        _bucketIdGenPRNG.fill(increment.bytes, OID::kIncrementSize);
+    }
+    oid.setInstanceUnique(instance);
+    oid.setIncrement(increment);
 
-    return {bucketId, roundedTime};
+    return {oid, roundedTime};
 }
 
 Status getTimeseriesBucketClearedError(const OID& bucketId,

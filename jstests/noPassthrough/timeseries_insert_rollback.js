@@ -53,7 +53,7 @@ rollbackTest.transitionToSteadyStateOperations();
 assert.commandWorked(coll.insert(docs[2], {ordered: true}));
 assert.commandWorked(coll.insert(docs[3], {ordered: false}));
 
-assert.docEq(coll.find().toArray(), docs.slice(2));
+assert.sameMembers(coll.find().toArray(), docs.slice(2));
 const buckets = bucketsColl.find().toArray();
 assert.eq(buckets.length, 2, 'Expected two bucket but found: ' + tojson(buckets));
 
