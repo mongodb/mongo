@@ -314,14 +314,16 @@ SemiFuture<BatchedCommandResponse> deleteShardingIndexCatalogMetadataStatement(
 
 void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                            const boost::optional<CollectionType>& optFromCollType,
+                                           const NamespaceString& fromNss,
                                            const NamespaceString& toNss,
                                            const boost::optional<UUID>& droppedTargetUUID,
                                            const WriteConcernOptions& writeConcern,
                                            const std::shared_ptr<executor::TaskExecutor>& executor,
                                            const OperationSessionInfo& osi) {
+
+    std::string logMsg = str::stream() << fromNss.ns() << " to " << toNss.ns();
     if (optFromCollType) {
         // Case sharded FROM collection
-        auto fromNss = optFromCollType->getNss();
         auto fromUUID = optFromCollType->getUuid();
 
         // Every statement in the transaction runs under the same clusterTime. To ensure in the
@@ -390,7 +392,7 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
                                                              6,
                                                              upsertCollResponse);
                 })
-                // update tags and check it was sucessful
+                // update tags and check it was successful
                 .thenRunOn(txnExec)
                 .then([&](const BatchedCommandResponse& insertCollResponse) {
                     uassertStatusOK(insertCollResponse.toStatus());
@@ -406,6 +408,15 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         const bool useClusterTransaction = true;
         sharding_ddl_util::runTransactionOnShardingCatalog(
             opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+
+        ShardingLogging::get(opCtx)->logChange(
+            opCtx,
+            "renameCollection.metadata",
+            str::stream() << logMsg << ": dropped target collection and renamed source collection",
+            BSON("newCollMetadata" << optFromCollType->toBSON()),
+            ShardingCatalogClient::kMajorityWriteConcern,
+            Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+            Grid::get(opCtx)->catalogClient());
     } else {
         // Case unsharded FROM collection : just delete the target collection if sharded
         auto now = VectorClock::get(opCtx)->getTime();
@@ -448,6 +459,15 @@ void renameCollectionMetadataInTransaction(OperationContext* opCtx,
         const bool useClusterTransaction = true;
         sharding_ddl_util::runTransactionOnShardingCatalog(
             opCtx, std::move(transactionChain), writeConcern, osi, useClusterTransaction, executor);
+
+        ShardingLogging::get(opCtx)->logChange(opCtx,
+                                               "renameCollection.metadata",
+                                               str::stream()
+                                                   << logMsg << " : dropped target collection.",
+                                               BSONObj(),
+                                               ShardingCatalogClient::kMajorityWriteConcern,
+                                               Grid::get(opCtx)->shardRegistry()->getConfigShard(),
+                                               Grid::get(opCtx)->catalogClient());
     }
 }
 }  // namespace
@@ -735,6 +755,7 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                 const auto& osi = getNewSession(opCtx);
                 renameCollectionMetadataInTransaction(opCtx,
                                                       _doc.getOptShardedCollInfo(),
+                                                      nss(),
                                                       _request.getTo(),
                                                       _doc.getTargetUUID(),
                                                       ShardingCatalogClient::kMajorityWriteConcern,
