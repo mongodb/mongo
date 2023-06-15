@@ -307,7 +307,16 @@ void RegexMatchExpression::debugString(StringBuilder& debug, int indentationLeve
 
 BSONObj RegexMatchExpression::getSerializedRightHandSide(SerializationOptions opts) const {
     BSONObjBuilder regexBuilder;
-    opts.appendLiteral(&regexBuilder, "$regex", _regex);
+
+    // Sadly we cannot use the fast/short syntax to append this, we need to be careful to generate a
+    // valid regex, and the default string "?" is not valid.
+    if (opts.literalPolicy == LiteralSerializationPolicy::kToRepresentativeParseableValue) {
+        regexBuilder.append("$regex", "\\?");
+    } else {
+        // May generate {$regex: "?string"} - invalid regex but we don't care since it's not
+        // parseable it's just saying "there was a string here."
+        opts.appendLiteral(&regexBuilder, "$regex", _regex);
+    }
 
     if (!_flags.empty()) {
         opts.appendLiteral(&regexBuilder, "$options", _flags);

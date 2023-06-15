@@ -111,7 +111,6 @@ protected:
         return bob.obj();
     }
 
-
     /**
      * Append all non-query shape components of the query stats key to the passed-in BSONObj
      * builder.
