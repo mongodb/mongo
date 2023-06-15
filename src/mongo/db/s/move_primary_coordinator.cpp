@@ -268,8 +268,6 @@ ExecutorFuture<void> MovePrimaryCoordinator::runMovePrimaryWorkflow(
                 // shutdown.
                 VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
-                clearDbMetadataOnPrimary(opCtx);
-
                 logChange(opCtx, "commit");
             }))
         .then(_buildPhaseHandler(Phase::kClean,
@@ -774,6 +772,8 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 }
 
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
+    // The release of the critical section will clear db metadata on secondaries
+    clearDbMetadataOnPrimary(opCtx);
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
         opCtx, NamespaceString(_dbName), _csReason, ShardingCatalogClient::kLocalWriteConcern);
 }

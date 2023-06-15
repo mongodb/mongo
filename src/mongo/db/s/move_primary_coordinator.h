@@ -133,7 +133,6 @@ private:
     /**
      * Clears the database metadata in the local catalog cache. Secondary nodes clear the database
      * metadata as a result of exiting the critical section of the primary node
-     * (`kExitCriticalSection` phase).
      */
     void clearDbMetadataOnPrimary(OperationContext* opCtx) const;
 
