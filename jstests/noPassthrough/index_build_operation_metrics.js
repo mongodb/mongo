@@ -285,7 +285,7 @@ assert.commandWorked(primaryDB[collName].dropIndex({a: 1}));
         assert(!metrics[dbName]);
     });
 
-    // Ensure the index was actually built. Do this after checking metrics because the helper calls
+    // Ensure the index was not built. Do this after checking metrics because the helper calls
     // listIndexes which contributes to metrics.
     IndexBuildTest.assertIndexes(primaryDB[collName], 1, ['_id_']);
     IndexBuildTest.assertIndexes(secondaryDB[collName], 1, ['_id_']);
