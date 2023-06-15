@@ -555,6 +555,21 @@ struct __wt_col_fix_tw {
 /* WT_COL_FIX_TW_CELL gets the cell pointer from a WT_COL_FIX_TW_ENTRY. */
 #define WT_COL_FIX_TW_CELL(page, entry) ((WT_CELL *)((uint8_t *)(page)->dsk + (entry)->cell_offset))
 
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * WT_SPLIT_HIST --
+ *	State information of a split at a single point in time.
+ */
+struct __wt_split_page_hist {
+    const char *name;
+    const char *func;
+    uint64_t split_gen;
+    uint32_t entries;
+    uint32_t time_sec;
+    uint16_t line;
+};
+#endif
+
 /*
  * WT_PAGE --
  *	The WT_PAGE structure describes the in-memory page information.
@@ -758,6 +773,25 @@ struct __wt_page {
 
     uint64_t cache_create_gen; /* Page create timestamp */
     uint64_t evict_pass_gen;   /* Eviction pass generation */
+
+#ifdef HAVE_DIAGNOSTIC
+#define WT_SPLIT_SAVE_STATE_MAX 3
+    WT_SPLIT_PAGE_HIST split_hist[WT_SPLIT_SAVE_STATE_MAX];
+    uint64_t splitoff;
+
+#define WT_SPLIT_PAGE_SAVE_STATE(page, session, e, g)                                \
+    do {                                                                             \
+        (page)->split_hist[(page)->splitoff].name = (session)->name;                 \
+        __wt_seconds32((session), &(page)->split_hist[(page)->splitoff].time_sec);   \
+        (page)->split_hist[(page)->splitoff].func = __PRETTY_FUNCTION__;             \
+        (page)->split_hist[(page)->splitoff].line = (uint16_t)__LINE__;              \
+        (page)->split_hist[(page)->splitoff].split_gen = (uint32_t)(g);              \
+        (page)->split_hist[(page)->splitoff].entries = (uint32_t)(e);                \
+        (page)->splitoff = ((page)->splitoff + 1) % WT_ELEMENTS((page)->split_hist); \
+    } while (0)
+#else
+#define WT_SPLIT_PAGE_SAVE_STATE(page, session, e, g)
+#endif
 };
 
 /*
