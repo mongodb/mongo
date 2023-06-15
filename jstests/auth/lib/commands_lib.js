@@ -6076,14 +6076,14 @@ var authCommandsLib = {
           testcases: [
               {
                 runOnDb: firstDbName,
-                roles: Object.extend({restore: 1}, roles_dbAdmin),
+                roles: Object.extend({restore: 1}, roles_writeDbAdmin),
                 privileges:
                     [{resource: {db: firstDbName, collection: "foo"}, actions: ["updateSearchIndex"]}],
                 expectFail: true,
               },
               {
                 runOnDb: secondDbName,
-                roles: Object.extend({restore: 1}, roles_dbAdminAny),
+                roles: Object.extend({restore: 1}, roles_writeDbAdminAny),
                 privileges:
                     [{resource: {db: secondDbName, collection: "foo"}, actions: ["updateSearchIndex"]}],
                 expectFail: true,

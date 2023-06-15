@@ -136,7 +136,8 @@ MONGO_INITIALIZER(AuthorizationBuiltinRoles)(InitializerContext* context) {
         << ActionType::insert
         << ActionType::remove
         << ActionType::renameCollectionSameDB  // db admin gets this also
-        << ActionType::update;
+        << ActionType::update
+        << ActionType::updateSearchIndex;
 
     // User admin role
     userAdminRoleActions
