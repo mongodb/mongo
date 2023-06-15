@@ -105,7 +105,7 @@ bool ChunkInfo::containsKey(const BSONObj& shardKey) const {
 
 std::string ChunkInfo::toString() const {
     return str::stream() << ChunkType::shard() << ": " << _shardId << ", " << ChunkType::lastmod()
-                         << ": " << _lastmod.toString() << ", " << _range.toString();
+                         << ": " << _lastmod.toString() << ", range: " << _range.toString();
 }
 
 void ChunkInfo::markAsJumbo() {
