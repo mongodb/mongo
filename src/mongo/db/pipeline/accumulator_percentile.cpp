@@ -35,26 +35,11 @@ namespace mongo {
 
 using boost::intrusive_ptr;
 
-REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(percentile,
-                                       AccumulatorPercentile::parseArgs,
-                                       feature_flags::gFeatureFlagApproxPercentiles);
+REGISTER_ACCUMULATOR(percentile, AccumulatorPercentile::parseArgs);
+REGISTER_STABLE_EXPRESSION(percentile, AccumulatorPercentile::parseExpression);
 
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(percentile,
-                                      AccumulatorPercentile::parseExpression,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagApproxPercentiles);
-
-
-REGISTER_ACCUMULATOR_WITH_FEATURE_FLAG(median,
-                                       AccumulatorMedian::parseArgs,
-                                       feature_flags::gFeatureFlagApproxPercentiles);
-
-REGISTER_EXPRESSION_WITH_FEATURE_FLAG(median,
-                                      AccumulatorMedian::parseExpression,
-                                      AllowedWithApiStrict::kNeverInVersion1,
-                                      AllowedWithClientType::kAny,
-                                      feature_flags::gFeatureFlagApproxPercentiles);
+REGISTER_ACCUMULATOR(median, AccumulatorMedian::parseArgs);
+REGISTER_STABLE_EXPRESSION(median, AccumulatorMedian::parseExpression);
 
 Status AccumulatorPercentile::validatePercentileMethod(StringData method) {
     if (method != kApproximate) {

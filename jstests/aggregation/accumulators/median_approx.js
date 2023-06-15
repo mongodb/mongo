@@ -3,7 +3,6 @@
  * field 'p':[0.5].
  * @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 (function() {

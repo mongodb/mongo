@@ -2,7 +2,6 @@
  * Test that $percentile and $median work as window functions.
  *  @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 (function() {

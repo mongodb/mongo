@@ -82,13 +82,6 @@ feature_flags:
       version: 7.0
       shouldBeFCVGated: true
 
-    featureFlagApproxPercentiles:
-      description: "Feature flag to enable approximate $percentile accumulator/expression."
-      cpp_varname: gFeatureFlagApproxPercentiles
-      default: true
-      version: 7.0
-      shouldBeFCVGated: true
-
     featureFlagSearchBatchSizeLimit:
       description: "Feature flag to enable the search batchsize and limit optimization."
       cpp_varname: gFeatureFlagSearchBatchSizeLimit

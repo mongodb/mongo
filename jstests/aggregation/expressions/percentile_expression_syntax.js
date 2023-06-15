@@ -2,7 +2,6 @@
  * Tests for the $percentile expression syntax.
  * @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 (function() {

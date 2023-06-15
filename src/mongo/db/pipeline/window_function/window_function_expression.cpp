@@ -80,17 +80,11 @@ REGISTER_STABLE_WINDOW_FUNCTION(
     (ExpressionN<WindowFunctionBottom,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, true>>::parse));
 
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    percentile,
-    (window_function::ExpressionQuantile<AccumulatorPercentile>::parse),
-    feature_flags::gFeatureFlagApproxPercentiles,
-    AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_STABLE_WINDOW_FUNCTION(
+    percentile, (window_function::ExpressionQuantile<AccumulatorPercentile>::parse));
 
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    median,
-    (window_function::ExpressionQuantile<AccumulatorMedian>::parse),
-    feature_flags::gFeatureFlagApproxPercentiles,
-    AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_STABLE_WINDOW_FUNCTION(median,
+                                (window_function::ExpressionQuantile<AccumulatorMedian>::parse));
 StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;
 
 intrusive_ptr<Expression> Expression::parse(BSONObj obj,
