@@ -1511,7 +1511,6 @@ static const char *const __stats_connection_desc[] = {
   "chunk-cache: aggregate number of spanned chunks on read",
   "chunk-cache: aggregate number of spanned chunks on remove",
   "chunk-cache: chunks evicted",
-  "chunk-cache: chunks removed on becoming invalid",
   "chunk-cache: could not allocate due to exceeding capacity",
   "chunk-cache: lookups",
   "chunk-cache: number of misses",
@@ -2156,7 +2155,6 @@ __wt_stat_connection_clear_single(WT_CONNECTION_STATS *stats)
     stats->chunk_cache_spans_chunks_read = 0;
     stats->chunk_cache_spans_chunks_remove = 0;
     stats->chunk_cache_chunks_evicted = 0;
-    stats->chunk_cache_chunks_invalidated = 0;
     stats->chunk_cache_exceeded_capacity = 0;
     stats->chunk_cache_lookups = 0;
     stats->chunk_cache_misses = 0;
@@ -2805,7 +2803,6 @@ __wt_stat_connection_aggregate(WT_CONNECTION_STATS **from, WT_CONNECTION_STATS *
     to->chunk_cache_spans_chunks_read += WT_STAT_READ(from, chunk_cache_spans_chunks_read);
     to->chunk_cache_spans_chunks_remove += WT_STAT_READ(from, chunk_cache_spans_chunks_remove);
     to->chunk_cache_chunks_evicted += WT_STAT_READ(from, chunk_cache_chunks_evicted);
-    to->chunk_cache_chunks_invalidated += WT_STAT_READ(from, chunk_cache_chunks_invalidated);
     to->chunk_cache_exceeded_capacity += WT_STAT_READ(from, chunk_cache_exceeded_capacity);
     to->chunk_cache_lookups += WT_STAT_READ(from, chunk_cache_lookups);
     to->chunk_cache_misses += WT_STAT_READ(from, chunk_cache_misses);
