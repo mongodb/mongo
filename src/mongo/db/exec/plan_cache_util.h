@@ -67,6 +67,7 @@ void logTieForBest(std::string&& query,
                    std::string runnerUpPlanSummary);
 void logNotCachingZeroResults(std::string&& query, double score, std::string winnerPlanSummary);
 void logNotCachingNoData(std::string&& solution);
+void logNotCachingOneWorkesAndZeroResults(std::string&& query, double score, std::string winnerPlanSummary);
 }  // namespace log_detail
 
 /**
@@ -151,6 +152,44 @@ void updatePlanCache(
 
             log_detail::logNotCachingZeroResults(
                 query.toStringShort(), ranking->scores[0], winnerExplainer->getPlanSummary());
+        }
+    }
+
+    // when the mode is PlanCachingMode::AlwaysCache or PlanCachingMode::SometimesCache, there is a special case.
+    // take Classic plan cache for example:
+    //   If the winning index's advanced = 0 && works == 1 && isEOF == true, which means we didn't get any data to rank score, all candidates 
+    //   score is same. the score of the calculation is meaningless.
+    //
+    //In this case, if we cache the plan, it will increased memory overhead. when the cached plan stage pick best plan, 
+    //it will trigger replan. this will increase computing overhead.
+    if (canCache == true) {
+        std::unique_ptr<PlanExplainer> winnerExplainer;
+        if constexpr (std::is_same_v<PlanStageType, std::unique_ptr<sbe::PlanStage>>) {
+            winnerExplainer = plan_explainer_factory::make(candidates[winnerIdx].root.get(),
+                                                    &candidates[winnerIdx].data,
+                                                    candidates[winnerIdx].solution.get());
+            auto const& rankingStats = ranking->getStats<sbe::PlanStageStats>();
+            auto numReads = calculateNumberOfReads(rankingStats.candidatePlanStats[winnerIdx].get());
+
+            if (numReads == 1 && rankingStats.candidatePlanStats[winnerIdx]->common.advances == 0 
+                && rankingStats.candidatePlanStats[winnerIdx]->common.isEOF == true) {
+                canCache = false;
+                log_detail::logNotCachingOneWorkesAndZeroResults(
+                    query.toStringShort(), ranking->scores[0], winnerExplainer->getPlanSummary());
+            }
+        } else {
+            static_assert(std::is_same_v<PlanStageType, PlanStage*>);
+            winnerExplainer =  plan_explainer_factory::make(candidates[winnerIdx].root);
+            
+            std::unique_ptr<PlanStageStats> bestCandidateStatTrees;
+            bestCandidateStatTrees = candidates[winnerIdx].root->getStats();
+            if (bestCandidateStatTrees->common.advanced == 0 
+                && bestCandidateStatTrees->common.works== 1
+                && bestCandidateStatTrees->common.isEOF == true) {
+                canCache = false;
+                log_detail::logNotCachingOneWorkesAndZeroResults(
+                    query.toStringShort(), ranking->scores[0], winnerExplainer->getPlanSummary());
+            }
         }
     }
 
