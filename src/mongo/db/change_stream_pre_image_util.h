@@ -46,8 +46,6 @@ namespace change_stream_pre_image_util {
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
 
 /**
- * TODO SERVER-74981: Investigate whether there is a safer way to extract the Timestamp.
- *
  * Parses the 'ts' field from the 'ChangeStreamPreImageId' associated with the 'rid'. The 'rid' MUST
 be
  * generated from a pre-image.
