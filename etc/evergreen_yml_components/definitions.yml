@@ -5976,7 +5976,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_wiredtiger_cursor_sweeps_gen
-  tags: ["concurrency", "repl"]
+  tags: ["concurrency", "repl", "cursor_sweeps"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6206,7 +6206,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
-  tags: ["concurrency", "repl", "random_name"]
+  tags: ["concurrency", "repl", "cursor_sweeps"]
   commands:
   - func: "do setup"
   - func: "run tests"
