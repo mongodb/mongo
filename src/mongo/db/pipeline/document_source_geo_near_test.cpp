@@ -204,5 +204,15 @@ TEST_F(DocumentSourceGeoNearTest, RedactionWithLegacyCoordinates) {
         redact(*docSource));
 }
 
+TEST_F(DocumentSourceGeoNearTest, FailToParseIfUnkownArg) {
+    auto stageObj = fromjson(
+        "{$geoNear: {near: {type: 'Point', coordinates: [0, 0]}, distanceField: 'distanceField', "
+        "spherical: true, blah: 'blaarghhh'}}");
+    ASSERT_THROWS_CODE(DocumentSourceGeoNear::createFromBson(stageObj.firstElement(), getExpCtx()),
+                       AssertionException,
+                       ErrorCodes::BadValue);
+}
+
+
 }  // namespace
 }  // namespace mongo
