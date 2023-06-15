@@ -72,6 +72,7 @@ constexpr StringData kDocFieldName = "doc"_sd;
 constexpr StringData kNumDocsFieldName = "numDocs"_sd;
 constexpr StringData kNumBytesFieldName = "numBytes"_sd;
 constexpr StringData kNumDistinctValuesFieldName = "numDistinctValues"_sd;
+constexpr StringData kMostCommonValuesFieldName = "mostCommonValues"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
 constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
@@ -113,6 +114,7 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                                                      << BSON("$meta"
                                                              << "indexKey"))));
 
+    // Calculate the "frequency" of each original/hashed shard key value by doing a $group.
     BSONObjBuilder groupByBuilder;
     int fieldNum = 0;
     boost::optional<std::string> origHashedFieldName;
@@ -136,17 +138,32 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
     pipeline.push_back(BSON("$group" << BSON("_id" << groupByBuilder.obj() << kFrequencyFieldName
                                                    << BSON("$sum" << 1))));
 
-    pipeline.push_back(BSON("$setWindowFields"
-                            << BSON("sortBy"
-                                    << BSON(kFrequencyFieldName << -1) << "output"
-                                    << BSON(kNumDocsFieldName
-                                            << BSON("$sum" << ("$" + kFrequencyFieldName))
-                                            << kNumDistinctValuesFieldName << BSON("$sum" << 1)))));
+    // Calculate the "numDocs", "numDistinctValues" and "mostCommonValues" by doing a $group with
+    // $topN.
+    pipeline.push_back(BSON(
+        "$group" << BSON(
+            "_id" << BSONNULL << kNumDocsFieldName << BSON("$sum" << ("$" + kFrequencyFieldName))
+                  << kNumDistinctValuesFieldName << BSON("$sum" << 1) << kMostCommonValuesFieldName
+                  << BSON("$topN" << BSON("n" << numMostCommonValues << "sortBy"
+                                              << BSON(kFrequencyFieldName << -1) << "output"
+                                              << BSON("_id"
+                                                      << "$_id" << kFrequencyFieldName
+                                                      << ("$" + kFrequencyFieldName)))))));
 
-    pipeline.push_back(BSON("$limit" << numMostCommonValues));
+    // Unwind "mostCommonValues" to return each shard value in its own document.
+    pipeline.push_back(BSON("$unwind" << ("$" + kMostCommonValuesFieldName)));
 
+    // If the supporting index is hashed and the hashed field is one of the shard key fields, look
+    // up the corresponding values by doing a $lookup with $toHashedIndexKey. Replace "_id"
+    // with "doc" or "key" accordingly.
     if (origHashedFieldName) {
         invariant(tempHashedFieldName);
+
+        pipeline.push_back(
+            BSON("$set" << BSON(
+                     "_id" << ("$" + kMostCommonValuesFieldName + "._id") << kFrequencyFieldName
+                           << ("$" + kMostCommonValuesFieldName + "." + kFrequencyFieldName))));
+        pipeline.push_back(BSON("$unset" << kMostCommonValuesFieldName));
 
         BSONObjBuilder letBuilder;
         BSONObjBuilder matchBuilder;
@@ -169,13 +186,15 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
                        << "docs")));
         pipeline.push_back(BSON("$set" << BSON(kDocFieldName << BSON("$first"
                                                                      << "$docs"))));
-        pipeline.push_back(BSON("$unset"
-                                << "docs"));
+        pipeline.push_back(BSON("$unset" << BSON_ARRAY("docs"
+                                                       << "_id")));
     } else {
-        pipeline.push_back(BSON("$set" << BSON(kIndexKeyFieldName << "$_id")));
+        pipeline.push_back(BSON(
+            "$set" << BSON(kIndexKeyFieldName
+                           << ("$" + kMostCommonValuesFieldName + "._id") << kFrequencyFieldName
+                           << ("$" + kMostCommonValuesFieldName + "." + kFrequencyFieldName))));
+        pipeline.push_back(BSON("$unset" << BSON_ARRAY(kMostCommonValuesFieldName << "_id")));
     }
-    pipeline.push_back(BSON("$unset"
-                            << "_id"));
 
     AggregateCommandRequest aggRequest(nss, pipeline);
     aggRequest.setHint(hintIndexKey);
