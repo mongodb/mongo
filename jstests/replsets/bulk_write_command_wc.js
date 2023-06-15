@@ -1,4 +1,15 @@
-// Tests write-concern-related bulkWrite protocol functionality
+/**
+ * Tests write-concern-related bulkWrite protocol functionality
+ *
+ * The test runs commands that are not allowed with security token: bulkWrite.
+ * @tags: [
+ *   assumes_against_mongod_not_mongos,
+ *   not_allowed_with_security_token,
+ *   command_not_supported_in_serverless,
+ *   # TODO SERVER-52419 Remove this tag.
+ *   featureFlagBulkWriteCommand,
+ * ]
+ */
 (function() {
 
 // Skip this test when running with storage engines other than inMemory, as the test relies on
