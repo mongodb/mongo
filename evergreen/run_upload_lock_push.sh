@@ -53,6 +53,8 @@ if [ -f "${MSI_PATH}" ]; then
   ARTIFACTS[${MSI_MD5_PATH}]=${MSI_MD5_KEY}
 fi
 
+set -o verbose
+
 for path in "${!ARTIFACTS[@]}"; do
 
   key=${ARTIFACTS[${path}]}
@@ -61,6 +63,6 @@ for path in "${!ARTIFACTS[@]}"; do
     -w $(pwd) \
     --env-host \
     ${UPLOAD_LOCK_IMAGE} \
-    upload-lock -key=${key} -tag=task-id=${EVERGREEN_TASK_ID} ${path}
+    -key=${key} -tag=task-id=${EVERGREEN_TASK_ID} ${path}
 
 done
