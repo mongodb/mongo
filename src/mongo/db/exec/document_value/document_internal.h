@@ -359,11 +359,11 @@ public:
 
     /**
      * Construct a storage from the BSON. The BSON is lazily processed as fields are requested from
-     * the document. If we know that the BSON does not contain any metadata fields we can set the
-     * 'stripMetadata' flag to false that will speed up the field iteration.
+     * the document. If we know that the BSON contains metadata fields we can set the
+     * 'bsonHasMetadata' flag to true.
      */
     DocumentStorage(const BSONObj& bson,
-                    bool stripMetadata,
+                    bool bsonHasMetadata,
                     bool modified,
                     uint32_t numBytesFromBSONInCache)
         : _cache(nullptr),
@@ -373,12 +373,12 @@ public:
           _hashTabMask(0),
           _bson(bson),
           _numBytesFromBSONInCache(numBytesFromBSONInCache),
-          _stripMetadata(stripMetadata),
+          _bsonHasMetadata(bsonHasMetadata),
           _modified(modified) {}
 
     ~DocumentStorage();
 
-    void reset(const BSONObj& bson, bool stripMetadata);
+    void reset(const BSONObj& bson, bool bsonHasMetadata);
 
     /**
      * Populates the cache by recursively walking the underlying BSON.
@@ -551,7 +551,7 @@ public:
      * WorkingSetMember.
      */
     const DocumentMetadataFields& metadata() const {
-        if (_stripMetadata) {
+        if (_bsonHasMetadata) {
             loadLazyMetadata();
         }
         return _metadataFields;
@@ -589,14 +589,18 @@ public:
         return _firstElement ? _firstElement->plusBytes(_usedBytes) : nullptr;
     }
 
-    auto stripMetadata() const {
-        return _stripMetadata;
+    auto bsonHasMetadata() const {
+        return _bsonHasMetadata;
     }
 
     Position constructInCache(const BSONElement& elem);
 
     auto isModified() const {
         return _modified;
+    }
+
+    auto isMetadataModified() const {
+        return _metadataFields.isModified();
     }
 
     auto bsonObj() const {
@@ -708,17 +712,16 @@ private:
     // whole backing BSON, but only the portion of backing BSON that's not already in the cache.
     uint32_t _numBytesFromBSONInCache = 0;
 
-    // If '_stripMetadata' is true, tracks whether or not the metadata has been lazy-loaded from the
-    // backing '_bson' object. If so, then no attempt will be made to load the metadata again, even
-    // if the metadata has been released by a call to 'releaseMetadata()'.
+    // Tracks whether or not the metadata has been lazy-loaded from the backing '_bson' object. If
+    // so, then no attempt will be made to load the metadata again, even if the metadata has been
+    // released by a call to 'releaseMetadata()'.
     mutable bool _haveLazyLoadedMetadata = false;
 
     mutable DocumentMetadataFields _metadataFields;
 
-    // The storage constructed from a BSON value may contain metadata. When we process the BSON we
-    // have to move the metadata to the MetadataFields object. If we know that the BSON does not
-    // have any metadata we can set _stripMetadata to false that will speed up the iteration.
-    bool _stripMetadata{false};
+    // True if this storage was constructed from BSON with metadata. Serializing this object using
+    // the 'toBson()' method will omit (strip) the metadata fields.
+    bool _bsonHasMetadata{false};
 
     // This flag is set to true anytime the storage returns a mutable field. It is used to optimize
     // a conversion to BSON; i.e. if there are not any modifications we can directly return _bson.
