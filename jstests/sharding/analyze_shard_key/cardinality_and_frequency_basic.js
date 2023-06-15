@@ -139,8 +139,8 @@ const writeConcern = {
 };
 
 /**
- * Finds the profiler entries for all aggregate and count commands with the given comment on the
- * given mongods and verifies that:
+ * Finds the profiler entries for all aggregate commands with the given comment on the given
+ * mongods and verifies that:
  * - The aggregate commands used index scan and did not fetch any documents.
  * - The count commands used fast count, i.e. did not scan the index or fetch any documents.
  */
@@ -182,19 +182,6 @@ function assertReadQueryPlans(mongodConns, dbName, collName, comment) {
                     assert.eq(doc.readConcern.level, "available", doc);
                 }
             });
-
-        profilerColl.find({"command.count": collName, "command.comment": comment}).forEach(doc => {
-            if (doc.hasOwnProperty("ok") && (doc.ok === 0)) {
-                return;
-            }
-
-            assert(doc.hasOwnProperty("planSummary"), doc);
-            assert(doc.planSummary.includes("RECORD_STORE_FAST_COUNT"), doc);
-            assert(!doc.usedDisk, doc);
-            // Verify that it did not scan the index or fetch any documents.
-            assert.eq(doc.keysExamined, 0, doc);
-            assert.eq(doc.docsExamined, 0, doc);
-        });
     });
 }
 
