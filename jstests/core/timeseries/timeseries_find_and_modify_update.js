@@ -44,6 +44,8 @@ load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
     };
     const doc_m1_c_d =
         {[timeFieldName]: ISODate("2023-02-06T19:19:02Z"), [metaFieldName]: 1, _id: 2, c: 1, d: 1};
+    const doc_m1_a_b_later =
+        {[timeFieldName]: ISODate("2023-02-07T19:19:01Z"), [metaFieldName]: 1, _id: 1, a: 1, b: 1};
     const query_m1_a1 = {a: {$eq: 1}, [metaFieldName]: {$eq: 1}};
     const query_m1_b1 = {b: {$eq: 1}, [metaFieldName]: {$eq: 1}};
 
@@ -177,14 +179,14 @@ load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
     (function testMatchMultipleUpdateOne() {
         const resultDoc = Object.assign({}, doc_a_b, {a: 100});
         testFindOneAndUpdate({
-            initialDocList: [doc_a_b, doc_m1_a_b, doc_m1_c_d],
+            initialDocList: [doc_a_b, doc_m1_a_b_later],
             cmd: {
                 filter: {},
                 update: {$set: {a: 100}},
                 returnNew: true,
             },
             res: {
-                resultDocList: [resultDoc, doc_m1_a_b, doc_m1_c_d],
+                resultDocList: [resultDoc, doc_m1_a_b_later],
                 returnDoc: resultDoc,
                 bucketFilter: makeBucketFilter({}),
                 residualFilter: {},
