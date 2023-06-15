@@ -152,6 +152,60 @@ assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB2"}, {_id: 1, 
 
 coll.drop();
 
+// Test update with sort and not return
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 0, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+        {
+            update: 0,
+            filter: {skey: "MongoDB"},
+            updateMods: {$set: {skey: "MongoDB2"}},
+            sort: {_id: -1}
+        },
+    ],
+    nsInfo: [{ns: "test.coll"}]
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1, nModified: 1});
+assert(!res.cursor.firstBatch[3]);
+assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB"}, {_id: 1, skey: "MongoDB2"}]);
+
+coll.drop();
+
+// Test update with sort and not return
+res = db.adminCommand({
+    bulkWrite: 1,
+    ops: [
+        {insert: 0, document: {_id: 0, skey: "MongoDB"}},
+        {insert: 0, document: {_id: 1, skey: "MongoDB"}},
+        {
+            update: 0,
+            filter: {skey: "MongoDB"},
+            updateMods: {$set: {skey: "MongoDB2"}},
+            sort: {_id: 1}
+        },
+    ],
+    nsInfo: [{ns: "test.coll"}]
+});
+
+assert.commandWorked(res);
+assert.eq(res.numErrors, 0);
+
+cursorEntryValidator(res.cursor.firstBatch[0], {ok: 1, idx: 0, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[1], {ok: 1, idx: 1, n: 1});
+cursorEntryValidator(res.cursor.firstBatch[2], {ok: 1, idx: 2, n: 1, nModified: 1});
+assert(!res.cursor.firstBatch[3]);
+assert.sameMembers(coll.find().toArray(), [{_id: 0, skey: "MongoDB2"}, {_id: 1, skey: "MongoDB"}]);
+
+coll.drop();
+
 // Test Insert outside of bulkWrite + update in bulkWrite.
 coll.insert({_id: 1, skey: "MongoDB"});
 
