@@ -421,7 +421,8 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
             initializeExpr = std::move(accExpr.initializer);
 
             // Retrieve the values of 'ps' and 'method' from the accumulator's IDL parser.
-            std::tie(ps, method) = AccumulatorTType::parsePercentileAndMethod(elem);
+            std::tie(ps, method) = AccumulatorTType::parsePercentileAndMethod(
+                expCtx, elem, expCtx->variablesParseState);
 
         } else if (fieldName == kWindowArg) {
             bounds = WindowBounds::parse(elem, sortBy, expCtx);

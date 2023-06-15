@@ -32,6 +32,8 @@ global:
 imports:
   - "mongo/db/basic_types.idl"
 structs:
+    # $percentile allows expressions for 'input' and 'p' fields, which we cannot evaluate through
+    # the 'validator' callback and have to accept IDLAnyType.
     AccumulatorPercentileSpec:
         description: "Specification for the $percentile accumulator."
         strict: true
@@ -42,10 +44,8 @@ structs:
                 optional: false
             p:
                 description: "The array listing the percentiles we will calculate."
-                type: array<safeDouble>
+                type: IDLAnyType
                 optional: false
-                validator:
-                    {callback: "AccumulatorPercentile::validatePercentileArg"}
             method:
                 description: "The method we will use to find the percentile."
                 type: string
