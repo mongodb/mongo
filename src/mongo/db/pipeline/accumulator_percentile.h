@@ -49,11 +49,6 @@ public:
     }
 
     /**
-     * Checks that 'pv' is an array of valid percentile specifications. Called by the IDL file.
-     */
-    static Status validatePercentileArg(const std::vector<double>& pv);
-
-    /**
      * Blocks the percentile methods that aren't supported yet.
      */
     static Status validatePercentileMethod(StringData method);
@@ -73,6 +68,12 @@ public:
                                                          const std::vector<double>& ps,
                                                          PercentileMethod method);
 
+    /**
+     * Necessary for supporting $percentile as window functions and/or as expression.
+     */
+    static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
+        ExpressionContext* expCtx, BSONElement elem, VariablesParseState vps);
+    static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
     AccumulatorPercentile(ExpressionContext* expCtx,
                           const std::vector<double>& ps,
                           PercentileMethod method);
@@ -88,12 +89,6 @@ public:
      */
     void reset() final;
 
-    /**
-     * Necessary for supporting $percentile as window functions and/or as expression.
-     */
-    static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
-        BSONElement elem);
-    static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
     /**
      * Serializes this accumulator to a valid MQL accumulation statement that would be legal
@@ -164,7 +159,7 @@ public:
      * Necessary for supporting $median as window functions and/or as expression.
      */
     static std::pair<std::vector<double> /*ps*/, PercentileMethod> parsePercentileAndMethod(
-        BSONElement elem);
+        ExpressionContext* expCtx, BSONElement elem, VariablesParseState vps);
     static Value formatFinalValue(int nPercentiles, const std::vector<double>& pctls);
 
     /**
