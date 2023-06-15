@@ -82,7 +82,12 @@ public:
             uassertStatusOK(validateNamespace(nss));
             const auto collUuid = uassertStatusOK(validateCollectionOptions(opCtx, nss));
 
-            LOGV2(6875001, "Start analyzing shard key", logAttrs(nss), "shardKey"_attr = key);
+            const auto analyzeShardKeyId = UUID::gen();
+            LOGV2(7790010,
+                  "Start analyzing shard key",
+                  logAttrs(nss),
+                  "analyzeShardKeyId"_attr = analyzeShardKeyId,
+                  "shardKey"_attr = key);
 
             Response response;
 
@@ -90,7 +95,7 @@ public:
             if (!MONGO_unlikely(
                     analyzeShardKeySkipCalcalutingKeyCharactericsMetrics.shouldFail())) {
                 auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
-                    opCtx, nss, collUuid, key);
+                    opCtx, analyzeShardKeyId, nss, collUuid, key);
                 response.setKeyCharacteristics(keyCharacteristics);
                 if (response.getNumOrphanDocs()) {
                     response.setNote(StringData(kOrphanDocsWarningMessage));
@@ -104,10 +109,16 @@ public:
                     analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics.shouldFail())) {
                 auto [readDistribution, writeDistribution] =
                     analyze_shard_key::calculateReadWriteDistributionMetrics(
-                        opCtx, nss, collUuid, key);
+                        opCtx, analyzeShardKeyId, nss, collUuid, key);
                 response.setReadDistribution(readDistribution);
                 response.setWriteDistribution(writeDistribution);
             }
+
+            LOGV2(7790011,
+                  "Finished analyzing shard key",
+                  logAttrs(nss),
+                  "analyzeShardKeyId"_attr = analyzeShardKeyId,
+                  "shardKey"_attr = key);
 
             return response;
         }
