@@ -472,7 +472,7 @@ private:
         //
         // If (_recordIdsIter == _recordIds.end() && _overflowDocs.empty() &&
         //     _inProgressReads == 0) then all documents have been returned to the destination.
-        RecordIdSet::size_type _inProgressReads = 0;
+        int64_t _inProgressReads = 0;
 
         // This condition variable allows us to wait on the following condition:
         //   Either we're done and the above condition is satisfied, or there is some document to
