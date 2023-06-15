@@ -99,7 +99,7 @@ public:
 
 public:
     void record(OperationContext* opCtx,
-                StringData ns,
+                const NamespaceString& nss,
                 LogicalOp logicalOp,
                 LockType lockType,
                 long long micros,

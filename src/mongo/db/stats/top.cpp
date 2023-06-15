@@ -90,16 +90,17 @@ Top& Top::get(ServiceContext* service) {
 }
 
 void Top::record(OperationContext* opCtx,
-                 StringData ns,
+                 const NamespaceString& nss,
                  LogicalOp logicalOp,
                  LockType lockType,
                  long long micros,
                  bool command,
                  Command::ReadWriteType readWriteType) {
-    if (ns[0] == '?')
+    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    if (nssStr[0] == '?')
         return;
 
-    auto hashedNs = UsageMap::hasher().hashed_key(ns);
+    auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
     stdx::lock_guard<Latch> lk(_lock);
 
     CollectionData& coll = _usage[hashedNs];
@@ -114,7 +115,7 @@ void Top::record(OperationContext* opCtx,
                  bool command,
                  Command::ReadWriteType readWriteType) {
     for (const auto& nss : nssSet) {
-        record(opCtx, nss.ns(), logicalOp, lockType, micros, command, readWriteType);
+        record(opCtx, nss, logicalOp, lockType, micros, command, readWriteType);
     }
 }
 
@@ -167,8 +168,9 @@ void Top::_record(OperationContext* opCtx,
 }
 
 void Top::collectionDropped(const NamespaceString& nss) {
+    const auto nssStr = NamespaceStringUtil::serialize(nss);
     stdx::lock_guard<Latch> lk(_lock);
-    _usage.erase(nss.ns());
+    _usage.erase(nssStr);
 }
 
 void Top::append(BSONObjBuilder& b) {
@@ -220,11 +222,12 @@ void Top::_appendStatsEntry(BSONObjBuilder& b, const char* statsName, const Usag
 void Top::appendLatencyStats(const NamespaceString& nss,
                              bool includeHistograms,
                              BSONObjBuilder* builder) {
-    auto hashedNs = UsageMap::hasher().hashed_key(nss.ns());
+    const auto nssStr = NamespaceStringUtil::serialize(nss);
+    auto hashedNs = UsageMap::hasher().hashed_key(nssStr);
     stdx::lock_guard<Latch> lk(_lock);
     BSONObjBuilder latencyStatsBuilder;
     _usage[hashedNs].opLatencyHistogram.append(includeHistograms, false, &latencyStatsBuilder);
-    builder->append("ns", NamespaceStringUtil::serialize(nss));
+    builder->append("ns", nssStr);
     builder->append("latencyStats", latencyStatsBuilder.obj());
 }
 

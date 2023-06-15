@@ -226,7 +226,7 @@ void finishCurOp(OperationContext* opCtx, CurOp* curOp) {
         recordCurOpMetrics(opCtx);
         Top::get(opCtx->getServiceContext())
             .record(opCtx,
-                    curOp->getNS(),
+                    curOp->getNSS(),
                     curOp->getLogicalOp(),
                     Top::LockType::WriteLocked,
                     durationCount<Microseconds>(curOp->elapsedTimeExcludingPauses()),
@@ -954,7 +954,7 @@ WriteResult performInserts(OperationContext* opCtx,
         curOp.done();
         Top::get(opCtx->getServiceContext())
             .record(opCtx,
-                    wholeOp.getNamespace().ns(),
+                    wholeOp.getNamespace(),
                     LogicalOp::opInsert,
                     Top::LockType::WriteLocked,
                     durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
@@ -2702,7 +2702,7 @@ write_ops::InsertCommandReply performTimeseriesWrites(
         curOp.done();
         Top::get(opCtx->getServiceContext())
             .record(opCtx,
-                    ns(request).ns(),
+                    ns(request),
                     LogicalOp::opInsert,
                     Top::LockType::WriteLocked,
                     durationCount<Microseconds>(curOp.elapsedTimeExcludingPauses()),
