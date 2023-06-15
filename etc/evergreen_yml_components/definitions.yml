@@ -7314,6 +7314,12 @@ tasks:
       aws_secret_remote: ${repo_aws_secret}
   - func: "set up notary client credentials"
   - *f_expansions_write
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -oe
+        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
   - command: subprocess.exec
     params:
       binary: bash
