@@ -429,7 +429,9 @@ std::vector<ShardEndpoint> CollectionRoutingInfoTargeter::targetUpdate(
         uassert(ErrorCodes::InvalidOptions,
                 str::stream()
                     << "An {upsert:true} update on a sharded timeseries collection is disallowed.",
-                !isUpsert);
+                feature_flags::gTimeseriesUpdatesSupport.isEnabled(
+                    serverGlobalParams.featureCompatibility) ||
+                    !isUpsert);
 
         // Translate the update query on a timeseries collection into the bucket-level predicate
         // so that we can target the request to the correct shard or broadcast the request if

@@ -774,16 +774,18 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
         n: 0,
     });
 
-    // Do the same test case as above but with upsert:true, which should fail.
-    testUpdate({
-        updates: [{
-            q: {[metaField]: "Z"},
-            u: {$set: {[metaField]: 5}},
-            multi: true,
-            upsert: true,
-        }]
-    },
-               expectFailedUpdate([doc1, doc4, doc5]));
+    if (!arbitraryUpdatesEnabled) {
+        // Do the same test case as above but with upsert:true, which should fail.
+        testUpdate({
+            updates: [{
+                q: {[metaField]: "Z"},
+                u: {$set: {[metaField]: 5}},
+                multi: true,
+                upsert: true,
+            }]
+        },
+                   expectFailedUpdate([doc1, doc4, doc5]));
+    }
 }
 
 function testCaseUpdateWithLetDoc({testUpdate}) {

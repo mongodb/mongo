@@ -30,8 +30,18 @@
 #include "mongo/db/exec/timeseries_upsert.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/internal_transactions_feature_flag_gen.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/s/would_change_owning_shard_exception.h"
+
+namespace {
+
+const char idFieldName[] = "_id";
+const mongo::FieldRef idFieldRef(idFieldName);
+
+}  // namespace
+
 
 namespace mongo {
 
@@ -88,15 +98,7 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
 
     // If this is an explain, skip performing the actual insert.
     if (!_params.isExplain) {
-        writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
-            timeseries::performAtomicWritesForUpdate(opCtx(),
-                                                     collection(),
-                                                     RecordId{},
-                                                     boost::none,
-                                                     {_specificStats.objInserted},
-                                                     _params.fromMigrate,
-                                                     _params.stmtId);
-        });
+        _performInsert(_specificStats.objInserted);
     }
 
     // We should always be EOF at this point.
@@ -113,17 +115,80 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
     return PlanStage::ADVANCED;
 }
 
+void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
+    if (_isUserInitiatedUpdate) {
+        if (const auto& collDesc = collectionAcquisition().getShardingDescription();
+            collDesc.isSharded()) {
+            auto newBucket = timeseries::makeBucketDocument({newMeasurement},
+                                                            collection()->ns(),
+                                                            *collection()->getTimeseriesOptions(),
+                                                            collection()->getDefaultCollator());
+
+            //  The shard key fields may not have arrays at any point along their paths.
+            update::assertPathsNotArray(mutablebson::Document{newBucket},
+                                        collDesc.getKeyPatternFields());
+
+            const auto& collFilter = collectionAcquisition().getShardingFilter();
+            invariant(collFilter);
+
+            auto newShardKey = collDesc.getShardKeyPattern().extractShardKeyFromDoc(newBucket);
+            if (!collFilter->keyBelongsToMe(newShardKey)) {
+                // An attempt to upsert a document with a shard key value that belongs on
+                // another shard must either be a retryable write or inside a transaction. An
+                // upsert without a transaction number is legal if
+                // gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi is enabled because
+                // mongos will be able to start an internal transaction to handle the
+                // wouldChangeOwningShard error thrown below.
+                if (!feature_flags::gFeatureFlagUpdateDocumentShardKeyUsingTransactionApi.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    uassert(ErrorCodes::IllegalOperation,
+                            "The upsert document could not be inserted onto the shard targeted "
+                            "by the query, since its shard key belongs on a different shard. "
+                            "Cross-shard upserts are only allowed when running in a "
+                            "transaction or with retryWrites: true.",
+                            opCtx()->getTxnNumber());
+                }
+                uasserted(WouldChangeOwningShardInfo(_originalPredicate->serialize(),
+                                                     newBucket,
+                                                     true,  // upsert
+                                                     collection()->ns(),
+                                                     collection()->uuid(),
+                                                     newMeasurement),
+                          "The document we are inserting belongs on a different shard");
+            }
+        }
+    }
+    writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
+        timeseries::performAtomicWritesForUpdate(opCtx(),
+                                                 collection(),
+                                                 RecordId{},
+                                                 boost::none,
+                                                 {newMeasurement},
+                                                 _params.fromMigrate,
+                                                 _params.stmtId);
+    });
+}
+
+
 BSONObj TimeseriesUpsertStage::_produceNewDocumentForInsert() {
-    FieldRefSet immutablePaths;
+    // Initialize immutable paths based on the shard key field(s).
+    _getImmutablePaths();
+
     mutablebson::Document doc;
 
     if (_request.shouldUpsertSuppliedDocument()) {
-        update::generateNewDocumentFromSuppliedDoc(opCtx(), immutablePaths, &_request, doc);
+        update::generateNewDocumentFromSuppliedDoc(opCtx(), _immutablePaths, &_request, doc);
     } else {
+        // When populating the document from the query for replacement updates, we should include
+        // the _id field. However, we don't want to block _id from being set/updated, so only
+        // include it in 'immutablePaths' for this step.
+        _immutablePaths.emplace_back(std::make_unique<FieldRef>(idFieldName));
         uassertStatusOK(_params.updateDriver->populateDocumentWithQueryFields(
-            *_originalPredicate, immutablePaths, doc));
+            *_originalPredicate, _immutablePaths, doc));
+        _immutablePaths.pop_back();
 
-        update::generateNewDocumentFromUpdateOp(opCtx(), immutablePaths, _params.updateDriver, doc);
+        update::generateNewDocumentFromUpdateOp(
+            opCtx(), _immutablePaths, _params.updateDriver, doc);
     }
 
     update::ensureIdFieldIsFirst(&doc, true);

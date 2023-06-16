@@ -230,6 +230,7 @@ struct UpdateShardKeyResult {
 UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
     OperationContext* opCtx,
     BatchedCommandRequest* request,
+    const NamespaceString& nss,
     BatchedCommandResponse* response,
     const WouldChangeOwningShardInfo& changeInfo) {
     // Shared state for the transaction API use below.
@@ -241,7 +242,7 @@ UpdateShardKeyResult handleWouldChangeOwningShardErrorTransaction(
         NamespaceString nss;
         bool updatedShardKey{false};
     };
-    auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, request->getNS());
+    auto sharedBlock = std::make_shared<SharedBlock>(changeInfo, nss);
     auto& executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
     auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
     auto txn = txn_api::SyncTransactionWithRetries(
@@ -320,7 +321,7 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
             serverGlobalParams.featureCompatibility)) {
         if (txnRouter) {
             auto updateResult = handleWouldChangeOwningShardErrorTransaction(
-                opCtx, request, response, *wouldChangeOwningShardErrorInfo);
+                opCtx, request, nss, response, *wouldChangeOwningShardErrorInfo);
             updatedShardKey = updateResult.updatedShardKey;
             upsertedId = std::move(updateResult.upsertedId);
         } else {
@@ -376,7 +377,15 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                    upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+                    // For timeseries collections, the 'userPostImage' is returned back
+                    // through WouldChangeOwningShardInfo from the old shard as well and it should
+                    // be returned to the user instead of the post-image.
+                    auto postImage = [&] {
+                        return wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            ? *wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            : wouldChangeOwningShardErrorInfo->getPostImage();
+                    }();
+                    upsertedId = postImage["_id"].wrap();
                 }
 
                 // Commit the transaction
@@ -421,7 +430,16 @@ bool ClusterWriteCmd::handleWouldChangeOwningShardError(OperationContext* opCtx,
 
                 // If the operation was an upsert, record the _id of the new document.
                 if (updatedShardKey && wouldChangeOwningShardErrorInfo->getShouldUpsert()) {
-                    upsertedId = wouldChangeOwningShardErrorInfo->getPostImage()["_id"].wrap();
+                    // For timeseries collections, the 'userPostImage' is returned back
+                    // through WouldChangeOwningShardInfo from the old shard as well and it should
+                    // be returned to the user instead of the post-image.
+                    auto postImage = [&] {
+                        return wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            ? *wouldChangeOwningShardErrorInfo->getUserPostImage()
+                            : wouldChangeOwningShardErrorInfo->getPostImage();
+                    }();
+
+                    upsertedId = postImage["_id"].wrap();
                 }
             } catch (const ExceptionFor<ErrorCodes::DuplicateKey>& ex) {
                 Status status = ex->getKeyPattern().hasField("_id")

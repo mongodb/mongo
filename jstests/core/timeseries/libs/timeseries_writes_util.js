@@ -110,7 +110,8 @@ function prepareCollection({dbToUse, collName, initialDocList}) {
     return coll;
 }
 
-function prepareShardedCollection({dbToUse, collName, initialDocList, includeMeta = true}) {
+function prepareShardedCollection(
+    {dbToUse, collName, initialDocList, includeMeta = true, shardKey, splitPoint}) {
     if (!dbToUse) {
         assert.neq(
             null, testDB, "testDB must be initialized before calling prepareShardedCollection");
@@ -127,13 +128,16 @@ function prepareShardedCollection({dbToUse, collName, initialDocList, includeMet
     assert.commandWorked(dbToUse.createCollection(coll.getName(), tsOptions));
     assert.commandWorked(coll.insert(initialDocList));
 
-    const shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
+    if (!shardKey) {
+        shardKey = includeMeta ? {[metaFieldName]: 1} : {[timeFieldName]: 1};
+    }
     assert.commandWorked(coll.createIndex(shardKey));
     assert.commandWorked(
         dbToUse.adminCommand({shardCollection: coll.getFullName(), key: shardKey}));
 
-    const splitPoint =
-        includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
+    if (!splitPoint) {
+        splitPoint = includeMeta ? splitMetaPointBetweenTwoShards : splitTimePointBetweenTwoShards;
+    }
     // [MinKey, splitPoint) and [splitPoint, MaxKey) are the two chunks after the split.
     assert.commandWorked(
         dbToUse.adminCommand({split: dbToUse[sysCollName].getFullName(), middle: splitPoint}));

@@ -416,7 +416,7 @@ void executeTwoPhaseWrite(OperationContext* opCtx,
                       .toBSON();
 
     auto swRes = write_without_shard_key::runTwoPhaseWriteProtocol(
-        opCtx, clientRequest.getNS(), std::move(cmdObj));
+        opCtx, targeter.getNS(), std::move(cmdObj));
 
     Status responseStatus = swRes.getStatus();
     BatchedCommandResponse batchedCommandResponse;

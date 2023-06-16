@@ -493,12 +493,6 @@ CollectionRoutingInfo getCollectionRoutingInfo(OperationContext* opCtx,
             "Cannot perform findAndModify with sort on a sharded timeseries collection",
             !cmdObj.hasField("sort"));
 
-    // TODO SERVER-77775: Remove this check. For now, we do not support findAndModify upsert on
-    // sharded timeseries collections.
-    uassert(7687101,
-            "Cannot perform findAndModify upsert on a sharded timeseries collection",
-            !cmdObj["upsert"].trueValue());
-
     return bucketCollCri;
 }
 

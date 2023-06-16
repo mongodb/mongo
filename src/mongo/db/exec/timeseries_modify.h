@@ -178,6 +178,9 @@ protected:
     // Original, untranslated and complete predicate.
     std::unique_ptr<MatchExpression> _originalPredicate;
 
+    // Temporary storage for _getImmutablePaths().
+    std::vector<std::unique_ptr<FieldRef>> _immutablePaths;
+
 private:
     bool _isMultiWrite() const {
         return _params.isMulti;
@@ -266,8 +269,5 @@ private:
     // A pending retry to get to after a NEED_YIELD propagation and a new storage snapshot is
     // established. This can be set when a write fails or when a fetch fails.
     WorkingSetID _retryBucketId = WorkingSet::INVALID_ID;
-
-    // Temporary storage for _getImmutablePaths().
-    std::vector<std::unique_ptr<FieldRef>> _immutablePaths;
 };
 }  //  namespace mongo

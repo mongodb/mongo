@@ -49,6 +49,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/shard_role_api',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_conversion_util',
         '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
+        '$BUILD_DIR/mongo/db/timeseries/timeseries_write_util',
         'query/cluster_query',
         'sharding_router_api',
         'write_ops/batch_write_types',

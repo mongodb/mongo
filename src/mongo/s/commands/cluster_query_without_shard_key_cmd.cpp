@@ -209,6 +209,7 @@ ParsedCommandInfo parseWriteCommand(OperationContext* opCtx, const BSONObj& writ
 
         if ((parsedInfo.upsert = updateRequest.getUpdates().front().getUpsert())) {
             parsedInfo.updateRequest = updateRequest.getUpdates().front();
+            parsedInfo.updateRequest->setNamespaceString(updateRequest.getNamespace());
         }
 
         if (auto parsedCollation = updateRequest.getUpdates().front().getCollation()) {
@@ -399,9 +400,19 @@ public:
             // If there are no targetable documents and {upsert: true}, create the document to
             // upsert.
             if (!res.getTargetDoc() && parsedInfoFromRequest.upsert) {
-                res.setTargetDoc(write_without_shard_key::generateUpsertDocument(
-                    opCtx, parsedInfoFromRequest.updateRequest.get()));
+                auto [upsertDoc, userUpsertDoc] = write_without_shard_key::generateUpsertDocument(
+                    opCtx,
+                    parsedInfoFromRequest.updateRequest.get(),
+                    timeseriesFields
+                        ? boost::make_optional(timeseriesFields->getTimeseriesOptions())
+                        : boost::none,
+                    cri.cm.getDefaultCollator());
+                res.setTargetDoc(upsertDoc);
                 res.setUpsertRequired(true);
+
+                if (timeseriesFields) {
+                    res.setUserUpsertDocForTimeseries(userUpsertDoc);
+                }
             }
 
             return res;

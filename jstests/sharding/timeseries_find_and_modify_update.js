@@ -287,9 +287,6 @@ const replacementDoc = {
             returnNew: true,
         },
         res: {
-            // TODO SERVER-77775: Reenable the verification.
-            errorCode: 7687101,
-            /*
             resultDocList: resultDocList,
             returnDoc: returnDoc,
             writeType: "targeted",
@@ -305,16 +302,12 @@ const replacementDoc = {
             nMatched: 0,
             nModified: 0,
             nUpserted: 1,
-            */
         },
     });
 })();
 
 // The update is targeted but there's actually no match. The update becomes an upsert but the
-// replacement document has a different shard key value. For now, the upsert succeeds but the new
-// document is inserted to the wrong shard. This should be blocked until SERVER-77775 is fixed.
-// TODO SERVER-77775 Enable this test.
-/*
+// replacement document has a different shard key value.
 (function testTargetedReplacementUpsertByMetaAndFieldFilter() {
     const replacementDoc = Object.assign(
         {}, {_id: -100, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(10), f: 2345});
@@ -323,6 +316,7 @@ const replacementDoc = {
 
     testFindOneAndUpdateOnShardedCollection({
         initialDocList: docs,
+        startTxn: true,
         cmd: {
             filter: {[metaFieldName]: "B", f: 2345},
             update: replacementDoc,
@@ -338,89 +332,7 @@ const replacementDoc = {
         },
     });
 })();
-*/
 
-// This test case causes an interesting test failure. It seems that the measurement doc is validated
-// against bucket schema at the mongos side.
-// TODO SERVER-77775: Enable this test.
-/*
-{
-    "ok" : 0,
-    "errmsg" : "Document failed validation",
-    "code" : 121,
-    "codeName" : "DocumentValidationFailure",
-    "errInfo" : {
-        "failingDocumentId" : -100,
-        "details" : {
-            "operatorName" : "$jsonSchema",
-            "schemaRulesNotSatisfied" : [
-                {
-                    "operatorName" : "properties",
-                    "propertiesNotSatisfied" : [
-                        {
-                            "propertyName" : "_id",
-                            "details" : [
-                                {
-                                    "operatorName" : "bsonType",
-                                    "specifiedAs" : {
-                                        "bsonType" : "objectId"
-                                    },
-                                    "reason" : "type did not match",
-                                    "consideredValue" : -100,
-                                    "consideredType" : "double"
-                                }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    "operatorName" : "additionalProperties",
-                    "specifiedAs" : {
-                        "additionalProperties" : false
-                    },
-                    "additionalProperties" : [
-                        "tag",
-                        "time",
-                        "f"
-                    ]
-                },
-                {
-                    "operatorName" : "additionalProperties",
-                    "specifiedAs" : {
-                        "additionalProperties" : false
-                    },
-                    "additionalProperties" : [
-                        "tag",
-                        "time",
-                        "f"
-                    ]
-                },
-                {
-                    "operatorName" : "required",
-                    "specifiedAs" : {
-                        "required" : [
-                            "_id",
-                            "control",
-                            "data"
-                        ]
-                    },
-                    "missingProperties" : [
-                        "control",
-                        "data"
-                    ]
-                }
-            ]
-        }
-    },
-    "$clusterTime" : {
-        "clusterTime" : Timestamp(1685747650, 18),
-        "signature" : {
-            "hash" : BinData(0,"AAAAAAAAAAAAAAAAAAAAAAAAAAA="),
-            "keyId" : NumberLong(0)
-        }
-    },
-    "operationTime" : Timestamp(1685747650, 16)
-}
 (function testTwoPhaseReplacementUpsertByFieldFilter() {
     const replacementDoc = Object.assign(
         {}, {_id: -100, [metaFieldName]: "A", [timeFieldName]: generateTimeValue(10), f: 2345});
@@ -439,12 +351,13 @@ const replacementDoc = {
             resultDocList: resultDocList,
             returnDoc: replacementDoc,
             writeType: "twoPhaseProtocol",
-            dataBearingShard: "any",
+            // For a two-phase upsert, no shard will get the targeted findAndModify update command.
+            // Instead, one of them will get an insert command.
+            dataBearingShard: "none",
             nUpserted: 1,
         },
     });
 })();
-*/
 
 // Query on the time field leads to a targeted update when the time field is included in the shard
 // key.

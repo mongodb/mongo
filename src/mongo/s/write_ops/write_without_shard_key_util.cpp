@@ -34,7 +34,9 @@
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
+#include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
@@ -67,7 +69,11 @@ bool shardKeyHasCollatableType(const BSONObj& shardKey) {
 }
 }  // namespace
 
-BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest) {
+std::pair<BSONObj, BSONObj> generateUpsertDocument(
+    OperationContext* opCtx,
+    const UpdateRequest& updateRequest,
+    boost::optional<TimeseriesOptions> timeseriesOptions,
+    const StringData::ComparatorInterface* comparator) {
     // We are only using this to parse the query for producing the upsert document.
     ParsedUpdateForMongos parsedUpdate(opCtx, &updateRequest);
     uassertStatusOK(parsedUpdate.parseRequest());
@@ -83,7 +89,17 @@ BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& upd
                                      immutablePaths,
                                      parsedUpdate.getDriver()->getDocument());
 
-    return parsedUpdate.getDriver()->getDocument().getObject();
+    auto upsertDoc = parsedUpdate.getDriver()->getDocument().getObject();
+    if (!timeseriesOptions) {
+        return {upsertDoc, BSONObj()};
+    }
+
+    tassert(7777500,
+            "Expected timeseries buckets collection namespace",
+            updateRequest.getNamespaceString().isTimeseriesBucketsCollection());
+    auto upsertBucketObj = timeseries::makeBucketDocument(
+        std::vector{upsertDoc}, updateRequest.getNamespaceString(), *timeseriesOptions, comparator);
+    return {upsertBucketObj, upsertDoc};
 }
 
 BSONObj constructUpsertResponse(BatchedCommandResponse& writeRes,
@@ -269,11 +285,13 @@ StatusWith<ClusterWriteWithoutShardKeyResponse> runTwoPhaseWriteProtocol(Operati
                 auto writeRes = txnClient.runCRUDOpSync(insertRequest,
                                                         std::vector<StmtId>{kUninitializedStmtId});
 
-                auto upsertResponse =
-                    constructUpsertResponse(writeRes,
-                                            queryResponse.getTargetDoc().get(),
-                                            sharedBlock->cmdObj.firstElementFieldNameStringData(),
-                                            sharedBlock->cmdObj.getBoolField("new"));
+                auto upsertResponse = constructUpsertResponse(
+                    writeRes,
+                    queryResponse.getUserUpsertDocForTimeseries()
+                        ? queryResponse.getUserUpsertDocForTimeseries().get()
+                        : queryResponse.getTargetDoc().get(),
+                    sharedBlock->cmdObj.firstElementFieldNameStringData(),
+                    sharedBlock->cmdObj.getBoolField("new"));
 
                 sharedBlock->clusterWriteResponse = ClusterWriteWithoutShardKeyResponse::parseOwned(
                     IDLParserContext("_clusterWriteWithoutShardKeyResponse"),

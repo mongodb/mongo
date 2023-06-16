@@ -334,6 +334,20 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
             upsert: true
         });
     })();
+
+    // Run a replacement upsert that includes an _id in the query.
+    (function testReplacementUpsertWithId() {
+        testUpdateOne({
+            initialDocList: [doc_t2023_m1_id1_a1],
+            updateQuery: {_id: 100},
+            updateObj: {[timeFieldName]: ISODate("2023-02-06T19:19:01Z"), a: 5},
+            upsert: true,
+            resultDocList: [
+                doc_t2023_m1_id1_a1,
+                {_id: 100, [timeFieldName]: ISODate("2023-02-06T19:19:01Z"), a: 5}
+            ],
+        });
+    })();
 }
 
 /**

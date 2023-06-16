@@ -27,7 +27,7 @@ const docs = [
     doc7_c_f106,
 ];
 
-function verifyDeleteOneRes(res, nAffected) {
+function verifyUpdateDeleteOneRes(res, nAffected) {
     assert.eq(nAffected, res.n, tojson(res));
 }
 
@@ -48,23 +48,19 @@ function testWriteOneOnCollectionWithStaleShardingState({
     const callerName = getCallerName();
     jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
 
-    let findAndModifyCmd = false;
-    let deleteOneCmd = false;
-    let updateOneCmd = false;
+    let isFindAndModifyCmd = false;
     // The collection name is same as the caller name.
     const collName = (() => {
         if (writeCmd.hasOwnProperty("findAndModify")) {
-            findAndModifyCmd = true;
+            isFindAndModifyCmd = true;
             writeCmd["findAndModify"] = callerName;
             return writeCmd["findAndModify"];
         } else if (writeCmd.hasOwnProperty("delete") && writeCmd["deletes"].length === 1 &&
                    writeCmd["deletes"][0].limit === 1) {
-            deleteOneCmd = true;
             writeCmd["delete"] = callerName;
             return writeCmd["delete"];
         } else if (writeCmd.hasOwnProperty("update") && writeCmd["updates"].length === 1 &&
                    !writeCmd["updates"][0].multi) {
-            updateOneCmd = true;
             writeCmd["update"] = callerName;
             return writeCmd["update"];
         } else {
@@ -83,10 +79,10 @@ function testWriteOneOnCollectionWithStaleShardingState({
     // should be able to refresh its sharding state from the config server and retry the write
     // command internally.
     let res = assert.commandWorked(mongos1DB[collName].runCommand(writeCmd));
-    if (deleteOneCmd) {
-        verifyDeleteOneRes(res, nAffected);
-    } else if (findAndModifyCmd) {
+    if (isFindAndModifyCmd) {
         verifyFindAndModifyRes(res, nAffected, resultDoc);
+    } else {
+        verifyUpdateDeleteOneRes(res, nAffected);
     }
 
     // This will cause mongos1 to have the up-to-date sharding state but this state will be soon
@@ -103,10 +99,10 @@ function testWriteOneOnCollectionWithStaleShardingState({
     // This write command should succeed since mongos1 should have refreshed its sharding state.
     res = assert.commandWorked(mongos1DB[collName].runCommand(writeCmd));
     jsTestLog(tojson(res));
-    if (deleteOneCmd) {
-        verifyDeleteOneRes(res, nAffected);
-    } else if (findAndModifyCmd) {
+    if (isFindAndModifyCmd) {
         verifyFindAndModifyRes(res, nAffected, resultDoc);
+    } else {
+        verifyUpdateDeleteOneRes(res, nAffected);
     }
 }
 
@@ -144,7 +140,32 @@ setUpShardedCluster({nMongos: 2});
     });
 })();
 
-// TODO SERVER-77132: Add tests for updateOne / findAndModify upsert.
+(function testFindAndModifyUpsertOnCollectionWithStaleShardingState() {
+    const replacementDoc = {_id: 1000, tag: "A", time: generateTimeValue(0), f: 1000};
+    testWriteOneOnCollectionWithStaleShardingState({
+        writeCmd: {
+            findAndModify: "$$$",
+            query: {f: 1000},
+            update: replacementDoc,
+            upsert: true,
+            new: true
+        },
+        nAffected: 1,
+        resultDoc: replacementDoc,
+    });
+})();
+
+(function testUpdateOneUpsertOnCollectionWithStaleShardingState() {
+    const replacementDoc = {_id: 1000, tag: "A", time: generateTimeValue(0), f: 1000};
+    testWriteOneOnCollectionWithStaleShardingState({
+        writeCmd: {
+            update: "$$$",
+            updates: [{q: {f: 1000}, u: replacementDoc, multi: false, upsert: true}]
+        },
+        nAffected: 1,
+        resultDoc: replacementDoc,
+    });
+})();
 
 tearDownShardedCluster();
 })();

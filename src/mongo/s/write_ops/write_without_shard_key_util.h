@@ -46,7 +46,11 @@ const BSONObj targetDocForExplain = BSON("_id"
 /**
  * Uses updateDriver to produce the document to insert. Only use when {upsert: true}.
  */
-BSONObj generateUpsertDocument(OperationContext* opCtx, const UpdateRequest& updateRequest);
+std::pair<BSONObj, BSONObj> generateUpsertDocument(
+    OperationContext* opCtx,
+    const UpdateRequest& updateRequest,
+    boost::optional<TimeseriesOptions> timeseriesOptions,
+    const StringData::ComparatorInterface* comparator);
 
 /**
  * Returns true if we can use the two phase protocol to complete a single write without shard
