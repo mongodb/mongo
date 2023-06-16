@@ -264,6 +264,19 @@ BSONObj ChunkMap::toBSON() const {
     return builder.obj();
 }
 
+std::string ChunkMap::toString() const {
+    StringBuilder sb;
+
+    sb << "Chunks (" << size() << "):\n";
+    for (const auto& chunkInfoPtr : _chunkMap) {
+        sb << "\t" << chunkInfoPtr->toString() << '\n';
+    }
+
+    sb << "Collection placement version:" << _collectionPlacementVersion.toString() << '\n';
+
+    return sb.str();
+}
+
 bool ChunkMap::allElementsAreOfType(BSONType type, const BSONObj& obj) {
     for (auto&& elem : obj) {
         if (elem.type() != type) {
@@ -539,11 +552,7 @@ std::string RoutingTableHistory::toString() const {
     sb << "RoutingTableHistory: " << toStringForLogging(_nss)
        << " key: " << _shardKeyPattern.toString() << '\n';
 
-    sb << "Chunks:\n";
-    _chunkMap.forEach([&sb](const auto& chunk) {
-        sb << "\t" << chunk->toString() << '\n';
-        return true;
-    });
+    sb << _chunkMap.toString();
 
     sb << "Shard placement versions:\n";
     for (const auto& entry : _placementVersions) {
