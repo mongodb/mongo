@@ -661,8 +661,6 @@ private:
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
-            _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion, actualVersion);
-            // Depends on _setOnCurrentShardSinceFieldOnChunks()
             _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
             _setShardedClusterCardinalityParam(opCtx, requestedVersion);
@@ -824,17 +822,6 @@ private:
                     configsvrSetClusterParameter.toBSON({}),
                     Shard::RetryPolicy::kIdempotent));
             uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
-        }
-    }
-
-    // TODO (SERVER-72791): Remove once FCV 7.0 becomes last-lts.
-    void _setOnCurrentShardSinceFieldOnChunks(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion actualVersion) {
-        if (feature_flags::gAutoMerger.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, actualVersion)) {
-            ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx);
         }
     }
 

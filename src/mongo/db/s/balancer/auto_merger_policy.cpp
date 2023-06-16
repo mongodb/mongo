@@ -35,7 +35,6 @@
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -68,8 +67,7 @@ bool AutoMergerPolicy::isEnabled() {
 
 void AutoMergerPolicy::checkInternalUpdates() {
     stdx::lock_guard<Latch> lk(_mutex);
-    if (!feature_flags::gAutoMerger.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !_enabled) {
+    if (!_enabled) {
         return;
     }
     _checkInternalUpdatesWithLock(lk);
@@ -83,8 +81,7 @@ boost::optional<BalancerStreamAction> AutoMergerPolicy::getNextStreamingAction(
     OperationContext* opCtx) {
     stdx::unique_lock<Latch> lk(_mutex);
 
-    if (!feature_flags::gAutoMerger.isEnabled(serverGlobalParams.featureCompatibility) ||
-        !_enabled) {
+    if (!_enabled) {
         return boost::none;
     }
 

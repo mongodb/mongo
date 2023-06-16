@@ -556,14 +556,6 @@ public:
                               const Timestamp& validAfter);
 
     /**
-     * Set `onCurrentShardSince` to the same value as `history[0].validAfter` for all config.chunks
-     * entries.
-     * Only called on the FCV upgrade
-     * TODO (SERVER-72791): Remove the method once FCV 7.0 becomes last-lts.
-     */
-    void setOnCurrentShardSinceFieldOnChunks(OperationContext* opCtx);
-
-    /**
      * Returns a catalog client that will always run commands locally. Can only be used on a
      * config server node.
      */
