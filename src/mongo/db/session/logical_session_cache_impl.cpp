@@ -69,6 +69,12 @@ LogicalSessionCacheImpl::LogicalSessionCacheImpl(std::unique_ptr<ServiceLiaison>
     _stats.setLastSessionsCollectionJobTimestamp(_service->now());
     _stats.setLastTransactionReaperJobTimestamp(_service->now());
 
+    // Skip initializing this background thread when using 'recoverFromOplogAsStandalone=true' as
+    // the server is put in read-only mode after oplog recovery.
+    if (repl::ReplSettings::shouldRecoverFromOplogAsStandalone()) {
+        return;
+    }
+
     if (!disableLogicalSessionCacheRefresh) {
         _service->scheduleJob({"LogicalSessionCacheRefresh",
                                [this](Client* client) { _periodicRefresh(client); },
