@@ -1714,11 +1714,8 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
     // operator, we know we won't make clustered collection scans.
     if (!inArrayOperator && 0 != root->numChildren()) {
         bool clusteredCollection = params.clusteredInfo.has_value();
-        bool possibleToCollscan =
-            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::GEO_NEAR) &&
-            !QueryPlannerCommon::hasNode(query.root(), MatchExpression::TEXT);
         const bool isTailable = query.getFindCommandRequest().getTailable();
-        if (clusteredCollection && possibleToCollscan) {
+        if (clusteredCollection) {
             auto clusteredScanDirection =
                 QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
             while (0 < root->numChildren()) {
@@ -1727,10 +1724,16 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
                 std::unique_ptr<QuerySolutionNode> collScan =
                     makeCollectionScan(query, isTailable, params, clusteredScanDirection, child);
                 // Confirm the collection scan node is a clustered collection scan.
-                if (!static_cast<CollectionScanNode*>(collScan.get())
-                         ->doClusteredCollectionScanClassic()) {
+                CollectionScanNode* collScanNode = static_cast<CollectionScanNode*>(collScan.get());
+                if (!collScanNode->doClusteredCollectionScanClassic()) {
                     return nullptr;
                 }
+
+                // Caching OR queries with collection scans is restricted, since it is challenging
+                // to determine which match expressions from the input query require a clustered
+                // collection scan. Therefore, we cannot correctly calculate the correct bounds for
+                // the query using the cached plan.
+                collScanNode->markNotEligibleForPlanCache();
                 scanNodes.push_back(std::move(collScan));
                 // Erase child from root.
                 root->getChildVector()->erase(root->getChildVector()->begin());

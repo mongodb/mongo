@@ -60,7 +60,7 @@ selector:
   - jstests/core/**/index_bounds_pipe.js
   # Expects an index on _id to cover the query.
   - jstests/core/**/covered_index_simple_id.js
-  # TODO (SERVER-61259): $text not supported: "No query solutions"
+  # TODO (SERVER-78045): $text not supported: "No query solutions"
   - jstests/core/**/fts6.js
   - jstests/core/**/fts_projection.js
 

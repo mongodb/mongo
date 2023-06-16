@@ -255,6 +255,11 @@ struct QuerySolutionNode {
     bool hasNode(StageType type) const;
 
     /**
+     * True, if this node, and all of it's children are eligible to be cached.
+     */
+    bool isEligibleForPlanCache() const;
+
+    /**
      * Returns the id associated with this node. Each node in a 'QuerySolution' tree is assigned a
      * unique identifier, which are assigned as sequential positive integers starting from 1.  An id
      * of 0 means that no id was explicitly assigned during construction of the QuerySolution.
@@ -296,6 +301,8 @@ protected:
             other->filter = this->filter->clone();
         }
     }
+
+    bool eligibleForPlanCache = true;
 
 private:
     // Allows the QuerySolution constructor to set '_nodeId'.
@@ -343,6 +350,13 @@ public:
      */
     bool hasNode(StageType type) const {
         return _root && _root->hasNode(type);
+    }
+
+    /**
+     * Return true if all nodes in the solution tree can be cached.
+     */
+    bool isEligibleForPlanCache() const {
+        return !_root || _root->isEligibleForPlanCache();
     }
 
     /**
@@ -461,6 +475,10 @@ struct CollectionScanNode : public QuerySolutionNodeWithSortSet {
     // Tells whether this scan will be performed as a clustered collection scan in classic.
     bool doClusteredCollectionScanClassic() const {
         return (isClustered && !isOplog && (minRecord || maxRecord));
+    }
+
+    void markNotEligibleForPlanCache() {
+        eligibleForPlanCache = false;
     }
 
     std::unique_ptr<QuerySolutionNode> clone() const final;

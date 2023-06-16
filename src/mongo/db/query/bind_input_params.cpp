@@ -459,32 +459,25 @@ void bindClusteredCollectionBounds(const CanonicalQuery& cq,
                                    const stage_builder::PlanStageData* data,
                                    sbe::RuntimeEnvironment* runtimeEnvironment) {
     // Arguments needed to mimic the original build-time bounds setting from the current query.
-    //
-    // If the 'cq' is an OR query, then every child of the OR query that uses a clustered collection
-    // scan needs to be bound to its correct slot. However, queries with a 'min' or 'max' set
-    // default to clustered collection scans, and should not be iterated through.
     auto clusteredBoundInfos = data->staticData->clusteredCollBoundsInfos;
-    std::vector<MatchExpression*> conjuncts;
+    const MatchExpression* conjunct = cq.root();  // this is csn->filter
     bool minAndMaxEmpty = cq.getFindCommandRequest().getMin().isEmpty() &&
         cq.getFindCommandRequest().getMax().isEmpty();
-    if (cq.root()->matchType() == MatchExpression::OR && minAndMaxEmpty) {
-        for (auto& child : *cq.root()->getChildVector()) {
-            if (child->path() == data->staticData->clusterKeyFieldName) {
-                conjuncts.emplace_back(child.get());
-            }
-        }
-    } else {
-        // this is csn->filter
-        conjuncts.emplace_back(cq.root());
-    }
+
+    // Caching OR queries with collection scans is restricted, since it is challenging to determine
+    // which match expressions from the input query require a clustered collection scan. Therefore,
+    // we cannot correctly calculate the correct bounds for the query using the cached plan.
+    tassert(6125900,
+            "OR queries with clustered collection scans are not supported by the SBE cache.",
+            cq.root()->matchType() != MatchExpression::OR || !minAndMaxEmpty);
+
     tassert(7228000,
-            "Must have the same number of slots saved as collection scans requested.",
-            conjuncts.size() == clusteredBoundInfos.size());
+            "We only expect to cache plans with one clustered collection scan.",
+            1 == clusteredBoundInfos.size());
 
     const CollatorInterface* queryCollator = cq.getCollator();  // current query's desired collator
 
     for (size_t i = 0; i < clusteredBoundInfos.size(); ++i) {
-        MatchExpression* conjunct = conjuncts[i];
         // The outputs produced by the QueryPlannerAccess APIs below (passed by reference).
         boost::optional<RecordIdBound> minRecord;  // scan start bound
         boost::optional<RecordIdBound> maxRecord;  // scan end bound

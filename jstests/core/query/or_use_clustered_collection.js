@@ -20,7 +20,6 @@ load("jstests/libs/sbe_util.js");                  // for checkSBEEnabled
 
 const coll = db.or_use_clustered_collection;
 assertDropCollection(db, coll.getName());
-const numDocs = 10;
 
 // Create a clustered collection and create indexes.
 assert.commandWorked(
@@ -31,8 +30,10 @@ assert.commandWorked(coll.createIndex({b: "text"}));
 
 // Insert documents, and store them to be used later in the test.
 const docs = [];
+const textFields = ["foo", "one", "two", "three", "four", "foo", "foo", "seven", "eight", "nine"];
+const numDocs = textFields.length;
 for (let i = 0; i < numDocs; i++) {
-    docs.push({b: "foo", a: i, _id: i, c: i * 2, d: [{e: i * 2}, {g: i / 2}], noIndex: i});
+    docs.push({b: textFields[i], a: i, _id: i, c: i * 2, d: [{e: i * 2}, {g: i / 2}], noIndex: i});
 }
 assert.commandWorked(coll.insertMany(docs));
 
@@ -257,6 +258,13 @@ validateQueryOR({
     expectedDocIds: [0, 1, 2, 3, 4, 8, 9]
 });
 
+// $or query where the branch of the clustered collection scan is not a leaf node.
+validateQueryOR({
+    query: {$or: [{a: 1}, {$and: [{_id: {$gt: 7}}, {_id: {$lt: 10}}]}]},
+    expectedStageCount: {"CLUSTERED_IXSCAN": 1, "IXSCAN": 1, "FETCH": 1},
+    expectedDocIds: [1, 8, 9]
+});
+
 // $or inside an $and should not change, and still use a FETCH with an IXSCAN.
 validateQueryPlan({
     query: {$and: [{a: {$gte: 8}}, {$or: [{_id: 2}, {c: {$gt: 10}}]}]},
@@ -323,50 +331,42 @@ function validateQuerySort() {
 }
 validateQuerySort();
 
-// These tests validate that the plan cache works with these new plans by running two similar plans
-// but with different bounds. The first query will be cached and used by the second query.
+//
+// These tests validate that $or queries with a text index work.
+//
 
-// Validate queries with a single equality clustered collection scan.
-assertCorrectResults({query: coll.find({$or: [{_id: 123}, {a: 12}]}), expectedDocIds: []});
-assertCorrectResults({query: coll.find({$or: [{_id: 6}, {a: 5}]}), expectedDocIds: [5, 6]});
-
-// Validate queries with multiple equality clustered collection scans.
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: 100}, {_id: 123}, {a: 11}]}), expectedDocIds: []});
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: 9}, {_id: 5}, {a: 4}]}), expectedDocIds: [4, 5, 9]});
-
-// Validate queries with multiple range clustered collection scans.
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: {$lt: -1}}, {_id: {$gt: 10}}, {a: 12}]}), expectedDocIds: []});
-assertCorrectResults({
-    query: coll.find({$or: [{_id: {$lt: 1}}, {_id: {$gt: 8}}, {a: 4}]}),
-    expectedDocIds: [0, 4, 9]
+// Basic case $or with text and a clustered collection scan.
+validateQueryOR({
+    query: {$or: [{$text: {$search: "foo"}}, {_id: 1}]},
+    expectedStageCount: {"CLUSTERED_IXSCAN": 1, "TEXT_MATCH": 1, "IXSCAN": 1},
+    expectedDocIds: [0, 1, 5, 6]
 });
 
-// Validate queries with both range and equality clustered collection scans.
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: {$lt: -1}}, {_id: 11}, {a: 12}]}), expectedDocIds: []});
-assertCorrectResults(
-    {query: coll.find({$or: [{_id: {$lt: 2}}, {_id: 8}, {a: 4}]}), expectedDocIds: [0, 1, 4, 8]});
-
-// Validate queries with 'max' and 'min' set have the correct results. These plans fall back to
-// collection scans by the query planner for clustered collections.
-assertCorrectResults({
-    query: coll.find({$or: [{_id: 123}, {a: 12}]}).max({_id: 4}).hint({_id: 1}),
-    expectedDocIds: []
-});
-assertCorrectResults({
-    query: coll.find({$or: [{_id: 6}, {a: 5}]}).max({_id: 6}).hint({_id: 1}),
-    expectedDocIds: [5]
+// $or with a text index work with a clustered collection scan plan and a secondary index scan plan.
+// We expected 2 IXSCAN nodes because the TEXT_MATCH stage has a IXSCAN node child, and there is an
+// index scan plan for the {a: 9} predicate.
+validateQueryOR({
+    query: {$or: [{$text: {$search: "foo"}}, {_id: {$lt: 2}}, {a: 9}]},
+    expectedStageCount: {"CLUSTERED_IXSCAN": 1, "TEXT_MATCH": 1, "IXSCAN": 2},
+    expectedDocIds: [0, 1, 5, 6, 9]
 });
 
-assertCorrectResults({
-    query: coll.find({$or: [{_id: 8}, {a: 5}]}).min({_id: 6}).hint({_id: 1}),
-    expectedDocIds: [8]
+// $or inside an and with a text index works.
+validateQueryPlan({
+    query: {$and: [{a: {$gte: 8}}, {$or: [{$text: {$search: "foo"}}, {c: {$gt: 10}}]}]},
+    expectedStageCount: {"FETCH": 2, "IXSCAN": 2, "TEXT_MATCH": 1},
+    expectedDocIds: [8, 9],
 });
-assertCorrectResults({
-    query: coll.find({$or: [{_id: 123}, {a: 12}]}).min({_id: 4}).hint({_id: 1}),
-    expectedDocIds: []
+
+// $or inside an or with a text index works.
+validateQueryOR({
+    query: {$or: [{_id: {$gte: 8}}, {$or: [{$text: {$search: "foo"}}, {c: {$gt: 10}}]}]},
+    expectedStageCount: {"FETCH": 2, "IXSCAN": 2, "TEXT_MATCH": 1, "CLUSTERED_IXSCAN": 1},
+    expectedDocIds: [0, 5, 6, 7, 8, 9],
 });
+
+// $or with a text index and an unindexed field should still fail.
+const err =
+    assert.throws(() => coll.find({$or: [{$text: {$search: "foo"}}, {noIndex: 1}]}).toArray());
+assert.commandFailedWithCode(err, ErrorCodes.NoQueryExecutionPlans);
 }());

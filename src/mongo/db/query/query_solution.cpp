@@ -176,6 +176,20 @@ bool QuerySolutionNode::hasNode(StageType type) const {
     return false;
 }
 
+bool QuerySolutionNode::isEligibleForPlanCache() const {
+    if (!eligibleForPlanCache) {
+        return false;
+    }
+
+    for (auto&& child : children) {
+        if (!child->isEligibleForPlanCache()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 std::string QuerySolution::summaryString() const {
     tassert(5968205, "QuerySolutionNode cannot be null in this QuerySolution", _root);
 

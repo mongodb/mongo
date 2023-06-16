@@ -75,7 +75,7 @@ void updatePlanCache(OperationContext* opCtx,
                      const sbe::PlanStage& root,
                      stage_builder::PlanStageData& stageData) {
     const CollectionPtr& collection = collections.getMainCollection();
-    if (collection && shouldCacheQuery(query)) {
+    if (collection && shouldCacheQuery(query) && solution.isEligibleForPlanCache()) {
         sbe::PlanCacheKey key = plan_cache_key_factory::make(query, collections);
         auto plan = std::make_unique<sbe::CachedSbePlan>(root.clone(), stageData);
         plan->indexFilterApplied = solution.indexFilterApplied;
