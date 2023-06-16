@@ -68,8 +68,8 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::removeShard)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::removeShard)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

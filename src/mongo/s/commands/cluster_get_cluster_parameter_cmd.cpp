@@ -90,7 +90,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to retrieve cluster parameters",
                     authzSession->isAuthorizedForPrivilege(Privilege{
-                        ResourcePattern::forClusterResource(), ActionType::getClusterParameter}));
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::getClusterParameter}));
         }
 
         NamespaceString ns() const override {

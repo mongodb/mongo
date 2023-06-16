@@ -84,20 +84,21 @@ public:
             const bool nameOnly = cmd.getNameOnly();
 
             // { authorizedDatabases: bool } - Dynamic default based on perms.
-            const bool authorizedDatabases = ([as](const boost::optional<bool>& authDB) {
-                const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::listDatabases);
-                if (authDB) {
-                    uassert(ErrorCodes::Unauthorized,
-                            "Insufficient permissions to list all databases",
-                            authDB.value() || mayListAllDatabases);
-                    return authDB.value();
-                }
+            const bool authorizedDatabases =
+                ([as, tenantId = cmd.getDbName().tenantId()](const boost::optional<bool>& authDB) {
+                    const bool mayListAllDatabases = as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(tenantId), ActionType::listDatabases);
+                    if (authDB) {
+                        uassert(ErrorCodes::Unauthorized,
+                                "Insufficient permissions to list all databases",
+                                authDB.value() || mayListAllDatabases);
+                        return authDB.value();
+                    }
 
-                // By default, list all databases if we can, otherwise
-                // only those we're allowed to find on.
-                return !mayListAllDatabases;
-            })(cmd.getAuthorizedDatabases());
+                    // By default, list all databases if we can, otherwise
+                    // only those we're allowed to find on.
+                    return !mayListAllDatabases;
+                })(cmd.getAuthorizedDatabases());
 
             auto const shardRegistry = Grid::get(opCtx)->shardRegistry();
 

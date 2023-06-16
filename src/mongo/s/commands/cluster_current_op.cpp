@@ -51,11 +51,12 @@ public:
     ClusterCurrentOpCommand() = default;
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const final {
-        bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
-                                ->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(), ActionType::inprog);
+        bool isAuthorized =
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::inprog);
 
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
@@ -82,7 +83,7 @@ private:
             ClusterAggregate::Namespaces{nss, nss},
             request,
             {request},
-            {Privilege(ResourcePattern::forClusterResource(), ActionType::inprog)},
+            {Privilege(ResourcePattern::forClusterResource(nss.tenantId()), ActionType::inprog)},
             &responseBuilder);
 
         if (!status.isOK()) {

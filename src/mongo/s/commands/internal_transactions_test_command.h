@@ -134,11 +134,13 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(Base::request().getDbName().tenantId()),
+                        ActionType::internal));
         }
 
         std::shared_ptr<executor::TaskExecutor> getTransactionExecutor() {
