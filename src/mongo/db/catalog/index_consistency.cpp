@@ -614,21 +614,12 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
     // when validating index consistency
     (*numRecords) -= results.keysRemovedFromRecordStore;
 
-    // Do not fail on finding too few index entries compared to collection entries when full:false.
-    bool hasTooFewKeys = false;
-    const bool noErrorOnTooFewKeys = !_validateState->isFullIndexValidation();
-
     if (desc->isIdIndex() && numTotalKeys != (*numRecords)) {
-        hasTooFewKeys = (numTotalKeys < (*numRecords));
         const std::string msg = str::stream()
             << "number of _id index entries (" << numTotalKeys
             << ") does not match the number of documents in the index (" << (*numRecords) << ")";
-        if (noErrorOnTooFewKeys && (numTotalKeys < (*numRecords))) {
-            results.warnings.push_back(msg);
-        } else {
-            results.errors.push_back(msg);
-            results.valid = false;
-        }
+        results.errors.push_back(msg);
+        results.valid = false;
     }
 
     // Hashed indexes may never be multikey.
@@ -656,23 +647,11 @@ void KeyStringIndexConsistency::validateIndexKeyCount(OperationContext* opCtx,
     // index may be a full text, geo or special index plugin with different semantics.
     if (results.valid && !desc->isSparse() && !desc->isPartial() && !desc->isIdIndex() &&
         desc->getAccessMethodName() == "" && numTotalKeys < (*numRecords)) {
-        hasTooFewKeys = true;
         const std::string msg = str::stream()
             << "index " << desc->indexName() << " is not sparse or partial, but has fewer entries ("
             << numTotalKeys << ") than documents in the index (" << (*numRecords) << ")";
-        if (noErrorOnTooFewKeys) {
-            results.warnings.push_back(msg);
-        } else {
-            results.errors.push_back(msg);
-            results.valid = false;
-        }
-    }
-
-    if (!_validateState->isFullIndexValidation() && hasTooFewKeys) {
-        const std::string warning = str::stream()
-            << "index " << desc->indexName() << " has fewer keys than records."
-            << " Please re-run the validate command with {full: true}";
-        results.warnings.push_back(warning);
+        results.errors.push_back(msg);
+        results.valid = false;
     }
 }
 
