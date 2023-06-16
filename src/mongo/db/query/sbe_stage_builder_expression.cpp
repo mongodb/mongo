@@ -2961,7 +2961,21 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionStrLenBytes* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 1);
+        _context->ensureArity(1);
+
+        auto strName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto strExpression = _context->popABTExpr();
+        auto strVar = makeVariable(strName);
+
+        auto strLenBytesExpr = optimizer::make<optimizer::If>(
+            makeFillEmptyFalse(makeABTFunction("isString", strVar)),
+            makeABTFunction("strLenBytes", strVar),
+            makeABTFail(ErrorCodes::Error{5155800}, "$strLenBytes requires a string argument"));
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(strName), std::move(strExpression), std::move(strLenBytesExpr)));
+        return;
     }
     void visit(const ExpressionBinarySize* expr) final {
         unsupportedExpression(expr->getOpName());

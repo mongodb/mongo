@@ -3688,6 +3688,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(ArityTy
     return {false, value::TypeTags::Nothing, 0};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [_, operandTag, operandVal] = getFromStack(0);
+
+    if (value::isString(operandTag)) {
+        auto str = value::getStringView(operandTag, operandVal);
+        auto strLenBytes = str.size();
+        uassert(5155801,
+                "string length could not be represented as an int.",
+                strLenBytes <= std::numeric_limits<int>::max());
+        return {false, value::TypeTags::NumberInt32, strLenBytes};
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(ArityType arity) {
     auto [_, operandTag, operandVal] = getFromStack(0);
 
@@ -6673,6 +6689,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinBitTestPosition(arity);
         case Builtin::bsonSize:
             return builtinBsonSize(arity);
+        case Builtin::strLenBytes:
+            return builtinStrLenBytes(arity);
         case Builtin::toUpper:
             return builtinToUpper(arity);
         case Builtin::toLower:
@@ -6982,6 +7000,8 @@ std::string builtinToString(Builtin b) {
             return "bitTestPosition";
         case Builtin::bsonSize:
             return "bsonSize";
+        case Builtin::strLenBytes:
+            return "strLenBytes";
         case Builtin::toUpper:
             return "toUpper";
         case Builtin::toLower:

@@ -3374,9 +3374,7 @@ public:
 class ExpressionStrLenBytes final : public ExpressionFixedArity<ExpressionStrLenBytes, 1> {
 public:
     explicit ExpressionStrLenBytes(ExpressionContext* const expCtx)
-        : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx) {
-        expCtx->sbeCompatibility = SbeCompatibility::notCompatible;
-    }
+        : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx) {}
 
     ExpressionStrLenBytes(ExpressionContext* const expCtx, ExpressionVector&& children)
         : ExpressionFixedArity<ExpressionStrLenBytes, 1>(expCtx, std::move(children)) {}
