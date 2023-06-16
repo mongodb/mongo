@@ -41,7 +41,6 @@ namespace mongo {
 
 class BSONObj;
 class BSONElement;
-
 class OID;
 class Timestamp;
 

@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/db/catalog/database_holder.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

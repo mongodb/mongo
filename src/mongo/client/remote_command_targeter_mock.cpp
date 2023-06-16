@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 #include <utility>
 
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/client/remote_command_targeter_mock.h"

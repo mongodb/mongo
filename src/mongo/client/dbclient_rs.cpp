@@ -29,6 +29,8 @@
 
 #include "mongo/client/dbclient_rs.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
 #include <memory>
@@ -37,8 +39,7 @@
 #include <type_traits>
 #include <utility>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"

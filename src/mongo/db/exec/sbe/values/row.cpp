@@ -27,9 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <array>
+#include <cstring>
+#include <string>
+#include <tuple>
 
-#include "mongo/bson/bsonmisc.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
@@ -38,8 +51,18 @@
 #include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/pcre.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/time_support.h"
+
 namespace mongo::sbe::value {
 
 static std::pair<TypeTags, Value> deserializeValue(BufReader& buf) {

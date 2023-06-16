@@ -27,23 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <limits>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
 
-#include "mongo/db/catalog/collection_options.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include <algorithm>
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_validation.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/commands/create_gen.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

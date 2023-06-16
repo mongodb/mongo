@@ -30,7 +30,9 @@
 #pragma once
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <iosfwd>
 #include <memory>
@@ -38,9 +40,6 @@
 #include <string>
 #include <type_traits>
 #include <utility>
-
-#include <boost/preprocessor/control/iif.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"

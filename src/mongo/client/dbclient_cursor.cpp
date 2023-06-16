@@ -29,12 +29,16 @@
 
 #include "mongo/client/dbclient_cursor.h"
 
+#include <boost/cstdint.hpp>
 #include <cstdint>
 #include <cstring>
 #include <memory>
 #include <ostream>
 
-#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

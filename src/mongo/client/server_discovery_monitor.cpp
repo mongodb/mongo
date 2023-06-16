@@ -29,18 +29,20 @@
 
 #include "mongo/client/server_discovery_monitor.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <algorithm>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <ratio>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/meta/type_traits.h>
-#include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

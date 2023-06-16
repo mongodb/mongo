@@ -29,23 +29,46 @@
 
 #include "mongo/db/query/collection_query_info.h"
 
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/collection_index_usage_tracker.h"
-#include "mongo/db/curop_metrics.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
-#include "mongo/db/exec/projection_executor_utils.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/columns_access_method.h"
+#include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
-#include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/clock_source.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

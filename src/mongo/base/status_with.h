@@ -30,13 +30,12 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iosfwd>
 #include <string>
 #include <type_traits>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"

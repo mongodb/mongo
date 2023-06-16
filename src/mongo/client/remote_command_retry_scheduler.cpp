@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
+#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <functional>
 #include <memory>
 #include <mutex>
 #include <utility>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"

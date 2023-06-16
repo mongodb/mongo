@@ -30,17 +30,29 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/inlined_vector.h>
+#include <algorithm>
+#include <cstddef>
 #include <memory>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/indexed_string_vector.h"
 

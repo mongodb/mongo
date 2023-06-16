@@ -27,32 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
-#include "mongo/base/status.h"
-#include "mongo/config.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
-#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/net/ssl_peer_info.h"
+#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/read_through_cache.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)
 #define ASSERT_NON_NULL(EXPR) ASSERT_TRUE(EXPR)

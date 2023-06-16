@@ -30,14 +30,13 @@
 #pragma once
 
 #include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <iterator>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

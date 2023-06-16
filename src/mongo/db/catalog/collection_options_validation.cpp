@@ -29,8 +29,10 @@
 
 #include "mongo/db/catalog/collection_options_validation.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/crypto/encryption_fields_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::collection_options_validation {
 Status validateStorageEngineOptions(const BSONObj& storageEngine) {

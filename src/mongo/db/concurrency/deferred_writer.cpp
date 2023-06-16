@@ -29,14 +29,32 @@
 
 #include "mongo/db/concurrency/deferred_writer.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <compare>
+#include <functional>
+#include <mutex>
+#include <utility>
+
+#include <boost/none.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
@@ -176,8 +194,8 @@ bool DeferredWriter::insertDocument(BSONObj obj) {
 
     // Check if we're allowed to insert this object.
     if (_numBytes + obj.objsize() >= _maxNumBytes) {
-        // If not, drop it.  We always drop new entries rather than old ones; that way the caller
-        // knows at the time of the call that the entry was dropped.
+        // If not, drop it.  We always drop new entries rather than old ones; that way the
+        // caller knows at the time of the call that the entry was dropped.
         _logDroppedEntry();
         return false;
     }

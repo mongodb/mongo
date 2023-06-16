@@ -29,14 +29,13 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <cstdlib>
 #include <fmt/format.h>
 #include <initializer_list>
 #include <memory>
 #include <string>
 #include <type_traits>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

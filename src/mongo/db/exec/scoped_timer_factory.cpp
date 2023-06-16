@@ -29,6 +29,14 @@
 
 #include "mongo/db/exec/scoped_timer_factory.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo {
 namespace scoped_timer_factory {
 

@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include <cstdint>
+#include <tuple>
 #include <vector>
 
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace bulk_write {

@@ -30,14 +30,13 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <memory>
 #include <utility>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type.h"

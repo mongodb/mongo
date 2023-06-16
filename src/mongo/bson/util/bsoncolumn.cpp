@@ -31,15 +31,17 @@
 
 #include <algorithm>
 #include <array>
-#include <cstdint>
-#include <cstring>
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
+#include <cstdint>
+#include <cstring>
+#include <utility>
+
+#include <absl/numeric/int128.h>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

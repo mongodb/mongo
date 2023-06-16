@@ -29,11 +29,22 @@
 
 #pragma once
 
+#include <functional>
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/snapshot.h"
 
 namespace mongo {
 namespace collection_internal {

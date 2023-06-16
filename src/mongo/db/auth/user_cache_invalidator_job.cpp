@@ -28,22 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/user_cache_invalidator_job.h"
-
 #include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/user_cache_invalidator_job.h"
 #include "mongo/db/auth/user_cache_invalidator_job_parameters_gen.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

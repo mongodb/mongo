@@ -29,11 +29,19 @@
 
 #include "mongo/crypto/fle_fields_util.h"
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/basic_types_gen.h"
-#include "mongo/db/exec/document_value/value.h"
+#include <cstdint>
 #include <limits>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 void validateIDLFLE2EncryptionPlaceholder(const FLE2EncryptionPlaceholder* placeholder) {

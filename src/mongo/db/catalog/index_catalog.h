@@ -29,17 +29,30 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
 #include <memory>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 
 namespace mongo {
@@ -47,8 +60,8 @@ namespace mongo {
 class Client;
 class Collection;
 class CollectionPtr;
-
 class IndexDescriptor;
+
 struct InsertDeleteOptions;
 
 struct BsonRecord {

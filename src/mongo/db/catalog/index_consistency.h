@@ -29,8 +29,26 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/catalog/validate_state.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/progress_meter.h"
 

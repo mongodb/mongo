@@ -28,6 +28,7 @@
  */
 
 #include <functional>
+#include <utility>
 
 #include "mongo/db/commands/fsync_locked.h"
 

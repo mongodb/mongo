@@ -27,10 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
 #include "mongo/db/exec/sbe/stages/spool.h"
+#include "mongo/db/exec/sbe/values/row.h"
 
 namespace mongo::sbe {
 SpoolEagerProducerStage::SpoolEagerProducerStage(std::unique_ptr<PlanStage> input,

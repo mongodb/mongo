@@ -29,12 +29,28 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/hash/hash.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/compare_numbers.h"
-#include "mongo/config.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
@@ -43,8 +59,11 @@
 #include "mongo/db/exec/sbe/vm/label.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-
-#include <absl/container/inlined_vector.h>
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 
 #if !defined(MONGO_CONFIG_DEBUG_BUILD)
 #define MONGO_COMPILER_ALWAYS_INLINE_OPT MONGO_COMPILER_ALWAYS_INLINE

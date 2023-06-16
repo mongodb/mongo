@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <ostream>
+#include <vector>
 
-#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 
 namespace mongo {
 

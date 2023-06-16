@@ -29,10 +29,25 @@
 
 #include "mongo/db/query/plan_cache_key_factory.h"
 
+#include <cstddef>
+#include <map>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/plan_cache_key_info.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/shard_version.h"
 
 namespace mongo {
 namespace plan_cache_detail {

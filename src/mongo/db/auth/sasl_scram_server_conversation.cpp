@@ -27,29 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/sasl_scram_server_conversation.h"
-#include <boost/algorithm/string/join.hpp>
+#include <algorithm>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/iterator/iterator_traits.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <deque>
+#include <memory>
+#include <set>
 
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/crypto/mechanism_scram.h"
-#include "mongo/crypto/sha1_block.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_mechanism_policies.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/sasl_scram_server_conversation.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/read_through_cache.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

@@ -29,8 +29,12 @@
 
 #include "mongo/bson/util/bsoncolumnbuilder.h"
 
+#include <absl/numeric/int128.h>
 #include <algorithm>
 #include <array>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <cstring>
 #include <iterator>
@@ -38,10 +42,8 @@
 #include <queue>
 #include <tuple>
 
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

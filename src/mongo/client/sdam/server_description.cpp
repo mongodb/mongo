@@ -31,12 +31,15 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <set>
 #include <tuple>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"

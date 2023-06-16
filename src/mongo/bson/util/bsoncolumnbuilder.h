@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
@@ -36,9 +38,6 @@
 #include <memory>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelementvalue.h"

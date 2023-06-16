@@ -29,9 +29,21 @@
 
 #pragma once
 
-#include "mongo/config.h"
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/values/column_store_encoder.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/util/assert_util_core.h"
 
 /**
  * Helper functions for reading values out of a columnar index for processing in SBE.

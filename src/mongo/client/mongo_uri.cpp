@@ -27,22 +27,16 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <array>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/compare.hpp>
 #include <boost/algorithm/string/find_iterator.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <boost/range/algorithm/count.hpp>
-#include <cstddef>
-#include <exception>
-#include <memory>
-#include <type_traits>
-#include <utility>
-
-#include <boost/algorithm/string/compare.hpp>
 // IWYU pragma: no_include "boost/algorithm/string/detail/classification.hpp"
 // IWYU pragma: no_include "boost/algorithm/string/detail/finder.hpp"
+#include <algorithm>
+#include <array>
 #include <boost/algorithm/string/finder.hpp>
 #include <boost/core/addressof.hpp>
 #include <boost/function/function_base.hpp>
@@ -50,6 +44,16 @@
 #include <boost/range/const_iterator.hpp>
 #include <boost/range/iterator_range_core.hpp>
 #include <boost/type_index/type_index_facade.hpp>
+#include <cstddef>
+#include <exception>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

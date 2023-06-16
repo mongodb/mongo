@@ -27,22 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <iterator>
 
-#include "mongo/db/auth/sasl_mechanism_registry.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/client/authenticate.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/connection_health_metrics_parameter_gen.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/exit_code.h"
-#include "mongo/util/icu.h"
-#include "mongo/util/net/socket_utils.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

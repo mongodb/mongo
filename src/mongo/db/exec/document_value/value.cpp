@@ -27,21 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/document_value/value.h"
-
-#include <boost/functional/hash.hpp>
+#include <MurmurHash3.h>
+#include <boost/container_hash/extensions.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cmath>
+#include <cstdint>
 #include <limits>
+#include <memory>
+#include <ostream>
+#include <type_traits>
+#include <typeinfo>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"

@@ -29,10 +29,18 @@
 
 #include "mongo/db/catalog/coll_mod.h"
 
-#include <boost/optional.hpp>
+#include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/coll_mod_gen.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

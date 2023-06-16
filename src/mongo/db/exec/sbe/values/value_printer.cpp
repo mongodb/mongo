@@ -27,12 +27,32 @@
  *    it in the license file.
  */
 #include <algorithm>
+#include <cstdint>
+#include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <fmt/format.h>
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
-#include "mongo/platform/basic.h"
+#include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/fts/fts_query_impl.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
 
 namespace mongo::sbe::value {

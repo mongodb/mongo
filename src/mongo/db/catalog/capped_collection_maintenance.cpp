@@ -29,8 +29,36 @@
 
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/storage/capped_snapshots.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+
 namespace mongo {
 namespace collection_internal {
 namespace {

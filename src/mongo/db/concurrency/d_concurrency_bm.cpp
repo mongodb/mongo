@@ -28,14 +28,27 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/lock_manager_test_help.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

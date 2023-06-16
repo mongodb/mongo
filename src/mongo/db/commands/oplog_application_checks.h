@@ -30,6 +30,8 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

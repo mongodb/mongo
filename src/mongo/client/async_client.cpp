@@ -28,14 +28,16 @@
  */
 
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <memory>
 #include <ratio>
 #include <type_traits>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

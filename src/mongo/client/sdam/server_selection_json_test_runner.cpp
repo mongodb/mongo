@@ -27,6 +27,13 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/path_traits.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstddef>
@@ -40,14 +47,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <boost/filesystem/directory.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/filesystem/path_traits.hpp>
-#include <boost/iterator/iterator_facade.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

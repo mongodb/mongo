@@ -29,17 +29,16 @@
 
 #pragma once
 
+#include <absl/numeric/int128.h>
 #include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <deque>
 #include <functional>
 #include <iterator>
 #include <vector>
-
-#include <absl/numeric/int128.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/int128.h"

@@ -30,13 +30,16 @@
 
 #include <algorithm>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <cstddef>
 #include <fstream>  // IWYU pragma: keep
 #include <initializer_list>
 #include <iostream>
 #include <memory>
 
-#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

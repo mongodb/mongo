@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <cstdint>
 #include <memory>
 #include <set>
@@ -36,8 +37,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/client/connection_string.h"
 #include "mongo/executor/task_executor.h"

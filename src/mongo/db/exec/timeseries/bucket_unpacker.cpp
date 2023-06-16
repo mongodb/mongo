@@ -29,28 +29,31 @@
 
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 
+#include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <array>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <s2cellid.h>
 #include <set>
 #include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_always_boolean.h"
-#include "mongo/db/matcher/expression_expr.h"
-#include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
-#include "mongo/db/matcher/expression_internal_expr_comparison.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/matcher/rewrite_expr.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

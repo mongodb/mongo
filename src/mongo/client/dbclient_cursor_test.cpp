@@ -28,10 +28,11 @@
  */
 
 
+#include <boost/cstdint.hpp>
 #include <cstdint>
 #include <initializer_list>
 
-#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

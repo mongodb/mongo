@@ -29,6 +29,7 @@
 
 #include "mongo/db/catalog/external_data_source_scope_guard.h"
 
+#include "mongo/base/status.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
@@ -36,7 +37,11 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

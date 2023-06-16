@@ -30,6 +30,8 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 

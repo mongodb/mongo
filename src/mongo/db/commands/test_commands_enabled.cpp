@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/test_commands_enabled_gen.h"
 

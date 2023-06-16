@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include <tuple>
-
 #include <absl/container/node_hash_map.h>
+#include <tuple>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -50,7 +49,6 @@
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/util/secure_compare_memory.h"
 #include "mongo/util/str.h"
 
 #ifdef MONGO_CONFIG_SSL

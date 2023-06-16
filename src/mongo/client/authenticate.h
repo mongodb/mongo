@@ -29,13 +29,12 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"

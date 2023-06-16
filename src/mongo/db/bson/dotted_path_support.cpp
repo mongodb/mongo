@@ -27,16 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/bson/dotted_path_support.h"
-
+#include <cstddef>
+#include <cstring>
+#include <limits>
 #include <string>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {

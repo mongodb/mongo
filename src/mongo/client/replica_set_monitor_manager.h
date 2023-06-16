@@ -29,15 +29,14 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <deque>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/counter.h"
 #include "mongo/base/status.h"
@@ -67,7 +66,6 @@ namespace mongo {
 
 class BSONObjBuilder;
 class ConnectionString;
-
 class ReplicaSetMonitor;
 class MongoURI;
 

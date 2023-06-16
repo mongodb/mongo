@@ -27,8 +27,23 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <tuple>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/pcre.h"
 #include "mongo/util/pcre_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::sbe {
 class SBERegexTest : public EExpressionTestFixture {

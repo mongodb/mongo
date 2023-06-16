@@ -27,8 +27,21 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer {
 namespace {

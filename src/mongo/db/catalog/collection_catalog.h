@@ -29,23 +29,44 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <functional>
+#include <immer/detail/util.hpp>
 #include <map>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/historical_catalogid_tracker.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

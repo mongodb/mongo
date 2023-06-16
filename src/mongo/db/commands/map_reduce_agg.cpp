@@ -26,34 +26,54 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <cstdint>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <utility>
 
-#include "mongo/base/string_data.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/map_reduce_agg.h"
-#include "mongo/db/commands/map_reduce_javascript_code.h"
+#include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/commands/map_reduce_global_variable_scope.h"
+#include "mongo/db/commands/map_reduce_out_options.h"
 #include "mongo/db/commands/mr_common.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_cursor.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/db/pipeline/pipeline_d.h"
-#include "mongo/db/pipeline/plan_executor_pipeline.h"
-#include "mongo/db/query/explain_common.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/map_reduce_output_format.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

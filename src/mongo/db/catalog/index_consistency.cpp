@@ -28,27 +28,69 @@
  */
 
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/storage/key_string.h"
 #include <algorithm>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <mutex>
+#include <new>
+#include <numeric>
+#include <type_traits>
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/algorithm.hpp"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
+#include <boost/move/algo/move.hpp>
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/catalog/index_consistency.h"
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_consistency.h"
 #include "mongo/db/catalog/index_repair.h"
 #include "mongo/db/catalog/validate_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/shared_buffer_fragment.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

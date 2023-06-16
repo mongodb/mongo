@@ -32,11 +32,14 @@
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/role_name_or_string.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
 #include "mongo/db/database_name.h"
 

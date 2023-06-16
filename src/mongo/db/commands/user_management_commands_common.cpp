@@ -27,29 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/user_management_commands_common.h"
-
-#include <string>
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <memory>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/parsed_privilege_gen.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/auth/security_token_gen.h"
-#include "mongo/db/auth/user.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/auth/umc_info_command_arg.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy.h"
-#include "mongo/db/multitenancy_gen.h"
-#include "mongo/util/sequence_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

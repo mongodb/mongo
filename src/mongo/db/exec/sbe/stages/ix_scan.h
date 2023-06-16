@@ -29,14 +29,41 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sbe {
 

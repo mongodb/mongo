@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ref_counter.hpp>
 #include <cstddef>
@@ -38,11 +42,6 @@
 #include <memory>
 #include <variant>
 #include <vector>
-
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

@@ -31,20 +31,47 @@
  * This file contains tests for mongo/db/commands/index_filter_commands.h
  */
 
+#include <cstddef>
+#include <fmt/format.h>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

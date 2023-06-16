@@ -27,13 +27,34 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <string_view>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/represent_as.h"
 
 namespace mongo::sbe {
 

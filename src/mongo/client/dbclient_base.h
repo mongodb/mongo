@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <functional>
 #include <list>
@@ -37,10 +40,6 @@
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

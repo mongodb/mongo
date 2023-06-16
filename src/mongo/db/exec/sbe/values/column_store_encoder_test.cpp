@@ -27,12 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/sbe/expression_test_base.h"
+#include <absl/container/node_hash_map.h>
+#include <fmt/format.h>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/index/column_cell.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/safe_num.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::sbe {
 TEST(SBEColumnStoreEncoder, EncodeTest) {

@@ -28,27 +28,53 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/bson/util/builder.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/generic_servers_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/log_process_details.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_util.h"
 #include "mongo/logv2/ramlog.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/exit.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/ntservice.h"
 #include "mongo/util/processinfo.h"
-
-#include <string>
-#include <vector>
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

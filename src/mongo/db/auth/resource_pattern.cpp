@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <iostream>
-
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/util/namespace_string_util.h"
 
 
 namespace mongo {

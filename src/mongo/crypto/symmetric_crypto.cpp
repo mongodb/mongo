@@ -28,20 +28,18 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/secure_allocator.h"
 #include "mongo/crypto/symmetric_crypto.h"
-
-#include <memory>
-
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
 #include "mongo/crypto/symmetric_key.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/net/ssl_manager.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

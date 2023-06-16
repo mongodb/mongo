@@ -29,11 +29,10 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <string>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"

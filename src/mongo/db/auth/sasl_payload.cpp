@@ -29,7 +29,12 @@
 
 #include "mongo/db/auth/sasl_payload.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace auth {

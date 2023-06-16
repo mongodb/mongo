@@ -28,29 +28,78 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <chrono>
+#include <compare>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/auth/authorization_checks.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/dbcheck.h"
+#include "mongo/db/repl/dbcheck_gen.h"
+#include "mongo/db/repl/dbcheck_idl.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
-#include "mongo/util/background.h"
-
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

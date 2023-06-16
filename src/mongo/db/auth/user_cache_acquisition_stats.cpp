@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/auth/user_cache_acquisition_stats.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/system_tick_source.h"
 
 namespace mongo {
 

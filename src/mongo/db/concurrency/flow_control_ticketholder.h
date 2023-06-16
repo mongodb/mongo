@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"

@@ -30,17 +30,34 @@
 
 #include "mongo/db/auth/user_document_parser.h"
 
+#include <algorithm>
+#include <array>
+#include <iterator>
 #include <string>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/parsed_privilege_gen.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/restriction_set.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl

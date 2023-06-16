@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <functional>
@@ -37,8 +38,6 @@
 #include <tuple>
 #include <unordered_set>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"

@@ -29,14 +29,40 @@
 
 #pragma once
 
-#include "mongo/config.h"
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
 #include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/exec/sbe/values/columnar.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace sbe {

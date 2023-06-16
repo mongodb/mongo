@@ -31,12 +31,23 @@
  * Unit tests of the builtin roles psuedo-collection.
  */
 
-#include <algorithm>
+#include <boost/optional.hpp>
+#include <vector>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/builtin_roles.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/str.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {

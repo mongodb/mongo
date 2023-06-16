@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 #include <algorithm>
+#include <boost/none_t.hpp>
 #include <boost/optional.hpp>
 #include <cstddef>
 #include <iterator>
 #include <set>
 #include <vector>
 
-#include <boost/none_t.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"

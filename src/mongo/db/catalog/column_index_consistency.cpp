@@ -28,7 +28,33 @@
  */
 
 #include "mongo/db/catalog/column_index_consistency.h"
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
+#include <mutex>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/index/column_cell.h"
+#include "mongo/db/index/column_key_generator.h"
+#include "mongo/db/index/columns_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

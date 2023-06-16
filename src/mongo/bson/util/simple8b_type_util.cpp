@@ -30,12 +30,14 @@
 #include "mongo/bson/util/simple8b_type_util.h"
 
 #include <algorithm>
-#include <cmath>
-#include <cstring>
-
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <cmath>
+#include <cstring>
+
+#include <absl/numeric/int128.h>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

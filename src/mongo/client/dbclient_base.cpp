@@ -32,12 +32,15 @@
  */
 
 
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <limits>
 #include <ostream>
 #include <utility>
 
-#include <boost/cstdint.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"

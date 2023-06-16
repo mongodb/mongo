@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <boost/optional.hpp>
-#include <cstddef>
-#include <cstdint>
-
 #include <absl/base/config.h>
 #include <absl/numeric/int128.h>
+#include <array>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"

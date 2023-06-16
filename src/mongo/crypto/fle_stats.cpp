@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
-#include "mongo/crypto/fle_stats.h"
-
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_options_gen.h"
+#include "mongo/crypto/fle_stats.h"
 #include "mongo/util/system_tick_source.h"
 #include "mongo/util/testing_options_gen.h"
 

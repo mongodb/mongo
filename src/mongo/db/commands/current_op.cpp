@@ -27,16 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/commands/current_op_common.h"
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/commands/current_op_common.h"
 #include "mongo/db/commands/fsync_locked.h"
 #include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo {
 

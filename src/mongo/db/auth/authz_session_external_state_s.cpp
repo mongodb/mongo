@@ -27,15 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authz_session_external_state_s.h"
-
+#include <memory>
 #include <string>
 
 #include "mongo/base/shim.h"
-#include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/auth/authz_session_external_state.h"
+#include "mongo/db/auth/authz_session_external_state_s.h"
 
 namespace mongo {
 

@@ -27,9 +27,15 @@
  *    it in the license file.
  */
 
-#include <set>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <memory>
 #include <string>
+#include <utility>
+#include <variant>
 #include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/cst/cst_sort_translation.h"
 #include "mongo/db/cst/key_value.h"
@@ -37,7 +43,10 @@
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::cst_sort_translation {
 

@@ -29,11 +29,33 @@
 
 #pragma once
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/trial_run_tracker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo {

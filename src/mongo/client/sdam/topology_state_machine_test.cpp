@@ -28,12 +28,12 @@
  */
 #include "mongo/client/sdam/topology_state_machine.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstddef>
 #include <iostream>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/oid.h"

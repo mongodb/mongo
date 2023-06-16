@@ -30,8 +30,14 @@
 #pragma once
 
 #include <MurmurHash3.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/secure_allocator.h"
 #include "mongo/platform/atomic_word.h"

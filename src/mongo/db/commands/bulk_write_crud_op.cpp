@@ -29,6 +29,9 @@
 
 #include "mongo/db/commands/bulk_write_crud_op.h"
 
+#include "mongo/db/auth/action_type.h"
+#include "mongo/stdx/variant.h"
+
 namespace mongo {
 
 BulkWriteCRUDOp::BulkWriteCRUDOp(const stdx::variant<mongo::BulkWriteInsertOp,

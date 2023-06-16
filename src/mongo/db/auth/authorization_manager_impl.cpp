@@ -28,39 +28,56 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_manager_impl.h"
-
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <list>
 #include <memory>
+#include <mutex>
+#include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/config.h"
-#include "mongo/crypto/mechanism_scram.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/auth_types_gen.h"
-#include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
-#include "mongo/db/auth/authorization_manager_impl_parameters_gen.h"
+#include "mongo/db/auth/authorization_manager_impl.h"
+#include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
-#include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/restriction_set.h"
+#include "mongo/db/auth/user_acquisition_stats.h"
 #include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/mongod_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/net/ssl_peer_info.h"
-#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/future.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

@@ -29,7 +29,9 @@
 
 #include <map>
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace catalog {

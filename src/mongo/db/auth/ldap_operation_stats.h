@@ -29,12 +29,15 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <iostream>
 #include <memory>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source.h"
 

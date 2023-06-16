@@ -29,10 +29,18 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 

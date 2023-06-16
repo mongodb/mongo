@@ -33,14 +33,13 @@
  * Connect to a Replica Set, from C++.
  */
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"

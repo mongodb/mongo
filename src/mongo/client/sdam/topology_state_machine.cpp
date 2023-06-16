@@ -30,11 +30,11 @@
 #include "mongo/client/sdam/topology_state_machine.h"
 
 // IWYU pragma: no_include "ext/alloc_traits.h"
-#include <boost/optional.hpp>
-#include <set>
-
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <set>
 
 #include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/server_description.h"

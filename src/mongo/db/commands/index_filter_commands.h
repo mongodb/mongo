@@ -29,10 +29,19 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 

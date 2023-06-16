@@ -31,14 +31,17 @@
 
 #include <algorithm>
 #include <array>
+#include <boost/cstdint.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
 #include <limits>
 #include <memory>
 #include <type_traits>
 #include <utility>
 
-#include <boost/cstdint.hpp>
-#include <boost/none.hpp>
+#include <absl/numeric/int128.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/util/simple8b_constants.h"
 #include "mongo/platform/bits.h"

@@ -30,17 +30,16 @@
 
 #include <algorithm>
 #include <boost/algorithm/string.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <map>
 #include <memory>
 #include <ostream>
 #include <set>
 #include <string>
 #include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"

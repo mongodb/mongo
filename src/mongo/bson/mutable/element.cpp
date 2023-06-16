@@ -28,6 +28,9 @@
  */
 
 #include "mongo/bson/mutable/element.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/mutable/document.h"
 

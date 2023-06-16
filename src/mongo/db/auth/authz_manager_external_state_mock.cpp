@@ -30,18 +30,40 @@
 #include "mongo/db/auth/authz_manager_external_state_mock.h"
 
 #include <string>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/update_driver.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/safe_num.h"
 
 namespace mongo {
 namespace {

@@ -30,20 +30,20 @@
 // _ todo: reconnect?
 
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <chrono>
 #include <cstddef>
 #include <exception>
-#include <fmt/format.h>
 #include <functional>
 #include <limits>
 #include <ostream>
 #include <set>
 #include <string>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep

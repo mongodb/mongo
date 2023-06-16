@@ -29,9 +29,14 @@
 
 #pragma once
 
-#include "mongo/db/catalog/database_holder.h"
+#include <boost/optional/optional.hpp>
+#include <vector>
 
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 

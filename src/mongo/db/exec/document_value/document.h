@@ -29,23 +29,46 @@
 
 #pragma once
 
-#include "mongo/db/exec/document_value/document_internal.h"
-
 #include <boost/functional/hash.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstring>
+#include <initializer_list>
+#include <iosfwd>
+#include <string>
+#include <typeinfo>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/document_value/value_internal.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
 class BSONObj;
+
 class FieldIterator;
 class FieldPath;
 class Value;
 class MutableDocument;
-
 /** An internal class that represents the position of a field in a document.
  *
  *  This is a low-level class that you usually don't need to worry about.

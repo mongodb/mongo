@@ -27,22 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/sbe/expressions/expression.h"
-
-#include <iomanip>
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <functional>
 #include <sstream>
-#include <stack>
 #include <vector>
 
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
-#include "mongo/db/exec/sbe/stages/spool.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/exec/sbe/vm/label.h"
+#include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

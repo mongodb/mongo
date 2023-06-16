@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <cstdint>
 #include <list>
 #include <map>
@@ -37,8 +38,6 @@
 #include <stack>
 #include <string>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"

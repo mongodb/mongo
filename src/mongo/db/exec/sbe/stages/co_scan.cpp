@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 
 namespace mongo::sbe {
 CoScanStage::CoScanStage(PlanNodeId planNodeId,

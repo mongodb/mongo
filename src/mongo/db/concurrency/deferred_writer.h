@@ -29,14 +29,26 @@
 
 #pragma once
 
+#include <chrono>
+#include <cstdint>
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {
 
 class ScopedCollectionAcquisition;
+
 class ThreadPool;
 
 /**

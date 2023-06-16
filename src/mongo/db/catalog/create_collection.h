@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
@@ -37,6 +39,10 @@
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/commands/create_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

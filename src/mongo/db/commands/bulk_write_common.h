@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 

@@ -28,11 +28,19 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <map>
+#include <string>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/util/assert_util_core.h"
 
 
 namespace mongo {

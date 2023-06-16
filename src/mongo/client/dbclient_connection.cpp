@@ -32,6 +32,8 @@
  */
 
 
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <functional>
 #include <memory>
@@ -39,8 +41,8 @@
 #include <utility>
 #include <vector>
 
-#include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

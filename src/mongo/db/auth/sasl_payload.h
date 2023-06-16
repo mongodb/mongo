@@ -30,6 +30,7 @@
 #pragma once
 
 #include <string>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

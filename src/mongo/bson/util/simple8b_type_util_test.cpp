@@ -34,6 +34,9 @@
 #include <limits>
 #include <vector>
 
+#include <absl/numeric/int128.h>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"

@@ -28,12 +28,14 @@
  */
 
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <utility>
 #include <vector>
 
-#include <boost/preprocessor/control/iif.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

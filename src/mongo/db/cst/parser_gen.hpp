@@ -47,8 +47,17 @@
 // "%code requires" blocks.
 #line 66 "grammar.yy"
 
+#include <new>
+#include <type_traits>
+#include <utility>
+
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/cst/bson_location.h"
 #include "mongo/db/cst/c_node.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/time_support.h"
 
 // Forward declare any parameters needed for lexing/parsing.
 namespace mongo {
@@ -109,6 +118,7 @@ class BSONLexer;
 #include <typeinfo>
 #ifndef YY_ASSERT
 #include <cassert>
+
 #define YY_ASSERT assert  // NOLINT(mongo-assert-check)
 #endif
 

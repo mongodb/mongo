@@ -28,11 +28,13 @@
  */
 #include "mongo/client/streamable_replica_set_monitor_error_handler.h"
 
+#include <boost/none.hpp>
 #include <functional>
 #include <memory>
 #include <vector>
 
-#include <boost/none.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

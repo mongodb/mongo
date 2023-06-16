@@ -29,19 +29,23 @@
 
 #pragma once
 
+#include <MurmurHash3.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
 #include <string>
 
-#include <MurmurHash3.h>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

@@ -27,25 +27,42 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
+#include <list>
+#include <memory>
 #include <string>
+#include <utility>
+#include <variant>
 
+#include <boost/none.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/unordered_fields_bsonobj_comparator.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
-#include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/path.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
-#include "mongo/db/pipeline/document_source_skip.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {

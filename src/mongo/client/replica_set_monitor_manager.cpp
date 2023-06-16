@@ -28,14 +28,16 @@
  */
 
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <mutex>
 #include <set>
 #include <utility>
 
-#include <absl/container/flat_hash_map.h>
-#include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"

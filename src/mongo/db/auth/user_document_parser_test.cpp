@@ -31,17 +31,31 @@
  * Unit tests of the UserDocumentParser type.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/mechanism_scram.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/restriction_environment.h"
+#include "mongo/db/auth/restriction_set.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/net/sockaddr.h"
 #include "mongo/util/net/socket_utils.h"
 
 #define ASSERT_NULL(EXPR) ASSERT_FALSE(EXPR)

@@ -30,10 +30,32 @@
 #pragma once
 
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
+#include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/projection_policies.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::projection_executor {
 /**

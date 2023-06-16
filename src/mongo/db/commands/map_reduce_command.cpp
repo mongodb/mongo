@@ -27,16 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/document_validation.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_agg.h"
 #include "mongo/db/commands/map_reduce_command_base.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 
 
 namespace mongo {

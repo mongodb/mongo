@@ -28,12 +28,12 @@
  */
 
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <cstddef>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

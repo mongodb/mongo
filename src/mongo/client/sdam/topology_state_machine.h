@@ -28,12 +28,11 @@
  */
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_datatypes.h"

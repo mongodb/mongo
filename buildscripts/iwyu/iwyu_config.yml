@@ -60,6 +60,7 @@ skip_files:
 # regex file paths to add keep pragma
 # include quotes are angle brackets
 keep_includes:
+  - '".*\.cstruct"' # these are not true includes, but used for very large initializers
   - '<fmt/printf\.h>'
   - '<fmt/ranges\.h>'
   - '<fmt/chrono\.h>'

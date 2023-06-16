@@ -28,33 +28,46 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
-#include "mongo/db/catalog/index_build_block.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include <vector>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/aggregated_index_usage_tracker.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_key_validate.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/collection_index_usage_tracker.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/skipped_record_tracker.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/collection_index_usage_tracker_decoration.h"
 #include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/ttl_collection_cache.h"
-#include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
 
 namespace mongo {
-
-class IndexCatalog;
 
 IndexBuildBlock::IndexBuildBlock(const NamespaceString& nss,
                                  const BSONObj& spec,

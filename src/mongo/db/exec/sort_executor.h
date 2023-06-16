@@ -29,13 +29,21 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort_key_comparator.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_stats.h"
 
 namespace mongo {
 /**

@@ -28,15 +28,27 @@
  */
 
 #include <algorithm>
-
-#include "mongo/base/data_range.h"
-
-#include "mongo/platform/random.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/hex.h"
+#include <array>
+#include <cstdint>
+#include <cstring>
+#include <initializer_list>
+#include <iostream>
+#include <string>
+#include <vector>
 
 #include "aead_encryption.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/random.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 namespace {

@@ -29,16 +29,15 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <iosfwd>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"

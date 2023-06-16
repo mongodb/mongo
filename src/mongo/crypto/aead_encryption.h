@@ -32,10 +32,12 @@
 #include <cstddef>
 #include <cstdint>
 
-#include "mongo/crypto/fle_data_frames.h"
-
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/crypto/fle_data_frames.h"
+#include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
 
 namespace mongo {

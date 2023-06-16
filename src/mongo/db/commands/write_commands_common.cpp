@@ -27,20 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/write_commands_common.h"
-
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/privilege.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/commands/write_commands_common.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

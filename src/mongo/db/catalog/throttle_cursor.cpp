@@ -27,14 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <string>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/throttle_cursor.h"
-
 #include "mongo/db/catalog/validate_gen.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

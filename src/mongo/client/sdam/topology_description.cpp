@@ -29,17 +29,17 @@
 
 #include "mongo/client/sdam/topology_description.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
-#include <algorithm>
-#include <iterator>
-#include <memory>
-#include <ostream>
-
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/type_traits/decay.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <climits>
+#include <iterator>
+#include <memory>
+#include <ostream>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

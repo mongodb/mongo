@@ -27,12 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <cstdint>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/exec/sbe/values/bson.h"
-#include "mongo/db/exec/sbe/values/slot.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/exec/sbe/values/row.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo::sbe {
 /**

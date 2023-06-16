@@ -27,43 +27,80 @@
  *    it in the license file.
  */
 
-#include <boost/format.hpp>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/move/utility_core.hpp>
+#include <chrono>
+#include <functional>
+#include <initializer_list>
+#include <iosfwd>
+#include <memory>
+#include <queue>
+#include <ratio>
+#include <string_view>
+#include <system_error>
+#include <vector>
 
-#include "mongo/config.h"
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/exec/sbe/vm/vm_printer.h"
-
-#include <boost/algorithm/string.hpp>
-
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/client.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/exec/sbe/values/columnar.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/indexed_string_vector.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

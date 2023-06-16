@@ -29,11 +29,21 @@
 
 #include "mongo/db/exec/sbe/stages/union.h"
 
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <utility>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/expressions/compile_ctx.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::sbe {
 UnionStage::UnionStage(PlanStage::Vector inputStages,

@@ -31,9 +31,21 @@
 
 #include "mongo/db/catalog/capped_visibility.h"
 
-#include "mongo/db/concurrency/exception_util.h"
+#include <absl/container/flat_hash_map.h>
+#include <mutex>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

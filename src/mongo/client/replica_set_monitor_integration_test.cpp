@@ -28,6 +28,7 @@
  */
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstddef>
 #include <memory>
@@ -35,8 +36,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

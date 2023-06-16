@@ -32,6 +32,8 @@
 #include <memory>
 #include <tuple>
 
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"

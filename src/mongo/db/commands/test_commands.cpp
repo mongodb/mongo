@@ -29,25 +29,55 @@
 
 #include "mongo/db/commands/test_commands.h"
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <ostream>
 #include <string>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
-#include "mongo/db/catalog/collection_yield_restore.h"
-#include "mongo/db/client.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -178,9 +208,9 @@ public:
 
         RecordId end;
         {
-            // Scan backwards through the collection to find the document to start truncating from.
-            // We will remove 'n' documents, so start truncating from the (n + 1)th document to the
-            // end.
+            // Scan backwards through the collection to find the document to start truncating
+            // from. We will remove 'n' documents, so start truncating from the (n + 1)th
+            // document to the end.
             auto exec = InternalPlanner::collectionScan(opCtx,
                                                         &collection.getCollection(),
                                                         PlanYieldPolicy::YieldPolicy::NO_YIELD,
@@ -297,10 +327,10 @@ public:
                               MODE_IX);
         WriteUnitOfWork wuow(opCtx);
 
-        // Note, this write will replicate to secondaries, but a secondary will not in-turn pin the
-        // oldest timestamp. The write otherwise must be timestamped in a storage engine table with
-        // logging disabled. This is to test that rolling back the written document also results in
-        // the pin being lifted.
+        // Note, this write will replicate to secondaries, but a secondary will not in-turn pin
+        // the oldest timestamp. The write otherwise must be timestamped in a storage engine
+        // table with logging disabled. This is to test that rolling back the written document
+        // also results in the pin being lifted.
         Timestamp pinTs =
             uassertStatusOK(opCtx->getServiceContext()->getStorageEngine()->pinOldestTimestamp(
                 opCtx, kTestingDurableHistoryPinName, requestedPinTs, round));

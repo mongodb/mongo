@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <functional>
 #include <map>
@@ -36,9 +38,6 @@
 #include <ostream>
 #include <string>
 #include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"

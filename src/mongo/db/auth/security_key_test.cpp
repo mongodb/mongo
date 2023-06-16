@@ -27,17 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/filesystem.hpp>
+#include <array>
 #include <boost/filesystem/fstream.hpp>
+#include <cstddef>
+#include <initializer_list>
+#include <memory>
+#include <ostream>
+#include <set>
+#include <utility>
+#include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/security_file.h"
 #include "mongo/db/auth/security_key.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

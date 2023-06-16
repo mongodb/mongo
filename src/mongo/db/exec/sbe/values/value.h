@@ -31,31 +31,51 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/flat_hash_set.h>
+#include <boost/predef/hardware/simd.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+// IWYU pragma: no_include "boost/predef/hardware/simd/x86.h"
+// IWYU pragma: no_include "boost/predef/hardware/simd/x86/versions.h"
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "emmintrin.h"
+#include <algorithm>
 #include <array>
 #include <bitset>
-#include <boost/predef/hardware/simd.h>
+#include <climits>
 #include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
 #include <ostream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/ordering.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/bson_typemask.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/platform/bits.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/represent_as.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 /**
@@ -68,7 +88,6 @@ class Value;
 }
 
 class TimeZoneDatabase;
-
 class TimeZone;
 
 class JsFunction;

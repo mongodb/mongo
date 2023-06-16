@@ -29,17 +29,19 @@
 
 #include "mongo/bson/util/simple8b.h"
 
+#include <absl/numeric/int128.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <cstring>
-#include <fmt/format.h>
 #include <limits>
 #include <memory>
 #include <utility>
 #include <vector>
-
-#include <absl/numeric/int128.h>
-#include <boost/cstdint.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"

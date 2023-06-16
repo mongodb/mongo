@@ -29,18 +29,40 @@
 
 #include "mongo/db/concurrency/locker_impl.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstdint>
+#include <mutex>
+#include <ratio>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/flow_control.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/ticketholder_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/stdx/new.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/fail_point.h"

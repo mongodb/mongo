@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
 #include <memory>
 #include <numeric>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/cst/c_node_disambiguation.h"
+#include "mongo/db/cst/compound_key.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::c_node_disambiguation {
 namespace {

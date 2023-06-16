@@ -29,9 +29,21 @@
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <limits>
+#include <set>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 class BSONObj;

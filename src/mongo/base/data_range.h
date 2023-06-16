@@ -29,13 +29,12 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstring>
 #include <tuple>
 #include <type_traits>
 #include <utility>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"

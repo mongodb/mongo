@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <initializer_list>
+#include <memory>
 #include <string>
+#include <variant>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/key_fieldname.h"
-#include "mongo/db/cst/key_value.h"
 #include "mongo/db/cst/parser_gen.hpp"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

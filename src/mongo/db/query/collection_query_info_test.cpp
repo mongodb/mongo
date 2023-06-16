@@ -27,11 +27,38 @@
  *    it in the license file.
  */
 
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
 #include "mongo/db/storage/devnull/devnull_kv_engine.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

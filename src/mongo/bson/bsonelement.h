@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <array>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>  // strlen
@@ -40,8 +41,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"

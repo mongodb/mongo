@@ -29,13 +29,12 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <utility>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/authenticate.h"

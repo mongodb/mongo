@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include <cstddef>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/sbe/makeobj_enums.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"

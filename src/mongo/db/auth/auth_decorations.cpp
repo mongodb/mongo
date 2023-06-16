@@ -27,20 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <fmt/format.h>
 #include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/authentication_commands.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/sequence_util.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace {

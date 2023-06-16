@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <iosfwd>
 #include <memory>
@@ -40,16 +43,23 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_build_block.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_build_interceptor.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -60,6 +70,7 @@ class CollectionPtr;
 class MatchExpression;
 class NamespaceString;
 class OperationContext;
+
 class ProgressMeterHolder;
 
 /**

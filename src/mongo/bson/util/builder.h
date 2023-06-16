@@ -30,8 +30,12 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/static_assert.hpp>
 #include <cfloat>
 #include <cinttypes>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -41,12 +45,6 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-#include <boost/static_assert.hpp>
-#include <cfloat>
-#include <climits>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

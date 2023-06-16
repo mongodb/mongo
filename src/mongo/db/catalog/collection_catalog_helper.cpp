@@ -29,9 +29,24 @@
 
 #include "mongo/db/catalog/collection_catalog_helper.h"
 
+#include <boost/optional.hpp>
+#include <functional>
+#include <memory>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/views/view.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

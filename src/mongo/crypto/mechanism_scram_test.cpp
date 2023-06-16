@@ -28,12 +28,16 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstring>
+#include <fmt/format.h>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

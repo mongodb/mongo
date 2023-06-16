@@ -28,22 +28,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/fle2_compact.h"
-
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <array>
+#include <functional>
 #include <memory>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/crypto/encryption_fields_gen.h"
-#include "mongo/crypto/fle_stats.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/commands/server_status.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

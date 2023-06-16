@@ -30,10 +30,21 @@
 #pragma once
 
 #include <bitset>
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 /**

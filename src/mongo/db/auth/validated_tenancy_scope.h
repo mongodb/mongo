@@ -30,12 +30,15 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <utility>
+#include <variant>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo {
 

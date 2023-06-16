@@ -28,14 +28,14 @@
  */
 #include "mongo/client/sdam/server_selector.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <map>
 #include <ratio>
 #include <string>
 #include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

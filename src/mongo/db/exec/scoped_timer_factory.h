@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace scoped_timer_factory {

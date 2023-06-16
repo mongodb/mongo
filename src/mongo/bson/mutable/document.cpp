@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
+#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <limits>
 #include <new>
 #include <type_traits>
 #include <vector>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"

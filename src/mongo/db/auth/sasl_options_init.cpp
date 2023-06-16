@@ -27,16 +27,23 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <string>
+#include <vector>
+
+#include <boost/algorithm/string/trim.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/sasl_options_gen.h"
-
-#include <boost/algorithm/string.hpp>
-
-#include "mongo/base/status.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/socket_utils.h"
-#include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/str.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace mongo {
 

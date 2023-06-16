@@ -30,6 +30,8 @@
 #include <queue>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/config.h"  // IWYU pragma: keep

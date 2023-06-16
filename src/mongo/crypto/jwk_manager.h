@@ -29,14 +29,18 @@
 
 #pragma once
 
-#include "mongo/crypto/jwt_types_gen.h"
+#include <cstddef>
 #include <map>
+#include <memory>
 #include <string>
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jws_validator.h"
+#include "mongo/crypto/jwt_types_gen.h"
 
 
 namespace mongo::crypto {

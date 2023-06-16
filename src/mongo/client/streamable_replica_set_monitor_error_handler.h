@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 #pragma once
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <string>
 #include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"

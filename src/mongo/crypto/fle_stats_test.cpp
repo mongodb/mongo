@@ -27,12 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/unordered_fields_bsonobj_comparator.h"
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_stats.h"
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/testing_options_gen.h"
 #include "mongo/util/tick_source_mock.h"
 

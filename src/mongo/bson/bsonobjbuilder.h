@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>
@@ -40,8 +41,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"

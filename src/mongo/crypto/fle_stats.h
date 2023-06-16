@@ -30,9 +30,17 @@
 
 #pragma once
 
+#include <mutex>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_stats_gen.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/tick_source.h"
+#include "mongo/util/timer.h"
 
 
 namespace mongo {

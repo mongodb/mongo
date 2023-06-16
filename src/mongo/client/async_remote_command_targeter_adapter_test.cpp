@@ -34,6 +34,8 @@
 #include <set>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"

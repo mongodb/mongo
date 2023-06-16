@@ -28,13 +28,15 @@
  */
 
 
+#include <boost/none.hpp>
 #include <list>
 #include <memory>
 #include <ratio>
 #include <utility>
 #include <vector>
 
-#include <boost/none.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"

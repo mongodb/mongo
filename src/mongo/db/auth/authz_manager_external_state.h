@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_impl.h"
 #include "mongo/db/auth/privilege.h"
@@ -44,6 +48,10 @@
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

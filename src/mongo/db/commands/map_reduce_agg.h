@@ -29,15 +29,18 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_options.h"
 
 namespace mongo::map_reduce_agg {
 
