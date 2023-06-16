@@ -42,7 +42,7 @@ class IndexDescriptor;
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    IndexInfo(const IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod);
+    IndexInfo(const IndexDescriptor* descriptor);
     // Index name.
     const std::string indexName;
     // Contains the indexes key pattern.
@@ -66,7 +66,7 @@ struct IndexInfo {
     // Indicates whether key entries must be unique.
     const bool unique;
     // Index access method pointer.
-    IndexAccessMethod* accessMethod;
+    const IndexAccessMethod* accessMethod;
 };
 
 /**

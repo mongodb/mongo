@@ -102,13 +102,13 @@ BSONObj _rehydrateKey(const BSONObj& keyPattern, const BSONObj& indexKey) {
 
 }  // namespace
 
-IndexInfo::IndexInfo(const IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod)
+IndexInfo::IndexInfo(const IndexDescriptor* descriptor)
     : indexName(descriptor->indexName()),
       keyPattern(descriptor->keyPattern()),
       indexNameHash(hash(descriptor->indexName())),
       ord(Ordering::make(descriptor->keyPattern())),
       unique(descriptor->unique()),
-      accessMethod(indexAccessMethod) {}
+      accessMethod(descriptor->getEntry()->accessMethod()) {}
 
 IndexEntryInfo::IndexEntryInfo(const IndexInfo& indexInfo,
                                RecordId entryRecordId,
@@ -141,9 +141,7 @@ KeyStringIndexConsistency::KeyStringIndexConsistency(
     for (const auto& indexIdent : _validateState->getIndexIdents()) {
         const IndexDescriptor* descriptor =
             validateState->getCollection()->getIndexCatalog()->findIndexByIdent(opCtx, indexIdent);
-        IndexAccessMethod* accessMethod =
-            const_cast<IndexAccessMethod*>(descriptor->getEntry()->accessMethod());
-        _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor, accessMethod));
+        _indexesInfo.emplace(descriptor->indexName(), IndexInfo(descriptor));
     }
 }
 

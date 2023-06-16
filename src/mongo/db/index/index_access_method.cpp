@@ -443,7 +443,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
 void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
                                                const IndexCatalogEntry* entry,
                                                const KeyString::Value& keyString,
-                                               bool dupsAllowed) {
+                                               bool dupsAllowed) const {
 
     try {
         _newInterface->unindex(opCtx, keyString, dupsAllowed);
@@ -477,7 +477,7 @@ Status SortedDataIndexAccessMethod::removeKeys(OperationContext* opCtx,
                                                const IndexCatalogEntry* entry,
                                                const KeyStringSet& keys,
                                                const InsertDeleteOptions& options,
-                                               int64_t* numDeleted) {
+                                               int64_t* numDeleted) const {
 
     for (const auto& key : keys) {
         removeOneKey(opCtx, entry, key, options.dupsAllowed);

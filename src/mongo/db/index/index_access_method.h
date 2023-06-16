@@ -451,7 +451,7 @@ public:
                       const IndexCatalogEntry* entry,
                       const KeyStringSet& keys,
                       const InsertDeleteOptions& options,
-                      int64_t* numDeleted);
+                      int64_t* numDeleted) const;
 
     /**
      * Gets the keys of the documents 'from' and 'to' and prepares them for the update.
@@ -633,7 +633,7 @@ private:
     void removeOneKey(OperationContext* opCtx,
                       const IndexCatalogEntry* entry,
                       const KeyString::Value& keyString,
-                      bool dupsAllowed);
+                      bool dupsAllowed) const;
 
     /**
      * While inserting keys into index (from external sorter), if a duplicate key is detected
