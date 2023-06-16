@@ -134,7 +134,6 @@ std::vector<bool> canProvideSortWithMergeSort(
     }
     return shouldReverseScan;
 }
-
 }  // namespace
 
 namespace mongo {
@@ -1764,6 +1763,10 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         return nullptr;
     }
 
+    if (!wcp::expandWildcardFieldBounds(scanNodes)) {
+        return nullptr;
+    }
+
     // If all index scans are identical, then we collapse them into a single scan. This prevents
     // us from creating OR plans where the branches of the OR perform duplicate work.
     scanNodes = collapseEquivalentScans(std::move(scanNodes));
@@ -1775,15 +1778,6 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         orResult = std::move(scanNodes[0]);
     } else {
         std::vector<bool> shouldReverseScan;
-        // (Ignore FCV check): This is intentional because we want clusters which have wildcard
-        // indexes still be able to use the feature even if the FCV is downgraded.
-        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe() &&
-            wildcard_planning::canOnlyAnswerWildcardPrefixQuery(scanNodes)) {
-            // If we get here, we have a an OR of IXSCANs, one of which is a compound wildcard
-            // index, but at least one of them can only support a FETCH + IXSCAN on queries on the
-            // prefix. This means this plan will produce incorrect results.
-            return nullptr;
-        }
 
         if (query.getSortPattern()) {
             // If all 'scanNodes' can provide the sort, shouldReverseScan is populated with which

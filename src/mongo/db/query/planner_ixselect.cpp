@@ -381,11 +381,13 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     }
 
     if (index.type == IndexType::INDEX_WILDCARD) {
-        // Fields after "$_path" of a compound wildcard index should not be used to answer any
-        // query, because wildcard IndexEntry with reserved field, "$_path", present is used only
-        // to answer query on non-wildcard prefix.
+        // If the compound wildcard index is expanded to a generic CWI IndexEntry with '$_path'
+        // field being the wildcard field, this index is mostly for queries on regular prefix of the
+        // CWI. So such IndexEntry is ineligible to answer a query on any field after "$_path".
         size_t idx = 0;
         for (auto&& elt : index.keyPattern) {
+            // Bail out because this IndexEntry is trying to answer a field comes after "$_path"
+            // field.
             if (elt.fieldNameStringData() == "$_path") {
                 return false;
             }
@@ -393,13 +395,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 break;
             }
             idx++;
-        }
-
-        // If this IndexEntry is considered relevant to a regular field of a compound wildcard
-        // index, the IndexEntry must not have a specific expanded field for the wildcard field.
-        // Instead, the key pattern should contain a reserved "$_path" field.
-        if (keyPatternIdx < index.wildcardFieldPos && !index.keyPattern.hasField("$_path")) {
-            return false;
         }
     }
 
