@@ -186,8 +186,9 @@ public:
             auto* as = AuthorizationSession::get(opCtx->getClient());
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to read tags",
-                    as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::internal));
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::internal));
         }
 
         NamespaceString ns() const final {

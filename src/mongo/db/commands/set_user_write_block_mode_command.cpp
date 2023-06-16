@@ -129,8 +129,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
-                                                             ActionType::setUserWriteBlockMode}));
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::setUserWriteBlockMode}));
         }
 
         Mutex _mutex = MONGO_MAKE_LATCH("SetUserWriteBlockModeCommand::_mutex");

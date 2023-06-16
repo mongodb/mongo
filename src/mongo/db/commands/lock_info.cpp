@@ -59,12 +59,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const final {
-        bool isAuthorized =
-            AuthorizationSession::get(opCtx->getClient())
-                ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                   ActionType::serverStatus);
+        bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
+                                ->isAuthorizedForActionsOnResource(
+                                    ResourcePattern::forClusterResource(dbName.tenantId()),
+                                    ActionType::serverStatus);
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 

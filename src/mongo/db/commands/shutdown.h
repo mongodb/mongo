@@ -98,7 +98,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::shutdown));
+                        ResourcePattern::forClusterResource(Base::request().getDbName().tenantId()),
+                        ActionType::shutdown));
         }
     };
 

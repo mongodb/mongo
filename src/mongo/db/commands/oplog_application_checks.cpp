@@ -43,7 +43,7 @@ UUID OplogApplicationChecks::getUUIDFromOplogEntry(const BSONObj& oplogEntry) {
 };
 
 Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opCtx,
-                                                           const DatabaseName&,
+                                                           const DatabaseName& dbName,
                                                            const BSONObj& oplogEntry,
                                                            AuthorizationSession* authSession,
                                                            bool alwaysUpsert) {
@@ -53,8 +53,9 @@ Status OplogApplicationChecks::checkOperationAuthorization(OperationContext* opC
 
     if (opType == "n"_sd) {
         // oplog notes require cluster permissions, and may not have a ns
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::appendOplogNote)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                ActionType::appendOplogNote)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
@@ -222,8 +223,8 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
                                                      const BSONObj& cmdObj,
                                                      OplogApplicationValidity validity) {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-    if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::applyOps)) {
+    if (!authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::applyOps)) {
         return Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
@@ -237,15 +238,15 @@ Status OplogApplicationChecks::checkAuthForOperation(OperationContext* opCtx,
     }
     if (validity == OplogApplicationValidity::kNeedsForceAndUseUUID) {
         if (!authSession->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(),
+                ResourcePattern::forClusterResource(dbName.tenantId()),
                 {ActionType::forceUUID, ActionType::useUUID})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         validity = OplogApplicationValidity::kOk;
     }
     if (validity == OplogApplicationValidity::kNeedsUseUUID) {
-        if (!authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::useUUID)) {
+        if (!authSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::useUUID)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         validity = OplogApplicationValidity::kOk;

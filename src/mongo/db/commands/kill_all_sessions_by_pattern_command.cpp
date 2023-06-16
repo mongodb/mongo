@@ -69,11 +69,12 @@ public:
         return "kill logical sessions by pattern";
     }
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
         if (!authSession->isAuthorizedForPrivilege(
-                Privilege{ResourcePattern::forClusterResource(), ActionType::killAnySession})) {
+                Privilege{ResourcePattern::forClusterResource(dbName.tenantId()),
+                          ActionType::killAnySession})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
@@ -88,7 +89,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
         IDLParserContext ctx("KillAllSessionsByPatternCmd");
@@ -106,7 +107,8 @@ public:
             auto authSession = AuthorizationSession::get(opCtx->getClient());
 
             if (!authSession->isAuthorizedForPrivilege(
-                    Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate))) {
+                    Privilege(ResourcePattern::forClusterResource(dbName.tenantId()),
+                              ActionType::impersonate))) {
 
                 for (const auto& pattern : ksc.getKillAllSessionsByPattern()) {
                     if (pattern.getUsers() || pattern.getRoles()) {

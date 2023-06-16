@@ -280,8 +280,9 @@ public:
             auto* as = AuthorizationSession::get(client);
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to send custom message to log",
-                    as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::applicationMessage));
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::applicationMessage));
         }
 
         NamespaceString ns() const final {

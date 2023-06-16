@@ -80,7 +80,8 @@ public:
         void doCheckAuthorization(OperationContext* opCtx) const override {
             auto client = opCtx->getClient();
             auto isInternal = AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::internal);
+                ResourcePattern::forClusterResource(Base::request().getDbName().tenantId()),
+                ActionType::internal);
             if (!getTestCommandsEnabled() && !isInternal) {
                 // Either the mongod/mongos must be in testing mode or this command must come from
                 // an internal user

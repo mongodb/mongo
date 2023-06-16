@@ -48,11 +48,11 @@ public:
     CurrentOpCommand() = default;
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const final {
         AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::inprog)) {
+        if (authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::inprog)) {
             return Status::OK();
         }
 
@@ -75,7 +75,9 @@ public:
 
         PrivilegeVector privileges;
         if (!aggCmdObj["$ownOps"].trueValue()) {
-            privileges = {Privilege(ResourcePattern::forClusterResource(), ActionType::inprog)};
+            privileges = {
+                Privilege(ResourcePattern::forClusterResource(request.getDbName().tenantId()),
+                          ActionType::inprog)};
         }
 
         auto status = runAggregate(opCtx,

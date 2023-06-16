@@ -111,8 +111,9 @@ void FeaturesCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) cons
         auto* as = AuthorizationSession::get(opCtx->getClient());
         uassert(ErrorCodes::Unauthorized,
                 "Not authorized to reset machine identifier",
-                as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                     ActionType::oidReset));
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                    ActionType::oidReset));
     }
 }
 template <>
@@ -144,8 +145,9 @@ void HostInfoCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) cons
     auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to read hostInfo",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::hostInfo));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                ActionType::hostInfo));
 }
 template <>
 HostInfoReply HostInfoCmd::Invocation::typedRun(OperationContext*) {
@@ -189,8 +191,9 @@ void GetCmdLineOptsCmd::Invocation::doCheckAuthorization(OperationContext* opCtx
     auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to read command line options",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::getCmdLineOpts));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                ActionType::getCmdLineOpts));
 }
 template <>
 GetCmdLineOptsReply GetCmdLineOptsCmd::Invocation::typedRun(OperationContext*) {
@@ -208,8 +211,9 @@ void LogRotateCmd::Invocation::doCheckAuthorization(OperationContext* opCtx) con
     auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to rotate logs",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::logRotate));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                ActionType::logRotate));
 }
 template <>
 OkReply LogRotateCmd::Invocation::typedRun(OperationContext* opCtx) {
@@ -262,11 +266,11 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const final {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::getLog)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::getLog)) {
             return {ErrorCodes::Unauthorized, "Not authorized to get log"};
         }
         return Status::OK();

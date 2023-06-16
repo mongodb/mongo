@@ -108,7 +108,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
         IDLParserContext ctx("KillSessionsCmd");
@@ -122,7 +122,8 @@ public:
             auto lsids = makeLogicalSessionIds(
                 ksc.getKillSessions(),
                 opCtx,
-                {Privilege{ResourcePattern::forClusterResource(), ActionType::killAnySession}});
+                {Privilege{ResourcePattern::forClusterResource(dbName.tenantId()),
+                           ActionType::killAnySession}});
 
             patterns.reserve(lsids.size());
             for (const auto& lsid : lsids) {

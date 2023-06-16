@@ -94,7 +94,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     authzSession->isAuthorizedForActionsOnResource(
-                        ResourcePattern::forClusterResource(), ActionType::internal));
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::internal));
         }
 
         Reply typedRun(OperationContext* opCtx) {

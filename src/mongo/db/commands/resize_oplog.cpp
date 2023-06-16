@@ -68,11 +68,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const final {
         AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-        if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::replSetResizeOplog)) {
+        if (authzSession->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                ActionType::replSetResizeOplog)) {
             return Status::OK();
         }
         return Status(ErrorCodes::Unauthorized, "Unauthorized");

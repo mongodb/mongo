@@ -69,11 +69,12 @@ public:
         return "kill all logical sessions, for a user, and their operations";
     }
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
         if (!authSession->isAuthorizedForPrivilege(
-                Privilege{ResourcePattern::forClusterResource(), ActionType::killAnySession})) {
+                Privilege{ResourcePattern::forClusterResource(dbName.tenantId()),
+                          ActionType::killAnySession})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 

@@ -363,8 +363,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
     } else if (arg.isAllForAllDBs()) {
         uassert(ErrorCodes::Unauthorized,
                 str::stream() << "Not authorized to view users from all databases",
-                as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                     ActionType::viewUser));
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbname.tenantId()), ActionType::viewUser));
     } else {
         invariant(arg.isExact());
         auto activeTenant = getActiveTenant(opCtx);
@@ -375,7 +375,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UsersInfoCommand& r
                         "May not specify tenant in usersInfo query",
                         !activeTenant &&
                             as->isAuthorizedForActionsOnResource(
-                                ResourcePattern::forClusterResource(), ActionType::internal));
+                                ResourcePattern::forClusterResource(dbname.tenantId()),
+                                ActionType::internal));
             }
 
             if (as->lookupUser(userName)) {
@@ -444,8 +445,9 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const InvalidateUserCache
     auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to invalidate user cache",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::invalidateUserCache));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request.getDbName().tenantId()),
+                ActionType::invalidateUserCache));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx,
@@ -453,8 +455,9 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
     auto* as = AuthorizationSession::get(opCtx->getClient());
     uassert(ErrorCodes::Unauthorized,
             "Not authorized to get cache generation",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                 ActionType::internal));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(request.getDbName().tenantId()),
+                ActionType::internal));
 }
 
 void checkAuthForTypedCommand(OperationContext* opCtx,
