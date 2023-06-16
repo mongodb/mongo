@@ -45,6 +45,7 @@ selector:
   - jstests/core/tailable_cursor_invalidation.js
   - jstests/core/tailable_getmore_batch_size.js
   - jstests/core/tailable_skip_limit.js
+  - jstests/core/timeseries/timeseries_lastpoint_top.js
   - jstests/core/constructors.js
   - jstests/core/views/views_all_commands.js
   - jstests/core/or4.js

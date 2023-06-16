@@ -26,8 +26,7 @@ const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());
 
 // Do not run the rest of the tests if the lastpoint optimization is disabled.
-// TODO SERVER-73509 The test doesn't work yet.
-if (false && !FeatureFlagUtil.isEnabled(db, "LastPointQuery")) {
+if (!FeatureFlagUtil.isEnabled(db, "LastPointQuery")) {
     jsTestLog("Skipping the test.");
     return;
 }
