@@ -59,13 +59,6 @@ public:
     static std::string serialize(const DatabaseName& dbName,
                                  const SerializationContext& context = SerializationContext());
 
-    // TODO SERVER-74284: Privatize the worker functions
-    static std::string serializeForStorage(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
-
-    static std::string serializeForCommands(
-        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
-
     /**
      *
      * TODO SERVER-76294 Remove this function. Any remaining call sites must be changed to use a
@@ -108,7 +101,21 @@ public:
                                     StringData db,
                                     const SerializationContext& context = SerializationContext());
 
-    // TODO SERVER-74284: Privatize the worker functions
+    /**
+     * To be used only by the storage catalog.
+     */
+    static DatabaseName deserializeForCatalog(
+        StringData db, const SerializationContext& context = SerializationContext());
+
+private:
+    static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
+
+    static std::string serializeForStorage(
+        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+
+    static std::string serializeForCommands(
+        const DatabaseName& dbName, const SerializationContext& context = SerializationContext());
+
     static DatabaseName deserializeForStorage(
         boost::optional<TenantId> tenantId,
         StringData db,
@@ -118,15 +125,6 @@ public:
         boost::optional<TenantId> tenantId,
         StringData db,
         const SerializationContext& context = SerializationContext());
-
-    /**
-     * To be used only by the storage catalog.
-     */
-    static DatabaseName deserializeForCatalog(
-        StringData db, const SerializationContext& context = SerializationContext());
-
-private:
-    static DatabaseName parseFromStringExpectTenantIdInMultitenancyMode(StringData dbName);
 };
 
 }  // namespace mongo

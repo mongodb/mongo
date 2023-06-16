@@ -76,14 +76,6 @@ public:
      */
     static std::string serializeForCatalog(const NamespaceString& ns);
 
-    // TODO SERVER-74284: Privatize the worker functions
-    static std::string serializeForStorage(
-        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
-
-    static std::string serializeForCommands(
-        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
-
-
     /**
      * This function serialize a NamespaceString without checking for presence of TenantId. This
      * must only be used by auth systems which are not yet tenant aware.
@@ -123,17 +115,6 @@ public:
         StringData ns,
         const SerializationContext& context = SerializationContext());
 
-    // TODO SERVER-74284: Privatize the worker functions
-    static NamespaceString deserializeForStorage(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext());
-
-    static NamespaceString deserializeForCommands(
-        boost::optional<TenantId> tenantId,
-        StringData ns,
-        const SerializationContext& context = SerializationContext());
-
     static NamespaceString parseNamespaceFromRequest(const boost::optional<TenantId>& tenantId,
                                                      StringData ns);
 
@@ -161,6 +142,23 @@ public:
     static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
+
+private:
+    static std::string serializeForStorage(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+
+    static std::string serializeForCommands(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+
+    static NamespaceString deserializeForStorage(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
+
+    static NamespaceString deserializeForCommands(
+        boost::optional<TenantId> tenantId,
+        StringData ns,
+        const SerializationContext& context = SerializationContext());
 };
 
 }  // namespace mongo

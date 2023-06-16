@@ -231,13 +231,23 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     ASSERT_EQ(outSource->getOutputNs(),
               NamespaceString::createNamespaceString_forTest(defaultDb, targetColl));
 
-    // TODO SERVER-74284: update this test once the serialize function has been updated to use
-    // DatabaseNameUtil::serialize() instead
+    // TODO SERVER-77000: update this test once the serialize function has been updated to use
+    // DatabaseNameUtil::serialize() instead.  We need to set the serialization context objs on the
+    // expCtx, and manipulate before calling outSource->serialize().
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
     auto expectedDoc =
         Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().toString_forTest()}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
+
+    // TODO SERVER-77000: uncomment the below
+    // expCtx->serializationCtxt.setPrefixState(true);
+    // expCtx->serializationCtxt.setTenantIdSource(false);
+    // std::string targetDb = str::stream()
+    //     << expCtx->ns.tenantId()->toString() << "_" << expCtx->ns.dbName().toString_forTest();
+    // serialized = outSource->serialize().getDocument();
+    // expectedDoc = Document{{"coll", targetColl}, {"db", targetDb}};
+    // ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
     // into different dbs.

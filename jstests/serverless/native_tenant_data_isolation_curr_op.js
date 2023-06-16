@@ -15,8 +15,7 @@ const kNewCollectionName = "currOpColl";
 
 // Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing '$currentOp' in
 // aggregation pipeline with a security token.
-function assertCurrentOpAggOutputToken(
-    tokenConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+function assertCurrentOpAggOutputToken(tokenConn, dbName, expectedBatchSize) {
     // Security token users are not allowed to pass "allUsers: true" because it requires having the
     // "inprog" action type, which is only available to the "clusterMonitor" role. Security token
     // users should not be allowed this role.
@@ -26,14 +25,12 @@ function assertCurrentOpAggOutputToken(
         cursor: {}
     });
     assert.eq(res.cursor.firstBatch.length, expectedBatchSize, tojson(res));
-    checkNsSerializedCorrectly(
-        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.cursor.firstBatch);
+    checkNsSerializedCorrectly(dbName, kNewCollectionName, res.cursor.firstBatch);
 }
 
 // Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing '$currentOp' in
 // aggregation pipeline and passing '$tenant' to it.
-function assertCurrentOpAggOutputDollarTenant(
-    rootConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+function assertCurrentOpAggOutputDollarTenant(rootConn, tenantId, dbName, expectedBatchSize) {
     // We pass "allUsers: true" in order to see ops run by other users, including the security token
     // user. Passing $tenant will filter for only ops which belong to this tenant.
     const res = rootConn.runCommand({
@@ -43,19 +40,16 @@ function assertCurrentOpAggOutputDollarTenant(
         '$tenant': tenantId
     });
     assert.eq(res.cursor.firstBatch.length, expectedBatchSize, tojson(res));
-    checkNsSerializedCorrectly(
-        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.cursor.firstBatch);
+    checkNsSerializedCorrectly(dbName, kNewCollectionName, res.cursor.firstBatch);
 }
 
 // Check for the 'insert' op(s) in the currOp output for 'tenantId' when issuing the currentOp
 // command with a security token.
-function assertCurrentOpCommandOutputToken(
-    tokenConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+function assertCurrentOpCommandOutputToken(tokenConn, dbName, expectedBatchSize) {
     const res = tokenConn.getDB("admin").runCommand(
         {currentOp: 1, $ownOps: true, $all: true, op: "insert"});
     assert.eq(res.inprog.length, expectedBatchSize, tojson(res));
-    checkNsSerializedCorrectly(
-        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.inprog);
+    checkNsSerializedCorrectly(dbName, kNewCollectionName, res.inprog);
     res.inprog.forEach(op => {
         assert.eq(op.command.insert, kNewCollectionName);
     });
@@ -63,34 +57,20 @@ function assertCurrentOpCommandOutputToken(
 
 // Check for the 'insert' op in the currOp output for 'tenantId' when issuing the currentOp
 // command with $tenant.
-function assertCurrentOpCommandOutputDollarTenant(
-    rootConn, tenantId, dbName, expectedBatchSize, featureFlagRequireTenantId) {
+function assertCurrentOpCommandOutputDollarTenant(rootConn, tenantId, dbName, expectedBatchSize) {
     const res = rootConn.runCommand(
         {currentOp: 1, $ownOps: false, $all: true, op: "insert", '$tenant': tenantId});
     assert.eq(res.inprog.length, expectedBatchSize, tojson(res));
-    checkNsSerializedCorrectly(
-        featureFlagRequireTenantId, tenantId, dbName, kNewCollectionName, res.inprog);
+    checkNsSerializedCorrectly(dbName, kNewCollectionName, res.inprog);
     res.inprog.forEach(op => {
         assert.eq(op.command.insert, kNewCollectionName);
     });
 }
 
-function checkNsSerializedCorrectly(
-    featureFlagRequireTenantId, kTenantId, dbName, collectionName, cursorRes) {
+function checkNsSerializedCorrectly(dbName, collectionName, cursorRes) {
     cursorRes.forEach(op => {
-        // TODO SERVER-74284: remove the feature flag check and else case
-        if (featureFlagRequireTenantId) {
-            // This case represents the upgraded state where we will not include the tenantId as the
-            // db prefix.
-            assert.eq(op.ns, dbName + "." + collectionName);
-            assert.eq(op.command.$db, dbName);
-        } else {
-            // This case represents the downgraded state where we will continue to prefix
-            // namespaces.
-            const prefixedDb = kTenant + "_" + kDbName;
-            assert.eq(op.ns, prefixedDb + "." + collectionName);
-            assert.eq(op.command.$db, kTenantId + "_" + dbName);
-        }
+        assert.eq(op.ns, dbName + "." + collectionName);
+        assert.eq(op.command.$db, dbName);
     });
 }
 
@@ -154,29 +134,22 @@ tokenConn._setSecurityToken(securityToken);
 
     // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
     // '$currentOp' in aggregation pipeline using both a security token and $tenant.
-    assertCurrentOpAggOutputToken(
-        tokenConn, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
-    assertCurrentOpAggOutputDollarTenant(
-        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputToken(tokenConn, kDbName, 1 /* expectedBatchSize */);
+    assertCurrentOpAggOutputDollarTenant(adminDb, kTenant, kDbName, 1 /* expectedBatchSize */);
 
     // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
     // the currentOp command using both a security token and $tenant.
-    assertCurrentOpCommandOutputToken(
-        tokenConn, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
-    assertCurrentOpCommandOutputDollarTenant(
-        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputToken(tokenConn, kDbName, 1 /* expectedBatchSize */);
+    assertCurrentOpCommandOutputDollarTenant(adminDb, kTenant, kDbName, 1 /* expectedBatchSize */);
 
     // Check that the other tenant does not see the op in any currentOp output.
     tokenConn._setSecurityToken(securityTokenOtherTenant);
-    assertCurrentOpAggOutputToken(
-        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
-    assertCurrentOpAggOutputDollarTenant(
-        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputToken(tokenConn, kDbName, 0 /* expectedBatchSize */);
+    assertCurrentOpAggOutputDollarTenant(adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */);
 
-    assertCurrentOpCommandOutputToken(
-        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputToken(tokenConn, kDbName, 0 /* expectedBatchSize */);
     assertCurrentOpCommandOutputDollarTenant(
-        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */);
 
     createCollFP.off();
     createShell();
@@ -206,35 +179,28 @@ tokenConn._setSecurityToken(securityToken);
     // '$currentOp' in aggregation pipeline using a security token. A security token user is not
     // authorized to pass ""allUsers: true", so it can only see ops that it has actually run itself.
     // In this case, the insert was issued by the "admin" user.
-    assertCurrentOpAggOutputToken(
-        tokenConn, kTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputToken(tokenConn, kDbName, 0 /* expectedBatchSize */);
 
     // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
     // '$currentOp' in aggregation pipeline using $tenant.
-    assertCurrentOpAggOutputDollarTenant(
-        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputDollarTenant(adminDb, kTenant, kDbName, 1 /* expectedBatchSize */);
 
     // Check that the 'insert' op also does NOT show up in the currOp output for 'kTenant' when
     // issuing the currentOp command, for the same reason as above.
-    assertCurrentOpCommandOutputToken(
-        tokenConn, kTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputToken(tokenConn, kDbName, 0 /* expectedBatchSize */);
 
     // Check that the 'insert' op shows up in the currOp output for 'kTenant' when issuing
     // the currentOp command using $tenant.
-    assertCurrentOpCommandOutputDollarTenant(
-        adminDb, kTenant, kDbName, 1 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputDollarTenant(adminDb, kTenant, kDbName, 1 /* expectedBatchSize */);
 
     // Now, check that the other tenant does not see the op in any currentOp output.
     tokenConn._setSecurityToken(securityTokenOtherTenant);
-    assertCurrentOpAggOutputToken(
-        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
-    assertCurrentOpAggOutputDollarTenant(
-        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpAggOutputToken(tokenConn, kDbName, 0 /* expectedBatchSize */);
+    assertCurrentOpAggOutputDollarTenant(adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */);
 
-    assertCurrentOpCommandOutputToken(
-        tokenConn, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+    assertCurrentOpCommandOutputToken(tokenConn, kDbName, 0 /* expectedBatchSize */);
     assertCurrentOpCommandOutputDollarTenant(
-        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */, featureFlagRequireTenantId);
+        adminDb, kOtherTenant, kDbName, 0 /* expectedBatchSize */);
 
     // Now check that a privileged user can see this op using both $currentOp and the currentOp
     // command when no tenantId is provided. The user currently authenticated on the adminDb

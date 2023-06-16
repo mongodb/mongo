@@ -160,31 +160,28 @@ TEST(DatabaseNameUtilTest, SerializeMissingExpectPrefix_CommandReply) {
     SerializationContext ctxt_withTenantId(SerializationContext::stateCommandReply());
     ctxt_withTenantId.setTenantIdSource(true);
 
-    // TODO SERVER-74284: call the serialize/deserialize entry points instead
-
     {  // No prefix, no tenantId.
         // request --> { ns: database.coll }
         auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnString);
     }
 
     {  // Has prefix, no tenantId.
         // request --> { ns: tenantId_database.coll }
         auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
     {  // No prefix, has tenantId.
         // request --> { ns: database.coll, $tenant: tenantId }
         auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId), dbnString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, $tenant: tenantId }
         auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId),
-                  dbnPrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnPrefixString);
     }
 }
 
@@ -201,31 +198,28 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixFalse_CommandReply) {
     ctxt_withTenantId.setTenantIdSource(true);
     ctxt_withTenantId.setPrefixState(false);
 
-    // TODO SERVER-74284: call the serialize/deserialize entry points instead
-
     {  // No prefix, no tenantId.
         // request --> { ns: database.coll, expectPrefix: false }
         auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnString);
     }
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, expectPrefix: false }
         auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
     {  // No prefix, has tenantId.
         // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: false }
         auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId), dbnString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: false }
         auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_withTenantId),
-                  dbnPrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnPrefixString);
     }
 }
 
@@ -243,24 +237,22 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixTrue_CommandReply) {
     ctxt_withTenantId.setTenantIdSource(true);
     ctxt_withTenantId.setPrefixState(true);
 
-    // TODO SERVER-74284: call the serialize/deserialize entry points instead
-
     {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: database.coll, expectPrefix: true }
         auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnString);
     }
 
     {  // Has prefix, no tenantId.
         // request --> { ns: tenantId_database.coll, expectPrefix: true }
         auto dbName = DatabaseName::createDatabaseName_forTest(boost::none, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_noTenantId), dbnPrefixString);
     }
 
     {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
         auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId), dbnPrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), dbnPrefixString);
     }
 
     {  // Has prefix, has tenantId.
@@ -268,8 +260,7 @@ TEST(DatabaseNameUtilTest, SerializeExpectPrefixTrue_CommandReply) {
         const std::string nsDoublePrefixString = str::stream()
             << tenantId.toString() << "_" << tenantId.toString() << "_" << dbnString;
         auto dbName = DatabaseName::createDatabaseName_forTest(tenantId, dbnPrefixString);
-        ASSERT_EQ(DatabaseNameUtil::serializeForCommands(dbName, ctxt_noTenantId),
-                  nsDoublePrefixString);
+        ASSERT_EQ(DatabaseNameUtil::serialize(dbName, ctxt_withTenantId), nsDoublePrefixString);
     }
 }
 
@@ -324,36 +315,36 @@ TEST(DatabaseNameUtilTest, DeserializeMissingExpectPrefix_CommandRequest) {
     SerializationContext ctxt_withTenantId(SerializationContext::stateCommandRequest());
     ctxt_withTenantId.setTenantIdSource(true);
 
-    // TODO SERVER-74284: call the serialize/deserialize entry points instead
-
     {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
         // request --> { ns: database.coll }
-        ASSERT_THROWS_CODE(
-            DatabaseNameUtil::deserializeForCommands(boost::none, dbnString, ctxt_noTenantId),
-            AssertionException,
-            8423388);
+        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId);
+        ASSERT_EQ(dbName.tenantId(), boost::none);
+        ASSERT_EQ(dbName.toString_forTest(), dbnString);
+
+        // TODO SERVER-73113: replace the above with the below test for assertion
+        // ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString,
+        // ctxt_noTenantId),
+        //                    AssertionException,
+        //                    8423388);
     }
 
     {  // Has prefix, no tenantId.
         // request --> { ns: tenantId_database.coll }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(boost::none, dbnPrefixString, ctxt_noTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 
     {  // No prefix, has tenantId.
         // request --> { ns: database.coll, $tenant: tenantId }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(tenantId, dbnString, ctxt_withTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnString, ctxt_withTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, $tenant: tenantId }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(tenantId, dbnPrefixString, ctxt_withTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnPrefixString);
     }
@@ -372,20 +363,23 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
     ctxt_withTenantId.setTenantIdSource(true);
     ctxt_withTenantId.setPrefixState(false);
 
-    // TODO SERVER-74284: call the serialize/deserialize entry points instead
-
-    {  // No prefix, no tenantId.
+    {
+        // No prefix, no tenantId.
         // request --> { ns: database.coll, expectPrefix: false }
-        ASSERT_THROWS_CODE(
-            DatabaseNameUtil::deserializeForCommands(boost::none, dbnString, ctxt_noTenantId),
-            AssertionException,
-            8423388);
+        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId);
+        ASSERT_EQ(dbName.tenantId(), boost::none);
+        ASSERT_EQ(dbName.toString_forTest(), dbnString);
+
+        // TODO SERVER-73113: replace the above with the below test for assertion
+        // ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString,
+        // ctxt_noTenantId),
+        //                    AssertionException,
+        //                    8423388);
     }
 
     {  // Has prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, expectPrefix: false }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(boost::none, dbnPrefixString, ctxt_noTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId);
         // This is an anomaly, when no tenantId is supplied, we actually ignore expectPrefix, so we
         // can't expect dbName.toString == dbnPrefixString as we will still attempt to parse the
         // prefix as usual.
@@ -395,16 +389,14 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixFalse_CommandRequest) {
 
     {  // No prefix, has tenantId.
         // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: false }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(tenantId, dbnString, ctxt_withTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnString, ctxt_withTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 
     {  // Has prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: false }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(tenantId, dbnPrefixString, ctxt_withTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnPrefixString);
     }
@@ -423,36 +415,37 @@ TEST(DatabaseNameUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
     ctxt_withTenantId.setTenantIdSource(true);
     ctxt_withTenantId.setPrefixState(true);
 
-    // TODO SERVER-74284: call the serialize/deserialize entry points in this test instead
-
-    {  // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
+    {
+        // No prefix, no tenantId.  *** we shouldn't see this from Atlas Proxy in MT mode
         // request --> { ns: database.coll, expectPrefix: true }
-        ASSERT_THROWS_CODE(
-            DatabaseNameUtil::deserializeForCommands(boost::none, dbnString, ctxt_noTenantId),
-            AssertionException,
-            8423388);
+        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnString, ctxt_noTenantId);
+        ASSERT_EQ(dbName.tenantId(), boost::none);
+        ASSERT_EQ(dbName.toString_forTest(), dbnString);
+
+        // TODO SERVER-73113: replace the above with the below test for assertion
+        // ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(boost::none, dbnString,
+        // ctxt_noTenantId),
+        //                    AssertionException,
+        //                    8423388);
     }
 
     {  // Has prefix, no tenantId.
         // request --> { ns: tenantId_database.coll, expectPrefix: true }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(boost::none, dbnPrefixString, ctxt_noTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(boost::none, dbnPrefixString, ctxt_noTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }
 
     {  // No prefix, has tenantId.  *** we shouldn't see this from Atlas Proxy
         // request --> { ns: database.coll, $tenant: tenantId, expectPrefix: true }
-        ASSERT_THROWS_CODE(
-            DatabaseNameUtil::deserializeForCommands(tenantId, dbnString, ctxt_withTenantId),
-            AssertionException,
-            8423386);
+        ASSERT_THROWS_CODE(DatabaseNameUtil::deserialize(tenantId, dbnString, ctxt_withTenantId),
+                           AssertionException,
+                           8423386);
     }
 
     {  // Has prefix, has tenantId.
         // request -->  { ns: tenantId_database.coll, $tenant: tenantId, expectPrefix: true }
-        auto dbName =
-            DatabaseNameUtil::deserializeForCommands(tenantId, dbnPrefixString, ctxt_withTenantId);
+        auto dbName = DatabaseNameUtil::deserialize(tenantId, dbnPrefixString, ctxt_withTenantId);
         ASSERT_EQ(dbName.tenantId(), tenantId);
         ASSERT_EQ(dbName.toString_forTest(), dbnString);
     }

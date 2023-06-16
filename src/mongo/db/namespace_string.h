@@ -449,6 +449,14 @@ public:
     }
 
     /**
+     * Returns a namespace string without tenant id.  Only to be used when a tenant id cannot be
+     * tolerated in the serialized output, and should otherwise be avoided whenever possible.
+     */
+    std::string serializeWithoutTenantPrefix_UNSAFE() const {
+        return toString();
+    }
+
+    /**
      * Gets a namespace string with tenant id.
      *
      * MUST only be used for tests.

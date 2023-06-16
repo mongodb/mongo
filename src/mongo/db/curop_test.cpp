@@ -333,25 +333,22 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
         NetworkOp::dbQuery);
 
     // Test without using the expectPrefix field.
-    // TODO SERVER-74284: uncomment the below and remove the line after when command
-    // serializer/deserializer is plumbed in
-    // for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
-    bool tenantIdFromDollarTenantOrSecurityToken = false;
+    for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
+        SerializationContext sc = SerializationContext::stateCommandReply();
+        sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
 
-    SerializationContext sc = SerializationContext::stateCommandReply();
-    sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
+        BSONObjBuilder builder;
+        {
+            stdx::lock_guard<Client> lk(*opCtx->getClient());
+            curop->reportState(&builder, sc);
+        }
+        auto bsonObj = builder.done();
 
-    BSONObjBuilder builder;
-    {
-        stdx::lock_guard<Client> lk(*opCtx->getClient());
-        curop->reportState(&builder, sc);
+        std::string serializedNs = tenantIdFromDollarTenantOrSecurityToken
+            ? "testDb.coll"
+            : tid.toString() + "_testDb.coll";
+        ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
     }
-    auto bsonObj = builder.done();
-
-    std::string serializedNs =
-        tenantIdFromDollarTenantOrSecurityToken ? "testDb.coll" : tid.toString() + "_testDb.coll";
-    ASSERT_EQ(serializedNs, bsonObj.getField("ns").String());
-    // }
 }
 }  // namespace
 }  // namespace mongo
