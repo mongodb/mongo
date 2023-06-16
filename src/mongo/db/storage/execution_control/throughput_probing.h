@@ -67,7 +67,9 @@ private:
     void _probeUp(double throughput);
     void _probeDown(double throughput);
 
-    void _setConcurrency(double concurrency);
+    void _resetConcurrency();
+    void _increaseConcurrency();
+    void _decreaseConcurrency();
 
     // This value is split between reads and writes based on the read/write ratio.
     double _stableConcurrency;
