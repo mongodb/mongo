@@ -84,6 +84,35 @@ Status validateGetMoreCollectionName(StringData collectionName) {
     return Status::OK();
 }
 
+Status validateResumeAfter(const mongo::BSONObj& resumeAfter, bool isClusteredCollection) {
+    if (resumeAfter.isEmpty()) {
+        return Status::OK();
+    }
+
+    BSONType recordIdType = resumeAfter["$recordId"].type();
+    if (resumeAfter.nFields() != 1 ||
+        (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
+         recordIdType != BSONType::jstNULL)) {
+        return Status(ErrorCodes::BadValue,
+                      "Malformed resume token: the '_resumeAfter' object must contain"
+                      " exactly one field named '$recordId', of type NumberLong, BinData "
+                      "or jstNULL.");
+    }
+
+    // Clustered collections can only have accept '$_resumeAfter' parameter of type
+    // BinData. Non clustered collections should only accept '$_resumeAfter' of type
+    // Long.
+    if ((isClusteredCollection && recordIdType == BSONType::NumberLong) ||
+        (!isClusteredCollection && recordIdType == BSONType::BinData)) {
+        return Status(ErrorCodes::Error(7738600),
+                      "The '$_resumeAfter parameter must match collection type. Clustered "
+                      "collections only have BinData recordIds, and all other collections"
+                      "have Long recordId.");
+    }
+
+    return Status::OK();
+}
+
 Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
     // Min and Max objects must have the same fields.
     if (!findCommand.getMin().isEmpty() && !findCommand.getMax().isEmpty()) {
@@ -130,17 +159,8 @@ Status validateFindCommandRequest(const FindCommandRequest& findCommand) {
             return Status(ErrorCodes::BadValue,
                           "sort must be unset or {$natural:1} if 'requestResumeToken' is enabled");
         }
-        if (!findCommand.getResumeAfter().isEmpty()) {
-            if (findCommand.getResumeAfter().nFields() != 1 ||
-                (findCommand.getResumeAfter()["$recordId"].type() != BSONType::NumberLong &&
-                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::BinData &&
-                 findCommand.getResumeAfter()["$recordId"].type() != BSONType::jstNULL)) {
-                return Status(ErrorCodes::BadValue,
-                              "Malformed resume token: the '_resumeAfter' object must contain"
-                              " exactly one field named '$recordId', of type NumberLong, BinData "
-                              "or jstNULL.");
-            }
-        }
+        // The $_resumeAfter parameter is checked in 'validateResumeAfter()'.
+
     } else if (!findCommand.getResumeAfter().isEmpty()) {
         return Status(ErrorCodes::BadValue,
                       "'requestResumeToken' must be true if 'resumeAfter' is"

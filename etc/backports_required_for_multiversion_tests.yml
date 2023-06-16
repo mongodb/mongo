@@ -867,4 +867,8 @@ last-lts:
     ticket: SERVER-77237
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-78050
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-77386
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-77386
   suites: null

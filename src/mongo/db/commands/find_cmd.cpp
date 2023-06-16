@@ -298,6 +298,11 @@ public:
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
             const auto& collection = ctx->getCollection();
+            if (!ctx->getView()) {
+                const bool isClusteredCollection = collection && collection->isClustered();
+                uassertStatusOK(query_request_helper::validateResumeAfter(
+                    findCommand->getResumeAfter(), isClusteredCollection));
+            }
             auto expCtx = makeExpressionContext(opCtx, *findCommand, collection, verbosity);
             const bool isExplain = true;
             auto cq = uassertStatusOK(
@@ -505,6 +510,7 @@ public:
                                   << " specified in query request not found",
                     collection || !isFindByUUID);
 
+            bool isClusteredCollection = false;
             if (collection) {
                 if (isFindByUUID) {
                     // Replace the UUID in the find command with the fully qualified namespace of
@@ -516,7 +522,7 @@ public:
                 const bool isTailable = findCommand->getTailable();
                 const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
                     repl::ReadConcernLevel::kMajorityReadConcern;
-                const bool isClusteredCollection = collection->isClustered();
+                isClusteredCollection = collection->isClustered();
                 const bool isCapped = collection->isCapped();
                 const bool isReplicated = collection->ns().isReplicated();
                 if (isClusteredCollection && isCapped && isReplicated && isTailable) {
@@ -525,6 +531,14 @@ public:
                             "read concern",
                             isMajorityReadConcern);
                 }
+            }
+
+            // Views use the aggregation system and the $_resumeAfter parameter is not allowed. A
+            // more descriptive error will be raised later, but we want to validate this parameter
+            // before beginning the operation.
+            if (!ctx->getView()) {
+                uassertStatusOK(query_request_helper::validateResumeAfter(
+                    findCommand->getResumeAfter(), isClusteredCollection));
             }
 
             // Fill out curop information.
@@ -724,9 +738,9 @@ public:
                 if (stashResourcesForGetMore) {
                     // Collect storage stats now before we stash the recovery unit. These stats are
                     // normally collected in the service entry point layer just before a command
-                    // ends, but they must be collected before stashing the
-                    // RecoveryUnit. Otherwise, the service entry point layer will collect the
-                    // stats from the new RecoveryUnit, which wasn't actually used for the query.
+                    // ends, but they must be collected before stashing the RecoveryUnit. Otherwise,
+                    // the service entry point layer will collect the stats from the new
+                    // RecoveryUnit, which wasn't actually used for the query.
                     //
                     // The stats collected here will not get overwritten, as the service entry
                     // point layer will only set these stats when they're not empty.
