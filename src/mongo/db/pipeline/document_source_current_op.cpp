@@ -185,7 +185,7 @@ intrusive_ptr<DocumentSource> DocumentSourceCurrentOp::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             "$currentOp must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
     boost::optional<ConnMode> includeIdleConnections;
     boost::optional<SessionMode> includeIdleSessions;

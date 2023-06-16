@@ -95,7 +95,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
     const NamespaceString& nss = pExpCtx->ns;
     uassert(ErrorCodes::InvalidNamespace,
             "$operationMetrics must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
     uassert(ErrorCodes::BadValue,
             "The $operationMetrics stage specification must be an object",

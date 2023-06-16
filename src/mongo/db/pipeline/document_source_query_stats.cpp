@@ -169,7 +169,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
     return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
         return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);

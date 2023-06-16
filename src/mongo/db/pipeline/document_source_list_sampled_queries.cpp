@@ -48,7 +48,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceListSampledQueries::createFro
     const NamespaceString& nss = pExpCtx->ns;
     uassert(ErrorCodes::InvalidNamespace,
             "$listSampledQueries must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
     uassert(6876001,
             str::stream() << kStageName << " must take a nested object but found: " << specElem,
             specElem.type() == BSONType::Object);

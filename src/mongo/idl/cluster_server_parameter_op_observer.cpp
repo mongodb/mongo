@@ -139,7 +139,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
-    if (dbName.db() == DatabaseName::kConfig.db()) {
+    if (dbName.isConfigDB()) {
         // Entire config DB deleted, reset to default state.
         opCtx->recoveryUnit()->onCommit(
             [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {

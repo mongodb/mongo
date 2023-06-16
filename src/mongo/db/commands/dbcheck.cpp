@@ -197,9 +197,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                             const DatabaseName& dbName,
                                             const DbCheckAllInvocation& invocation) {
-    uassert(ErrorCodes::InvalidNamespace,
-            "Cannot run dbCheck on local database",
-            dbName.db() != DatabaseName::kLocal.db());
+    uassert(
+        ErrorCodes::InvalidNamespace, "Cannot run dbCheck on local database", !dbName.isLocalDB());
 
     AutoGetDb agd(opCtx, dbName, MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound,

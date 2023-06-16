@@ -1314,9 +1314,7 @@ void OpObserverImpl::onDropDatabase(OperationContext* opCtx, const DatabaseName&
               "object"_attr = oplogEntry.getObject());
     }
 
-    uassert(50714,
-            "dropping the admin database is not allowed.",
-            dbName.db() != DatabaseName::kAdmin.db());
+    uassert(50714, "dropping the admin database is not allowed.", !dbName.isAdminDB());
 }
 
 repl::OpTime OpObserverImpl::onDropCollection(OperationContext* opCtx,

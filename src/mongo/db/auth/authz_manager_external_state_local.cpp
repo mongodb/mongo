@@ -760,7 +760,7 @@ public:
         // invalidators will purge cache on a per-tenant basis as needed.
         auto db = nss.dbName();
         auto coll = nss.coll();
-        if (db.db() != DatabaseName::kAdmin.db()) {
+        if (!db.isAdminDB()) {
             return;
         }
 

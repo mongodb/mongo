@@ -352,7 +352,7 @@ TEST_F(AuthorizationManagerTest, testRefreshExternalV2User) {
 
     // Assert that all checked-out $external users are now marked invalid.
     for (const auto& checkedOutUser : checkedOutUsers) {
-        if (checkedOutUser->getName().getDB() == DatabaseName::kExternal.db()) {
+        if (checkedOutUser->getName().getDatabaseName().isExternalDB()) {
             ASSERT(!checkedOutUser.isValid());
         } else {
             ASSERT(checkedOutUser.isValid());

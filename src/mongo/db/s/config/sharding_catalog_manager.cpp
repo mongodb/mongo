@@ -1103,7 +1103,7 @@ boost::optional<BSONObj> ShardingCatalogManager::findOneConfigDocumentInTxn(
 BSONObj ShardingCatalogManager::findOneConfigDocument(OperationContext* opCtx,
                                                       const NamespaceString& nss,
                                                       const BSONObj& query) {
-    invariant(nss.dbName().db() == DatabaseName::kConfig.db());
+    invariant(nss.isConfigDB());
 
     FindCommandRequest findCommand(nss);
     findCommand.setFilter(query);

@@ -401,7 +401,7 @@ Status StorageInterfaceImpl::dropReplicatedDatabases(OperationContext* opCtx) {
     auto databaseHolder = DatabaseHolder::get(opCtx);
     auto hasLocalDatabase = false;
     for (const auto& dbName : dbNames) {
-        if (dbName.db() == DatabaseName::kLocal.db()) {
+        if (dbName.isLocalDB()) {
             hasLocalDatabase = true;
             continue;
         }

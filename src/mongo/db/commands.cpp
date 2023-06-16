@@ -573,7 +573,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << dbName.toStringForErrorMsg()
                           << "' database in a transaction.",
-            dbName.db() != DatabaseName::kLocal.db());
+            !dbName.isLocalDB());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << nss.toStringForErrorMsg()
@@ -588,7 +588,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     } else {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run command against the config database in a transaction.",
-                dbName.db() != DatabaseName::kConfig.db());
+                !dbName.isConfigDB());
     }
 }
 

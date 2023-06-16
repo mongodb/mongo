@@ -110,7 +110,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     uassert(
         ErrorCodes::InvalidNamespace,
         "Collectionless $listCatalog must be run against the 'admin' database with {aggregate: 1}",
-        nss.db() == DatabaseName::kAdmin.db() || !nss.isCollectionlessAggregateNS());
+        nss.isAdminDB() || !nss.isCollectionlessAggregateNS());
 
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             fmt::format("The {} aggregation stage is not enabled", kStageName),

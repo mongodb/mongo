@@ -1219,7 +1219,7 @@ Status ShardingCatalogClientImpl::removeConfigDocuments(OperationContext* opCtx,
                                                         const BSONObj& query,
                                                         const WriteConcernOptions& writeConcern,
                                                         boost::optional<BSONObj> hint) {
-    invariant(nss.db() == DatabaseName::kConfig.db());
+    invariant(nss.isConfigDB());
 
     BatchedCommandRequest request([&] {
         write_ops::DeleteCommandRequest deleteOp(nss);

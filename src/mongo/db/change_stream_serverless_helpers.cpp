@@ -112,7 +112,7 @@ TenantSet getConfigDbTenants(OperationContext* opCtx) {
 
     auto dbNames = CollectionCatalog::get(opCtx)->getAllDbNames();
     for (auto&& dbName : dbNames) {
-        if (dbName.db() == DatabaseName::kConfig.db() && dbName.tenantId()) {
+        if (dbName.isConfigDB() && dbName.tenantId()) {
             tenantIds.insert(*dbName.tenantId());
         }
     }

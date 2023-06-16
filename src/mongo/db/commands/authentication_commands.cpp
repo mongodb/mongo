@@ -126,7 +126,7 @@ public:
             as->logoutDatabase(opCtx->getClient(),
                                DatabaseNameUtil::serializeForAuth(dbname),
                                "Logging out on user request");
-            if (getTestCommandsEnabled() && (dbname.db() == DatabaseName::kAdmin.db())) {
+            if (getTestCommandsEnabled() && (dbname.isAdminDB())) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to
                 // support the auth passthrough test framework on mongos (since you can't use the
@@ -217,7 +217,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
-            userName.getDB() == DatabaseName::kExternal.db());
+            userName.getDatabaseName().isExternalDB());
 
     auto isInternalClient = [&]() -> bool {
         return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;

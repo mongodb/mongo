@@ -751,7 +751,7 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(
 
     // If the user is authorized for anyNormalResource, then they implicitly have access
     // to most databases.
-    if (dbname.db() != DatabaseName::kLocal.db() && dbname.db() != DatabaseName::kConfig.db() &&
+    if (!dbname.isLocalDB() && !dbname.isConfigDB() &&
         user->hasActionsForResource(ResourcePattern::forAnyNormalResource(tenantId))) {
         return true;
     }

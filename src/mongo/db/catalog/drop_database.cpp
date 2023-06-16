@@ -147,7 +147,7 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Dropping the '" << dbName.toStringForErrorMsg()
                           << "' database is prohibited.",
-            dbName.db() != DatabaseName::kAdmin.db());
+            !dbName.isAdminDB());
 
     {
         CurOp::get(opCtx)->ensureStarted();
@@ -163,8 +163,8 @@ Status _dropDatabase(OperationContext* opCtx, const DatabaseName& dbName, bool a
     // collections to drop.
     repl::OpTime latestDropPendingOpTime;
 
-    const auto tenantLockMode{boost::make_optional(
-        dbName.tenantId() && dbName.db() == DatabaseName::kConfig.db(), MODE_X)};
+    const auto tenantLockMode{
+        boost::make_optional(dbName.tenantId() && dbName.isConfigDB(), MODE_X)};
     {
         boost::optional<AutoGetDb> autoDB;
         autoDB.emplace(opCtx, dbName, MODE_X /* database lock mode*/, tenantLockMode);

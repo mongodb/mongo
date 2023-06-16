@@ -172,7 +172,7 @@ public:
                 const long long size = sizeEntry.second;
 
                 // Skip the local database, since all shards have their own independent local
-                if (dbname.db() == DatabaseName::kLocal.db()) {
+                if (dbname.isLocalDB()) {
                     continue;
                 }
 

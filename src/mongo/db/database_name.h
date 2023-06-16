@@ -144,6 +144,18 @@ public:
     bool isEmpty() const {
         return _data.size() == kDataOffset;
     }
+    bool isAdminDB() const {
+        return db() == DatabaseName::kAdmin.db();
+    }
+    bool isLocalDB() const {
+        return db() == DatabaseName::kLocal.db();
+    }
+    bool isConfigDB() const {
+        return db() == DatabaseName::kConfig.db();
+    }
+    bool isExternalDB() const {
+        return db() == DatabaseName::kExternal.db();
+    }
 
     /**
      * This function should only be used when creating a resouce id for databasename.

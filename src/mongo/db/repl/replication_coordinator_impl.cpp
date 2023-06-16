@@ -3061,7 +3061,7 @@ bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& ns
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
-    if (!isReplEnabled() || nsOrUUID.dbName().db() == DatabaseName::kLocal.db()) {
+    if (!isReplEnabled() || nsOrUUID.dbName().isLocalDB()) {
         // Writes on stand-alone nodes or "local" database are always permitted.
         return true;
     }

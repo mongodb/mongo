@@ -360,7 +360,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
     auto dbNames = catalog->getAllDbNames();
     for (auto& dbName : dbNames) {
         // Skip local database.
-        if (dbName.db() != DatabaseName::kLocal.db()) {
+        if (!dbName.isLocalDB()) {
             std::vector<NamespaceString> collectionNames;
             {
                 Lock::DBLock lk(_opCtx.get(), dbName, MODE_S);
