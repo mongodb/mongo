@@ -55,9 +55,7 @@ class ResourcePattern {
 
 public:
     // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-    // forAnyNormalResource() - Remove boost::none default.
     // forClusterResource() - Remove boost::none default.
-    // forCollectionName() - Remove variant without tenantId arg.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
     /**
@@ -71,8 +69,7 @@ public:
      * Returns a pattern that matches any database or collection resource except collections for
      * which ns.isSystem().
      */
-    static ResourcePattern forAnyNormalResource(
-        const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forAnyNormalResource(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchAnyNormalResource, tenantId);
     }
 
@@ -103,10 +100,6 @@ public:
         return ResourcePattern(
             MatchTypeEnum::kMatchCollectionName,
             NamespaceString::createNamespaceStringForAuth(tenantId, ""_sd, collectionName));
-    }
-
-    static ResourcePattern forCollectionName(StringData collectionName) {
-        return forCollectionName(boost::none, collectionName);
     }
 
     /**

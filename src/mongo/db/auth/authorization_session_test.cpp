@@ -1228,8 +1228,7 @@ TEST_F(AuthorizationSessionTest, CanCheckIfHasAnyPrivilegeOnResource) {
 
     // If we have a privilege on anyNormalResource, we have actions on all databases and all
     // collections they contain
-    authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forAnyNormalResource(), ActionType::find));
+    authzSession->assumePrivilegesForDB(Privilege(kAnyNormalResource, ActionType::find));
     ASSERT_TRUE(authzSession->isAuthorizedForAnyActionOnResource(testFooCollResource));
     ASSERT_TRUE(
         authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forDatabaseName(testDB)));

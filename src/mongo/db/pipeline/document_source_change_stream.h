@@ -81,7 +81,7 @@ public:
                                            bool bypassDocumentValidation) const override {
             if (_nss.isAdminDB() && _nss.isCollectionlessAggregateNS()) {
                 // Watching a whole cluster.
-                return {Privilege(ResourcePattern::forAnyNormalResource(), actions)};
+                return {Privilege(ResourcePattern::forAnyNormalResource(_nss.tenantId()), actions)};
             } else if (_nss.isCollectionlessAggregateNS()) {
                 // Watching a whole database.
                 return {Privilege(ResourcePattern::forDatabaseName(_nss.dbName()), actions)};

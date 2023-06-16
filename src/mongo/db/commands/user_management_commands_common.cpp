@@ -231,11 +231,12 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateUserCommand& 
     if (auto possibleRoles = request.getRoles()) {
         // You don't know what roles you might be revoking, so require the ability to
         // revoke any role in the system.
-        uassert(ErrorCodes::Unauthorized,
-                "In order to use updateUser to set roles array, must be "
-                "authorized to revoke any role in the system",
-                as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                     ActionType::revokeRole));
+        uassert(
+            ErrorCodes::Unauthorized,
+            "In order to use updateUser to set roles array, must be "
+            "authorized to revoke any role in the system",
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyNormalResource(dbname.tenantId()), ActionType::revokeRole));
 
         auto resolvedRoles = resolveRoleNames(possibleRoles.value(), dbname);
         uassertStatusOK(checkAuthorizedToGrantRoles(as, resolvedRoles));
@@ -276,8 +277,8 @@ void checkAuthForTypedCommand(OperationContext* opCtx, const UpdateRoleCommand& 
     // to revoke any role (or privilege) in the system.
     uassert(ErrorCodes::Unauthorized,
             "updateRole command required the ability to revoke any role in the system",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                 ActionType::revokeRole));
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forAnyNormalResource(dbname.tenantId()), ActionType::revokeRole));
 
     if (auto roles = request.getRoles()) {
         auto resolvedRoles = resolveRoleNames(roles.value(), dbname);
@@ -473,25 +474,32 @@ void checkAuthForTypedCommand(OperationContext* opCtx,
         actions.addAction(ActionType::dropUser);
         actions.addAction(ActionType::dropRole);
     }
-    uassert(ErrorCodes::Unauthorized,
-            "Not authorized to update user/role data using _mergeAuthzCollections a command",
-            as->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(), actions));
 
     auto tempUsersColl = request.getTempUsersCollection();
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to read " << tempUsersColl,
-            tempUsersColl.empty() ||
+    if (!tempUsersColl.empty()) {
+        auto tempUsersNS = NamespaceString(tempUsersColl);
+        uassert(ErrorCodes::Unauthorized,
+                "Not authorized to update user data using _mergeAuthzCollections a command",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(tempUsersColl)),
-                    ActionType::find));
+                    ResourcePattern::forAnyNormalResource(tempUsersNS.tenantId()), actions));
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to read " << tempUsersColl,
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(tempUsersNS), ActionType::find));
+    }
 
     auto tempRolesColl = request.getTempRolesCollection();
-    uassert(ErrorCodes::Unauthorized,
-            str::stream() << "Not authorized to read " << tempRolesColl,
-            tempRolesColl.empty() ||
+    if (!tempRolesColl.empty()) {
+        auto tempRolesNS = NamespaceString(tempRolesColl);
+        uassert(ErrorCodes::Unauthorized,
+                "Not authorized to update role data using _mergeAuthzCollections a command",
                 as->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forExactNamespace(NamespaceString(tempRolesColl)),
-                    ActionType::find));
+                    ResourcePattern::forAnyNormalResource(tempRolesNS.tenantId()), actions));
+        uassert(ErrorCodes::Unauthorized,
+                str::stream() << "Not authorized to read " << tempRolesColl,
+                as->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forExactNamespace(tempRolesNS), ActionType::find));
+    }
 }
 
 }  // namespace auth

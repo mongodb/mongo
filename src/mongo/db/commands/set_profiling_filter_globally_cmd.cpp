@@ -43,8 +43,8 @@ Status SetProfilingFilterGloballyCmd::checkAuthForOperation(OperationContext* op
                                                             const DatabaseName& dbName,
                                                             const BSONObj& cmdObj) const {
     AuthorizationSession* authSession = AuthorizationSession::get(opCtx->getClient());
-    return authSession->isAuthorizedForActionsOnResource(ResourcePattern::forAnyNormalResource(),
-                                                         ActionType::enableProfiler)
+    return authSession->isAuthorizedForActionsOnResource(
+               ResourcePattern::forAnyNormalResource(dbName.tenantId()), ActionType::enableProfiler)
         ? Status::OK()
         : Status(ErrorCodes::Unauthorized, "unauthorized");
 }
