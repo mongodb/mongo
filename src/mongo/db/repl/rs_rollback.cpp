@@ -1968,7 +1968,7 @@ Status _syncRollback(OperationContext* opCtx,
         auto res = syncRollBackLocalOperations(
             localOplog, rollbackSource.getOplog(), processOperationForFixUp);
         if (!res.isOK()) {
-            const auto status = res.getStatus();
+            auto status = res.getStatus();
             switch (status.code()) {
                 case ErrorCodes::OplogStartMissing:
                 case ErrorCodes::UnrecoverableRollbackError:

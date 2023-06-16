@@ -204,11 +204,11 @@ Status V2UserDocumentParser::checkValidUserDocument(const BSONObj& doc) const {
             return Status::OK();
         };
 
-        const auto sha1status = validateScram(SCRAMSHA1_CREDENTIAL_FIELD_NAME);
+        auto sha1status = validateScram(SCRAMSHA1_CREDENTIAL_FIELD_NAME);
         if (!sha1status.isOK() && (sha1status.code() != ErrorCodes::NoSuchKey)) {
             return sha1status;
         }
-        const auto sha256status = validateScram(SCRAMSHA256_CREDENTIAL_FIELD_NAME);
+        auto sha256status = validateScram(SCRAMSHA256_CREDENTIAL_FIELD_NAME);
         if (!sha256status.isOK() && (sha256status.code() != ErrorCodes::NoSuchKey)) {
             return sha256status;
         }

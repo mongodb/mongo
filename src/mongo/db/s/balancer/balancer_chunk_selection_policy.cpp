@@ -147,7 +147,7 @@ getDataSizeInfoForCollections(OperationContext* opCtx,
     for (auto&& response : responsesFromShards) {
         try {
             const auto& shardId = response.shardId;
-            const auto errorContext =
+            auto errorContext =
                 "Failed to get stats for balancing from shard '{}'"_format(shardId.toString());
             const auto responseValue =
                 uassertStatusOKWithContext(std::move(response.swResponse), errorContext);

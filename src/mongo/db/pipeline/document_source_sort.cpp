@@ -260,7 +260,7 @@ DocumentSource::GetNextResult DocumentSourceSort::doGetNext() {
     }
 
     if (!_populated) {
-        const auto populationResult = populate();
+        auto populationResult = populate();
         if (populationResult.isPaused()) {
             return populationResult;
         }

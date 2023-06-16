@@ -297,7 +297,7 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& db
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
-    const NamespaceString nss(
+    NamespaceString nss(
         NamespaceStringUtil::parseNamespaceFromRequest(dbName, first.valueStringData()));
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg() << "'",

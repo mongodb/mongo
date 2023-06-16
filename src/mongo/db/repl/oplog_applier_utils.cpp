@@ -561,7 +561,7 @@ Status OplogApplierUtils::applyOplogBatchCommon(
 
         // If we didn't create a group, try to apply the op individually.
         try {
-            const Status status =
+            Status status =
                 applyOplogEntryOrGroupedInserts(opCtx, op, oplogApplicationMode, isDataConsistent);
 
             if (!status.isOK()) {

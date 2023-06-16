@@ -392,7 +392,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
     auto future = launchAsync([this, &chunksQuery, newOpTime, &collEpoch, &collTimestamp] {
         OpTime opTime;
 
-        const auto chunks =
+        auto chunks =
             assertGet(catalogClient()->getChunks(operationContext(),
                                                  chunksQuery,
                                                  BSON(ChunkType::lastmod() << -1),
@@ -460,7 +460,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
              << BSON("$gte" << static_cast<long long>(queryChunkVersion.toLong()))));
 
     auto future = launchAsync([this, &chunksQuery, &collEpoch, &collTimestamp] {
-        const auto chunks =
+        auto chunks =
             assertGet(catalogClient()->getChunks(operationContext(),
                                                  chunksQuery,
                                                  BSONObj(),

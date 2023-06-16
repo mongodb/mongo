@@ -541,7 +541,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                        long long* nNonCompliantDocuments,
                                        size_t* dataSize,
                                        ValidateResults* results) {
-    const Status status =
+    Status status =
         validateBSON(record.data(), record.size(), _validateState->getBSONValidateMode());
     if (!status.isOK()) {
         if (status.code() != ErrorCodes::NonConformantBSON) {

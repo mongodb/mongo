@@ -618,7 +618,7 @@ std::vector<NamespaceString> MovePrimaryCoordinator::cloneDataToRecipient(
         "movePrimary operation on database {} failed to clone data to recipient {}"_format(
             _dbName.toStringForErrorMsg(), toShardId.toString()));
 
-    const auto clonedCollections = [&] {
+    auto clonedCollections = [&] {
         std::vector<NamespaceString> colls;
         for (const auto& bsonElem : cloneResponse.getValue().response["clonedColls"].Obj()) {
             if (bsonElem.type() == String) {

@@ -525,7 +525,7 @@ Status StorageInterfaceImpl::dropCollection(OperationContext* opCtx, const Names
                 return Status::OK();
             }
             WriteUnitOfWork wunit(opCtx);
-            const auto status = autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
+            auto status = autoDb.getDb()->dropCollectionEvenIfSystem(opCtx, nss);
             if (!status.isOK()) {
                 return status;
             }
@@ -548,7 +548,7 @@ Status StorageInterfaceImpl::truncateCollection(OperationContext* opCtx,
         }
 
         WriteUnitOfWork wunit(opCtx);
-        const auto status = autoColl.getWritableCollection(opCtx)->truncate(opCtx);
+        auto status = autoColl.getWritableCollection(opCtx)->truncate(opCtx);
         if (!status.isOK()) {
             return status;
         }
@@ -578,7 +578,7 @@ Status StorageInterfaceImpl::renameCollection(OperationContext* opCtx,
                               << fromNS.dbName().toStringForErrorMsg() << " not found.");
         }
         WriteUnitOfWork wunit(opCtx);
-        const auto status = autoDB.getDb()->renameCollection(opCtx, fromNS, toNS, stayTemp);
+        auto status = autoDB.getDb()->renameCollection(opCtx, fromNS, toNS, stayTemp);
         if (!status.isOK()) {
             return status;
         }
@@ -1488,7 +1488,7 @@ boost::optional<Timestamp> StorageInterfaceImpl::getLastStableRecoveryTimestamp(
         return boost::none;
     }
 
-    const auto ret = serviceCtx->getStorageEngine()->getLastStableRecoveryTimestamp();
+    auto ret = serviceCtx->getStorageEngine()->getLastStableRecoveryTimestamp();
     if (ret == boost::none) {
         return Timestamp::min();
     }

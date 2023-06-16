@@ -139,8 +139,7 @@ bool LiteParsedDocumentSourceNestedPipelines::allowedToPassthroughFromMongos() c
 Status LiteParsedDocumentSourceNestedPipelines::checkShardedForeignCollAllowed(
     NamespaceString nss, bool inMultiDocumentTransaction) const {
     for (auto&& pipeline : _pipelines) {
-        if (const auto status =
-                pipeline.checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
+        if (auto status = pipeline.checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
             !status.isOK()) {
             return status;
         }

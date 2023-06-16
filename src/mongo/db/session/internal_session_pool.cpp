@@ -97,7 +97,7 @@ boost::optional<InternalSessionPool::Session> InternalSessionPool::_acquireSessi
 }
 
 InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
-    const InternalSessionPool::Session session = [&] {
+    InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
         const auto& systemSession = makeSystemLogicalSessionId();
@@ -116,7 +116,7 @@ InternalSessionPool::Session InternalSessionPool::acquireSystemSession() {
 
 InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
     OperationContext* opCtx) {
-    const InternalSessionPool::Session session = [&] {
+    InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
         const auto& userDigest = getLogicalSessionUserDigestForLoggedInUser(opCtx);
@@ -136,7 +136,7 @@ InternalSessionPool::Session InternalSessionPool::acquireStandaloneSession(
 
 InternalSessionPool::Session InternalSessionPool::acquireChildSession(
     OperationContext* opCtx, const LogicalSessionId& parentLsid) {
-    const InternalSessionPool::Session session = [&] {
+    InternalSessionPool::Session session = [&] {
         stdx::lock_guard<Latch> lock(_mutex);
 
         auto it = _childSessions.find(parentLsid);

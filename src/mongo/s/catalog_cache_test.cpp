@@ -134,7 +134,7 @@ protected:
     }
 
     CollectionType loadCollection(const ShardVersion& version) {
-        const auto coll = makeCollectionType(version);
+        auto coll = makeCollectionType(version);
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version.placementVersion()));
         auto future = launchAsync([&] {

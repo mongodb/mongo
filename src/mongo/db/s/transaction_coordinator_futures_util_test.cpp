@@ -421,7 +421,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsOK) {
         kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
     ASSERT(!future.isReady());
 
-    const auto objResponse = BSON("ok" << 1 << "responseData" << 2);
+    auto objResponse = BSON("ok" << 1 << "responseData" << 2);
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_BSONOBJ_EQ(BSON("TestCommand" << 1), request.cmdObj);
         return objResponse;
@@ -439,7 +439,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsNotOK) {
         kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 2));
     ASSERT(!future.isReady());
 
-    const auto objResponse = BSON("ok" << 0 << "responseData" << 3);
+    auto objResponse = BSON("ok" << 0 << "responseData" << 3);
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_BSONOBJ_EQ(BSON("TestCommand" << 2), request.cmdObj);
         return objResponse;

@@ -116,7 +116,7 @@ public:
                         repl::ReplicationCoordinator::get(opCtx)->getMemberState().primary());
             }
 
-            const auto response = [&] {
+            auto response = [&] {
                 const auto nss = ns();
                 switch (metadata_consistency_util::getCommandLevel(nss)) {
                     case MetadataConsistencyCommandLevelEnum::kClusterLevel:

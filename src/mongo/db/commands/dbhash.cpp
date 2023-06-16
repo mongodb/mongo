@@ -67,7 +67,7 @@ std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(Operati
     // Loop until we get a consistent catalog and snapshot. This is only used for the lock-free
     // implementation of dbHash which skips acquiring database and collection locks.
     while (true) {
-        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+        auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
         opCtx->recoveryUnit()->preallocateSnapshot();
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
         if (catalogBeforeSnapshot == catalogAfterSnapshot) {

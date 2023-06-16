@@ -1294,13 +1294,13 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
 
         try {
             bool containsDotsAndDollarsField = false;
-            const auto ret = performSingleUpdateOp(opCtx,
-                                                   ns,
-                                                   opCollectionUUID,
-                                                   &request,
-                                                   source,
-                                                   &containsDotsAndDollarsField,
-                                                   forgoOpCounterIncrements);
+            auto ret = performSingleUpdateOp(opCtx,
+                                             ns,
+                                             opCollectionUUID,
+                                             &request,
+                                             source,
+                                             &containsDotsAndDollarsField,
+                                             forgoOpCounterIncrements);
 
             if (containsDotsAndDollarsField) {
                 // If it's an upsert, increment 'inserts' metric, otherwise increment 'updates'.

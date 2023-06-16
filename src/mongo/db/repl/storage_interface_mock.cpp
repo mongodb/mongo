@@ -109,7 +109,7 @@ Status CollectionBulkLoaderMock::init(const std::vector<BSONObj>& secondaryIndex
 Status CollectionBulkLoaderMock::insertDocuments(const std::vector<BSONObj>::const_iterator begin,
                                                  const std::vector<BSONObj>::const_iterator end) {
     LOGV2_DEBUG(21758, 1, "CollectionBulkLoaderMock::insertDocuments called");
-    const auto status = insertDocsFn(begin, end);
+    auto status = insertDocsFn(begin, end);
 
     // Only count if it succeeds.
     if (status.isOK()) {

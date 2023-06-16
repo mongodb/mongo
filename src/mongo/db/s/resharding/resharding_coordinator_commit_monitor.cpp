@@ -158,12 +158,12 @@ CoordinatorCommitMonitor::queryRemainingOperationTimeForRecipients() const {
                 !_cancelToken.isCanceled());
 
         auto response = ars.next();
-        const auto errorContext =
+        auto errorContext =
             "Failed command: {} on {}"_format(cmdObj.toString(), response.shardId.toString());
 
-        const auto shardResponse =
+        auto shardResponse =
             uassertStatusOKWithContext(std::move(response.swResponse), errorContext);
-        const auto status = getStatusFromCommandResult(shardResponse.data);
+        auto status = getStatusFromCommandResult(shardResponse.data);
         uassertStatusOKWithContext(status, errorContext);
 
         const auto remainingTime = extractOperationRemainingTime(shardResponse.data);

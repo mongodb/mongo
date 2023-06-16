@@ -92,7 +92,7 @@ const char* DocumentSourceBucketAuto::getSourceName() const {
 
 DocumentSource::GetNextResult DocumentSourceBucketAuto::doGetNext() {
     if (!_populated) {
-        const auto populationResult = populateSorter();
+        auto populationResult = populateSorter();
         if (populationResult.isPaused()) {
             return populationResult;
         }

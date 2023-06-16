@@ -490,8 +490,7 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
 
     const BSONObj writeConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
                                                   << "mock");
-    const BSONObj resWithWriteConcernError =
-        BSON("ok" << 1 << "writeConcernError" << writeConcernError);
+    BSONObj resWithWriteConcernError = BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
@@ -533,7 +532,7 @@ TEST_F(AsyncRPCTestFixture, WriteError) {
     const BSONObj writeError = BSON("code" << ErrorCodes::DocumentValidationFailure << "errInfo"
                                            << writeErrorExtraInfo << "errmsg"
                                            << "Document failed validation");
-    const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
+    BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
         helloCmd, getExecutorPtr(), _cancellationToken);

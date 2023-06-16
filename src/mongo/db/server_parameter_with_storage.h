@@ -319,7 +319,7 @@ public:
     Status validateValue(const element_type& newValue,
                          const boost::optional<TenantId>& tenantId) const {
         for (const auto& validator : _validators) {
-            const auto status = validator(newValue, tenantId);
+            auto status = validator(newValue, tenantId);
             if (!status.isOK()) {
                 return status;
             }

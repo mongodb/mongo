@@ -93,7 +93,7 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBsonWithMaxM
 
 DocumentSource::GetNextResult DocumentSourceGroup::doGetNext() {
     if (!_groupsReady) {
-        const auto initializationResult = performBlockingGroup();
+        auto initializationResult = performBlockingGroup();
         if (initializationResult.isPaused()) {
             return initializationResult;
         }

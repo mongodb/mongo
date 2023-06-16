@@ -460,7 +460,7 @@ Status storeServerOptions(const moe::Environment& params) {
     }
 
     if (params.count("net.compression.compressors")) {
-        const auto ret =
+        auto ret =
             storeMessageCompressionOptions(params["net.compression.compressors"].as<string>());
         if (!ret.isOK()) {
             return ret;

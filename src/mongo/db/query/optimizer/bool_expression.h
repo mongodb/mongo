@@ -42,7 +42,7 @@ namespace mongo::optimizer {
 
 template <class T>
 struct TassertNegator {
-    T operator()(const T v) const {
+    T operator()(T v) const {
         tassert(7453909, "No negator specified", false);
         return v;
     }

@@ -45,8 +45,7 @@ public:
 
     ConnectionString getConnString() const override {
         const HostAndPort configHost{"configHost1"};
-        const ConnectionString configCS{
-            ConnectionString::forReplicaSet("configReplSet", {configHost})};
+        ConnectionString configCS{ConnectionString::forReplicaSet("configReplSet", {configHost})};
         return configCS;
     }
 

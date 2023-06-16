@@ -303,8 +303,8 @@ TEST_F(AsyncRPCShardingTestFixture, ShardIdOverload) {
         NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     const BSONObj testFirstBatch = BSON("x" << 1);
     const FindCommandRequest findCmd = FindCommandRequest(testNS);
-    const BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
-                                  .toBSON(CursorResponse::ResponseType::InitialResponse);
+    BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
+                            .toBSON(CursorResponse::ResponseType::InitialResponse);
 
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         findCmd, executor(), CancellationToken::uncancelable());

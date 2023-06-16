@@ -367,7 +367,7 @@ Status DatabaseImpl::dropCollection(OperationContext* opCtx,
 
     invariant(nss.dbName() == _name);
 
-    if (const auto droppable = isDroppableCollection(opCtx, nss); !droppable.isOK()) {
+    if (auto droppable = isDroppableCollection(opCtx, nss); !droppable.isOK()) {
         return droppable;
     }
 

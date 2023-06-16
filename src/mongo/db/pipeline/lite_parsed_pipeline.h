@@ -154,8 +154,7 @@ public:
     Status checkShardedForeignCollAllowed(NamespaceString nss,
                                           bool isMultiDocumentTransaction) const {
         for (auto&& spec : _stageSpecs) {
-            if (const auto status =
-                    spec->checkShardedForeignCollAllowed(nss, isMultiDocumentTransaction);
+            if (auto status = spec->checkShardedForeignCollAllowed(nss, isMultiDocumentTransaction);
                 !status.isOK()) {
                 return status;
             }

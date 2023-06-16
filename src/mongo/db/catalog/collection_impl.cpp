@@ -145,7 +145,7 @@ Status validateIsNotInDbs(const NamespaceString& ns,
 // Validates that the option is not used on admin, local or config db as well as not being used on
 // config servers.
 Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns) {
-    const auto validationStatus =
+    auto validationStatus =
         validateIsNotInDbs(ns,
                            {DatabaseName::kAdmin, DatabaseName::kLocal, DatabaseName::kConfig},
                            "changeStreamPreAndPostImages");

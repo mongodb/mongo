@@ -152,7 +152,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForUncappedCollection(
                     const auto& doc = *insertIter++;
                     bytesInBlock += doc.objsize();
                     // This version of insert will not update any indexes.
-                    const auto status = collection_internal::insertDocumentForBulkLoader(
+                    auto status = collection_internal::insertDocumentForBulkLoader(
                         _opCtx.get(), _acquisition.getCollectionPtr(), doc, onRecordInserted);
                     if (!status.isOK()) {
                         return status;
@@ -199,7 +199,7 @@ Status CollectionBulkLoaderImpl::_insertDocumentsForCappedCollection(
                 WriteUnitOfWork wunit(_opCtx.get());
                 // For capped collections, we use regular insertDocument, which
                 // will update pre-existing indexes.
-                const auto status = collection_internal::insertDocument(
+                auto status = collection_internal::insertDocument(
                     _opCtx.get(), _acquisition.getCollectionPtr(), InsertStatement(doc), nullptr);
                 if (!status.isOK()) {
                     return status;
@@ -384,7 +384,7 @@ Status CollectionBulkLoaderImpl::_runTaskReleaseResourcesOnFailure(const F& task
     AlternativeClientRegion acr(_client);
     ScopeGuard guard([this] { _releaseResources(); });
     try {
-        const auto status = task();
+        auto status = task();
         if (status.isOK()) {
             guard.dismiss();
         }

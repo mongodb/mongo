@@ -136,7 +136,7 @@ DocumentSource::GetNextResult DocumentSourceChangeStreamEnsureResumeTokenPresent
         const auto extraInfo = ex.extraInfo<ChangeStreamStartAfterInvalidateInfo>();
         tassert(5779200, "Missing ChangeStreamStartAfterInvalidationInfo on exception", extraInfo);
 
-        const DocumentSource::GetNextResult nextInput =
+        DocumentSource::GetNextResult nextInput =
             Document::fromBsonWithMetaData(extraInfo->getStartAfterInvalidateEvent());
 
         _resumeStatus =

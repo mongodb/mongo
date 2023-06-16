@@ -275,7 +275,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
     // Loop until we get a consistent catalog and snapshot
     while (true) {
-        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+        auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
         opCtx->recoveryUnit()->preallocateSnapshot();
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
         if (catalogBeforeSnapshot == catalogAfterSnapshot) {

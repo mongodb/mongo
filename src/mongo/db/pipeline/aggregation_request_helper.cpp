@@ -143,7 +143,7 @@ NamespaceString parseNs(const DatabaseName& dbName, const BSONObj& cmdObj) {
                               << typeName(firstElement.type()),
                 firstElement.type() == BSONType::String);
 
-        const NamespaceString nss(
+        NamespaceString nss(
             NamespaceStringUtil::parseNamespaceFromRequest(dbName, firstElement.valueStringData()));
 
         uassert(ErrorCodes::InvalidNamespace,

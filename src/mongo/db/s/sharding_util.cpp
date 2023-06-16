@@ -91,17 +91,16 @@ std::vector<AsyncRequestsSender::Response> processShardResponses(
             auto response = ars.next();
 
             if (throwOnError) {
-                const auto errorContext =
-                    "Failed command {} for database '{}' on shard '{}'"_format(
-                        command.toString(), dbName, StringData{response.shardId});
+                auto errorContext = "Failed command {} for database '{}' on shard '{}'"_format(
+                    command.toString(), dbName, StringData{response.shardId});
 
                 uassertStatusOKWithContext(response.swResponse.getStatus(), errorContext);
                 const auto& respBody = response.swResponse.getValue().data;
 
-                const auto status = getStatusFromCommandResult(respBody);
+                auto status = getStatusFromCommandResult(respBody);
                 uassertStatusOKWithContext(status, errorContext);
 
-                const auto wcStatus = getWriteConcernStatusFromCommandResult(respBody);
+                auto wcStatus = getWriteConcernStatusFromCommandResult(respBody);
                 uassertStatusOKWithContext(wcStatus, errorContext);
             }
 

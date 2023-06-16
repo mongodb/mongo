@@ -2770,7 +2770,7 @@ Value ExpressionFilter::serialize(SerializationOptions options) const {
 
 Value ExpressionFilter::evaluate(const Document& root, Variables* variables) const {
     // We are guaranteed at parse time that this isn't using our _varId.
-    const Value inputVal = _children[_kInput]->evaluate(root, variables);
+    Value inputVal = _children[_kInput]->evaluate(root, variables);
 
     if (inputVal.nullish())
         return Value(BSONNULL);
@@ -3049,7 +3049,7 @@ Value ExpressionMap::serialize(SerializationOptions options) const {
 
 Value ExpressionMap::evaluate(const Document& root, Variables* variables) const {
     // guaranteed at parse time that this isn't using our _varId
-    const Value inputVal = _children[_kInput]->evaluate(root, variables);
+    Value inputVal = _children[_kInput]->evaluate(root, variables);
     if (inputVal.nullish())
         return Value(BSONNULL);
 
