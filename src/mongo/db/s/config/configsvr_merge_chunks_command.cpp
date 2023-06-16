@@ -109,8 +109,9 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
             if (!AuthorizationSession::get(opCtx->getClient())
-                     ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                        ActionType::internal)) {
+                     ->isAuthorizedForActionsOnResource(
+                         ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                         ActionType::internal)) {
                 uasserted(ErrorCodes::Unauthorized, "Unauthorized");
             }
         }

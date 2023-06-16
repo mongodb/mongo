@@ -135,19 +135,21 @@ public:
                                    std::make_move_iterator(hiddenCollectionsIncon.begin()),
                                    std::make_move_iterator(hiddenCollectionsIncon.end()));
 
+            const auto nss = ns();
             auto exec = metadata_consistency_util::makeQueuedPlanExecutor(
-                opCtx, std::move(inconsistencies), ns());
+                opCtx, std::move(inconsistencies), nss);
 
             ClientCursorParams cursorParams{
                 std::move(exec),
-                ns(),
+                nss,
                 AuthorizationSession::get(opCtx->getClient())->getAuthenticatedUserName(),
                 APIParameters::get(opCtx),
                 opCtx->getWriteConcern(),
                 repl::ReadConcernArgs::get(opCtx),
                 ReadPreferenceSetting::get(opCtx),
                 request().toBSON({}),
-                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
+                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
+                           ActionType::internal)}};
 
             const auto batchSize = [&]() -> long long {
                 const auto& cursorOpts = request().getCursor();
@@ -175,8 +177,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
