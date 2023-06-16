@@ -63,15 +63,17 @@ namespace {
 auto& oplogGetMoreStats = makeServerStatusMetric<TimerStats>("repl.network.oplogGetMoresProcessed");
 
 BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
-                                         const BSONObj& cmdObj) {
+                                         const BSONObj& cmdObj,
+                                         const SerializationContext& sc) {
     auto db = cmdObj["$db"];
     if (!db) {
         return cmdObj;
     }
 
-    auto dbName = DatabaseNameUtil::deserialize(tenantId, db.String());
-    auto newCmdObj =
-        cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(dbName)).firstElement());
+    auto dbName = DatabaseNameUtil::deserialize(tenantId, db.String(), sc);
+    auto newCmdObj = cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(
+                                              dbName, SerializationContext::stateCommandReply(sc)))
+                                         .firstElement());
     return newCmdObj;
 }
 
@@ -265,7 +267,10 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
                 str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
                               << expCtx->ns.ns(),
                 expCtx->serializationCtxt != SerializationContext::stateDefault());
-        CurOp::get(clientOpCtx)->reportState(infoBuilder, expCtx->serializationCtxt, truncateOps);
+
+        // reportState is used to generate a command reply
+        auto sc = SerializationContext::stateCommandReply(expCtx->serializationCtxt);
+        CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
     }
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
@@ -305,11 +310,7 @@ OperationContext* CurOp::opCtx() {
 }
 
 void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
-    if (_nss.tenantId()) {
-        _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
-    } else {
-        _opDescription = opDescription;
-    }
+    _opDescription = opDescription;
 }
 
 void CurOp::setGenericCursor_inlock(GenericCursor gc) {
@@ -336,7 +337,7 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
-    _opDescription = serializeDollarDbInOpDescription(nss.tenantId(), cmdObj);
+    _opDescription = cmdObj;
     _command = command;
     _nss = std::move(nss);
 }
@@ -734,7 +735,9 @@ void CurOp::reportState(BSONObjBuilder* builder,
     // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
 
-    auto obj = appendCommentField(opCtx, _opDescription);
+    auto opDescription =
+        serializeDollarDbInOpDescription(_nss.tenantId(), _opDescription, serializationContext);
+    auto obj = appendCommentField(opCtx, opDescription);
 
     // If flag is true, add command field to builder without sensitive information.
     if (omitAndRedactInformation) {

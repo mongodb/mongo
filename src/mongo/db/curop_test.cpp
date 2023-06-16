@@ -330,7 +330,7 @@ TEST(CurOpTest, CheckNSAgainstSerializationContext) {
     // for (bool tenantIdFromDollarTenantOrSecurityToken : {false, true}) {
     bool tenantIdFromDollarTenantOrSecurityToken = false;
 
-    SerializationContext sc = SerializationContext::stateCommandRequest();
+    SerializationContext sc = SerializationContext::stateCommandReply();
     sc.setTenantIdSource(tenantIdFromDollarTenantOrSecurityToken);
 
     BSONObjBuilder builder;
