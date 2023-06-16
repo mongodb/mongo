@@ -61,6 +61,12 @@ static constexpr auto kNaturalSortField = "$natural";
 Status validateGetMoreCollectionName(StringData collectionName);
 
 /**
+ * Returns a non-OK status if '$_resumeAfter' is set to an unexpected value, or the wrong type
+ * determined by the collection type.
+ */
+Status validateResumeAfter(const mongo::BSONObj& resumeAfter, bool isClusteredCollection);
+
+/**
  * Returns a non-OK status if any property of the QR has a bad value (e.g. a negative skip
  * value) or if there is a bad combination of options (e.g. awaitData is illegal without
  * tailable).

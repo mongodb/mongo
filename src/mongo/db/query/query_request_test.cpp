@@ -248,10 +248,13 @@ TEST(QueryRequestTest, InvalidResumeAfterWrongRecordIdType) {
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                            false /* isClusteredCollection */));
     resumeAfter = BSON("$recordId" << 1LL);
     findCommand.setResumeAfter(resumeAfter);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
@@ -261,7 +264,8 @@ TEST(QueryRequestTest, InvalidResumeAfterExtraField) {
     findCommand.setRequestResumeToken(true);
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
-    ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_NOT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                            false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, ResumeAfterWithHint) {
@@ -284,6 +288,8 @@ TEST(QueryRequestTest, ResumeAfterWithSort) {
     // Hint must be explicitly set for the query request to validate.
     findCommand.setHint(fromjson("{$natural: 1}"));
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
     findCommand.setSort(fromjson("{a: 1}"));
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setSort(fromjson("{$natural: 1}"));
@@ -299,6 +305,8 @@ TEST(QueryRequestTest, ResumeNoSpecifiedRequestResumeToken) {
     ASSERT_NOT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
 }
 
 TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
@@ -310,6 +318,8 @@ TEST(QueryRequestTest, ExplicitEmptyResumeAfter) {
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
     findCommand.setRequestResumeToken(true);
     ASSERT_OK(query_request_helper::validateFindCommandRequest(findCommand));
+    ASSERT_OK(query_request_helper::validateResumeAfter(findCommand.getResumeAfter(),
+                                                        false /* isClusteredCollection */));
 }
 
 //
