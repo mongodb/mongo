@@ -774,10 +774,3 @@ feature_flags:
         default: true
         version: 6.3
         shouldBeFCVGated: true
-
-    featureFlagApplyPreparedTxnsInParallel:
-        description: when enabled, secondaries will apply prepared transactions in parallel.
-        cpp_varname: feature_flags::gApplyPreparedTxnsInParallel
-        default: true
-        version: 7.0
-        shouldBeFCVGated: true

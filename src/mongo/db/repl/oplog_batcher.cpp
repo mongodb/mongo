@@ -245,9 +245,7 @@ OplogBatcher::BatchAction OplogBatcher::_getBatchActionForEntry(const OplogEntry
             : continueOrStartNewBatch();
     }
 
-    // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-    if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabledAndIgnoreFCVUnsafe() &&
-        _oplogApplier->getOptions().mode == OplogApplication::Mode::kSecondary) {
+    if (_oplogApplier->getOptions().mode == OplogApplication::Mode::kSecondary) {
         if (entry.shouldPrepare()) {
             // Grouping too many prepare ops in a batch may have performance implications,
             // so we break the batch when it contains enough prepare ops.

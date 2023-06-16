@@ -720,14 +720,8 @@ Status applyPrepareTransaction(OperationContext* opCtx,
         case repl::OplogApplication::Mode::kSecondary: {
             switch (op.instruction) {
                 case repl::ApplicationInstruction::applyOplogEntry: {
-                    // Checkout the session and apply non-split prepare op.
-                    // TODO (SERVER-70578): This can no longer happen once the feature flag
-                    // is removed.
-                    invariant(!op.subSession);
-                    invariant(!op.preparedTxnOps);
-                    auto ops = readTransactionOperationsFromOplogChain(opCtx, *op, {});
-                    return _applyPrepareTransaction(
-                        opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), ops, mode);
+                    // Not possible for secondary when applying prepare oplog entries.
+                    MONGO_UNREACHABLE;
                 }
                 case repl::ApplicationInstruction::applySplitPreparedTxnOp: {
                     // Checkout the session and apply split prepare op.

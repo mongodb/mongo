@@ -840,25 +840,22 @@ void OplogApplierImpl::_deriveOpsAndFillWriterVectors(
             continue;
         }
 
-        // (Ignore FCV check): This feature flag doesn't have any upgrade/downgrade concerns.
-        if (repl::feature_flags::gApplyPreparedTxnsInParallel.isEnabledAndIgnoreFCVUnsafe()) {
-            // Prepare entries in secondary mode do not come in their own batch, extract applyOps
-            // operations and fill writers with the extracted operations.
-            if (op.shouldPrepare() && (getOptions().mode == OplogApplication::Mode::kSecondary)) {
-                auto* partialTxnList = getPartialTxnList(op);
-                _addOplogChainOpsToWriterVectors(
-                    opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
-                continue;
-            }
+        // Prepare entries in secondary mode do not come in their own batch, extract applyOps
+        // operations and fill writers with the extracted operations.
+        if (op.shouldPrepare() && (getOptions().mode == OplogApplication::Mode::kSecondary)) {
+            auto* partialTxnList = getPartialTxnList(op);
+            _addOplogChainOpsToWriterVectors(
+                opCtx, &op, partialTxnList, derivedOps, writerVectors, &collPropertiesCache);
+            continue;
+        }
 
-            // Fill the writers with commit or abort operation. Depending on whether the operation
-            // refers to a split prepare, it might also be split into multiple ops.
-            if (op.isPreparedCommitOrAbort() &&
-                (getOptions().mode == OplogApplication::Mode::kSecondary)) {
-                OplogApplierUtils::addDerivedCommitsOrAborts(
-                    opCtx, &op, writerVectors, &collPropertiesCache);
-                continue;
-            }
+        // Fill the writers with commit or abort operation. Depending on whether the operation
+        // refers to a split prepare, it might also be split into multiple ops.
+        if (op.isPreparedCommitOrAbort() &&
+            (getOptions().mode == OplogApplication::Mode::kSecondary)) {
+            OplogApplierUtils::addDerivedCommitsOrAborts(
+                opCtx, &op, writerVectors, &collPropertiesCache);
+            continue;
         }
 
         // If we see a commitTransaction command that is a part of a prepared transaction during
