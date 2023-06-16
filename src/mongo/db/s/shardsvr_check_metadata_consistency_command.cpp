@@ -269,7 +269,8 @@ public:
                 repl::ReadConcernArgs::get(opCtx),
                 ReadPreferenceSetting::get(opCtx),
                 request().toBSON({}),
-                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
+                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
+                           ActionType::internal)}};
 
             return metadata_consistency_util::createInitialCursorReplyMongod(
                 opCtx, std::move(cursorParams), batchSize);
@@ -287,8 +288,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 

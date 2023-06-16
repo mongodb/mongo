@@ -256,7 +256,8 @@ public:
                 repl::ReadConcernArgs::get(opCtx),
                 ReadPreferenceSetting::get(opCtx),
                 request().toBSON({}),
-                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
+                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
+                           ActionType::internal)}};
 
             const auto batchSize = [&]() -> long long {
                 const auto& cursorOpts = request().getCursor();
@@ -382,8 +383,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 
