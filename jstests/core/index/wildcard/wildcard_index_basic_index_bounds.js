@@ -7,6 +7,11 @@
  * @tags: [
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
+ *   # Some expected index bounds require the multi-planner to choose the optimal plan that uses a
+ *   # more efficient CWI (non-generic). Sharded suites could mislead the multi-planner to choose a
+ *   # worse CWI because the planner may not run sufficient trials if there's no enough docs in some
+ *   # shard.
+ *   assumes_unsharded_collection,
  * ]
  */
 (function() {
@@ -35,17 +40,19 @@ const allowCompoundWildcardIndexes =
 // Template document which defines the 'schema' of the documents in the test collection.
 const templateDoc = {
     a: 0,
-    b: {c: 0, d: {e: 0}, f: {}}
+    b: {c: 0, d: {e: 0, g: 1}, f: {}, arr: [1]}
 };
 const pathList = ['a', 'b.c', 'b.d.e', 'b.f'];
 
 // Insert a set of documents into the collection, based on the template document and populated
 // with an increasing sequence of values. This is to ensure that the range of values present for
 // each field in the dataset is not entirely homogeneous.
-for (let i = 0; i < 10; i++) {
+for (let i = 0; i < 100; i++) {
     (function populateDoc(doc, value) {
         for (let key in doc) {
-            if (typeof doc[key] === 'object')
+            if (Array.isArray(doc[key])) {
+                doc[key].push(value);
+            } else if (typeof doc[key] === 'object')
                 value = populateDoc(doc[key], value);
             else
                 doc[key] = value++;
@@ -88,29 +95,30 @@ const operationList = [
     // In principle we could have tighter bounds for this. See SERVER-36765.
     {expression: {$eq: null, $exists: true}, bounds: ['[MinKey, MaxKey]'], subpathBounds: true},
     {expression: {$eq: []}, bounds: ['[undefined, undefined]', '[[], []]']},
-
 ];
 
 // Operations for compound wildcard indexes.
 const operationListCompound = [
     {
         query: {'a': 3, 'b.c': {$gte: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
-        path: '$_path',
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[MinKey, MaxKey]']},
+        path: 'b.c',
+        subpathBounds: false,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
     },
     {
         query: {'a': 3, 'b.c': {$gte: 3}, 'c': {$lt: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
-        path: '$_path',
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[3.0, inf.0]'], 'c': ['[-inf.0, 3.0)']},
+        path: 'b.c',
+        subpathBounds: false,
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
     },
     {
-        query: {'a': 3, 'b.c': {$in: [1, 2]}},
-        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
-        path: '$_path',
+        query: {'a': 3, 'b.c': {$in: [1]}},
+        bounds: {'a': ['[3.0, 3.0]'], 'b.c': ['[1.0, 1.0]'], 'c': ['[MinKey, MaxKey]']},
+        path: 'b.c',
         subpathBounds: false,
-        expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}
+        expectedKeyPattern: {'a': 1, '$_path': 1, 'b.c': 1, 'c': 1}
     },
 
     {
@@ -304,14 +312,17 @@ function runCompoundWildcardIndexTest(keyPattern, pathProjection) {
         // Verify that the winning plan uses the compound wildcard index with the expected bounds.
         assert.eq(ixScans.length, FixtureHelpers.numberOfShardsForCollection(coll));
         // Use "tojson()" in order to make ordering of fields matter.
-        assert.docEq(tojson(op.expectedKeyPattern), tojson(ixScans[0].keyPattern));
-        assert.docEq(tojson(expectedBounds), tojson(ixScans[0].indexBounds));
+        assert.docEq(tojson(op.expectedKeyPattern), tojson(ixScans[0].keyPattern), explainRes);
+        if (tojson(expectedBounds) != tojson(ixScans[0].indexBounds)) {
+            assert.docEq(expectedBounds, ixScans[0].indexBounds, explainRes);
+        }
 
         // Verify that the results obtained from the compound wildcard index are identical to a
         // COLLSCAN. We must explicitly hint the wildcard index, because we also sort on {_id: 1} to
         // ensure that both result sets are in the same order.
         assertResultsEq(coll.find(op.query).sort({_id: 1}).hint(keyPattern),
-                        coll.find(op.query).sort({_id: 1}).hint({$natural: 1}));
+                        coll.find(op.query).sort({_id: 1}).hint({$natural: 1}),
+                        explainRes);
     }
 }
 

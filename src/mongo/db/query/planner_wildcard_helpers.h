@@ -103,5 +103,12 @@ bool isWildcardObjectSubpathScan(const IndexScanNode* node);
  * 'index' must be a WILDCARD index.
  */
 BSONElement getWildcardField(const IndexEntry& index);
+
+/**
+ * If the compound wildcard index is expanded to any known field and the index is used to answer a
+ * $or query, we should expand the index bounds of the wildcard field in such IndexEntry to include
+ * all keys. Returns false if the query plan cannot use the index.
+ */
+bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& ixscanNodes);
 }  // namespace wildcard_planning
 }  // namespace mongo
