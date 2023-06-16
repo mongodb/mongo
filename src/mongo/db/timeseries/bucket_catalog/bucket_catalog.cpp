@@ -1613,13 +1613,32 @@ Bucket* BucketCatalog::_allocateBucket(Stripe* stripe,
     Bucket* bucket = it->second.get();
     stripe->openBuckets[info.key].emplace(bucket);
 
-    auto state = changeBucketState(
-        _bucketStateRegistry,
-        it->first,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(!input.has_value());
-            return BucketState{};
-        });
+    bool conflicts = false;
+    auto state = changeBucketState(_bucketStateRegistry,
+                                   bucket->bucketId,
+                                   [&conflicts](boost::optional<BucketState> input,
+                                                std::uint64_t) -> boost::optional<BucketState> {
+                                       // If we have an existing state for a bucket not tracked in
+                                       // the catalog (which can happen if a bucket is undergoing
+                                       // compression) then we should avoid allocating the bucket
+                                       // and throw a WriteConflict.
+                                       if (input.has_value()) {
+                                           conflicts = true;
+                                           return input;
+                                       }
+
+                                       conflicts = false;
+                                       return BucketState{};
+                                   });
+
+    if (conflicts) {
+        // At this point, we have only added the bucket to the openBuckets and allBuckets maps so we
+        // can go ahead and simply remove them from those maps.
+        stripe->openBuckets[info.key].erase(bucket);
+        stripe->allBuckets.erase(it);
+        throwWriteConflictException("OID collision occurred when inserting document(s).");
+    }
+
     invariant(state == BucketState{});
     _numberOfActiveBuckets.fetchAndAdd(1);
 
