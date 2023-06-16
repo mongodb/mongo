@@ -115,8 +115,6 @@ public:
 
     BSONObj toBSON() const;
 
-    std::string toString() const;
-
     static bool allElementsAreOfType(BSONType type, const BSONObj& obj);
 
 private:
