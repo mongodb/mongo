@@ -109,11 +109,22 @@ public:
                 if (response.getNumOrphanDocs()) {
                     response.setNote(StringData(kOrphanDocsWarningMessage));
                 }
+                if (!response.getNumDocs()) {
+                    // No calculation was performed. By design this must be because the shard key
+                    // does not have a supporting index. If the command is not requesting the
+                    // metrics about the read and write distribution, there are no metrics to
+                    // return to the user. So throw an error here.
+                    uassert(
+                        ErrorCodes::IllegalOperation,
+                        "Cannot analyze the characteristics of a shard key that does not have a "
+                        "supporting index",
+                        request().getAnalyzeReadWriteDistribution());
+                }
             }
 
             // Calculate metrics about the read and write distribution from sampled queries. Query
             // sampling is not supported on multitenant replica sets.
-            if (!gMultitenancySupport && request().getAnalyzeReadWriteDistribution()) {
+            if (request().getAnalyzeReadWriteDistribution()) {
                 auto [readDistribution, writeDistribution] =
                     analyze_shard_key::calculateReadWriteDistributionMetrics(
                         opCtx, analyzeShardKeyId, nss, collUuid, key);

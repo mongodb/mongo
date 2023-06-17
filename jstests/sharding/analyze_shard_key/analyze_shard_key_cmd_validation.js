@@ -66,13 +66,13 @@ function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationT
     for (let {indexOptions, shardKey} of validationTest.noCompatibleIndexTestCases) {
         jsTest.log(`Testing incompatible index ${tojson({indexOptions, shardKey})}`);
         assert.commandWorked(testDB.runCommand({createIndexes: collName, indexes: [indexOptions]}));
-        const res = assert.commandWorked(conn.adminCommand({
+        assert.commandFailedWithCode(conn.adminCommand({
             analyzeShardKey: ns,
             key: shardKey,
             keyCharacteristics: true,
             readWriteDistribution: false
-        }));
-        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res);
+        }),
+                                     ErrorCodes.IllegalOperation);
         assert.commandWorked(testDB.runCommand({dropIndexes: collName, index: indexOptions.name}));
     }
 

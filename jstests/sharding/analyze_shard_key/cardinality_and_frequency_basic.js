@@ -255,18 +255,18 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     // key values.
     const [docs0, metrics0] = makeSubTestCase(numMostCommonValues - 1);
     assert.commandWorked(coll.insert(docs0, {writeConcern}));
-    const res0 = assert.commandWorked(conn.adminCommand({
+    const res0 = conn.adminCommand({
         analyzeShardKey: ns,
         key: testCase.shardKey,
         comment: testCase.comment,
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
         readWriteDistribution: false
-    }));
+    });
     if (testCase.expectMetrics) {
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
     } else {
-        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res0);
+        assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);
     }
     assert.commandWorked(coll.remove({}));
 
@@ -274,18 +274,18 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     // key values.
     const [docs1, metrics1] = makeSubTestCase(numMostCommonValues);
     assert.commandWorked(coll.insert(docs1, {writeConcern}));
-    const res1 = assert.commandWorked(conn.adminCommand({
+    const res1 = conn.adminCommand({
         analyzeShardKey: ns,
         key: testCase.shardKey,
         comment: testCase.comment,
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
         readWriteDistribution: false
-    }));
+    });
     if (testCase.expectMetrics) {
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
     } else {
-        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res1);
+        assert.commandFailedWithCode(res1, ErrorCodes.IllegalOperation);
     }
     assert.commandWorked(coll.remove({}));
 
@@ -293,18 +293,18 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
     // key values.
     const [docs2, metrics2] = makeSubTestCase(numMostCommonValues * 25);
     assert.commandWorked(coll.insert(docs2, {writeConcern}));
-    const res2 = assert.commandWorked(conn.adminCommand({
+    const res2 = conn.adminCommand({
         analyzeShardKey: ns,
         key: testCase.shardKey,
         comment: testCase.comment,
         // Skip calculating the read and write distribution metrics since they are not needed by
         // this test.
         readWriteDistribution: false
-    }));
+    });
     if (testCase.expectMetrics) {
         AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
     } else {
-        AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res2);
+        assert.commandFailedWithCode(res2, ErrorCodes.IllegalOperation);
     }
     assert.commandWorked(coll.remove({}));
 }

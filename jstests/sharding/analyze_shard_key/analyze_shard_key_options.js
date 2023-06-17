@@ -51,15 +51,28 @@ function runTest(conn) {
     AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res3);
     AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res3);
 
-    assert.commandFailedWithCode(
-        conn.adminCommand({
-            analyzeShardKey: ns,
-            key: {x: 1},
-            keyCharacteristics: false,
-            readWriteDistribution: false
-        }),
-        ErrorCodes.InvalidOptions,
-    );
+    // Verify that when both 'keyCharacteristics' and 'readWriteDistribution' are false,
+    // the command fails because there are metrics to return.
+    assert.commandFailedWithCode(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {x: 1},
+        keyCharacteristics: false,
+        readWriteDistribution: false
+    }),
+                                 ErrorCodes.InvalidOptions);
+
+    // Verify that when 'readWriteDistribution' is false and the shard key does not have a
+    // supporting index, the command fails because there are metrics to return.
+    const res4 = assert.commandFailedWithCode(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: {y: 1},
+        keyCharacteristics: true,
+        readWriteDistribution: false
+    }),
+                                              ErrorCodes.IllegalOperation);
+    assert.eq(
+        res4.errmsg,
+        "Cannot analyze the characteristics of a shard key that does not have a supporting index");
 
     assert(coll.drop());
 }
