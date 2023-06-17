@@ -100,5 +100,10 @@ double calculatePercentage(double part, double whole) {
     return round(part / whole * 100, kMaxNumDecimalPlaces);
 }
 
+bool isInternalClient(OperationContext* opCtx) {
+    return !opCtx->getClient()->session() ||
+        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
+}
+
 }  // namespace analyze_shard_key
 }  // namespace mongo

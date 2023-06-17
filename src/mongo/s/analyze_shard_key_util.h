@@ -111,5 +111,10 @@ double round(double val, int n);
  */
 double calculatePercentage(double part, double whole);
 
+/*
+ * Returns true if the client is internal.
+ */
+bool isInternalClient(OperationContext* opCtx);
+
 }  // namespace analyze_shard_key
 }  // namespace mongo
