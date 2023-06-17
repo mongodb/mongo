@@ -94,11 +94,6 @@ BSONObj createIndex(OperationContext* opCtx, const NamespaceString& nss, const B
     return resObj;
 }
 
-bool isInternalClient(const OperationContext* opCtx) {
-    return !opCtx->getClient()->session() ||
-        (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
-}
-
 struct SampledCommandRequest {
     UUID sampleId;
     NamespaceString nss;
@@ -124,7 +119,7 @@ SampledCommandRequest makeSampledReadCommand(const UUID& sampleId,
  * Returns a sampled update command for the update at 'opIndex' in the given update command.
  */
 SampledCommandRequest makeSampledUpdateCommandRequest(
-    const OperationContext* opCtx,
+    OperationContext* opCtx,
     const UUID& sampleId,
     const write_ops::UpdateCommandRequest& originalCmd,
     int opIndex) {
@@ -163,7 +158,7 @@ SampledCommandRequest makeSampledUpdateCommandRequest(
  * Returns a sampled delete command for the delete at 'opIndex' in the given delete command.
  */
 SampledCommandRequest makeSampledDeleteCommandRequest(
-    const OperationContext* opCtx,
+    OperationContext* opCtx,
     const UUID& sampleId,
     const write_ops::DeleteCommandRequest& originalCmd,
     int opIndex) {

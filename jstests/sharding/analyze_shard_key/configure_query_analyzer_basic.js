@@ -199,4 +199,31 @@ if (!TestData.auth) {
 
     MongoRunner.stopMongod(mongod);
 }
+
+{
+    // Verify that an external client cannot run the configureQueryAnalyzer command against a
+    // shardsvr mongod.
+
+    // Start a sharded cluster with testing diagnostics (TestingProctor) disabled so the command
+    // below not bypass the internal client check.
+    TestData.testingDiagnosticsEnabled = false;
+
+    const st = new ShardingTest({shards: 1, rs: {nodes: 1}});
+    const shard0Primary = st.rs0.getPrimary();
+
+    const dbName = "testDb";
+    const collName = "testColl";
+    const ns = dbName + "." + collName;
+
+    assert.commandWorked(st.s.getCollection(ns).insert({x: 1}));
+
+    const configureRes = assert.commandFailedWithCode(
+        shard0Primary.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}),
+        ErrorCodes.IllegalOperation);
+    // Verify that the error message is as expected.
+    assert.eq(configureRes.errmsg,
+              "Cannot run configureQueryAnalyzer command directly against a shardsvr mongod");
+
+    st.stop();
+}
 })();
