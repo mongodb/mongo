@@ -38,7 +38,7 @@ namespace analyze_shard_key {
 
 /**
  * Returns metrics about the characteristics of the shard key (i.e. the cardinality, frequency
- * and monotonicity).
+ * and monotonicity) if the shard key has a supporting index.
  */
 KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
                                                              const UUID& analyzeShardKeyId,
