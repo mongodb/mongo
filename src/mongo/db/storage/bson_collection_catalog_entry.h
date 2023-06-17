@@ -174,6 +174,12 @@ public:
         // up will have this flag set to false by default. This will be boost::none if this catalog
         // entry is not representing a time-series collection or if FCV < 5.2.
         boost::optional<bool> timeseriesBucketsMayHaveMixedSchemaData;
+
+        // The flag will be set to false at the time of time-series collection creation. For any
+        // other collection type the flag will be boost::none. If a subsequent collMod operation
+        // changes either 'bucketRoundingSeconds' or 'bucketMaxSpanSeconds', we set the flag to
+        // true.
+        boost::optional<bool> timeseriesBucketingParametersHaveChanged;
     };
 };
 }  // namespace mongo

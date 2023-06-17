@@ -309,6 +309,15 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool timeseriesBucketingParametersMayHaveChanged() const override {
+        return _coll->timeseriesBucketingParametersMayHaveChanged();
+    }
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) override {
+        MONGO_UNREACHABLE;
+    }
+
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const override {
         return _coll->doesTimeseriesBucketsDocContainMixedSchemaData(bucketsDoc);
     }

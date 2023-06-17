@@ -812,6 +812,21 @@ boost::optional<bool> CollectionImpl::getTimeseriesBucketsMayHaveMixedSchemaData
     return _metadata->timeseriesBucketsMayHaveMixedSchemaData;
 }
 
+bool CollectionImpl::timeseriesBucketingParametersMayHaveChanged() const {
+    return _metadata->timeseriesBucketingParametersHaveChanged
+        ? *_metadata->timeseriesBucketingParametersHaveChanged
+        : true;
+}
+
+void CollectionImpl::setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                             boost::optional<bool> value) {
+    tassert(7625800, "This is not a time-series collection", _metadata->options.timeseries);
+
+    _writeMetadata(opCtx, [&](BSONCollectionCatalogEntry::MetaData& md) {
+        md.timeseriesBucketingParametersHaveChanged = value;
+    });
+}
+
 void CollectionImpl::setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                                 boost::optional<bool> setting) {
     uassert(6057500, "This is not a time-series collection", _metadata->options.timeseries);

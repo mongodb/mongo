@@ -63,6 +63,9 @@ const size_t kMaxKeyPatternPathLength = 2048;
 const std::string kTimeseriesBucketsMayHaveMixedSchemaDataFieldName =
     "timeseriesBucketsMayHaveMixedSchemaData";
 
+const std::string kTimeseriesBucketingParametersHaveChanged =
+    "timeseriesBucketingParametersHaveChanged";
+
 /**
  * Encodes 'multikeyPaths' as binary data and appends it to 'bob'.
  *
@@ -276,6 +279,11 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
                  *timeseriesBucketsMayHaveMixedSchemaData);
     }
 
+    if (timeseriesBucketingParametersHaveChanged) {
+        b.append(kTimeseriesBucketingParametersHaveChanged,
+                 *timeseriesBucketingParametersHaveChanged);
+    }
+
     return b.obj();
 }
 
@@ -324,6 +332,11 @@ void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
     BSONElement timeseriesMixedSchemaElem = obj[kTimeseriesBucketsMayHaveMixedSchemaDataFieldName];
     if (!timeseriesMixedSchemaElem.eoo() && timeseriesMixedSchemaElem.isBoolean()) {
         timeseriesBucketsMayHaveMixedSchemaData = timeseriesMixedSchemaElem.Bool();
+    }
+
+    BSONElement tsBucketingParametersChangedElem = obj[kTimeseriesBucketingParametersHaveChanged];
+    if (!tsBucketingParametersChangedElem.eoo() && tsBucketingParametersChangedElem.isBoolean()) {
+        timeseriesBucketingParametersHaveChanged = tsBucketingParametersChangedElem.Bool();
     }
 }
 }  // namespace mongo

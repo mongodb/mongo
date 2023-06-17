@@ -37,10 +37,34 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
+#include <boost/optional.hpp>
+
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/virtual_collection_impl.h"
+#include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/coll_mod_gen.h"
+#include "mongo/db/commands/create_gen.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/db_raii.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/timeseries/timeseries_collmod.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/stdx/utility.h"
+#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -110,5 +134,103 @@ TEST(CollModOptionTest, makeDryRunRequest) {
     ASSERT_TRUE(dryRunRequest.getIndex()->getUnique() && *dryRunRequest.getIndex()->getUnique());
     ASSERT_TRUE(dryRunRequest.getDryRun() && *dryRunRequest.getDryRun());
 }
+
+class CollModTest : public ServiceContextMongoDTest {
+protected:
+    void setUp() override {
+        // Set up mongod.
+        ServiceContextMongoDTest::setUp();
+
+        auto service = getServiceContext();
+
+        // Set up ReplicationCoordinator and ensure that we are primary.
+        auto replCoord = std::make_unique<repl::ReplicationCoordinatorMock>(service);
+        ASSERT_OK(replCoord->setFollowerMode(repl::MemberState::RS_PRIMARY));
+        repl::ReplicationCoordinator::set(service, std::move(replCoord));
+    }
+    void tearDown() override {
+        // Tear down mongod.
+        ServiceContextMongoDTest::tearDown();
+    }
+};
+
+ServiceContext::UniqueOperationContext makeOpCtx() {
+    auto opCtx = cc().makeOperationContext();
+    repl::createOplog(opCtx.get());
+    return opCtx;
+}
+
+TEST_F(CollModTest, CollModTimeseriesWithFixedBucket) {
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+    auto bucketsColl =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
+
+    auto opCtx = makeOpCtx();
+    auto tsOptions = TimeseriesOptions("t");
+    tsOptions.setBucketRoundingSeconds(100);
+    tsOptions.setBucketMaxSpanSeconds(100);
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    // Run collMod without changing the bucket span and validate that the
+    // timeseriesBucketingParametersMayHaveChanged() returns false.
+    CollMod collModCmd(curNss);
+    CollModRequest collModRequest;
+    stdx::variant<std::string, std::int64_t> expireAfterSeconds = 100;
+    collModRequest.setExpireAfterSeconds(expireAfterSeconds);
+    collModCmd.setCollModRequest(collModRequest);
+    BSONObjBuilder result;
+    uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
+        opCtx.get(), curNss, collModCmd, true, &result));
+    {
+        AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
+        ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
+    }
+
+    // Run collMod which changes the bucket span and validate that the
+    // timeseriesBucketingParametersMayHaveChanged() returns true.
+    CollModTimeseries collModTs;
+    collModTs.setBucketMaxSpanSeconds(200);
+    collModTs.setBucketRoundingSeconds(200);
+    collModRequest.setTimeseries(std::move(collModTs));
+    collModCmd.setCollModRequest(std::move(collModRequest));
+    uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
+        opCtx.get(), curNss, collModCmd, true, &result));
+    {
+        AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
+        ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
+    }
+}
+
+TEST_F(CollModTest, TimeseriesBucketingParameterChanged) {
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+    auto bucketsColl =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
+
+    auto opCtx = makeOpCtx();
+    auto tsOptions = TimeseriesOptions("t");
+    tsOptions.setBucketRoundingSeconds(100);
+    tsOptions.setBucketMaxSpanSeconds(100);
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    uassertStatusOK(writeConflictRetry(
+        opCtx.get(), "unitTestTimeseriesBucketingParameterChanged", bucketsColl, [&] {
+            WriteUnitOfWork wunit(opCtx.get());
+
+            AutoGetCollection collection(opCtx.get(), bucketsColl, MODE_X);
+            auto writableColl = collection.getWritableCollection(opCtx.get());
+            writableColl->setTimeseriesBucketingParametersChanged(opCtx.get(), boost::none);
+
+            wunit.commit();
+            return Status::OK();
+        }));
+
+    AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
+    ASSERT_TRUE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
+}
+
 }  // namespace
 }  // namespace mongo

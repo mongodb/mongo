@@ -199,6 +199,15 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    bool timeseriesBucketingParametersMayHaveChanged() const {
+        MONGO_UNREACHABLE;
+    }
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) {
+        MONGO_UNREACHABLE;
+    }
+
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const {
         MONGO_UNREACHABLE;
     }

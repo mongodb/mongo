@@ -524,6 +524,9 @@ Status _createTimeseries(OperationContext* opCtx,
         uassertStatusOK(db->userCreateNS(opCtx, bucketsNs, bucketsOptions, createIdIndex));
 
         CollectionWriter collectionWriter(opCtx, bucketsNs);
+        collectionWriter.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(
+            opCtx, false);
+
         uassertStatusOK(_createDefaultTimeseriesIndex(opCtx, collectionWriter));
         wuow.commit();
         return Status::OK();

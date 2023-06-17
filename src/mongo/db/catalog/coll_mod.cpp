@@ -985,6 +985,8 @@ Status _collModInternal(OperationContext* opCtx,
             auto [newOptions, changed] = res.getValue();
             if (changed) {
                 coll.getWritableCollection(opCtx)->setTimeseriesOptions(opCtx, newOptions);
+                coll.getWritableCollection(opCtx)->setTimeseriesBucketingParametersChanged(opCtx,
+                                                                                           true);
             }
         }
 
