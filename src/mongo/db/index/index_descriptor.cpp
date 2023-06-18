@@ -191,10 +191,10 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
         return build.obj();
     };
     
-    BSONObj keyPattern = dealBtreeKeyPattern(keyPattern());
+    BSONObj newKeyPattern = dealBtreeKeyPattern(keyPattern());
 
     // We first check whether the key pattern is identical for both indexes.
-    if (SimpleBSONObjComparator::kInstance.evaluate(keyPattern =
+    if (SimpleBSONObjComparator::kInstance.evaluate(newKeyPattern =
                                                     existingIndexDesc->keyPattern())) {
         return Comparison::kDifferent;
     }
