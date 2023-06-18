@@ -55,7 +55,11 @@ __wt_isdigit(u_char c)
 static inline bool
 __wt_isprint(u_char c)
 {
-    return (isprint(c) != 0);
+    /*
+     * On some systems, isprint() says that characters over 0x80 are printable, even if they may not
+     * actually be printable.
+     */
+    return (isprint(c) != 0) && (c < 0x80);
 }
 
 /*
