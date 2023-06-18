@@ -171,8 +171,30 @@ IndexDescriptor::Comparison IndexDescriptor::compareIndexOptions(
     const IndexCatalogEntry* existingIndex) const {
     auto existingIndexDesc = existingIndex->descriptor();
 
+    auto dealBtreeKeyPattern = [&](const BSONObj& indexKeyPattern) {
+        if (getIndexType() != INDEX_BTREE) {
+             return indexKeyPattern;
+        }
+        
+        BSONObjBuilder build;
+        BSONObjIterator kpIt(indexKeyPattern);
+        while (kpIt.more()) {
+            BSONElement elt = kpIt.next();
+            
+            // The canonical check as to whether a key pattern element is "ascending" or "descending" is
+            // (elt.number() >= 0). This is defined by the Ordering class.  
+            invariant(elt.isNumber());
+            int sortOrder = (elt.number() >= 0) ? 1 : -1;
+            build.append(elt.fieldName(), sortOrder);
+        }
+        
+        return build.obj();
+    };
+    
+    BSONObj keyPattern = dealBtreeKeyPattern(keyPattern());
+
     // We first check whether the key pattern is identical for both indexes.
-    if (SimpleBSONObjComparator::kInstance.evaluate(keyPattern() !=
+    if (SimpleBSONObjComparator::kInstance.evaluate(keyPattern =
                                                     existingIndexDesc->keyPattern())) {
         return Comparison::kDifferent;
     }
