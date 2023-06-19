@@ -2072,9 +2072,14 @@ Status applyOperation_inlock(OperationContext* opCtx,
                 }
                 // It is legal for a delete operation on the pre-images collection to delete zero
                 // documents - pre-image collections are not guaranteed to contain the same set of
-                // documents at all times.
+                // documents at all times. The same holds for change-collections as they both rely
+                // on unreplicated deletes when "featureFlagUseUnreplicatedTruncatesForDeletions" is
+                // enabled.
+                //
+                // TODO SERVER-70591: Remove feature flag requirement in comment above.
                 if (result.nDeleted == 0 && mode == OplogApplication::Mode::kSecondary &&
-                    !requestNss.isChangeStreamPreImagesCollection()) {
+                    !requestNss.isChangeStreamPreImagesCollection() &&
+                    !requestNss.isChangeCollection()) {
                     // In FCV 4.4, each node is responsible for deleting the excess documents in
                     // capped collections. This implies that capped deletes may not be synchronized
                     // between nodes at times. When upgraded to FCV 5.0, the primary will generate
