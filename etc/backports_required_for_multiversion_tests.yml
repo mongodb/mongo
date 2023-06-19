@@ -659,4 +659,6 @@ last-lts:
     ticket: SERVER-78050
   - test_file: jstests/sharding/implicit_create_collection_triggered_by_DDLs.js
     ticket: SERVER-76489
+  - test_file: jstests/change_streams/large_events_failed_metric.js
+    ticket: SERVER-67699
   suites: null
