@@ -514,8 +514,7 @@ MONGO_INITIALIZER(RegisterBenchmarks)(InitializerContext* context) {
             ->Args({1000, 10000})
             ->Args({10, 10})
             ->Args({10, 100})
-            ->Args({10, 1000})
-            ->Args({10, 10000});
+            ->Args({10, 1000});
     }
 }
 
