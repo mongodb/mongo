@@ -1659,7 +1659,6 @@ env.Library(
 )
 
 if wiredtiger:
-
     env.Library(
         target='oplog_applier_impl_test_fixture',
         source=[
@@ -1679,6 +1678,9 @@ if wiredtiger:
             'oplog_application',
             'replmocks',
             'storage_interface_impl',
+        ],
+        LIBDEPS_PRIVATE=[
+            '$BUILD_DIR/mongo/db/op_observer/op_observer',
         ],
     )
 
@@ -1951,10 +1953,8 @@ env.CppUnitTest(
         'tenant_file_cloner_test.cpp',
     ],
     LIBDEPS=[
-        # Required for service context test fixture
-        'cloner_test_fixtures',
-        'initial_sync_cloners',
-        'tenant_migration_cloners'
+        '$BUILD_DIR/mongo/db/op_observer/op_observer', 'cloner_test_fixtures',
+        'initial_sync_cloners', 'tenant_migration_cloners'
     ],
 )
 

@@ -8,6 +8,7 @@ env.Library(
     target='op_observer',
     source=[
         'op_observer.cpp',
+        'op_observer_registry.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
