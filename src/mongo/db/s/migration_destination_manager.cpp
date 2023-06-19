@@ -1259,13 +1259,17 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
                                                         range,
                                                         rangeDeletionWaitDeadline);
 
-            if (!status.isOK()) {
+            if (!status.isOK() && status != ErrorCodes::ExceededTimeLimit) {
                 _setStateFail(redact(status.toString()));
                 return;
             }
 
-            uassert(ErrorCodes::ExceededTimeLimit,
-                    "Exceeded deadline waiting for overlapping range deletion to finish",
+            uassert(
+                ErrorCodes::ExceededTimeLimit,
+                "Migration failed because the orphans cleanup routine didn't clear yet a portion "
+                "of the range being migrated that was previously owned by the recipient "
+                "shard.",
+                status != ErrorCodes::ExceededTimeLimit &&
                     outerOpCtx->getServiceContext()->getFastClockSource()->now() <
                         rangeDeletionWaitDeadline);
 
