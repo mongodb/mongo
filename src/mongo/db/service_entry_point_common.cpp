@@ -1736,16 +1736,11 @@ void ExecCommandDatabase::_initiateCommand() {
         feature_flags::gCheckForDirectShardOperations.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         bool clusterHasTwoOrMoreShards = [&]() {
-            if (feature_flags::gClusterCardinalityParameter.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-                auto* clusterCardinalityParam =
-                    clusterParameters
-                        ->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-                            "shardedClusterCardinalityForDirectConns");
-                return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-            }
-            return false;
+            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+            auto* clusterCardinalityParam =
+                clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+                    "shardedClusterCardinalityForDirectConns");
+            return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
         }();
         if (clusterHasTwoOrMoreShards && !command->shouldSkipDirectConnectionChecks()) {
             const bool authIsEnabled = AuthorizationManager::get(opCtx->getServiceContext()) &&

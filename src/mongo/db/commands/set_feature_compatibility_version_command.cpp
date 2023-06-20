@@ -94,8 +94,6 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_index_catalog.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/exit.h"
@@ -666,7 +664,6 @@ private:
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
             _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
-            _setShardedClusterCardinalityParam(opCtx, requestedVersion);
         }
         _removeRecordPreImagesCollectionOption(opCtx);
     }
@@ -784,47 +781,6 @@ private:
             if (indexCatalogNss == NamespaceString::kShardIndexCatalogNamespace) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
-        }
-    }
-
-    void _setShardedClusterCardinalityParam(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gClusterCardinalityParameter.isEnabledOnVersion(requestedVersion)) {
-            // Get current cluster parameter value so that we don't run SetClusterParameter
-            // extraneously
-            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            auto* clusterCardinalityParam =
-                clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-                    "shardedClusterCardinalityForDirectConns");
-            auto currentValue =
-                clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-
-            // config.shards is stable during FCV changes, so query that to discover the current
-            // number of shards.
-            DBDirectClient client(opCtx);
-            FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
-            findRequest.setLimit(2);
-            auto numShards = client.find(std::move(findRequest))->itcount();
-            bool expectedValue = numShards >= 2;
-
-            if (expectedValue == currentValue) {
-                return;
-            }
-
-            ConfigsvrSetClusterParameter configsvrSetClusterParameter(
-                BSON("shardedClusterCardinalityForDirectConns"
-                     << BSON("hasTwoOrMoreShards" << expectedValue)));
-            configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
-
-            const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-            const auto cmdResponse =
-                uassertStatusOK(shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
-                    opCtx,
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    DatabaseName::kAdmin.toString(),
-                    configsvrSetClusterParameter.toBSON({}),
-                    Shard::RetryPolicy::kIdempotent));
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
         }
     }
 

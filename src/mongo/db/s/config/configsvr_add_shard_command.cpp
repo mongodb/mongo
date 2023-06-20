@@ -58,11 +58,6 @@ namespace mongo {
 namespace {
 
 Status notifyShardsOfSecondShardIfNeeded(OperationContext* opCtx) {
-    if (!feature_flags::gClusterCardinalityParameter.isEnabled(
-            serverGlobalParams.featureCompatibility)) {
-        return Status::OK();
-    }
-
     auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
     auto* clusterCardinalityParam =
         clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
