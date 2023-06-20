@@ -127,7 +127,8 @@ std::vector<BSONObj> parseAndValidateIndexSpecs(OperationContext* opCtx,
             parsedIndexSpec = index_key_validate::removeUnknownFields(ns, parsedIndexSpec);
         }
 
-        parsedIndexSpec = index_key_validate::parseAndValidateIndexSpecs(opCtx, parsedIndexSpec);
+        parsedIndexSpec = index_key_validate::parseAndValidateIndexSpecs(
+            opCtx, parsedIndexSpec, true /* checkFCV */);
         uassert(ErrorCodes::BadValue,
                 "Can't hide index on system collection",
                 !(ns.isSystem() && !ns.isTimeseriesBucketsCollection()) ||
