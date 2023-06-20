@@ -40,4 +40,6 @@ executor:
       syncdelay: 10
       set_parameters:
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
     num_nodes: 3

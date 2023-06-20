@@ -44,7 +44,7 @@ var QuerySamplingUtil = (function() {
      * to be active on the given node.
      */
     function waitForActiveSamplingOnNode(node, ns, collUuid) {
-        jsTest.log("Start waiting for active sampling " + tojson({node, ns, collUuid}));
+        jsTest.log("Start waiting for active sampling " + tojsononeline({node, ns, collUuid}));
         let numTries = 0;
         assert.soon(() => {
             numTries++;
@@ -61,7 +61,7 @@ var QuerySamplingUtil = (function() {
             }
             return false;
         });
-        jsTest.log("Finished waiting for active sampling " + tojson({node, ns, collUuid}));
+        jsTest.log("Finished waiting for active sampling " + tojsononeline({node, ns, collUuid}));
     }
 
     /**
@@ -69,7 +69,7 @@ var QuerySamplingUtil = (function() {
      * to be inactive on the given node.
      */
     function waitForInactiveSamplingOnNode(node, ns, collUuid) {
-        jsTest.log("Start waiting for inactive sampling " + tojson({node, ns, collUuid}));
+        jsTest.log("Start waiting for inactive sampling " + tojsononeline({node, ns, collUuid}));
         let numTries = 0;
         assert.soon(() => {
             numTries++;
@@ -86,7 +86,7 @@ var QuerySamplingUtil = (function() {
             }
             return false;
         });
-        jsTest.log("Finished waiting for inactive sampling " + tojson({node, ns, collUuid}));
+        jsTest.log("Finished waiting for inactive sampling " + tojsononeline({node, ns, collUuid}));
     }
 
     /**

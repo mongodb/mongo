@@ -29,7 +29,6 @@
 
 #include "mongo/db/pipeline/document_source_list_sampled_queries.h"
 
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_feature_flag_gen.h"
@@ -69,31 +68,49 @@ Value DocumentSourceListSampledQueries::serialize(SerializationOptions opts) con
 }
 
 DocumentSource::GetNextResult DocumentSourceListSampledQueries::doGetNext() {
-    if (_finished) {
-        return GetNextResult::makeEOF();
-    }
+    if (_pipeline == nullptr) {
+        auto foreignExpCtx = pExpCtx->copyWith(NamespaceString::kConfigSampledQueriesNamespace);
+        MakePipelineOptions opts;
+        // For a sharded cluster, disallow shard targeting since we want to fetch the
+        // config.sampledQueries documents on this replica set not the ones on the config server.
+        opts.shardTargetingPolicy = ShardTargetingPolicy::kNotAllowed;
 
-    auto ns = _spec.getNamespace();
-    if (_cursor == nullptr) {
-        FindCommandRequest findRequest{NamespaceString::kConfigSampledQueriesNamespace};
-        if (ns) {
-            findRequest.setFilter(BSON(SampledQueryDocument::kNsFieldName << ns->toString()));
+        std::vector<BSONObj> stages;
+        if (auto& nss = _spec.getNamespace()) {
+            stages.push_back(
+                BSON("$match" << BSON(SampledQueryDocument::kNsFieldName << nss->toString())));
         }
-
-        DBDirectClient client(pExpCtx->opCtx);
-        _cursor = client.find(std::move(findRequest));
+        try {
+            _pipeline = Pipeline::makePipeline(std::move(stages), foreignExpCtx, opts);
+        } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>& ex) {
+            LOGV2(7807800,
+                  "Failed to create aggregation pipeline to list sampled queries",
+                  "error"_attr = redact(ex.toStatus()));
+            return GetNextResult::makeEOF();
+        }
     }
 
-    if (_cursor->more()) {
-        const auto obj = _cursor->next().getOwned();
-        const auto doc = SampledQueryDocument::parse(
-            IDLParserContext(DocumentSourceListSampledQueries::kStageName), obj);
+    if (auto doc = _pipeline->getNext()) {
+        const auto queryDoc = SampledQueryDocument::parse(
+            IDLParserContext(DocumentSourceListSampledQueries::kStageName), doc->toBson());
         DocumentSourceListSampledQueriesResponse response;
-        response.setSampledQueryDocument(doc);
+        response.setSampledQueryDocument(std::move(queryDoc));
         return {Document(response.toBSON())};
     }
-    _finished = true;
+
     return GetNextResult::makeEOF();
+}
+
+void DocumentSourceListSampledQueries::detachFromOperationContext() {
+    if (_pipeline) {
+        _pipeline->detachFromOperationContext();
+    }
+}
+
+void DocumentSourceListSampledQueries::reattachToOperationContext(OperationContext* opCtx) {
+    if (_pipeline) {
+        _pipeline->reattachToOperationContext(opCtx);
+    }
 }
 
 }  // namespace analyze_shard_key
