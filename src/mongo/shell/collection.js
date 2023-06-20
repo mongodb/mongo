@@ -1450,6 +1450,10 @@ DBCollection.prototype.distinct = function(keyString, query, options) {
         cmd.collation = opts.collation;
     }
 
+    if (opts.hint) {
+        cmd.hint = opts.hint;
+    }
+
     // Execute distinct command
     var res = this.runReadCommand(cmd);
     if (!res.ok) {

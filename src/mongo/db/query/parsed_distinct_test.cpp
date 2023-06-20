@@ -146,7 +146,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                                          << "testcoll"
                                          << "key"
                                          << "x"
-                                         << "collation"
+                                         << "hint" << BSON("b" << 5) << "collation"
                                          << BSON("locale"
                                                  << "en_US")
                                          << "readConcern"
@@ -182,6 +182,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                       BSON("readPreference"
                            << "secondary"));
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 100u);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getHint().value_or(BSONObj()), fromjson("{ b : 5 }"));
 
     std::vector<BSONObj> expectedPipeline{
         BSON("$replaceRoot" << BSON(

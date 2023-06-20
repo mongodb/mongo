@@ -49,6 +49,7 @@ const char ParsedDistinct::kKeyField[] = "key";
 const char ParsedDistinct::kQueryField[] = "query";
 const char ParsedDistinct::kCollationField[] = "collation";
 const char ParsedDistinct::kUnwoundArrayFieldForViewUnwind[] = "_internalUnwoundArray";
+const char ParsedDistinct::kHintField[] = "hint";
 
 namespace {
 
@@ -218,6 +219,7 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
     pipelineBuilder.doneFast();
 
     aggregationBuilder.append(kCollationField, findCommand.getCollation());
+    aggregationBuilder.append(kHintField, findCommand.getHint());
 
     int maxTimeMS = findCommand.getMaxTimeMS() ? static_cast<int>(*findCommand.getMaxTimeMS()) : 0;
     if (maxTimeMS > 0) {
@@ -272,6 +274,8 @@ StatusWith<ParsedDistinct> ParsedDistinct::parse(OperationContext* opCtx,
     if (auto collation = parsedDistinct.getCollation()) {
         findCommand->setCollation(collation.value().getOwned());
     }
+
+    findCommand->setHint(parsedDistinct.getHint());
 
     // The IDL parser above does not handle generic command arguments. Since the underlying query
     // request requires the following options, manually parse and verify them here.

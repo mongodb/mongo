@@ -31,6 +31,7 @@ global:
 
 imports:
     - "mongo/db/basic_types.idl"
+    - "mongo/db/query/hint.idl"
 
 commands:
     distinct:
@@ -60,3 +61,7 @@ commands:
                 description: "The unique sample id for the operation if it has been chosen for sampling."
                 type: uuid
                 optional: true
+            hint:
+                description: "The index name to use or the index specification document."
+                type: indexHint
+                default: BSONObj()
