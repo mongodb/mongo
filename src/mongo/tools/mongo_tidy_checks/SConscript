@@ -129,6 +129,7 @@ mongo_custom_check = env.SharedLibrary(
         "MongoCxx20StdChronoCheck.cpp",
         "MongoStdOptionalCheck.cpp",
         "MongoVolatileCheck.cpp",
+        "MongoPolyFillCheck.cpp",
         "MongoStdAtomicCheck.cpp",
         "MongoTidyModule.cpp",
         "MongoTraceCheck.cpp",
