@@ -36,6 +36,7 @@
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
@@ -320,6 +321,13 @@ void processReshardingFieldsForCollection(OperationContext* opCtx,
                                           const NamespaceString& nss,
                                           const CollectionMetadata& metadata,
                                           const ReshardingFields& reshardingFields) {
+    // Persist the config time to ensure that in case of stepdown next filtering metadata refresh on
+    // the new primary will always fetch the latest information.
+    auto* const replCoord = repl::ReplicationCoordinator::get(opCtx);
+    if (!replCoord->isReplEnabled() || replCoord->getMemberState().primary()) {
+        VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
+    }
+
     if (reshardingFields.getState() == CoordinatorStateEnum::kAborting) {
         // The coordinator encountered an unrecoverable error, both donors and recipients should be
         // made aware.

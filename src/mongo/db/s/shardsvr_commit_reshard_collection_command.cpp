@@ -37,6 +37,7 @@
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/commit_reshard_collection_gen.h"
@@ -65,6 +66,10 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+
+            // Persist the config time to ensure that in case of stepdown next filtering metadata
+            // refresh on the new primary will always fetch the latest information.
+            VectorClockMutable::get(opCtx)->waitForDurableConfigTime().get(opCtx);
 
             std::vector<SharedSemiFuture<void>> futuresToWait;
 
