@@ -330,6 +330,8 @@ MigrationChunkClonerSource::MigrationChunkClonerSource(OperationContext* opCtx,
 
 MigrationChunkClonerSource::~MigrationChunkClonerSource() {
     invariant(_state == kDone);
+    invariant(_reload.empty());
+    invariant(_deleted.empty());
 }
 
 Status MigrationChunkClonerSource::startClone(OperationContext* opCtx,
