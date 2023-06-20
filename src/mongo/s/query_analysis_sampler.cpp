@@ -196,7 +196,7 @@ void QueryAnalysisSampler::_refreshQueryStats() {
         return;
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
+    stdx::lock_guard<Latch> lk(_queryStatsMutex);
     _queryStats.refreshTotalCount();
 }
 
@@ -283,7 +283,7 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
 
     boost::optional<double> lastAvgCount;
     {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_queryStatsMutex);
         lastAvgCount = (MONGO_unlikely(overwriteQueryAnalysisSamplerAvgLastCountToZero.shouldFail())
                             ? 0
                             : _queryStats.getLastAvgCount());
@@ -310,6 +310,9 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                 "Refreshed query analyzer configurations",
                 "numQueriesExecutedPerSecond"_attr = lastAvgCount,
                 "configurations"_attr = configurations);
+
+    stdx::lock_guard<Latch> lk(_mutex);
+
     if (configurations.size() != _sampleRateLimiters.size()) {
         LOGV2(7362407,
               "Refreshed query analyzer configurations. The number of collections with active "
@@ -319,27 +322,46 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
               "configurations"_attr = configurations);
     }
 
-    stdx::lock_guard<Latch> lk(_mutex);
-
     std::map<NamespaceString, SampleRateLimiter> sampleRateLimiters;
+    std::array<uint64_t, srlBloomFilterNumBlocks> srlBloomFilter{};
     for (const auto& configuration : configurations) {
-        auto it = _sampleRateLimiters.find(configuration.getNs());
-        if (it == _sampleRateLimiters.end() ||
-            it->second.getCollectionUuid() != configuration.getCollectionUuid()) {
-            // There is no existing SampleRateLimiter for the collection with this specific
-            // collection uuid so create one for it.
-            sampleRateLimiters.emplace(configuration.getNs(),
-                                       SampleRateLimiter{opCtx->getServiceContext(),
-                                                         configuration.getNs(),
-                                                         configuration.getCollectionUuid(),
-                                                         configuration.getSamplesPerSecond()});
-        } else {
-            auto rateLimiter = it->second;
-            rateLimiter.refreshSamplesPerSecond(configuration.getSamplesPerSecond());
-            sampleRateLimiters.emplace(configuration.getNs(), std::move(rateLimiter));
-        }
+        auto nss = configuration.getNs();
+
+        // Set the bit corresponding to nss's hash to 1 in 'srlBloomFilter'.
+        size_t nssHash = absl::Hash<NamespaceString>{}(nss);
+        size_t blockIdx = (nssHash / srlBloomFilterNumBitsPerBlock) % srlBloomFilterNumBlocks;
+        size_t bit = nssHash % srlBloomFilterNumBitsPerBlock;
+        srlBloomFilter[blockIdx] |= (1ull << bit);
+
+        // Create a SampleRateLimiter or copy an existing one ('rateLimiter') for 'nss'.
+        auto rateLimiter = [&] {
+            auto it = _sampleRateLimiters.find(nss);
+            if (it == _sampleRateLimiters.end() ||
+                it->second.getCollectionUuid() != configuration.getCollectionUuid()) {
+                // There is no existing SampleRateLimiter for the collection with this specific
+                // collection uuid so create one for it.
+                return SampleRateLimiter{opCtx->getServiceContext(),
+                                         configuration.getNs(),
+                                         configuration.getCollectionUuid(),
+                                         configuration.getSamplesPerSecond()};
+            } else {
+                auto rateLimiter = it->second;
+                rateLimiter.refreshSamplesPerSecond(configuration.getSamplesPerSecond());
+                return rateLimiter;
+            }
+        }();
+
+        // Add 'std::pair(nss, rateLimiter)' to the 'sampleRateLimiters' map.
+        sampleRateLimiters.emplace(std::move(nss), std::move(rateLimiter));
     }
+
+    // Update '_sampleRateLimiters'.
     _sampleRateLimiters = std::move(sampleRateLimiters);
+
+    // Update '__srlBloomFilter'.
+    for (size_t i = 0; i < srlBloomFilterNumBlocks; ++i) {
+        _srlBloomFilter[i].store(srlBloomFilter[i]);
+    }
 
     QueryAnalysisSampleTracker::get(opCtx).refreshConfigurations(configurations);
 }
@@ -389,6 +411,16 @@ boost::optional<UUID> QueryAnalysisSampler::tryGenerateSampleId(OperationContext
                 (data.getStringField("comment") != opCtx->getComment()->checkAndGetStringData());
         });
         MONGO_unlikely(scoped.isActive())) {
+        return boost::none;
+    }
+
+    // Before checking '_sampleRateLimiters', check '_srlBloomFilter' first. If the bit
+    // corresponding to nss's hash is 0, then we don't need to bother with acquiring '_mutex'
+    // and we can return 'boost::none'.
+    size_t nssHash = absl::Hash<NamespaceString>{}(nss);
+    size_t blockIdx = (nssHash / srlBloomFilterNumBitsPerBlock) % srlBloomFilterNumBlocks;
+    size_t bit = nssHash % srlBloomFilterNumBitsPerBlock;
+    if (((_srlBloomFilter[blockIdx].load() >> bit) & 1u) == 0u) {
         return boost::none;
     }
 

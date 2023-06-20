@@ -195,7 +195,7 @@ public:
     void onShutdown();
 
     void gotCommand(const StringData& cmdName) {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_queryStatsMutex);
         _queryStats.gotCommand(cmdName);
     }
 
@@ -215,7 +215,7 @@ public:
     }
 
     QueryStats getQueryStatsForTest() const {
-        stdx::lock_guard<Latch> lk(_mutex);
+        stdx::lock_guard<Latch> lk(_queryStatsMutex);
         return _queryStats;
     }
 
@@ -229,6 +229,13 @@ public:
     }
 
 private:
+    static constexpr size_t srlBloomFilterLg2NumBits = 9u;
+    static constexpr size_t srlBloomFilterNumBitsPerBlock = 64u;
+
+    static constexpr size_t srlBloomFilterNumBits = 1ull << srlBloomFilterLg2NumBits;
+    static constexpr size_t srlBloomFilterNumBlocks =
+        srlBloomFilterNumBits / srlBloomFilterNumBitsPerBlock;
+
     void _refreshQueryStats();
 
     void _refreshConfigurations(OperationContext* opCtx);
@@ -238,12 +245,14 @@ private:
                             SampledCommandNameEnum cmdName);
 
     mutable Mutex _mutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_mutex");
+    mutable Mutex _queryStatsMutex = MONGO_MAKE_LATCH("QueryAnalysisSampler::_queryStatsMutex");
 
     PeriodicJobAnchor _periodicQueryStatsRefresher;
     QueryStats _queryStats;
 
     PeriodicJobAnchor _periodicConfigurationsRefresher;
     std::map<NamespaceString, SampleRateLimiter> _sampleRateLimiters;
+    std::array<AtomicWord<uint64_t>, srlBloomFilterNumBlocks> _srlBloomFilter{};
 };
 
 }  // namespace analyze_shard_key
