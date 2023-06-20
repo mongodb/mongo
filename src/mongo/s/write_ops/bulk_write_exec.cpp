@@ -49,6 +49,7 @@
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_op.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -100,8 +101,13 @@ void executeChildBatches(OperationContext* opCtx,
         auto response = ars.next();
 
         Status responseStatus = response.swResponse.getStatus();
-        // TODO (SERVER-76957): The status may not be OK, handle it.
-        invariant(responseStatus.isOK());
+        // When the responseStatus is not OK, this means that mongos was unable to receive a
+        // response from the shard the write batch was sent to, or mongos faced some other local
+        // error (for example, mongos was shutting down). In these cases, throw and return the
+        // error to the client.
+        // Note that this is different from an operation within the bulkWrite command having an
+        // error.
+        uassertStatusOK(responseStatus);
 
         auto bwReply = BulkWriteCommandReply::parse(IDLParserContext("bulkWrite"),
                                                     response.swResponse.getValue().data);
