@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/service_context_test_fixture.h"
-
-#include <memory>
 
 #include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/db/client.h"

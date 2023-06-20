@@ -8,9 +8,11 @@ env.Library(
     target='op_observer',
     source=[
         'op_observer.cpp',
+        'op_observer_registry.cpp',
     ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/server_base',
+        '$BUILD_DIR/mongo/db/shard_role_api_stor_ex',
     ],
 )
 

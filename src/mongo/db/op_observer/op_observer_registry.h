@@ -49,8 +49,8 @@ class OpObserverRegistry final : public OpObserver {
     OpObserverRegistry& operator=(const OpObserverRegistry&) = delete;
 
 public:
-    OpObserverRegistry() = default;
-    virtual ~OpObserverRegistry() = default;
+    OpObserverRegistry();
+    virtual ~OpObserverRegistry();
 
     // This implementaton is unused, but needs to be implemented to conform to the OpObserver
     // interface.

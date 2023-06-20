@@ -35,17 +35,13 @@
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/rollback.h"
 #include "mongo/db/transaction/transaction_operations.h"
 
 namespace mongo {
 
 struct InsertStatement;
-class OperationContext;
-
-namespace repl {
-class OpTime;
-}  // namespace repl
 
 enum class RetryableFindAndModifyLocation {
     // The operation is not retryable, or not a "findAndModify" command. Do not record a
