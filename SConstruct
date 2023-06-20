@@ -4368,6 +4368,11 @@ def doConfigure(myenv):
                     "Cannot use libunwind with TSAN, please add --use-libunwind=off to your compile flags"
                 )
 
+            # We add supressions based on the library file in etc/tsan.suppressions
+            # so the link-model needs to be dynamic.
+            if not link_model.startswith('dynamic'):
+                env.FatalError("TSAN is only supported with dynamic link models")
+
             # If anything is changed, added, or removed in
             # tsan_options, be sure to make the corresponding changes
             # to the appropriate build variants in etc/evergreen.yml
