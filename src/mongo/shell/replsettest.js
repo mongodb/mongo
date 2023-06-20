@@ -3137,6 +3137,12 @@ var ReplSetTest = function(opts) {
      * Restarts a db without clearing the data directory by default, and using the node(s)'s
      * original startup options by default.
      *
+     * When using this method with mongobridge, be aware that mongobridge may not do a good
+     * job of detecting that a node was restarted. For example, when mongobridge is being used
+     * between some Node A and Node B, on restarting Node B mongobridge will not aggressively
+     * close its connection with Node A, leading Node A to think the connection with Node B is
+     * still healthy.
+     *
      * Option { startClean : true } forces clearing the data directory.
      * Option { auth : Object } object that contains the auth details for admin credentials.
      *   Should contain the fields 'user' and 'pwd'
