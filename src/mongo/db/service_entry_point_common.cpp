@@ -2151,7 +2151,7 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                     "Assertion while executing command '{command}' on database '{db}': {error}",
                     "Assertion while executing command",
                     "command"_attr = execContext->getRequest().getCommandName(),
-                    "db"_attr = execContext->getRequest().getDatabase(),
+                    "db"_attr = execContext->getRequest().getDatabaseNoThrow(),
                     "error"_attr = status.toString());
             });
     past.emplaceValue();
