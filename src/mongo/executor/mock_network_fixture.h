@@ -335,12 +335,14 @@ public:
     // Advance time to the target. Run network operations and process requests along the way.
     void runUntil(Date_t targetTime);
 
+    // Run until both the executor and the network are idle. Otherwise, it hangs forever.
+    void runUntilIdle();
+
     // Run until both the executor and the network are idle and all expectations are satisfied.
     // Otherwise, it hangs forever.
     void runUntilExpectationsSatisfied();
 
 private:
-    void _runUntilIdle();
     bool _allExpectationsSatisfied() const;
 
     std::vector<std::unique_ptr<Expectation>> _expectations;

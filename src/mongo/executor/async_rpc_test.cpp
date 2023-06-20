@@ -1264,6 +1264,47 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
     future.get();
 }
 
+/**
+ * Checks that if cancellation occurs after TaskExecutor receives a network response, the
+ * cancellation fails and the network response fulfills the final response.
+ */
+TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
+    auto pauseAfterNetworkResponseFailPoint =
+        globalFailPointRegistry().find("pauseTaskExecutorAfterReceivesNetworkRespones");
+    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::alwaysOn);
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    CancellationSource source;
+    CancellationToken token = source.token();
+    FindCommandRequest findCmd(nss);
+    auto options =
+        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(findCmd, getExecutorPtr(), token);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    // Will pause processing response after network interface.
+    stdx::thread worker([&] {
+        onCommand([&](const auto& request) {
+            return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    });
+
+    // Cancel after network response received in the TaskExecutor.
+    pauseAfterNetworkResponseFailPoint->waitForTimesEntered(1);
+    source.cancel();
+    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::off);
+
+    // Canceling after network response received does not change the final response and
+    // does not send killOperation.
+    CursorInitialReply res = std::move(future).get().response;
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+
+    worker.join();
+}
+
 }  // namespace
 }  // namespace async_rpc
 }  // namespace mongo
