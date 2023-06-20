@@ -195,12 +195,12 @@ IndexBuildsCoordinatorMongod::IndexBuildsCoordinatorMongod()
         });
 }
 
-void IndexBuildsCoordinatorMongod::shutdown(OperationContext* opCtx) {
+void IndexBuildsCoordinatorMongod::shutdown(OperationContext*) {
     // Stop new scheduling.
     _threadPool.shutdown();
 
     // Wait for all active builds to stop.
-    waitForAllIndexBuildsToStopForShutdown(opCtx);
+    activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown();
 
     // Wait for active threads to finish.
     _threadPool.join();
@@ -246,6 +246,8 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                                                IndexBuildProtocol protocol,
                                                IndexBuildOptions indexBuildOptions,
                                                const boost::optional<ResumeIndexInfo>& resumeInfo) {
+    _waitIfNewIndexBuildsBlocked(opCtx, collectionUUID, specs, buildUUID);
+
     const NamespaceStringOrUUID nssOrUuid{dbName, collectionUUID};
 
     auto writeBlockState = GlobalUserWriteBlockState::get(opCtx);

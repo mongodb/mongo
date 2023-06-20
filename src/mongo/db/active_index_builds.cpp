@@ -44,7 +44,11 @@ ActiveIndexBuilds::~ActiveIndexBuilds() {
     invariant(_allIndexBuilds.empty());
 }
 
-void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx) {
+void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown() {
+    waitForAllIndexBuildsToStop(OperationContext::notInterruptible());
+}
+
+void ActiveIndexBuilds::waitForAllIndexBuildsToStop(Interruptible* interruptible) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     // All index builds should have been signaled to stop via the ServiceContext.
@@ -66,7 +70,7 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext*
     auto pred = [this]() {
         return _allIndexBuilds.empty();
     };
-    _indexBuildsCondVar.wait(lk, pred);
+    interruptible->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, pred);
 }
 
 void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
@@ -133,6 +137,11 @@ StatusWith<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getIndexBuil
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};
     }
     return it->second;
+}
+
+std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getAllIndexBuilds() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    return _filterIndexBuilds_inlock(lk, [](const auto& replState) { return true; });
 }
 
 void ActiveIndexBuilds::unregisterIndexBuild(
@@ -216,7 +225,7 @@ Status ActiveIndexBuilds::registerIndexBuild(
     return Status::OK();
 }
 
-size_t ActiveIndexBuilds::getActiveIndexBuilds() const {
+size_t ActiveIndexBuilds::getActiveIndexBuildsCount() const {
     stdx::unique_lock<Latch> lk(_mutex);
     return _allIndexBuilds.size();
 }

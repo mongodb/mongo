@@ -52,11 +52,21 @@ public:
     ~ActiveIndexBuilds();
 
     /**
+     * Waits for all index builds to stop after they have been interrupted during shutdown.
+     * Leaves the index builds in a recoverable state.
+     *
+     * This should only be called when certain the server will not start any new index builds --
+     * i.e. when the server is not accepting user requests and no internal operations are
+     * concurrently starting new index builds.
+     */
+    void waitForAllIndexBuildsToStopForShutdown();
+
+    /**
      * The following functions all have equivalent definitions in IndexBuildsCoordinator. The
      * IndexBuildsCoordinator functions forward to these functions. For descriptions of what they
      * do, see IndexBuildsCoordinator.
      */
-    void waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx);
+    void waitForAllIndexBuildsToStop(Interruptible* opCtx);
 
     void assertNoIndexBuildInProgress() const;
 
@@ -67,6 +77,8 @@ public:
     void verifyNoIndexBuilds_forTestOnly() const;
 
     StatusWith<std::shared_ptr<ReplIndexBuildState>> getIndexBuild(const UUID& buildUUID) const;
+
+    std::vector<std::shared_ptr<ReplIndexBuildState>> getAllIndexBuilds() const;
 
     void awaitNoIndexBuildInProgressForCollection(OperationContext* opCtx,
                                                   const UUID& collectionUUID,
@@ -98,7 +110,7 @@ public:
     /**
      * Get the number of in-progress index builds.
      */
-    size_t getActiveIndexBuilds() const;
+    size_t getActiveIndexBuildsCount() const;
 
     /**
      * Provides passthrough access to ReplIndexBuildState for index build info.

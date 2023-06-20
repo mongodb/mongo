@@ -825,8 +825,8 @@ Status IndexBuildsCoordinator::_setUpResumeIndexBuild(OperationContext* opCtx,
     return status;
 }
 
-void IndexBuildsCoordinator::waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx) {
-    activeIndexBuilds.waitForAllIndexBuildsToStopForShutdown(opCtx);
+void IndexBuildsCoordinator::waitForAllIndexBuildsToStop(OperationContext* opCtx) {
+    activeIndexBuilds.waitForAllIndexBuildsToStop(opCtx);
 }
 
 std::vector<UUID> IndexBuildsCoordinator::abortCollectionIndexBuilds(
@@ -946,25 +946,7 @@ void IndexBuildsCoordinator::abortTenantIndexBuilds(OperationContext* opCtx,
 
 void IndexBuildsCoordinator::abortAllIndexBuildsForInitialSync(OperationContext* opCtx,
                                                                const std::string& reason) {
-    LOGV2(4833200, "About to abort all index builders running", "reason"_attr = reason);
-
-    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        auto indexBuildFilter = [](const auto& replState) {
-            return true;
-        };
-        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
-    }();
-    for (const auto& replState : builds) {
-        if (!abortIndexBuildByBuildUUID(
-                opCtx, replState->buildUUID, IndexBuildAction::kInitialSyncAbort, reason)) {
-            // The index build may already be in the midst of tearing down.
-            LOGV2(5010503,
-                  "Index build: failed to abort index build for initial sync",
-                  "buildUUID"_attr = replState->buildUUID,
-                  "database"_attr = replState->dbName,
-                  "collectionUUID"_attr = replState->collectionUUID);
-        }
-    }
+    _abortAllIndexBuildsWithReason(opCtx, IndexBuildAction::kInitialSyncAbort, reason);
 }
 
 namespace {
@@ -994,12 +976,7 @@ bool forceSelfAbortIndexBuild(OperationContext* opCtx,
 void IndexBuildsCoordinator::abortAllIndexBuildsDueToDiskSpace(OperationContext* opCtx,
                                                                std::int64_t availableBytes,
                                                                std::int64_t requiredBytes) {
-    auto builds = [&]() -> std::vector<std::shared_ptr<ReplIndexBuildState>> {
-        auto indexBuildFilter = [](const auto& replState) {
-            return true;
-        };
-        return activeIndexBuilds.filterIndexBuilds(indexBuildFilter);
-    }();
+    auto builds = activeIndexBuilds.getAllIndexBuilds();
     auto abortStatus =
         Status(ErrorCodes::OutOfDiskSpace,
                fmt::format("available disk space of {} bytes is less than required minimum of {}",
@@ -1320,7 +1297,7 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
     const std::vector<std::string>& indexNames,
     std::string reason) {
     boost::optional<UUID> buildUUID;
-    auto indexBuilds = _getIndexBuilds();
+    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (replState->collectionUUID != collectionUUID) {
             return;
@@ -1350,12 +1327,53 @@ boost::optional<UUID> IndexBuildsCoordinator::abortIndexBuildByIndexNames(
     return buildUUID;
 }
 
+void IndexBuildsCoordinator::_abortAllIndexBuildsWithReason(OperationContext* opCtx,
+                                                            IndexBuildAction action,
+                                                            const std::string& reason) {
+    LOGV2(7738702,
+          "About to abort all running index builders",
+          "reason"_attr = reason,
+          "action"_attr = indexBuildActionToString(action));
+
+    auto builds = activeIndexBuilds.getAllIndexBuilds();
+    for (const auto& replState : builds) {
+        if (!abortIndexBuildByBuildUUID(opCtx, replState->buildUUID, action, reason)) {
+            // The index build may already be in the midst of tearing down.
+            LOGV2(7738703,
+                  "Index build: failed to abort index build, this is expected if the build is "
+                  "already being committed or in the process of tearing down.",
+                  "buildUUID"_attr = replState->buildUUID,
+                  "database"_attr = replState->dbName,
+                  "collectionUUID"_attr = replState->collectionUUID);
+        }
+    }
+}
+
+void IndexBuildsCoordinator::abortAllIndexBuildsWithReason(OperationContext* opCtx,
+                                                           const std::string& reason) {
+    _abortAllIndexBuildsWithReason(opCtx, IndexBuildAction::kPrimaryAbort, reason);
+}
+
+void IndexBuildsCoordinator::setNewIndexBuildsBlocked(const bool newValue,
+                                                      boost::optional<std::string> reason) {
+    stdx::unique_lock<Latch> lk(_newIndexBuildsBlockedMutex);
+    invariant(newValue != _newIndexBuildsBlocked);
+    invariant((newValue && reason) || (!newValue && !reason));
+
+    _newIndexBuildsBlocked = newValue;
+    _blockReason = reason;
+
+    if (!_newIndexBuildsBlocked) {
+        _newIndexBuildsBlockedCV.notify_all();
+    }
+}
+
 bool IndexBuildsCoordinator::hasIndexBuilder(OperationContext* opCtx,
                                              const UUID& collectionUUID,
                                              const std::vector<std::string>& indexNames) const {
     bool foundIndexBuilder = false;
     boost::optional<UUID> buildUUID;
-    auto indexBuilds = _getIndexBuilds();
+    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (replState->collectionUUID != collectionUUID) {
             return;
@@ -1632,7 +1650,7 @@ void IndexBuildsCoordinator::_completeAbortForShutdown(
 }
 
 std::size_t IndexBuildsCoordinator::getActiveIndexBuildCount(OperationContext* opCtx) {
-    auto indexBuilds = _getIndexBuilds();
+    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     // We use forEachIndexBuild() to log basic details on the current index builds and don't intend
     // to modify any of the index builds, hence the no-op.
     forEachIndexBuild(indexBuilds, "IndexBuildsCoordinator::getActiveIndexBuildCount"_sd, nullptr);
@@ -1677,7 +1695,7 @@ void IndexBuildsCoordinator::onStepUp(OperationContext* opCtx) {
 }
 
 void IndexBuildsCoordinator::_onStepUpAsyncTaskFn(OperationContext* opCtx) {
-    auto indexBuilds = _getIndexBuilds();
+    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     const auto signalCommitQuorumAndRetrySkippedRecords =
         [this, opCtx](const std::shared_ptr<ReplIndexBuildState>& replState) {
             if (replState->protocol != IndexBuildProtocol::kTwoPhase) {
@@ -1771,7 +1789,7 @@ IndexBuilds IndexBuildsCoordinator::stopIndexBuildsForRollback(OperationContext*
 
     IndexBuilds buildsStopped;
 
-    auto indexBuilds = _getIndexBuilds();
+    auto indexBuilds = activeIndexBuilds.getAllIndexBuilds();
     auto onIndexBuild = [&](const std::shared_ptr<ReplIndexBuildState>& replState) {
         if (IndexBuildProtocol::kSinglePhase == replState->protocol) {
             LOGV2(20659,
@@ -1917,7 +1935,7 @@ void IndexBuildsCoordinator::restartIndexBuildsForRecovery(
 }
 
 bool IndexBuildsCoordinator::noIndexBuildInProgress() const {
-    return activeIndexBuilds.getActiveIndexBuilds() == 0;
+    return activeIndexBuilds.getActiveIndexBuildsCount() == 0;
 }
 
 int IndexBuildsCoordinator::numInProgForDb(const DatabaseName& dbName) const {
@@ -2170,6 +2188,34 @@ Status IndexBuildsCoordinator::_setUpIndexBuildForTwoPhaseRecovery(
     const auto& nss = collection->ns();
     const auto protocol = IndexBuildProtocol::kTwoPhase;
     return _startIndexBuildForRecovery(opCtx, nss, specs, buildUUID, protocol);
+}
+
+void IndexBuildsCoordinator::_waitIfNewIndexBuildsBlocked(OperationContext* opCtx,
+                                                          const UUID& collectionUUID,
+                                                          const std::vector<BSONObj>& specs,
+                                                          const UUID& buildUUID) {
+    stdx::unique_lock<Latch> lk(_newIndexBuildsBlockedMutex);
+    bool messageLogged = false;
+
+    opCtx->waitForConditionOrInterrupt(_newIndexBuildsBlockedCV, lk, [&] {
+        if (_newIndexBuildsBlocked && !messageLogged) {
+            LOGV2(7738700,
+                  "Index build: new index builds are blocked, waiting",
+                  "reason"_attr = *_blockReason,
+                  "indexSpecs"_attr = specs,
+                  "buildUUID"_attr = buildUUID,
+                  "collectionUUID"_attr = collectionUUID);
+            messageLogged = true;
+        }
+        return !_newIndexBuildsBlocked;
+    });
+    if (messageLogged) {
+        LOGV2(7738701,
+              "Index build: new index builds unblocked, continuing",
+              "indexSpecs"_attr = specs,
+              "buildUUID"_attr = buildUUID,
+              "collectionUUID"_attr = collectionUUID);
+    }
 }
 
 StatusWith<std::tuple<Lock::DBLock,
@@ -3475,13 +3521,6 @@ StatusWith<std::pair<long long, long long>> IndexBuildsCoordinator::_runIndexReb
 StatusWith<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuild(
     const UUID& buildUUID) const {
     return activeIndexBuilds.getIndexBuild(buildUUID);
-}
-
-std::vector<std::shared_ptr<ReplIndexBuildState>> IndexBuildsCoordinator::_getIndexBuilds() const {
-    auto filter = [](const auto& replState) {
-        return true;
-    };
-    return activeIndexBuilds.filterIndexBuilds(filter);
 }
 
 int IndexBuildsCoordinator::getNumIndexesTotal(OperationContext* opCtx,

@@ -126,6 +126,7 @@ MONGO_FAIL_POINT_DEFINE(hangDowngradingBeforeIsCleaningServerMetadata);
 MONGO_FAIL_POINT_DEFINE(failAfterReachingTransitioningState);
 MONGO_FAIL_POINT_DEFINE(hangAtSetFCVStart);
 MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangAfterBlockingIndexBuildsForFcvDowngrade);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -400,6 +401,9 @@ public:
                         "Failing setFeatureCompatibilityVersion before reaching the FCV "
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
+
+                ScopedPostFCVDocumentUpdateActions postUpdateAction =
+                    _prepareTransitionalState(opCtx, actualVersion, requestedVersion);
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV
@@ -1200,18 +1204,79 @@ private:
         }
     }
 
+    /**
+     * May contain actions to perfom after the FCV document update. Execution occurs when the object
+     * goes out of scope.
+     */
+    using ScopedPostFCVDocumentUpdateActions = ScopeGuard<std::function<void()>>;
+
+    /**
+     * Actions to be performed before the FCV document is set into upgrading or downgrading
+     * transitional state. The returned object may contain post-update actions which are executed
+     * when it goes out of scope, so it must be properly scoped to expire after the FCV document has
+     * been updated. The assumption is that the provided opCtx is still valid by the time the action
+     * is executed.
+     */
+    ScopedPostFCVDocumentUpdateActions _prepareTransitionalState(
+        OperationContext* opCtx,
+        multiversion::FeatureCompatibilityVersion actualVersion,
+        multiversion::FeatureCompatibilityVersion requestedVersion) {
+
+        std::function<void()> unblockNewIndexBuilds;
+
+        // TODO (SERVER-68290): Remove index build abort due to FCV downgrade once the
+        // feature flag is removed.
+        if (feature_flags::gIndexBuildGracefulErrorHandling
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, actualVersion)) {
+            invariant(requestedVersion < actualVersion);
+            const auto reason = fmt::format("FCV downgrade in progress, from {} to {}.",
+                                            toString(actualVersion),
+                                            toString(requestedVersion));
+
+            const auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+            // Block new index builds before writing the transitional FCV state, which will cause
+            // new feature flag checks to consider it disabled.
+            indexBuildsCoord->setNewIndexBuildsBlocked(true, reason);
+            // New index builds will be unblocked after ScopedPostFCVDocumentUpdateActions goes out
+            // of scope once the FCV document has been updated.
+            unblockNewIndexBuilds = [indexBuildsCoord] {
+                indexBuildsCoord->setNewIndexBuildsBlocked(false);
+            };
+
+            if (hangAfterBlockingIndexBuildsForFcvDowngrade.shouldFail()) {
+                LOGV2(7738704, "Hanging for failpoint hangAfterBlockingIndexBuildsForFcvDowngrade");
+                hangAfterBlockingIndexBuildsForFcvDowngrade.pauseWhileSet(opCtx);
+            }
+
+            // While new index builds are blocked, abort all existing index builds and wait for
+            // them.
+            indexBuildsCoord->abortAllIndexBuildsWithReason(opCtx, reason);
+            // Some index builds might already be committing or aborting, in which case the above
+            // call does not wait for them. Wait for the rest of the index builds.
+            indexBuildsCoord->waitForAllIndexBuildsToStop(opCtx);
+        }
+
+        const auto postUpdateActions = [unblockNewIndexBuilds =
+                                            std::move(unblockNewIndexBuilds)]() {
+            if (unblockNewIndexBuilds) {
+                unblockNewIndexBuilds();
+            }
+        };
+
+        return {postUpdateActions};
+    }
+
     // _prepareToDowngrade performs all actions and checks that need to be done before proceeding to
-    // make any metadata changes as part of FCV downgrade. Any new feature specific downgrade
-    // code should be placed in the helper functions:
+    // make any metadata changes as part of FCV downgrade. Any new feature specific downgrade code
+    // should be placed in the helper functions:
     // * _prepareToDowngradeActions: Any downgrade actions that should be done before taking the FCV
     // full transition lock in S mode should go in this function.
     // * _userCollectionsUassertsForDowngrade: for any checks on user data or settings that will
     // uassert if users need to manually clean up user data or settings.
     // When doing feature flag checking for downgrade, we should check the feature flag is enabled
     // on current FCV and will be disabled after downgrade by using
-    // isDisabledOnTargetFCVButEnabledOnOriginalFCV(targetFCV, originalFCV)
-    // Please read the comments on those helper functions for more details on what should be placed
-    // in each function.
+    // isDisabledOnTargetFCVButEnabledOnOriginalFCV(targetFCV, originalFCV) Please read the comments
+    // on those helper functions for more details on what should be placed in each function.
     void _prepareToDowngrade(OperationContext* opCtx,
                              const SetFeatureCompatibilityVersion& request,
                              boost::optional<Timestamp> changeTimestamp) {
