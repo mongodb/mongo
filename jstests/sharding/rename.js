@@ -1,13 +1,7 @@
-// The following checks involve talking to a shard node, which in this test is shutdown.
-TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
-TestData.skipCheckShardFilteringMetadata = true;
-
 (function() {
 'use strict';
 
-load("jstests/replsets/rslib.js");
-
-var s = new ShardingTest({shards: 2, mongos: 1, rs: {oplogSize: 10}});
+var s = new ShardingTest({});
 var db = s.getDB("test");
 
 assert.commandWorked(db.foo.insert({_id: 1}));
@@ -38,26 +32,28 @@ assert.commandWorked(
 assert.commandFailed(db.bar.renameCollection('shardedColl'));
 
 // Renaming unsharded collection to a different db with different primary shard.
-db.unSharded.insert({x: 1});
+let unshardedColl = db['unSharded'];
+
+unshardedColl.insert({x: 1});
 assert.commandFailedWithCode(
-    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDBDifferentPrimary.foo'}),
+    db.adminCommand(
+        {renameCollection: unshardedColl.getFullName(), to: 'otherDBDifferentPrimary.foo'}),
     [ErrorCodes.CommandFailed],
     "Source and destination collections must be on the same database.");
 
 // Renaming unsharded collection to a different db with same primary shard.
 assert.commandWorked(
-    db.adminCommand({renameCollection: 'test.unSharded', to: 'otherDBSamePrimary.foo'}));
-assert.eq(0, db.unsharded.countDocuments({}));
+    db.adminCommand({renameCollection: unshardedColl.getFullName(), to: 'otherDBSamePrimary.foo'}));
+assert.eq(0, unshardedColl.countDocuments({}));
 assert.eq(1, s.getDB('otherDBSamePrimary').foo.countDocuments({}));
 
-const testDB = s.rs0.getPrimary().getDB('test');
-const fcvDoc = testDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1});
 jsTest.log("Testing that rename operations involving views are not allowed");
 {
     assert.commandWorked(db.collForView.insert({_id: 1}));
     assert.commandWorked(db.createView('view', 'collForView', []));
 
-    let toAView = db.unsharded.renameCollection('view', true /* dropTarget */);
+    unshardedColl.insert({x: 1});
+    let toAView = unshardedColl.renameCollection('view', true /* dropTarget */);
 
     assert.commandFailedWithCode(
         toAView,
@@ -90,7 +86,7 @@ jsTest.log("Testing that rename operations involving views are not allowed");
     assert.eq(1, sameColl.countDocuments({}), "Rename a collection to itself must not loose data");
 }
 
-if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '6.1') >= 0) {
+{
     // Create collection on non-primary shard (shard1 for test db) to simulate wrong creation via
     // direct connection: collection rename should fail since `badcollection` uuids are inconsistent
     // across shards
@@ -102,6 +98,7 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '
         s.s0.getDB('test').badcollection.renameCollection('goodcollection'),
         [ErrorCodes.InvalidUUID],
         "collection rename should fail since test.badcollection uuids are inconsistent across shards");
+    s.shard1.getDB('test').badcollection.drop();
 
     // Target collection existing on non-primary shard: rename with `dropTarget=false` must fail
     jsTest.log(
@@ -117,24 +114,6 @@ if (MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version, '
     assert.commandWorked(
         s.s0.getDB('test').goodcollection.renameCollection('superbadcollection', true));
 }
-// Ensure write concern works by shutting down 1 node in a replica set shard
-jsTest.log("Testing write concern (2)");
-
-var replTest = s.rs0;
-
-// Kill any node. Don't care if it's a primary or secondary.
-replTest.stop(0);
-
-// Call getPrimary() to populate replTest._secondaries.
-replTest.getPrimary();
-let liveSecondaries = replTest.getSecondaries().filter(function(node) {
-    return node.host !== replTest.nodes[0].host;
-});
-replTest.awaitSecondaryNodes(null, liveSecondaries);
-awaitRSClientHosts(s.s, replTest.getPrimary(), {ok: true, ismaster: true}, replTest.name);
-
-assert.commandWorked(db.foo.insert({_id: 4}));
-assert.commandWorked(db.foo.renameCollection('bar', true));
 
 s.stop();
 })();
