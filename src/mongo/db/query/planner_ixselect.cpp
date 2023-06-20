@@ -380,7 +380,7 @@ void QueryPlannerIXSelect::removeRepeatContainIndexes(std::vector<IndexEntry>& a
 
         BSONObj keyPattern1 = dealKeyPattern((*iterator1).keyPattern);
 
-        bool eraseIterator1 = false;
+        bool eraseIterator = false;
         auto iterator2 = iterator1;
         ++iterator2;
         while (iterator2 != allIndices.end()) {
@@ -395,14 +395,14 @@ void QueryPlannerIXSelect::removeRepeatContainIndexes(std::vector<IndexEntry>& a
                 iterator2 = allIndices.erase(iterator2);
             } else if (keyPattern1.isPrefixOf(keyPattern2, SimpleBSONElementComparator::kInstance)) {
                 iterator1 = allIndices.erase(iterator1);
-                eraseIterator1 = true;
+                eraseIterator = true;
                 break;
             } else {
                 ++iterator2;
             }
         }
 
-        if (eraseIterator1 == false)
+        if (eraseIterator == false)
             iterator1++;
     }
 }
