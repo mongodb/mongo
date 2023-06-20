@@ -325,14 +325,6 @@ ActiveTransactionHistory fetchActiveTransactionHistory(OperationContext* opCtx,
                     continue;
                 }
 
-                // TODO (SERVER-64172): Remove leftover upgrade/downgrade code from 4.2 in
-                // fetchActiveTransactionHistory.
-                if (entry.getCommandType() == repl::OplogEntry::CommandType::kApplyOps &&
-                    !entry.shouldPrepare() && !entry.isPartialTransaction()) {
-                    result.lastTxnRecord->setState(DurableTxnStateEnum::kCommitted);
-                    return result;
-                }
-
                 insertStmtIdsForOplogEntry(entry);
             }
         } catch (const DBException& ex) {
