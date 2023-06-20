@@ -65,9 +65,9 @@ private:
     const int32_t _hitsBetweenMarks;
     const Milliseconds _msBetweenMarks;
 
-    AtomicWord<int32_t> _pings;
+    int32_t _pings;
 
-    AtomicWord<Date_t> _last;
+    Date_t _last;
 };
 
 }  // namespace mongo

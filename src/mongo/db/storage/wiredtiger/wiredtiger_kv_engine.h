@@ -496,6 +496,8 @@ private:
     std::unique_ptr<WiredTigerSizeStorer> _sizeStorer;
     std::string _sizeStorerUri;
     mutable ElapsedTracker _sizeStorerSyncTracker;
+    mutable Mutex _sizeStorerSyncTrackerMutex =
+        MONGO_MAKE_LATCH("WiredTigerKVEngine::_sizeStorerSyncTrackerMutex");
 
     bool _ephemeral;  // whether we are using the in-memory mode of the WT engine
     const bool _inRepairMode;

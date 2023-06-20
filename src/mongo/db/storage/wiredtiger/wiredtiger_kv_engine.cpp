@@ -2729,7 +2729,13 @@ StatusWith<BSONObj> WiredTigerKVEngine::getSanitizedStorageOptionsForSecondaryRe
 }
 
 void WiredTigerKVEngine::sizeStorerPeriodicFlush() {
-    if (_sizeStorerSyncTracker.intervalHasElapsed()) {
+    bool needSyncSizeInfo = false;
+    {
+        stdx::lock_guard<Mutex> lock(_sizeStorerSyncTrackerMutex);
+        needSyncSizeInfo = _sizeStorerSyncTracker.intervalHasElapsed();
+    }
+
+    if (needSyncSizeInfo) {
         syncSizeInfo(false);
     }
 }
