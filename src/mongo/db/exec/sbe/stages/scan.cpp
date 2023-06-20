@@ -297,8 +297,8 @@ void ScanStage::doDetachFromOperationContext() {
 }
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && opCtx->getClient()->isFromUserConnection() &&
-        opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && _open && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx->getClient()->isFromUserConnection() && opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
     if (auto cursor = getActiveCursor()) {
@@ -425,8 +425,8 @@ PlanState ScanStage::getNext() {
         return trackPlanState(PlanState::IS_EOF);
     }
 
-    if (_lowPriority && !_priority && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
 

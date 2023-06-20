@@ -1,6 +1,6 @@
 /**
  * Tests to validate the input values accepted by internal query server parameters. The test
- * verfies that the system responds with the expected error code for input values that fall outside
+ * verifies that the system responds with the expected error code for input values that fall outside
  * each parameter's valid bounds, and correctly applies input values which fall within that
  * parameter's valid bounds.
  */
@@ -67,6 +67,8 @@ const expectedParamDefaults = {
     internalQueryColumnScanMinNumColumnFilters: 3,
     internalQueryMaxSpoolMemoryUsageBytes: 100 * 1024 * 1024,
     internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
+    deprioritizeUnboundedUserCollectionScans: true,
+    deprioritizeUnboundedUserIndexScans: true,
 };
 
 function assertDefaultParameterValues() {
@@ -293,6 +295,11 @@ assertSetParameterFails("internalQueryMaxSpoolMemoryUsageBytes", 0);
 assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 100);
 assertSetParameterSucceeds("internalQueryMaxSpoolDiskUsageBytes", 1);
 assertSetParameterFails("internalQueryMaxSpoolDiskUsageBytes", 0);
+
+assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", true);
+assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", false);
+assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", true);
+assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", false);
 
 MongoRunner.stopMongod(conn);
 })();
