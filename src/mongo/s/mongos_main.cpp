@@ -105,6 +105,7 @@
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/debugger.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
@@ -986,6 +987,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
     if (argc < 1)
         return ExitCode::badOptions;
 
+    waitForDebugger();
 
     setupSignalHandlers();
 

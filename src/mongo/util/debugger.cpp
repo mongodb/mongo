@@ -32,6 +32,7 @@
 #include "mongo/util/debugger.h"
 
 #include <cstdlib>
+#include <iostream>
 #include <mutex>
 
 #ifndef _WIN32
@@ -145,6 +146,27 @@ void setupSIGTRAPforDebugger() {
         std::abort();
     }
 #endif
+#endif
+}
+
+/**
+ * If the environment variable "MONGODB_WAIT_FOR_DEBUGGER" is set, then raise SIGSTOP signal
+ *
+ * A SIGSTOP cannot be caught, blocked or ignored by a process. The SIGSTOP will freeze the process.
+ * This gives the debugger time to start, attach and then resume the process.
+ */
+void waitForDebugger() {
+#if WAIT_FOR_DEBUGGER
+#ifndef _WIN32
+    if (getenv("MONGODB_WAIT_FOR_DEBUGGER")) {
+        std::cout << "WAITING FOR DEBUGGER TO ATTACH (pid: " << getpid() << ")..................."
+                  << std::endl;
+        raise(SIGSTOP);  // pause all threads until debugger connects and continues
+    }
+#else
+#error "Wait for debugger is not supported on Windows"
+#endif
+
 #endif
 }
 }  // namespace mongo

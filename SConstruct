@@ -421,6 +421,12 @@ add_option(
 )
 
 add_option(
+    'wait-for-debugger',
+    help='Wait for debugger attach on process startup',
+    nargs=0,
+)
+
+add_option(
     'gcov',
     help='compile with flags for gcov',
     nargs=0,
