@@ -1530,8 +1530,7 @@ functions:
       local_file: jstests.tgz
       remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
       bucket: mciuploads
-      permissions: private
-      visibility: signed
+      permissions: public-read
       content_type: application/gzip
       display_name: Generated Tests - Execution ${execution}
 
@@ -2375,7 +2374,7 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: text/plain
-      display_name: Generated multiversion exclude tags options
+      display_name: multiversion_exclude_tags.yml from resmoke invocation
 
 # Pre task steps
 pre:

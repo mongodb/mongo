@@ -15,6 +15,7 @@ import curatorbin
 import pkg_resources
 import psutil
 
+from buildscripts.ciconfig.evergreen import parse_evergreen_file
 from buildscripts.resmokelib import parser as main_parser
 from buildscripts.resmokelib import config
 from buildscripts.resmokelib import configure_resmoke
@@ -31,6 +32,7 @@ from buildscripts.resmokelib.run import runtime_recorder
 from buildscripts.resmokelib.run import list_tags
 from buildscripts.resmokelib.run.runtime_recorder import compare_start_time
 from buildscripts.resmokelib.suitesconfig import get_suite_files
+from buildscripts.resmokelib.utils.dictionary import get_dict_value
 
 _INTERNAL_OPTIONS_TITLE = "Internal Options"
 _MONGODB_SERVER_OPTIONS_TITLE = "MongoDB Server Options"
@@ -259,6 +261,52 @@ class TestRunner(Subcommand):
 
     def _log_local_resmoke_invocation(self):
         """Log local resmoke invocation example."""
+
+        # Do not log local args if this is not being ran in evergreen
+        if not config.EVERGREEN_TASK_ID:
+            print("Skipping local invocation because evergreen task id was not provided.")
+            return
+
+        evg_conf = parse_evergreen_file("etc/evergreen.yml")
+
+        suite = self._get_suites()[0]
+        suite_name = config.ORIGIN_SUITE or suite.get_name()
+
+        # try to find the evergreen task from the resmoke suite name
+        task = evg_conf.get_task(suite_name) or evg_conf.get_task(f"{suite_name}_gen")
+
+        multiversion_bin_version = None
+        # Some evergreen task names do not reflect what suite names they run.
+        # The suite names should be in the evergreen functions in this case
+        if task is None:
+            for current_task in evg_conf.tasks:
+                func = current_task.find_func_command("run tests") \
+                    or current_task.find_func_command("generate resmoke tasks")
+                if func and get_dict_value(func, ["vars", "suite"]) == suite_name:
+                    task = current_task
+                    break
+
+                func = current_task.find_func_command("initialize multiversion tasks")
+                if not func:
+                    continue
+                for subtask in func["vars"]:
+                    if subtask == suite_name:
+                        task = current_task
+                        multiversion_bin_version = func["vars"][subtask]
+                        break
+
+                if task:
+                    break
+
+        if task is None:
+            raise RuntimeError(f"Error: Could not find evergreen task definition for {suite_name}")
+
+        is_multiversion = "multiversion" in task.tags
+        generate_func = task.find_func_command("generate resmoke tasks")
+        is_jstestfuzz = False
+        if generate_func:
+            is_jstestfuzz = get_dict_value(generate_func, ["vars", "is_jstestfuzz"]) == "true"
+
         local_args = to_local_args()
         local_args = strip_fuzz_config_params(local_args)
         local_resmoke_invocation = (
@@ -284,6 +332,10 @@ class TestRunner(Subcommand):
         if using_config_fuzzer:
             local_resmoke_invocation += f" --configFuzzSeed={str(config.CONFIG_FUZZ_SEED)}"
 
+        if multiversion_bin_version:
+            default_tag_file = config.DEFAULTS["exclude_tags_file_path"]
+            local_resmoke_invocation += f" --tagFile={default_tag_file}"
+
         resmoke_env_options = ''
         if os.path.exists('resmoke_env_options.txt'):
             with open('resmoke_env_options.txt') as fin:
@@ -292,26 +344,60 @@ class TestRunner(Subcommand):
         self._resmoke_logger.info("resmoke.py invocation for local usage: %s %s",
                                   resmoke_env_options, local_resmoke_invocation)
 
-        suite = self._get_suites()[0]
+        lines = []
+
+        if is_multiversion:
+            lines.append("# DISCLAIMER:")
+            lines.append(
+                "#     The `db-contrib-tool` command downloads the latest last-continuous/lts mongo shell binaries available in CI."
+            )
+            if multiversion_bin_version:
+                lines.append(
+                    "#     The generated `multiversion_exclude_tags.yml` is dependent on the `backports_required_for_multiversion_tests.yml` file of the last-continuous/lts mongo shell binary git commit."
+                )
+            lines.append(
+                "#     If there have been new commits to last-continuous/lts, the excluded tests & binaries may be slightly different on this task vs locally."
+            )
+        if is_jstestfuzz:
+            lines.append(
+                "# This is a jstestfuzz suite and is dependent on the generated tests specific to this task execution."
+            )
+
         if suite.get_description():
-            self._resmoke_logger.info("'%s' suite description:\n\n%s\n", suite.get_name(),
-                                      suite.get_description())
+            lines.append(f"# {suite.get_description()}")
 
-        if suite.is_matrix_suite():
-            self._resmoke_logger.info(
-                "This suite is a matrix suite. To view the generated matrix suite run python3 ./buildscripts/resmoke.py suiteconfig %s",
-                suite.get_name())
+        lines.append(
+            "# Having trouble reproducing your failure with this? Feel free to reach out in #server-testing."
+        )
+        lines.append("")
+        if is_multiversion:
+            if not os.path.exists("local-db-contrib-tool-invocation.txt"):
+                raise RuntimeError(
+                    "ERROR: local-db-contrib-tool-invocation.txt does not exist for multiversion task"
+                )
 
-        if config.EVERGREEN_TASK_ID:
-            with open("local-resmoke-invocation.txt", "w") as fh:
-                lines = [f"{resmoke_env_options} {local_resmoke_invocation}"]
-                if suite.get_description():
-                    lines.append(f"{suite.get_name()}: {suite.get_description()}")
-                if suite.is_matrix_suite():
-                    lines.append(
-                        f"This suite is a matrix suite. To view the generated matrix suite run python3 ./buildscripts/resmoke.py suiteconfig {suite.get_name()}"
-                    )
-                fh.write("\n".join(lines))
+            with open("local-db-contrib-tool-invocation.txt", "r") as fh:
+                db_contrib_tool_invocation = fh.read().strip() + " && \\"
+                lines.append(db_contrib_tool_invocation)
+
+            if multiversion_bin_version:
+                generate_tag_file_invocation = f"buildscripts/resmoke.py generate-multiversion-exclude-tags --oldBinVersion={multiversion_bin_version} && \\"
+                lines.append(generate_tag_file_invocation)
+
+        if is_jstestfuzz:
+            download_url = f"https://mciuploads.s3.amazonaws.com/{config.EVERGREEN_PROJECT_NAME}/{config.EVERGREEN_VARIANT_NAME}/{config.EVERGREEN_REVISION}/jstestfuzz/{config.EVERGREEN_TASK_ID}-{config.EVERGREEN_EXECUTION}.tgz"
+            jstestfuzz_dir = "jstestfuzz/"
+            jstests_tar = "jstests.tgz"
+            lines.append(f"mkdir -p {jstestfuzz_dir} && \\")
+            lines.append(f"rm -rf {jstestfuzz_dir}* && \\")
+            lines.append(f"wget '{download_url}' -O {jstests_tar} && \\")
+            lines.append(f"tar -xf {jstests_tar} -C {jstestfuzz_dir} && \\")
+            lines.append(f"rm {jstests_tar} && \\")
+
+        lines.append(local_resmoke_invocation)
+
+        with open("local-resmoke-invocation.txt", "w") as fh:
+            fh.write("\n".join(lines))
 
     def _check_for_mongo_processes(self):
         """Check for existing mongo processes as they could interfere with running the tests."""
@@ -863,6 +949,9 @@ class RunPlugin(PluginInterface):
         parser.add_argument("--maxTestQueueSize", type=int, dest="max_test_queue_size",
                             help=argparse.SUPPRESS)
 
+        parser.add_argument("--tagFile", action="append", dest="tag_files", metavar="TAG_FILES",
+                            help="One or more YAML files that associate tests and tags.")
+
         mongodb_server_options = parser.add_argument_group(
             title=_MONGODB_SERVER_OPTIONS_TITLE,
             description=("Options related to starting a MongoDB cluster that are forwarded from"
@@ -1080,10 +1169,6 @@ class RunPlugin(PluginInterface):
                                        metavar="REVISION_ORDER_ID",
                                        help="Sets the chronological order number of this commit.")
 
-        evergreen_options.add_argument("--tagFile", action="append", dest="tag_files",
-                                       metavar="TAG_FILES",
-                                       help="One or more YAML files that associate tests and tags.")
-
         evergreen_options.add_argument(
             "--taskName", dest="task_name", metavar="TASK_NAME",
             help="Sets the name of the Evergreen task running the tests.")
@@ -1226,6 +1311,9 @@ def to_local_args(input_args=None):
 
     run_parser = command_subparser.choices.get("run")
 
+    # arguments that are in the standard run parser that we do not want to include in the local invocation
+    skipped_args = ["install_dir", "tag_files"]
+
     suites_arg = None
     storage_engine_arg = None
     other_local_args = []
@@ -1237,7 +1325,10 @@ def to_local_args(input_args=None):
 
         This function assumes that 'option_name' is always "--" prefix and isn't "-" prefixed.
         """
-        return f"{option_name}={option_value}"
+        if " " not in str(option_value):
+            return f"{option_name}={option_value}"
+        else:
+            return f"'{option_name}={option_value}'"
 
     # Trim the argument namespace of any args we don't want to return.
     for group in run_parser._action_groups:  # pylint: disable=protected-access
@@ -1262,6 +1353,8 @@ def to_local_args(input_args=None):
             elif group.title in [
                     _INTERNAL_OPTIONS_TITLE, _EVERGREEN_ARGUMENT_TITLE, _CEDAR_ARGUMENT_TITLE
             ]:
+                continue
+            elif arg_dest in skipped_args:
                 continue
             elif group.title == 'positional arguments':
                 positional_args.extend(arg_value)

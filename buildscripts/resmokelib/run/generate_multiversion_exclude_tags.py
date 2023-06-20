@@ -79,8 +79,7 @@ def generate_exclude_yaml(old_bin_version: str, output: str, logger: logging.Log
     output = os.path.abspath(output)
     location, _ = os.path.split(output)
     if not os.path.isdir(location):
-        logger.info(f"Cannot write to {output}. Not generating tag file.")
-        return
+        os.makedirs(location)
 
     backports_required_latest = read_yaml_file(os.path.join(ETC_DIR, BACKPORTS_REQUIRED_FILE))
 

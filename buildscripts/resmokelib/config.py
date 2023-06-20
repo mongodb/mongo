@@ -84,6 +84,7 @@ DEFAULTS = {
     "mrlog": None,
     "no_journal": False,
     "num_clients_per_fixture": 1,
+    "origin_suite": None,
     "perf_report_file": None,
     "cedar_report_file": None,
     "repeat_suites": 1,
@@ -426,6 +427,9 @@ NO_JOURNAL = None
 
 # If set, then each fixture runs tests with the specified number of clients.
 NUM_CLIENTS_PER_FIXTURE = None
+
+# Indicates the name of the test suite prior to the suite being split up by uite generation
+ORIGIN_SUITE = None
 
 # Report file for the Evergreen performance plugin.
 PERF_REPORT_FILE = None
