@@ -127,8 +127,6 @@ def generate_mongod_parameters(rng, mode):
         [1, 10, 100])
     ret["minSnapshotHistoryWindowInSeconds"] = rng.choice([300, rng.randint(30, 600)])
     ret["mirrorReads"] = {"samplingRate": rng.random()}
-    ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
-    ret["queryAnalysisWriterIntervalSecs"] = rng.choice([1, 10, 100])
     ret["queryAnalysisWriterMaxMemoryUsageBytes"] = rng.randint(1, 100) * 1024 * 1024
     ret["syncdelay"] = rng.choice([60, rng.randint(15, 180)])
     ret["wiredTigerCursorCacheSize"] = rng.randint(-100, 100)
@@ -162,7 +160,6 @@ def generate_mongos_parameters(rng, mode):
     ret = {}
     ret["initialServiceExecutorUseDedicatedThread"] = rng.choice([True, False])
     ret["opportunisticSecondaryTargeting"] = rng.choice([True, False])
-    ret["queryAnalysisSamplerConfigurationRefreshSecs"] = rng.choice([1, 10, 100])
     return ret
 
 

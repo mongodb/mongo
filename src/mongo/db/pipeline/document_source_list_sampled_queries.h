@@ -137,6 +137,9 @@ public:
     static boost::intrusive_ptr<DocumentSource> createFromBson(
         BSONElement elem, const boost::intrusive_ptr<ExpressionContext>& pExpCtx);
 
+    void detachFromOperationContext() final;
+    void reattachToOperationContext(OperationContext* opCtx) final;
+
 private:
     DocumentSourceListSampledQueries(const boost::intrusive_ptr<ExpressionContext>& expCtx)
         : DocumentSource(kStageName, expCtx) {}
@@ -144,8 +147,7 @@ private:
     GetNextResult doGetNext() final;
 
     DocumentSourceListSampledQueriesSpec _spec;
-    bool _finished = false;
-    std::unique_ptr<DBClientCursor> _cursor;
+    std::unique_ptr<Pipeline, PipelineDeleter> _pipeline;
 };
 
 }  // namespace analyze_shard_key
