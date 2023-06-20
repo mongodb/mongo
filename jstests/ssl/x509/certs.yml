@@ -23,8 +23,6 @@ certs:
     Primary Root Certificate Authority
     Most Certificates are issued by this CA.
   Subject: {CN: 'Kernel Test CA'}
-  # ca-2019.pem is our "legacy" SHA-1 self-signed CA root.
-  append_cert: ['jstests/libs/ca-2019.pem']
   Issuer: self
   extensions:
     basicConstraints:
@@ -103,14 +101,6 @@ certs:
     dmdName: Datum-54
     pseudonym: Datum-65
     role: Datum-72
-
-- name: 'client-custom-oids.pem'
-  description: Client certificate using non-standard OIDs.
-  Subject:
-    OU: 'KernelUser'
-    CN: 'client'
-    '1.2.3.56': 'RandoValue'
-    '1.2.3.45': 'Value,Rando'
 
 - name: 'client_email.pem'
   description: >-
@@ -979,3 +969,37 @@ certs:
   description: ECDSA certificate and key for OCSP responder
   Issuer: 'ecdsa-ca-ocsp.pem'
   tags: [ecdsa, ocsp, responder]
+
+###
+# Non-expiring chain
+###
+
+# The below certificates were generated once, and are intended to be permanent (non-renewable).
+# Due to changes in OpenSSL and/or the pyOpenSSL library, the definition for client-custom-oids.pem
+# will no longer work, as custom OIDs are no longer supported. These certificates were minted using
+# pyOpenSSL=19.0.0, OpenSSL version 1.1.1, using the following definitions:
+
+# - name: 'non-expiring-ca.pem'
+#   description: >-
+#     CA with an expiration date far into the future, used exclusively for testing client-custom-oids.pem.
+#     DO NOT regenerate this certificate or add any certificates to this certificate chain without
+#     consulting the Server Security team first.
+#   Subject: {CN: 'Kernel Test CA'}
+#   Issuer: self
+#   extensions:
+#     basicConstraints:
+#       critical: true
+#       CA: true
+#   not_after: 99999999999
+#
+# - name: 'client-custom-oids.pem'
+#   description: >-
+#     Client certificate using non-standard OIDs.
+#     DO NOT regenerate without consulting the Server Security team first.
+#   Issuer: 'non-expiring-ca.pem'
+#   Subject:
+#     OU: 'KernelUser'
+#     CN: 'client'
+#     '1.2.3.56': 'RandoValue'
+#     '1.2.3.45': 'Value,Rando'
+#   not_after: 99999999999

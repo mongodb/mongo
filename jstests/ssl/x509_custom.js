@@ -3,9 +3,6 @@
 (function() {
 'use strict';
 
-const SERVER_CERT = 'jstests/libs/server.pem';
-const CA_CERT = 'jstests/libs/ca.pem';
-
 function testClient(conn, name) {
     let auth = {mechanism: 'MONGODB-X509'};
     if (name !== null) {
@@ -19,7 +16,7 @@ function testClient(conn, name) {
                                      '--sslPEMKeyFile',
                                      'jstests/libs/client-custom-oids.pem',
                                      '--sslCAFile',
-                                     CA_CERT,
+                                     'jstests/libs/ca.pem',
                                      '--port',
                                      conn.port,
                                      '--eval',
@@ -46,8 +43,10 @@ function runTest(conn) {
 const mongod = MongoRunner.runMongod({
     auth: '',
     sslMode: 'requireSSL',
-    sslPEMKeyFile: SERVER_CERT,
-    sslCAFile: CA_CERT,
+    // Server PEM file is server.pem to match the shell's ca.pem.
+    sslPEMKeyFile: 'jstests/libs/server.pem',
+    // Server CA file is non-expiring-ca.pem to match the shell's client-custom-oids.pem.
+    sslCAFile: 'jstests/libs/non-expiring-ca.pem',
     sslAllowInvalidCertificates: '',
 });
 runTest(mongod);
