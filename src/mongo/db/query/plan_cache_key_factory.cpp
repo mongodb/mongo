@@ -160,7 +160,7 @@ sbe::PlanCacheKey make(const CanonicalQuery& query, const MultipleCollectionAcce
                 opCtx, collection, true /* isSecondaryColl */));
         }
     }
-
+    secondaryCollectionStates.shrink_to_fit();
     auto shapeString = canonical_query_encoder::encodeSBE(query);
     return {plan_cache_detail::makePlanCacheKeyInfo(
                 std::move(shapeString), query.root(), collections.getMainCollection()),

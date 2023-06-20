@@ -147,6 +147,9 @@ public:
         return _info.toString();
     }
 
+    /**
+     * Returns the estimated size of the plan cache key in bytes.
+     */
     uint64_t estimatedKeySizeBytes() const {
         return sizeof(*this) + _info.keySizeInBytes() +
             container_size_helper::estimateObjectSizeInBytes(_secondaryCollectionStates);
