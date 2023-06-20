@@ -73,7 +73,8 @@ public:
               _remoteCommandResult{getStatusFromCommandResult(_error)},
               _remoteCommandWriteConcernError{getWriteConcernStatusFromCommandResult(_error)},
               _remoteCommandFirstWriteError{getFirstWriteErrorStatusFromCommandResult(_error)},
-              _targetUsed{*rcr.target} {
+              _targetUsed{*rcr.target},
+              _elapsed{*rcr.elapsed} {
             // The buffer backing the default empty BSONObj has static duration so it is effectively
             // owned.
             invariant(_error.isOwned() || _error.objdata() == BSONObj().objdata());
@@ -111,6 +112,10 @@ public:
             return _targetUsed;
         }
 
+        Microseconds getElapsed() const {
+            return _elapsed;
+        }
+
         GenericReplyFields getGenericReplyFields() const {
             return _genericReplyFields;
         }
@@ -122,6 +127,7 @@ public:
         Status _remoteCommandFirstWriteError;
         std::vector<BSONElement> _errLabels;
         HostAndPort _targetUsed;
+        Microseconds _elapsed;
         GenericReplyFields _genericReplyFields;
     };
 
@@ -212,6 +218,19 @@ namespace async_rpc {
  *       concern error, but write error[s], the first write error is returned.
  */
 Status unpackRPCStatus(Status status);
+
+/**
+ * Converts a RemoteCommandExecutionError from the async_rpc::sendCommand API
+ * into the highest-priority 'underlying error' responsible for the RPC error,
+ * ignoring write errors returned from the remote. This means:
+ *   (1) If there was an error on the local node that caused the failure,
+ *       that error is returned.
+ *   (2) If we received an {ok: 0} response from the remote node, that error
+ *       is returned.
+ *   (3) If we received an {ok: 1} response from the remote node, but a write
+ *       concern error, the write concern error is returned.
+ */
+Status unpackRPCStatusIgnoringWriteErrors(Status status);
 
 /**
  * Converts a RemoteCommandExecutionError from the async_rpc::sendCommand API

@@ -44,6 +44,7 @@
 #include "mongo/db/timeseries/catalog_helper.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/executor/async_rpc_util.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/async_requests_sender.h"
@@ -78,18 +79,16 @@ bool hasTimeSeriesBucketingUpdate(const CollModRequest& request) {
     return ts->getGranularity() || ts->getBucketMaxSpanSeconds() || ts->getBucketRoundingSeconds();
 }
 
+template <typename CommandType>
 std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShards(
     OperationContext* opCtx,
-    StringData dbName,
-    const BSONObj& command,
+    std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
     const std::vector<ShardId>& shardIds,
-    const std::shared_ptr<executor::TaskExecutor>& executor,
     const OperationSessionInfo& osi,
     WriteConcernOptions wc = WriteConcernOptions()) {
-    command.addFields(osi.toBSON());
-    const auto commandWithWc = CommandHelpers::appendMajorityWriteConcern(command, wc);
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, dbName, commandWithWc, shardIds, executor);
+    async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(opts->genericArgs, wc);
+    // TODO SERVER-77461 Add back async_rpc::AsyncRPCCommandHelpers::appendOSI
+    return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
 }  // namespace
@@ -223,7 +222,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
         })
         .then(_buildPhaseHandler(
             Phase::kBlockShards,
-            [this, executor = executor, anchor = shared_from_this()] {
+            [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -256,12 +255,14 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                     ShardsvrParticipantBlock blockCRUDOperationsRequest(_collInfo->nsForTargeting);
                     blockCRUDOperationsRequest.setBlockType(
                         CriticalSectionBlockTypeEnum::kReadsAndWrites);
-                    sendAuthenticatedCommandWithOsiToShards(opCtx,
-                                                            nss().db().toString(),
-                                                            blockCRUDOperationsRequest.toBSON({}),
-                                                            _shardingInfo->shardsOwningChunks,
-                                                            **executor,
-                                                            getNewSession(opCtx));
+                    auto opts =
+                        std::make_shared<async_rpc::AsyncRPCOptions<ShardsvrParticipantBlock>>(
+                            blockCRUDOperationsRequest,
+                            **executor,
+                            token,
+                            async_rpc::GenericArgs());
+                    sendAuthenticatedCommandWithOsiToShards(
+                        opCtx, opts, _shardingInfo->shardsOwningChunks, getNewSession(opCtx));
                 }
             }))
         .then(_buildPhaseHandler(
@@ -292,7 +293,7 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                 }
             }))
         .then(_buildPhaseHandler(
-            Phase::kUpdateShards, [this, executor = executor, anchor = shared_from_this()] {
+            Phase::kUpdateShards, [this, token, executor = executor, anchor = shared_from_this()] {
                 auto opCtxHolder = cc().makeOperationContext();
                 auto* opCtx = opCtxHolder.get();
                 getForwardableOpMetadata().setOn(opCtx);
@@ -343,39 +344,37 @@ ExecutorFuture<void> CollModCoordinator::_runImpl(
                             // strip out other incompatible options.
                             auto dryRunRequest = ShardsvrCollModParticipant{
                                 originalNss(), makeCollModDryRunRequest(_request)};
+                            async_rpc::GenericArgs args;
+                            async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                            auto optsDryRun = std::make_shared<
+                                async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                                dryRunRequest, **executor, token, args);
                             sharding_ddl_util::sendAuthenticatedCommandToShards(
-                                opCtx,
-                                nss().db().toString(),
-                                CommandHelpers::appendMajorityWriteConcern(
-                                    dryRunRequest.toBSON({})),
-                                shardsOwningChunks,
-                                **executor);
+                                opCtx, optsDryRun, shardsOwningChunks);
                         }
 
                         // A view definition will only be present on the primary shard. So we pass
                         // an addition 'performViewChange' flag only to the primary shard.
                         if (primaryShardOwningChunk != shardsOwningChunks.end()) {
                             request.setPerformViewChange(true);
+                            auto opts = std::make_shared<
+                                async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                                request, **executor, token, async_rpc::GenericArgs());
                             const auto& primaryResponse = sendAuthenticatedCommandWithOsiToShards(
-                                opCtx,
-                                nss().db().toString(),
-                                request.toBSON({}),
-                                {_shardingInfo->primaryShard},
-                                **executor,
-                                getNewSession(opCtx));
+                                opCtx, opts, {_shardingInfo->primaryShard}, getNewSession(opCtx));
+
                             responses.insert(
                                 responses.end(), primaryResponse.begin(), primaryResponse.end());
                             shardsOwningChunks.erase(primaryShardOwningChunk);
                         }
 
                         request.setPerformViewChange(false);
-                        const auto& secondaryResponses =
-                            sendAuthenticatedCommandWithOsiToShards(opCtx,
-                                                                    nss().db().toString(),
-                                                                    request.toBSON({}),
-                                                                    shardsOwningChunks,
-                                                                    **executor,
-                                                                    getNewSession(opCtx));
+                        auto opts = std::make_shared<
+                            async_rpc::AsyncRPCOptions<ShardsvrCollModParticipant>>(
+                            request, **executor, token, async_rpc::GenericArgs());
+                        const auto& secondaryResponses = sendAuthenticatedCommandWithOsiToShards(
+                            opCtx, opts, shardsOwningChunks, getNewSession(opCtx));
+
                         responses.insert(
                             responses.end(), secondaryResponses.begin(), secondaryResponses.end());
 

@@ -89,11 +89,13 @@ private:
 
     void _freezeMigrations(std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                               const CancellationToken& token);
 
     void _commitDropCollection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                              const CancellationToken& token);
 };
 
 }  // namespace mongo

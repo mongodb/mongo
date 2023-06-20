@@ -209,6 +209,10 @@ public:
         return SemiFuture<std::vector<HostAndPort>>::makeReady(_resolvedHosts);
     }
 
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+        return SemiFuture<void>::makeReady();
+    }
+
 private:
     std::vector<HostAndPort> _resolvedHosts;
 };

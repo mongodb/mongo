@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/async_remote_command_targeter_adapter.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/remote_command_targeter.h"
@@ -284,7 +285,10 @@ TEST_F(HedgedAsyncRPCTest, HelloHedgeRemoteErrorWithGenericReplyFields) {
     network->enterNetwork();
 
     GenericReplyFieldsWithTypesV1 stableFields;
-    stableFields.setDollarClusterTime(LogicalTime(Timestamp(2, 3)));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
+    stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);

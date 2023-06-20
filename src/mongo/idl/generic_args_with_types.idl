@@ -41,6 +41,7 @@ imports:
     - "mongo/db/s/forwardable_operation_metadata.idl"
     - "mongo/db/write_concern_options.idl"       
     - "mongo/rpc/metadata/client_metadata.idl"
+    - "mongo/rpc/metadata/impersonated_user_metadata.idl"
     - "mongo/s/sharding_types.idl"
 
 # This file lists the generic arguments accepted by all commands, and generic
@@ -139,7 +140,7 @@ structs:
         is_generic_cmd_list: "arg"
         fields:
             $audit:
-                type: AuthenticationMetadata
+                type: ImpersonatedUserMetadata
                 cpp_name: "dollarAudit"
                 forward_to_shards: false
                 optional: true
@@ -217,6 +218,32 @@ structs:
                 forward_to_shards: true
                 optional: true
 
+    ClusterTimeSignature:
+        description: "Structure used in '$clusterTime'."
+        strict: false
+        fields:
+            hash:
+                type: bindata_generic
+                forward_from_shards: false
+                optional: false
+            keyId:
+                type: safeInt64
+                forward_from_shards: false
+                optional: false
+
+    ClusterTime:
+        description: "Field under '$clusterTime' that appears in GenericReplyFields. Matches VectorClock::SignedComponentFormat"
+        strict: false
+        fields:
+            clusterTime:
+                type: logicalTime
+                forward_from_shards: false
+                optional: true
+            signature:
+                type: ClusterTimeSignature
+                forward_from_shards: false
+                optional: true
+
     
     GenericReplyFieldsWithTypesV1:
         # This struct is meant to mirror 'generic_reply_fields_api_v1' in '../idl/generic_argument.idl'.
@@ -225,7 +252,7 @@ structs:
         is_generic_cmd_list: "reply"
         fields:
             $clusterTime:
-                type: logicalTime
+                type: ClusterTime
                 cpp_name: "dollarClusterTime"
                 forward_from_shards: false
                 optional: true

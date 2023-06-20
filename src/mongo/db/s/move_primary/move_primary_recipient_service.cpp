@@ -55,10 +55,11 @@
 #include "mongo/db/s/move_primary/move_primary_server_parameters_gen.h"
 #include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
 #include "mongo/db/s/resharding/resharding_data_copy_util.h"
-#include "mongo/db/s/sharding_ddl_util.h"
+#include "mongo/db/s/sharding_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/move_primary/move_primary_feature_flag_gen.h"
@@ -177,8 +178,14 @@ MovePrimaryRecipientExternalStateImpl::sendCommandToShards(
     const BSONObj& command,
     const std::vector<ShardId>& shardIds,
     const std::shared_ptr<executor::TaskExecutor>& executor) {
-    return sharding_ddl_util::sendAuthenticatedCommandToShards(
-        opCtx, dbName, command, shardIds, executor);
+    // The AsyncRequestsSender ignore impersonation metadata so we need to manually attach them to
+    // the command
+    BSONObjBuilder bob(command);
+    rpc::writeAuthDataToImpersonatedUserMetadata(opCtx, &bob);
+    WriteBlockBypass::get(opCtx).writeAsMetadata(&bob);
+    auto authenticatedCommand = bob.obj();
+    return sharding_util::sendCommandToShards(
+        opCtx, dbName, authenticatedCommand, shardIds, executor);
 }
 
 SemiFuture<void> MovePrimaryRecipientService::MovePrimaryRecipient::run(

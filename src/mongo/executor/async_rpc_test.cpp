@@ -44,6 +44,7 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -177,7 +178,9 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
     GenericReplyFieldsWithTypesUnstableV1 genericReplyUnstable;
     genericReplyUnstable.setOk(1);
     genericReplyUnstable.setDollarConfigTime(Timestamp(1, 1));
-    const LogicalTime clusterTime = LogicalTime(Timestamp(2, 3));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     genericReplyApiV1.setDollarClusterTime(clusterTime);
     auto configTime = Timestamp(1, 1);
     genericArgsUnstable.setDollarConfigTime(configTime);
@@ -205,7 +208,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
         BSONObjBuilder reply = BSONObjBuilder(helloReply.toBSON());
         reply.append("ok", 1);
         reply.append("$configTime", Timestamp(1, 1));
-        clusterTime.serializeToBSON("$clusterTime", &reply);
+        reply.append("$clusterTime", clusterTime.toBSON());
 
         return reply.obj();
     });
@@ -417,7 +420,10 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     GenericReplyFieldsWithTypesV1 stableFields;
-    stableFields.setDollarClusterTime(LogicalTime(Timestamp(2, 3)));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
+    stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);

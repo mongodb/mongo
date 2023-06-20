@@ -290,6 +290,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/common',
         '$BUILD_DIR/mongo/db/index_commands_idl',
         '$BUILD_DIR/mongo/db/serialization_options',
+        '$BUILD_DIR/mongo/executor/async_rpc_error_info',
         '$BUILD_DIR/mongo/rpc/message',
         '$BUILD_DIR/mongo/util/caching',
         'analyze_shard_key_common',
