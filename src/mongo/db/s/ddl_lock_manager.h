@@ -50,6 +50,7 @@ class DDLLockManager {
         ScopedBaseDDLLock& operator=(const ScopedBaseDDLLock&) = delete;
 
         ScopedBaseDDLLock(OperationContext* opCtx,
+                          Locker* locker,
                           StringData resName,
                           const ResourceId& resId,
                           StringData reason,
@@ -59,6 +60,7 @@ class DDLLockManager {
 
     public:
         ScopedBaseDDLLock(OperationContext* opCtx,
+                          Locker* locker,
                           const NamespaceString& ns,
                           StringData reason,
                           LockMode mode,
@@ -66,6 +68,7 @@ class DDLLockManager {
                           bool waitForRecovery);
 
         ScopedBaseDDLLock(OperationContext* opCtx,
+                          Locker* locker,
                           const DatabaseName& db,
                           StringData reason,
                           LockMode mode,
@@ -88,6 +91,8 @@ class DDLLockManager {
         const ResourceId _resourceId;
         const std::string _reason;
         const LockMode _mode;
+        LockResult _result;
+        Locker* _locker;
         DDLLockManager* _lockManager;
     };
 
@@ -202,6 +207,7 @@ protected:
     void setState(const State& state);
 
     void _lock(OperationContext* opCtx,
+               Locker* locker,
                StringData ns,
                const ResourceId& resId,
                StringData reason,
@@ -209,7 +215,7 @@ protected:
                Milliseconds timeout,
                bool waitForRecovery);
 
-    void _unlock(StringData ns, const ResourceId& resId, StringData reason);
+    void _unlock(Locker* locker, StringData ns, const ResourceId& resId, StringData reason);
 
     friend class ShardingDDLCoordinatorService;
     friend class ShardingDDLCoordinator;

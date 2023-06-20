@@ -201,8 +201,8 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     std::shared_ptr<executor::ScopedTaskExecutor> executor) {
     const auto& nss = coll.getNss();
 
-    // Acquire the collection distributed lock in order to synchronize with an eventual ongoing
-    // moveChunk and to prevent new ones from happening.
+    // Acquire the collection DDL lock in order to synchronize with other DDL operations that
+    // didn't take the DB DDL lock
     const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
     const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
         opCtx, nss, coorName, MODE_X, DDLLockManager::kDefaultLockTimeout};

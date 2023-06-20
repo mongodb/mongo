@@ -127,8 +127,10 @@ protected:
         Milliseconds timeout,
         bool waitForRecovery = true) {
         return std::make_pair(
-            ScopedBaseDDLLock{opCtx, ns.dbName(), reason, mode, timeout, waitForRecovery},
-            ScopedBaseDDLLock{opCtx, ns, reason, mode, timeout, waitForRecovery});
+            ScopedBaseDDLLock{
+                opCtx, opCtx->lockState(), ns.dbName(), reason, mode, timeout, waitForRecovery},
+            ScopedBaseDDLLock{
+                opCtx, opCtx->lockState(), ns, reason, mode, timeout, waitForRecovery});
     }
 
     /**

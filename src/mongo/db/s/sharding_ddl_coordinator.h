@@ -194,6 +194,11 @@ private:
     SharedPromise<void> _constructionCompletionPromise;
     SharedPromise<void> _completionPromise;
 
+    // A Locker object works attached to an opCtx and it's destroyed once the opCtx gets out of
+    // scope. However, we must keep alive a unique Locker object during the whole
+    // ShardingDDLCoordinator life to preserve the lock state among all the executor tasks.
+    std::unique_ptr<Locker> _locker;
+
     std::stack<DDLLockManager::ScopedBaseDDLLock> _scopedLocks;
 };
 

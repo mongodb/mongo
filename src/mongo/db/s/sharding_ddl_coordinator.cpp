@@ -32,6 +32,7 @@
 
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 
+#include "mongo/db/concurrency/locker_impl.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/database_sharding_state.h"
@@ -88,8 +89,13 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                    return DDLLockManager::kDefaultLockTimeout;
                }();
 
-               _scopedLocks.emplace(DDLLockManager::ScopedBaseDDLLock{
-                   opCtx, resource, coorName, lockMode, lockTimeOut, false /* waitForRecovery */});
+               _scopedLocks.emplace(DDLLockManager::ScopedBaseDDLLock{opCtx,
+                                                                      _locker.get(),
+                                                                      resource,
+                                                                      coorName,
+                                                                      lockMode,
+                                                                      lockTimeOut,
+                                                                      false /* waitForRecovery */});
            })
         .until([this, resource, lockMode](Status status) {
             if (!status.isOK()) {
@@ -303,6 +309,11 @@ SemiFuture<void> ShardingDDLCoordinator::run(std::shared_ptr<executor::ScopedTas
             auto opCtxHolder = cc().makeOperationContext();
             auto* opCtx = opCtxHolder.get();
             getForwardableOpMetadata().setOn(opCtx);
+
+            invariant(!_locker);
+            _locker = std::make_unique<LockerImpl>(opCtx->getServiceContext());
+            _locker->unsetThreadId();
+            _locker->setDebugInfo(str::stream() << _coordId.toBSON());
 
             // Check if this coordinator is allowed to start according to the user-writes blocking
             // critical section. If it is not the first execution, it means it had started already

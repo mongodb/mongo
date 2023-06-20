@@ -160,6 +160,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
         // Do another loop, with the db lock held in order to avoid taking the expensive path on
         // concurrent create database operations
         dbLock.emplace(opCtx,
+                       opCtx->lockState(),
                        DatabaseNameUtil::deserialize(boost::none, str::toLower(dbName)),
                        "createDatabase" /* reason */,
                        MODE_X,
