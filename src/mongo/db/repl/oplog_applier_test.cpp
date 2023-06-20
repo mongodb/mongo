@@ -103,7 +103,7 @@ void OplogApplierTest::tearDown() {
     _buffer = {};
 }
 
-constexpr auto dbName = "test"_sd;
+const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
 
 TEST_F(OplogApplierTest, GetNextApplierBatchGroupsCrudOps) {
     std::vector<OplogEntry> srcOps;
@@ -134,10 +134,7 @@ TEST_F(OplogApplierTest, GetNextApplierBatchGroupsUnpreparedApplyOpsOpWithOtherO
 
 TEST_F(OplogApplierTest, GetNextApplierBatchReturnsSystemDotViewsOpInOwnBatch) {
     std::vector<OplogEntry> srcOps;
-    srcOps.push_back(
-        makeInsertOplogEntry(1,
-                             NamespaceString::makeSystemDotViewsNamespace(
-                                 DatabaseName::createDatabaseName_forTest(boost::none, dbName))));
+    srcOps.push_back(makeInsertOplogEntry(1, NamespaceString::makeSystemDotViewsNamespace(dbName)));
     srcOps.push_back(
         makeInsertOplogEntry(2, NamespaceString::createNamespaceString_forTest(dbName, "bar")));
     _applier->enqueue(opCtx(), srcOps.cbegin(), srcOps.cend());

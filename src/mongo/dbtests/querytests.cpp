@@ -1224,7 +1224,7 @@ public:
         OldClientContext ctx(
             &_opCtx, NamespaceString::createNamespaceString_forTest("unittests.DirectLocking"));
         _client.remove(NamespaceString::createNamespaceString_forTest("a.b"), BSONObj());
-        ASSERT_EQUALS("unittests", ctx.db()->name().db());
+        ASSERT_EQUALS("unittests", ctx.db()->name().toString_forTest());
     }
     const char* ns;
 };

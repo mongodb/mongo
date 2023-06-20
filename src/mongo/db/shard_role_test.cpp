@@ -65,7 +65,7 @@ void installDatabaseMetadata(OperationContext* opCtx,
                              const DatabaseVersion& dbVersion) {
     AutoGetDb autoDb(opCtx, dbName, MODE_X, {}, {});
     auto scopedDss = DatabaseShardingState::assertDbLockedAndAcquireExclusive(opCtx, dbName);
-    scopedDss->setDbInfo(opCtx, {dbName.db().toString(), ShardId("this"), dbVersion});
+    scopedDss->setDbInfo(opCtx, {dbName.toString_forTest(), ShardId("this"), dbVersion});
 }
 
 void installUnshardedCollectionMetadata(OperationContext* opCtx, const NamespaceString& nss) {
@@ -366,7 +366,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithIncorrectPlacementVersionThrows) {
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-        ASSERT_EQ(dbNameTestDb.db(), exInfo->getDb());
+        ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
         ASSERT_EQ(incorrectDbVersion, exInfo->getVersionReceived());
         ASSERT_EQ(dbVersionTestDb, exInfo->getVersionWanted());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -408,7 +408,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenShardDoesNotKnowThePlacementVersio
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-        ASSERT_EQ(dbNameTestDb.db(), exInfo->getDb());
+        ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
         ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
         ASSERT_EQ(boost::none, exInfo->getVersionWanted());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -450,7 +450,7 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWhenCriticalSectionIsActiveThrows) {
 
         auto validateException = [&](const DBException& ex) {
             const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-            ASSERT_EQ(dbNameTestDb.db(), exInfo->getDb());
+            ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
             ASSERT_EQ(dbVersionTestDb, exInfo->getVersionReceived());
             ASSERT_EQ(boost::none, exInfo->getVersionWanted());
             ASSERT_TRUE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -784,7 +784,7 @@ TEST_F(ShardRoleTest, AcquireInexistentCollectionWithWrongPlacementThrowsBecause
 
     auto validateException = [&](const DBException& ex) {
         const auto exInfo = ex.extraInfo<StaleDbRoutingVersion>();
-        ASSERT_EQ(dbNameTestDb.db(), exInfo->getDb());
+        ASSERT_EQ(dbNameTestDb.toString_forTest(), exInfo->getDb());
         ASSERT_EQ(incorrectDbVersion, exInfo->getVersionReceived());
         ASSERT_EQ(dbVersionTestDb, exInfo->getVersionWanted());
         ASSERT_FALSE(exInfo->getCriticalSectionSignal().is_initialized());
@@ -1386,7 +1386,7 @@ void ShardRoleTest::testRestoreFailsIfCollectionRenamed(
         DBDirectClient client(opCtx());
         BSONObj info;
         ASSERT_TRUE(client.runCommand(
-            DatabaseName::createDatabaseName_forTest(boost::none, dbNameTestDb.db()),
+            dbNameTestDb,
             BSON("renameCollection"
                  << nss.ns_forTest() << "to"
                  << NamespaceString::createNamespaceString_forTest(dbNameTestDb, "foo2")

@@ -103,7 +103,7 @@ std::string toString(TenantOplogBatch& batch) {
     return sb.str();
 }
 
-constexpr auto dbName = "tenant_test"_sd;
+const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "tenant_test"_sd);
 
 TEST_F(TenantOplogBatcherTest, CannotRequestTwoBatchesAtOnce) {
     auto batcher = std::make_shared<TenantOplogBatcher>(

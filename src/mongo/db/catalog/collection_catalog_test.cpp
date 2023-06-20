@@ -807,7 +807,7 @@ public:
                           const NamespaceString& from,
                           const NamespaceString& to,
                           Timestamp timestamp) {
-        invariant(from.db() == to.db());
+        invariant(from == to);
 
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);

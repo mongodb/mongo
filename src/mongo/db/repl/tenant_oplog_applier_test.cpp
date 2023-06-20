@@ -364,7 +364,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
 
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> srcOps = makeMultiEntryTransactionOplogEntries(
-        2, _dbName.db(), /* prepared */ false, {innerOps1, innerOps2, innerOps3});
+        2, _dbName, /* prepared */ false, {innerOps1, innerOps2, innerOps3});
     pushOps(srcOps);
 
     auto writerPool = makeTenantMigrationWriterPool();
@@ -617,7 +617,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
             onInsertsCalled = true;
             // TODO Check that (nss.dbName() == _dbName) once the OplogEntry deserializer passes
             // "tid" to the NamespaceString constructor
-            ASSERT_EQUALS(nss.dbName().db(), _dbName.toStringWithTenantId_forTest());
+            ASSERT_EQUALS(nss.dbName().toString_forTest(), _dbName.toStringWithTenantId_forTest());
             ASSERT_EQUALS(nss.coll(), "bar");
             ASSERT_EQUALS(1, docs.size());
             ASSERT_BSONOBJ_EQ(docs[0], entry.getObject());
@@ -896,7 +896,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
-        ASSERT_EQUALS(nss.dbName().db(), _dbName.toStringWithTenantId_forTest());
+        ASSERT_EQUALS(nss.dbName().toString_forTest(), _dbName.toStringWithTenantId_forTest());
         ASSERT_EQUALS(nss.coll(), "bar");
         ASSERT_EQUALS(uuid, coll->uuid());
     };

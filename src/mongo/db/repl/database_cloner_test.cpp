@@ -345,7 +345,7 @@ TEST_F(DatabaseClonerTest, FirstCollectionListIndexesFailed) {
         {BSON("ok" << 0 << "errmsg"
                    << "fake message"
                    << "code" << ErrorCodes::CursorNotFound),
-         createCursorResponse(_dbName.db() + ".b", BSON_ARRAY(idIndexSpec))});
+         createCursorResponse(_dbName.toString_forTest() + ".b", BSON_ARRAY(idIndexSpec))});
     auto cloner = makeDatabaseCloner();
     auto status = cloner->run();
     ASSERT_NOT_OK(status);
@@ -380,8 +380,8 @@ TEST_F(DatabaseClonerTest, CreateCollections) {
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
     _mockServer->setCommandReply(
         "listIndexes",
-        {createCursorResponse(_dbName.db() + ".a", BSON_ARRAY(idIndexSpec)),
-         createCursorResponse(_dbName.db() + ".b", BSON_ARRAY(idIndexSpec))});
+        {createCursorResponse(_dbName.toString_forTest() + ".a", BSON_ARRAY(idIndexSpec)),
+         createCursorResponse(_dbName.toString_forTest() + ".b", BSON_ARRAY(idIndexSpec))});
     auto cloner = makeDatabaseCloner();
     auto status = cloner->run();
     ASSERT_OK(status);
@@ -427,8 +427,9 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     _mockServer->setCommandReply("count", {createCountResponse(0), createCountResponse(0)});
     _mockServer->setCommandReply(
         "listIndexes",
-        {createCursorResponse(_dbName.db() + ".a", BSON_ARRAY(idIndexSpec << extraIndexSpec)),
-         createCursorResponse(_dbName.db() + ".b", BSON_ARRAY(idIndexSpec))});
+        {createCursorResponse(_dbName.toString_forTest() + ".a",
+                              BSON_ARRAY(idIndexSpec << extraIndexSpec)),
+         createCursorResponse(_dbName.toString_forTest() + ".b", BSON_ARRAY(idIndexSpec))});
     auto cloner = makeDatabaseCloner();
 
     auto collClonerBeforeFailPoint = globalFailPointRegistry().find("hangBeforeClonerStage");
@@ -436,11 +437,13 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     auto timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName.db() + ".a'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" +
+                 _dbName.toString_forTest() + ".a'}"));
     collClonerAfterFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName.db() + ".a'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" +
+                 _dbName.toString_forTest() + ".a'}"));
 
     // Run the cloner in a separate thread.
     stdx::thread clonerThread([&] {
@@ -472,7 +475,8 @@ TEST_F(DatabaseClonerTest, DatabaseAndCollectionStats) {
     timesEntered = collClonerBeforeFailPoint->setMode(
         FailPoint::alwaysOn,
         0,
-        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" + _dbName.db() + ".b'}"));
+        fromjson("{cloner: 'CollectionCloner', stage: 'count', nss: '" +
+                 _dbName.toString_forTest() + ".b'}"));
     collClonerAfterFailPoint->setMode(FailPoint::off);
 
     // Wait for the failpoint to be reached

@@ -409,7 +409,7 @@ void _createCollection(OperationContext* opCtx,
         AutoGetDb autoDb(opCtx, nss.dbName(), MODE_X);
         auto db = autoDb.ensureDbExists(opCtx);
         ASSERT_TRUE(db) << "Cannot create collection " << nss.toStringForErrorMsg()
-                        << " because database " << nss.db() << " does not exist.";
+                        << " because database " << nss.toStringForErrorMsg() << " does not exist.";
 
         WriteUnitOfWork wuow(opCtx);
         ASSERT_TRUE(db->createCollection(opCtx, nss, options))
@@ -527,21 +527,6 @@ void _insertDocument(OperationContext* opCtx, const NamespaceString& nss, const 
             collection_internal::insertDocument(opCtx, *collection, InsertStatement(doc), opDebug));
         wuow.commit();
     });
-}
-
-/**
- * Retrieves the pointer to a collection associated with the given namespace string from the
- * catalog. The caller must hold the appropriate locks from the lock manager.
- */
-CollectionPtr _getCollection_inlock(OperationContext* opCtx, const NamespaceString& nss) {
-    invariant(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IS));
-    auto databaseHolder = DatabaseHolder::get(opCtx);
-    auto* db = databaseHolder->getDb(
-        opCtx, DatabaseName::createDatabaseName_forTest(boost::none, nss.db()));
-    if (!db) {
-        return CollectionPtr();
-    }
-    return CollectionPtr(CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
 }
 
 TEST_F(RenameCollectionTest, RenameCollectionReturnsNamespaceNotFoundIfDatabaseDoesNotExist) {

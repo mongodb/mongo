@@ -219,7 +219,8 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     // DatabaseNameUtil::serialize() instead
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
-    auto expectedDoc = Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().db()}};
+    auto expectedDoc =
+        Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().toString_forTest()}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
@@ -231,7 +232,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     ASSERT(outSource);
     ASSERT(outSource->getOutputNs().tenantId());
     ASSERT_EQ(*outSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
-    ASSERT_EQ(outSource->getOutputNs().dbName().db(), targetDb);
+    ASSERT_EQ(outSource->getOutputNs().dbName().toString_forTest(), targetDb);
 
     // Assert the tenantId is not included in the serialized namespace.
     serialized = outSource->serialize().getDocument();

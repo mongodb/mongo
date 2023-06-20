@@ -135,7 +135,7 @@ TEST(NamespaceStringUtilTest,
     std::string dbNameStr = str::stream() << tenantId.toString() << "_foo";
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, tenantNsStr);
     ASSERT_EQ(nss.tenantId(), boost::none);
-    ASSERT_EQ(nss.dbName().db(), dbNameStr);
+    ASSERT_EQ(nss.dbName().toString_forTest(), dbNameStr);
 }
 
 // Deserialize NamespaceString when multitenancySupport and featureFlagRequireTenantID are disabled.

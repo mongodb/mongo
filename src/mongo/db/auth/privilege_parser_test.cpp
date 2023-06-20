@@ -180,7 +180,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
         resolvePrivilege(BSON("resource"_sd << makeResource("db1"_sd, "coll"_sd, boost::none)
                                             << "actions"_sd << kFindActions));
     ASSERT_TRUE(exactNSSPriv.getResourcePattern().isExactNamespacePattern());
-    ASSERT_EQ(exactNSSPriv.getResourcePattern().dbNameToMatch().db(), "db1"_sd);
+    ASSERT_EQ(exactNSSPriv.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"_sd);
     ASSERT_EQ(exactNSSPriv.getResourcePattern().collectionToMatch(), "coll"_sd);
 
     // Works with any bucket in any db (implicit)
@@ -188,14 +188,14 @@ TEST(PrivilegeParserTest, IsValidTest) {
         resolvePrivilege(BSON("resource"_sd << makeResource(boost::none, boost::none, ""_sd)
                                             << "actions"_sd << kFindActions));
     ASSERT_TRUE(anyBucketImplicit.getResourcePattern().isAnySystemBucketsCollection());
-    ASSERT_EQ(anyBucketImplicit.getResourcePattern().dbNameToMatch().db(), ""_sd);
+    ASSERT_EQ(anyBucketImplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
     ASSERT_EQ(anyBucketImplicit.getResourcePattern().collectionToMatch(), ""_sd);
 
     // Works with any bucket in any db (explicit)
     auto anyBucketExplicit = resolvePrivilege(BSON(
         "resource"_sd << makeResource(""_sd, boost::none, ""_sd) << "actions"_sd << kFindActions));
     ASSERT_TRUE(anyBucketExplicit.getResourcePattern().isAnySystemBucketsCollection());
-    ASSERT_EQ(anyBucketExplicit.getResourcePattern().dbNameToMatch().db(), ""_sd);
+    ASSERT_EQ(anyBucketExplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
     ASSERT_EQ(anyBucketExplicit.getResourcePattern().collectionToMatch(), ""_sd);
 
     // Works with system_buckets in any db (implicit)
@@ -203,7 +203,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
         resolvePrivilege(BSON("resource"_sd << makeResource(boost::none, boost::none, "bucket"_sd)
                                             << "actions"_sd << kFindActions));
     ASSERT_TRUE(bucketAnyDBImplicit.getResourcePattern().isAnySystemBucketsCollectionInAnyDB());
-    ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().dbNameToMatch().db(), ""_sd);
+    ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
     ASSERT_EQ(bucketAnyDBImplicit.getResourcePattern().collectionToMatch(), "bucket"_sd);
 
     // Works with system_buckets in any db (explicit)
@@ -211,7 +211,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
         resolvePrivilege(BSON("resource"_sd << makeResource(""_sd, boost::none, "bucket"_sd)
                                             << "actions"_sd << kFindActions));
     ASSERT_TRUE(bucketAnyDBExplicit.getResourcePattern().isAnySystemBucketsCollectionInAnyDB());
-    ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().dbNameToMatch().db(), ""_sd);
+    ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().dbNameToMatch().toString_forTest(), ""_sd);
     ASSERT_EQ(bucketAnyDBExplicit.getResourcePattern().collectionToMatch(), "bucket"_sd);
 
     // Works with any system_bucket in specific db
@@ -219,7 +219,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
         resolvePrivilege(BSON("resource"_sd << makeResource("db1"_sd, boost::none, ""_sd)
                                             << "actions"_sd << kFindActions));
     ASSERT_TRUE(bucketInDB.getResourcePattern().isAnySystemBucketsCollectionInDB());
-    ASSERT_EQ(bucketInDB.getResourcePattern().dbNameToMatch().db(), "db1"_sd);
+    ASSERT_EQ(bucketInDB.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"_sd);
     ASSERT_EQ(bucketInDB.getResourcePattern().collectionToMatch(), ""_sd);
 
     // Works with exact system buckets namespace.
@@ -227,7 +227,7 @@ TEST(PrivilegeParserTest, IsValidTest) {
         resolvePrivilege(BSON("resource"_sd << makeResource("db1"_sd, boost::none, "bucket"_sd)
                                             << "actions"_sd << kFindActions));
     ASSERT_TRUE(exactBucket.getResourcePattern().isExactSystemBucketsCollection());
-    ASSERT_EQ(exactBucket.getResourcePattern().dbNameToMatch().db(), "db1"_sd);
+    ASSERT_EQ(exactBucket.getResourcePattern().dbNameToMatch().toString_forTest(), "db1"_sd);
     ASSERT_EQ(exactBucket.getResourcePattern().collectionToMatch(), "bucket"_sd);
 }
 

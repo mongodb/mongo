@@ -97,19 +97,22 @@ OplogEntry makeApplyOpsOplogEntry(int t,
                                   const std::vector<OplogEntry>& innerOps = {});
 
 OplogEntry makeCommitTransactionOplogEntry(int t,
-                                           StringData dbName,
+                                           const DatabaseName& dbName,
                                            bool prepared,
                                            boost::optional<int> count = boost::none);
 
-OplogEntry makeAbortTransactionOplogEntry(int t, StringData dbName);
+OplogEntry makeAbortTransactionOplogEntry(int t, const DatabaseName& dbName);
 
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
-                                                              StringData dbName,
+                                                              const DatabaseName& dbName,
                                                               bool prepared,
                                                               int count);
 
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
-    int t, StringData dbName, bool prepared, std::vector<std::vector<OplogEntry>> innerOps);
+    int t,
+    const DatabaseName& dbName,
+    bool prepared,
+    std::vector<std::vector<OplogEntry>> innerOps);
 std::string toString(const std::vector<OplogEntry>& ops);
 }  // namespace repl
 }  // namespace mongo

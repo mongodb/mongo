@@ -75,7 +75,7 @@ protected:
             operationContext(), kTestNss.dbName());
         scopedDss->setDbInfo(
             operationContext(),
-            DatabaseType{kTestNss.dbName().db().toString(), ShardId("this"), dbVersion1});
+            DatabaseType{kTestNss.dbName().toString_forTest(), ShardId("this"), dbVersion1});
         ASSERT_TRUE(db);
         ASSERT_TRUE(justCreated);
 

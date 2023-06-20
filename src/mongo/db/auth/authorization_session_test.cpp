@@ -137,8 +137,7 @@ public:
 
         return managerState->insert(
             _opCtx.get(),
-            NamespaceString::createNamespaceString_forTest(
-                username.getTenant(), DatabaseName::kAdmin.db(), NamespaceString::kSystemUsers),
+            NamespaceString::makeTenantUsersCollection(username.getTenant()),
             userDoc.obj(),
             {});
     }

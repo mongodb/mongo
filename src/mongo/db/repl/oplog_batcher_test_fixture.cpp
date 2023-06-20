@@ -290,7 +290,7 @@ OplogEntry makeApplyOpsOplogEntry(int t, bool prepare, const std::vector<OplogEn
  * transaction, with the given number used for the timestamp.
  */
 OplogEntry makeCommitTransactionOplogEntry(int t,
-                                           StringData dbName,
+                                           const DatabaseName& dbName,
                                            bool prepared,
                                            boost::optional<int> count) {
     auto nss = NamespaceString::createNamespaceString_forTest(dbName).getCommandNS();
@@ -334,7 +334,7 @@ OplogEntry makeCommitTransactionOplogEntry(int t,
 /**
  * Generates an abortTransaction oplog entry with the given number used for the timestamp.
  */
-OplogEntry makeAbortTransactionOplogEntry(int t, StringData dbName) {
+OplogEntry makeAbortTransactionOplogEntry(int t, const DatabaseName& dbName) {
     auto nss = NamespaceString::createNamespaceString_forTest(dbName).getCommandNS();
     BSONObj oField;
 
@@ -425,7 +425,7 @@ OplogEntry makeLargeTransactionOplogEntries(int t,
  * Generates a mock large-transaction which has more than one oplog entry.
  */
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
-                                                              StringData dbName,
+                                                              const DatabaseName& dbName,
                                                               bool prepared,
                                                               int count) {
     ASSERT_GTE(count, 2);
@@ -442,7 +442,10 @@ std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
  * operations in innerOps.
  */
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
-    int t, StringData dbName, bool prepared, std::vector<std::vector<OplogEntry>> innerOps) {
+    int t,
+    const DatabaseName& dbName,
+    bool prepared,
+    std::vector<std::vector<OplogEntry>> innerOps) {
     std::size_t count = innerOps.size() + (prepared ? 1 : 0);
     ASSERT_GTE(count, 2);
     std::vector<OplogEntry> vec;
