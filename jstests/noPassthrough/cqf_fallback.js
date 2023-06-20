@@ -36,6 +36,28 @@ function assertSupportedByBonsaiFully(cmd) {
     assert.commandWorked(db.runCommand(cmd));
 }
 
+function assertSupportedByBonsaiExperimentally(cmd) {
+    // Experimental features require the knob to be set to "tryBonsaiExperimental" or higher.
+    // With "tryBonsai", these features should not use the new optimizer.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    const defaultExplain = assert.commandWorked(db.runCommand({explain: cmd}));
+    assert(!usedBonsaiOptimizer(defaultExplain), tojson(defaultExplain));
+
+    // Non-explain should also work and use the fallback mechanism, but we cannnot verify exactly
+    // this without looking at the logs.
+    assert.commandWorked(db.runCommand(cmd));
+
+    // Enable "experimental" features in bonsai and expect the query to use Bonsai and pass.
+    assert.commandWorked(
+        db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
+    const explain = assert.commandWorked(db.runCommand({explain: cmd}));
+    assert(usedBonsaiOptimizer(explain), tojson(explain));
+
+    // Non-explain should still work.
+    assert.commandWorked(db.runCommand(cmd));
+}
+
 function assertNotSupportedByBonsai(cmd, testOnly, database = db) {
     // An unsupported stage should not use the new optimizer.
     assert.commandWorked(
@@ -92,6 +114,64 @@ assertNotSupportedByBonsai({find: coll.getName(), filter: {a: {$in: [/^b/, 1]}}}
 assertNotSupportedByBonsai({find: coll.getName(), filter: {$alwaysFalse: 1}}, true);
 assertNotSupportedByBonsai(
     {aggregate: coll.getName(), pipeline: [{$match: {$alwaysFalse: 1}}], cursor: {}}, true);
+
+// Test $match on _id; these have only experimental support.
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {_id: 1}});
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}});
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {_id: {$lt: 10}}});
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$match: {_id: {$lt: 10}}}], cursor: {}});
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {'_id.a': 1}});
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$match: {'_id.a': 1}}], cursor: {}});
+assertSupportedByBonsaiExperimentally(
+    {find: coll.getName(), filter: {$and: [{a: 10}, {_id: {$gte: 5}}]}});
+assertSupportedByBonsaiExperimentally({
+    aggregate: coll.getName(),
+    pipeline: [{$match: {$and: [{a: 10}, {_id: {$gte: 5}}]}}],
+    cursor: {}
+});
+
+// Test $project on _id. These are fully supported in bonsai unless the _id index is specifically
+// hinted, which is only experimentally supported.
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, projection: {_id: 1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [{$project: {_id: 1}}], cursor: {}});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, projection: {_id: 1, a: 1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [{$project: {_id: 1, a: 1}}], cursor: {}});
+
+assertSupportedByBonsaiExperimentally(
+    {find: coll.getName(), filter: {}, projection: {_id: 1}, hint: {_id: 1}});
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$project: {_id: 1}}], cursor: {}, hint: {_id: 1}});
+assertSupportedByBonsaiExperimentally(
+    {find: coll.getName(), filter: {}, projection: {_id: 1, a: 1}, hint: {_id: 1}});
+assertSupportedByBonsaiExperimentally({
+    aggregate: coll.getName(),
+    pipeline: [{$project: {_id: 1, a: 1}}],
+    cursor: {},
+    hint: {_id: 1}
+});
+
+// $natural hints are fully supported in Bonsai...
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiFully({find: coll.getName(), filter: {}, hint: {$natural: -1}});
+assertSupportedByBonsaiFully(
+    {aggregate: coll.getName(), pipeline: [], cursor: {}, hint: {$natural: -1}});
+
+// ... Except if the query relies on some experimental feature (e.g., predicate on _id).
+assertSupportedByBonsaiExperimentally(
+    {find: coll.getName(), filter: {_id: 1}, hint: {$natural: 1}});
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}, hint: {$natural: 1}});
+assertSupportedByBonsaiExperimentally(
+    {find: coll.getName(), filter: {_id: 1}, hint: {$natural: -1}});
+assertSupportedByBonsaiExperimentally(
+    {aggregate: coll.getName(), pipeline: [{$match: {_id: 1}}], cursor: {}, hint: {$natural: -1}});
 
 // Unsupported projection expression.
 assertNotSupportedByBonsai(
@@ -268,11 +348,11 @@ assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "fr_CA"}}));
 assertNotSupportedByBonsai({find: coll.getName(), filter: {}});
 assertNotSupportedByBonsai({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
-// A simple collation on an index should be eligible for CQF.
+// A simple collation on an index should only have experimental support in CQF.
 coll.drop();
 assert.commandWorked(coll.createIndex({a: 1}, {collation: {locale: "simple"}}));
-assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
-assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiExperimentally({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
 // A query against a collection with a hidden index should be eligible for CQF.
 coll.drop();
@@ -280,10 +360,10 @@ assert.commandWorked(coll.createIndex({a: 1}, {hidden: true}));
 assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
 assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
-// Unhiding the supported index means the query is still eligible for CQF.
+// Unhiding the index means the query only has experimental support in CQF once again.
 coll.unhideIndex({a: 1});
-assertSupportedByBonsaiFully({find: coll.getName(), filter: {}});
-assertSupportedByBonsaiFully({aggregate: coll.getName(), pipeline: [], cursor: {}});
+assertSupportedByBonsaiExperimentally({find: coll.getName(), filter: {}});
+assertSupportedByBonsaiExperimentally({aggregate: coll.getName(), pipeline: [], cursor: {}});
 
 // A query against a collection with a hidden index should be eligible for CQF even if the
 // underlying index is not supported.
@@ -421,6 +501,9 @@ db = conn.getDB("test");
 coll = db[jsTestName()];
 coll.drop();
 
+assert.commandWorked(
+    db.adminCommand({configureFailPoint: 'enableExplainInBonsai', 'mode': 'alwaysOn'}));
+
 const supportedExpression = {
     a: {$eq: 4}
 };
@@ -431,30 +514,47 @@ assert(!usedBonsaiOptimizer(explain), tojson(explain));
 explain = coll.explain().aggregate([{$match: supportedExpression}]);
 assert(!usedBonsaiOptimizer(explain), tojson(explain));
 
-// Show that trying to set the framework to tryBonsai or forceBonsai is not permitted when the
-// feature flag is off.
+// Show that trying to set the framework to tryBonsai is not permitted when the feature flag is off,
+// but tryBonsaiExperimental and forceBonsai are allowed (since test commands are enabled here by
+// default).
 assert.commandFailed(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 explain = coll.explain().find(supportedExpression).finish();
 assert(!usedBonsaiOptimizer(explain), tojson(explain));
 
-assert.commandFailed(
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
+explain = coll.explain().find(supportedExpression).finish();
+assert(usedBonsaiOptimizer(explain), tojson(explain));
+
+assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
 explain = coll.explain().find(supportedExpression).finish();
-assert(!usedBonsaiOptimizer(explain), tojson(explain));
+assert(usedBonsaiOptimizer(explain), tojson(explain));
 
 MongoRunner.stopMongod(conn);
 
-// Show that we can't start a mongod with the framework control set to tryBonsai or forceBonsai
-// when the feature flag is off.
-TestData.setParameters.featureFlagCommonQueryFramework = false;
-let mongodStarted = false;
+// Show that we can't start a mongod with the framework control set to tryBonsaiExperimental when
+// test commands are off.
+TestData.enableTestCommands = false;
 try {
-    conn = MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "tryBonsai"}});
+    conn = MongoRunner.runMongod(
+        {setParameter: {internalQueryFrameworkControl: "tryBonsaiExperimental"}});
     MongoRunner.stopMongod(conn);
-    mongodStarted = true;
+    assert(false, "MongoD was able to start up when it should have failed");
 } catch (_) {
     // This is expected.
 }
-assert(!mongodStarted, "MongoD was able to start up when it should have failed");
+
+// Show that we can't start a mongod with the framework control set to tryBonsai
+// when the feature flag is off.
+TestData.setParameters.featureFlagCommonQueryFramework = false;
+TestData.enableTestCommands = true;
+try {
+    conn = MongoRunner.runMongod({setParameter: {internalQueryFrameworkControl: "tryBonsai"}});
+    MongoRunner.stopMongod(conn);
+    assert(false, "MongoD was able to start up when it should have failed");
+} catch (_) {
+    // This is expected.
+}
 }());

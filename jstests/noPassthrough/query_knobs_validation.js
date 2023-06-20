@@ -5,7 +5,7 @@
  * parameter's valid bounds.
  */
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled
+load("jstests/libs/optimizer_utils.js");  // For checkCascadesFeatureFlagEnabled
 
 (function() {
 "use strict";
@@ -261,14 +261,15 @@ assertSetParameterFails("internalQueryFLERewriteMemoryLimit", 0);
 // Need to have the CQF feature flag enabled in order to set tryBonsai or forceBonsai.
 assertSetParameterSucceeds("internalQueryFrameworkControl", "forceClassicEngine");
 assertSetParameterSucceeds("internalQueryFrameworkControl", "trySbeEngine");
-if (checkCascadesOptimizerEnabled(testDB)) {
+if (checkCascadesFeatureFlagEnabled(testDB)) {
     assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsai");
+    assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsaiExperimental");
     assertSetParameterSucceeds("internalQueryFrameworkControl", "forceBonsai");
 } else {
     assert.commandFailed(
         testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
-    assert.commandFailed(
-        testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
+    assertSetParameterSucceeds("internalQueryFrameworkControl", "tryBonsaiExperimental");
+    assertSetParameterSucceeds("internalQueryFrameworkControl", "forceBonsai");
 }
 assertSetParameterFails("internalQueryFrameworkControl", "tryCascades");
 assertSetParameterFails("internalQueryFrameworkControl", 1);

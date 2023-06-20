@@ -41,7 +41,7 @@ feature_flags:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gFeatureFlagCommonQueryFramework
       default: false
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
 
     featureFlagBucketUnpackWithSort:
       description: "Enables a time-series optimization that allows for partially-blocking sort on time"

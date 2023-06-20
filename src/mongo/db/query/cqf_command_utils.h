@@ -46,7 +46,10 @@ namespace optimizer {
  * should set 'eligible' to false.
  */
 struct ABTUnsupportedDocumentSourceVisitorContext : public DocumentSourceVisitorContextBase {
+    ABTUnsupportedDocumentSourceVisitorContext(QueryFrameworkControlEnum controlEnum)
+        : frameworkControl(controlEnum) {}
     bool eligible{true};
+    const QueryFrameworkControlEnum frameworkControl;
 };
 }  // namespace optimizer
 

@@ -9,7 +9,7 @@ if (!checkCascadesOptimizerEnabled(db)) {
 }
 
 assert.commandWorked(
-    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
 
 const coll = db.cqf_analyze_scalar_hist;
 coll.drop();
