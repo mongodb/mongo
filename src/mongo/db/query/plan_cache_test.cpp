@@ -62,6 +62,8 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
+#include "mongo/db/catalog/collection_mock.h"
+
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 
@@ -2116,4 +2118,113 @@ TEST_F(PlanCacheTest, PlanCacheMaxSizeParameterCanBeZero) {
                             PlanSecurityLevel::kNotSensitive));
     ASSERT_EQ(0U, planCache.size());
 }
+
+/**
+ * Tests specifically for SBE plan cache.
+ */
+class SbePlanCacheTest : public unittest::Test {
+protected:
+    void setUp() override {
+        _queryTestServiceContext = std::make_unique<QueryTestServiceContext>();
+        _operationContext = _queryTestServiceContext->makeOperationContext();
+        _collection = std::make_unique<CollectionMock>(_nss);
+        _collectionPtr = CollectionPtr(_collection.get());
+    }
+
+    void tearDown() override {
+        _collectionPtr.reset();
+        _collection.reset();
+        _operationContext.reset();
+        _queryTestServiceContext.reset();
+    }
+
+    sbe::PlanCacheKey makeSbeKey(const CanonicalQuery& cq) {
+        ASSERT_TRUE(cq.isSbeCompatible());
+        return plan_cache_key_factory::make<sbe::PlanCacheKey>(cq, _collectionPtr);
+    }
+
+    /**
+     * Checks if plan cache size calculation returns expected result.
+     */
+    void assertSbePlanCacheKeySize(const char* queryStr,
+                                   const char* sortStr,
+                                   const char* projectionStr,
+                                   const char* collationStr) {
+        // Create canonical query.
+        std::unique_ptr<CanonicalQuery> cq = makeCQ(queryStr, sortStr, projectionStr, collationStr);
+        cq->setSbeCompatible(true);
+
+        auto sbeKey = makeSbeKey(*cq);
+
+        // The static size of the key structure.
+        const size_t staticSize = sizeof(sbeKey);
+
+        // The actual key representation is encoded as a string.
+        const size_t keyRepresentationSize = sbeKey.toString().size();
+
+        // The tests are setup for a single collection.
+        const size_t additionalCollectionSize = 0;
+
+        ASSERT_TRUE(sbeKey.estimatedKeySizeBytes() ==
+                    staticSize + keyRepresentationSize + additionalCollectionSize);
+    }
+
+private:
+    static const NamespaceString _nss;
+
+    std::unique_ptr<CanonicalQuery> makeCQ(const BSONObj& query,
+                                           const BSONObj& sort,
+                                           const BSONObj& projection,
+                                           const BSONObj& collation) {
+        auto findCommand = std::make_unique<FindCommandRequest>(_nss);
+        findCommand->setFilter(query);
+        findCommand->setSort(sort);
+        findCommand->setProjection(projection);
+        findCommand->setCollation(collation);
+        auto statusWithInputQuery =
+            CanonicalQuery::canonicalize(_operationContext.get(), std::move(findCommand));
+        ASSERT_OK(statusWithInputQuery.getStatus());
+        return std::move(statusWithInputQuery.getValue());
+    }
+
+    std::unique_ptr<CanonicalQuery> makeCQ(const char* queryStr,
+                                           const char* sortStr,
+                                           const char* projectionStr,
+                                           const char* collationStr) {
+        BSONObj query = fromjson(queryStr);
+        BSONObj sort = fromjson(sortStr);
+        BSONObj projection = fromjson(projectionStr);
+        BSONObj collation = fromjson(collationStr);
+
+        auto findCommand = std::make_unique<FindCommandRequest>(_nss);
+        findCommand->setFilter(query);
+        findCommand->setSort(sort);
+        findCommand->setProjection(projection);
+        findCommand->setCollation(collation);
+        auto statusWithInputQuery =
+            CanonicalQuery::canonicalize(_operationContext.get(), std::move(findCommand));
+        ASSERT_OK(statusWithInputQuery.getStatus());
+        return std::move(statusWithInputQuery.getValue());
+    }
+
+    std::unique_ptr<QueryTestServiceContext> _queryTestServiceContext;
+
+    ServiceContext::UniqueOperationContext _operationContext;
+    std::unique_ptr<Collection> _collection;
+    CollectionPtr _collectionPtr;
+};
+
+const NamespaceString SbePlanCacheTest::_nss(
+    NamespaceString::createNamespaceString_forTest("test.collection"));
+
+TEST_F(SbePlanCacheTest, SBEPlanCacheBudgetTest) {
+    assertSbePlanCacheKeySize("{a: 2}", "{}", "{_id: 1, a: 1}", "{}");
+
+    assertSbePlanCacheKeySize(
+        "{b: 'foo'}", "{}", "{_id: 1, b: 1}", "{locale: 'mock_reverse_string'}");
+
+    assertSbePlanCacheKeySize(
+        "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}", "{locale: 'mock_reverse_string'}");
+}
+
 }  // namespace
