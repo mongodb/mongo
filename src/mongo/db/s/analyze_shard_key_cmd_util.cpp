@@ -455,6 +455,10 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
         metrics.mostCommonValues.emplace_back(std::move(value), 1);
     });
 
+    uassert(ErrorCodes::IllegalOperation,
+            "Cannot analyze the cardinality and frequency of a shard key for an empty collection",
+            metrics.mostCommonValues.size() > 0);
+
     metrics.numDistinctValues = [&] {
         if (int64_t numMostCommonValues = metrics.mostCommonValues.size();
             numDocs < numMostCommonValues) {
@@ -957,16 +961,20 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId);
 
+    // Use a tassert here since the IllegalOperation error should have been thrown while
+    // calculating about the cardinality and frequency of the shard key.
+    tassert(ErrorCodes::IllegalOperation,
+            "Cannot analyze the characteristics of a shard key for an empty collection",
+            cardinalityFrequencyMetrics.numDocs > 0);
+
     metrics.setNumDocs(cardinalityFrequencyMetrics.numDocs);
     metrics.setNumDistinctValues(cardinalityFrequencyMetrics.numDistinctValues);
     metrics.setMostCommonValues(cardinalityFrequencyMetrics.mostCommonValues);
     // The average document size returned by $collStats can be inaccurate (or even zero) if there
     // has been an unclean shutdown since that can result in inaccurate fast data statistics. To
-    // avoid nonsensical metrics, if the collection is not empty, specify the lower limit for the
-    // average document size to the size of an empty document.
-    metrics.setAvgDocSizeBytes(cardinalityFrequencyMetrics.numDocs > 0
-                                   ? std::max(kEmptyDocSizeBytes, collStatsMetrics.avgDocSizeBytes)
-                                   : 0);
+    // avoid nonsensical metrics, set the lower limit for the average document size to the size of
+    // an empty document.
+    metrics.setAvgDocSizeBytes(std::max(kEmptyDocSizeBytes, collStatsMetrics.avgDocSizeBytes));
     metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
 
     LOGV2(7790007,

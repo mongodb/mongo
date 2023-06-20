@@ -164,6 +164,11 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     function validateKeyCharacteristicsMetrics(metrics) {
+        assert.gt(metrics.numDocs, 0, metrics);
+        assert.gt(metrics.numDistinctValues, 0, metrics);
+        assert.gt(metrics.mostCommonValues.length, 0, metrics);
+        assert.gt(metrics.avgDocSizeBytes, 0, metrics);
+
         assert.gte(metrics.numDocs, metrics.numDistinctValues, metrics);
         assert.gte(metrics.numDistinctValues, metrics.mostCommonValues.length, metrics);
 
@@ -187,8 +192,6 @@ var AnalyzeShardKeyUtil = (function() {
             assert.gte(Math.abs(coefficient), 0, metrics);
             assert.lte(Math.abs(coefficient), 1, metrics);
         }
-
-        assert.gt(metrics.avgDocSizeBytes, 0);
     }
 
     function assertNotContainKeyCharacteristicsMetrics(metrics) {

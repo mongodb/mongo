@@ -12,6 +12,7 @@
 (function() {
 "use strict";
 
+load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 
@@ -148,7 +149,7 @@ function runTest(conn, {rst, st}) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXAfter, {
         numDocs: docs.length,
         isUnique: false,
         numDistinctValues: numDistinctXValues,
@@ -179,6 +180,36 @@ function runTest(conn, {rst, st}) {
         numMostCommonValues
     });
     assert.eq(resYAfter.avgDocSizeBytes, Object.bsonsize({}));
+
+    let runAnalyzeShardKeyCmd = (host, ns, key) => {
+        const conn = new Mongo(host);
+        return conn.adminCommand({
+            analyzeShardKey: ns,
+            key: key,
+            // Skip calculating the read and write distribution metrics since there are not needed
+            // by this test.
+            readWriteDistribution: false
+        });
+    };
+
+    for (let shardKey of [{x: 1}, {y: 1}]) {
+        jsTest.log(
+            "Verify that the analyzeShardKey command fails when the collection is actually empty " +
+            tojson({shardKey}));
+        const analyzeShardKeyThread = new Thread(runAnalyzeShardKeyCmd, conn.host, ns, shardKey);
+        const fp =
+            configureFailPoint(st ? st.rs0.nodes[0] : rst.nodes[0],
+                               "analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics");
+        analyzeShardKeyThread.start();
+        fp.wait();
+        // Delete all documents in the collection.
+        assert.commandWorked(coll.remove({}));
+        fp.off();
+        assert.commandFailedWithCode(analyzeShardKeyThread.returnData(),
+                                     ErrorCodes.IllegalOperation);
+        // Reinsert the documents.
+        assert.commandWorked(coll.insert(docs));
+    }
 }
 
 {
