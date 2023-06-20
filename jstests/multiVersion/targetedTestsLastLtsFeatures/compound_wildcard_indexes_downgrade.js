@@ -125,5 +125,22 @@ const keyPattern = {
     conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: lastLTSVersion, noCleanData: true});
 
     MongoRunner.stopMongod(conn);
+
+    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latestVersion, noCleanData: true});
+    db = conn.getDB(dbNameTest);
+    coll = db[collName];
+    coll.dropIndexes();
+
+    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: '7.0'}));
+    // Create a CWI under latest FCV.
+    assert.commandWorked(coll.createIndex({"b.$**": 1, c: 1}));
+
+    // Downgrade FCV to 6.0.
+    assert.commandWorked(db.adminCommand({setFeatureCompatibilityVersion: '6.0'}));
+
+    MongoRunner.stopMongod(conn);
+    // We should be able to start a mongod even if there exists a CWI.
+    conn = MongoRunner.runMongod({dbpath: dbpath, binVersion: latestVersion, noCleanData: true});
+    MongoRunner.stopMongod(conn);
 }
 })();

@@ -135,7 +135,7 @@ BSONObj buildRepairedIndexSpec(
 
 Status validateKeyPattern(const BSONObj& key,
                           IndexDescriptor::IndexVersion indexVersion,
-                          bool inCollValidation) {
+                          bool checkFCV) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 
     if (key.objsize() > 2048)
@@ -158,7 +158,7 @@ Status validateKeyPattern(const BSONObj& key,
     // still be able to use the feature even if the FCV is downgraded.
     auto compoundWildcardIndexesAllowed =
         feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe();
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && !inCollValidation) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && checkFCV) {
         compoundWildcardIndexesAllowed =
             feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
                 serverGlobalParams.featureCompatibility);
@@ -336,7 +336,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
 
 StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
                                       const BSONObj& indexSpec,
-                                      bool inCollValidation) {
+                                      bool checkFCV) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
@@ -389,8 +389,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
 
             // Here we always validate the key pattern according to the most recent rules, in order
             // to enforce that all new indexes have well-formed key patterns.
-            Status keyPatternValidateStatus = validateKeyPattern(
-                keyPattern, IndexDescriptor::kLatestIndexVersion, inCollValidation);
+            Status keyPatternValidateStatus =
+                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion, checkFCV);
             if (!keyPatternValidateStatus.isOK()) {
                 return keyPatternValidateStatus;
             }
@@ -738,10 +738,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
     }
 
     if (hasOriginalSpecField) {
-        StatusWith<BSONObj> modifiedOriginalSpec =
-            validateIndexSpec(opCtx,
-                              indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
-                              inCollValidation);
+        StatusWith<BSONObj> modifiedOriginalSpec = validateIndexSpec(
+            opCtx, indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName), checkFCV);
         if (!modifiedOriginalSpec.isOK()) {
             return modifiedOriginalSpec.getStatus();
         }
@@ -997,13 +995,15 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
         !indexDesc.isSparse();
 }
 
-BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx,
+                                   const BSONObj& indexSpecObj,
+                                   bool checkFCV) {
     constexpr auto k_id_ = "_id_"_sd;
     constexpr auto kStar = "*"_sd;
 
     BSONObj parsedIndexSpec = indexSpecObj;
 
-    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
+    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec, checkFCV);
     uassertStatusOK(indexSpecStatus.getStatus().withContext(
         str::stream() << "Error in specification " << parsedIndexSpec.toString()));
 
