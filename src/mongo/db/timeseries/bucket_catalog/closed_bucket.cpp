@@ -33,15 +33,7 @@ namespace mongo::timeseries::bucket_catalog {
 
 ClosedBucket::~ClosedBucket() {
     if (_bucketStateRegistry) {
-        changeBucketState(
-            *_bucketStateRegistry,
-            bucketId,
-            [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-                uassert(7443900,
-                        "Expected bucket to be pending compression",
-                        input.has_value() && input->isSet(BucketStateFlag::kPendingCompression));
-                return boost::none;
-            });
+        removeDirectWrite(*_bucketStateRegistry, bucketId);
     }
 }
 
@@ -51,15 +43,7 @@ ClosedBucket::ClosedBucket(BucketStateRegistry* bsr,
                            boost::optional<uint32_t> nm)
     : bucketId{bucketId}, timeField{tf}, numMeasurements{nm}, _bucketStateRegistry{bsr} {
     invariant(_bucketStateRegistry);
-    changeBucketState(
-        *_bucketStateRegistry,
-        bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            uassert(7443901,
-                    "Expected bucket to be in normal state",
-                    input.has_value() && !input->conflictsWithInsertion());
-            return input.value().setFlag(BucketStateFlag::kPendingCompression);
-        });
+    addDirectWrite(*_bucketStateRegistry, bucketId, /*stopTracking*/ true);
 }
 
 ClosedBucket::ClosedBucket(ClosedBucket&& other)

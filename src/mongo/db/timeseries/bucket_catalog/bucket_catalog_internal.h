@@ -70,6 +70,11 @@ enum class RemovalMode {
 enum class IgnoreBucketState { kYes, kNo };
 
 /**
+ * Mode enum to control whether we prepare or unprepare a bucket.
+ */
+enum class BucketPrepareAction { kPrepare, kUnprepare };
+
+/**
  * Maps bucket key to the stripe that is responsible for it.
  */
 StripeNumber getStripeNumber(const BucketKey& key);
@@ -102,13 +107,13 @@ Bucket* useBucket(BucketStateRegistry& registry,
                   IgnoreBucketState mode);
 
 /**
- * Retrieve a bucket for write use, updating the state in the process.
+ * Retrieve a bucket for write use and prepare/unprepare the 'BucketState'.
  */
-Bucket* useBucketAndChangeState(BucketStateRegistry& registry,
-                                Stripe& stripe,
-                                WithLock stripeLock,
-                                const BucketId& bucketId,
-                                const BucketStateRegistry::StateChangeFn& change);
+Bucket* useBucketAndChangePreparedState(BucketStateRegistry& registry,
+                                        Stripe& stripe,
+                                        WithLock stripeLock,
+                                        const BucketId& bucketId,
+                                        BucketPrepareAction prepare);
 
 /**
  * Retrieve the open bucket for write use if one exists. If none exists and 'mode' is set to kYes,

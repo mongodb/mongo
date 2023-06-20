@@ -185,15 +185,12 @@ Status prepareCommit(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch) 
     internal::waitToCommitBatch(catalog.bucketStateRegistry, stripe, batch);
 
     stdx::lock_guard stripeLock{stripe.mutex};
-    Bucket* bucket = internal::useBucketAndChangeState(
-        catalog.bucketStateRegistry,
-        stripe,
-        stripeLock,
-        batch->bucketHandle.bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(input.has_value());
-            return input.value().setFlag(BucketStateFlag::kPrepared);
-        });
+    Bucket* bucket =
+        internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
+                                                  stripe,
+                                                  stripeLock,
+                                                  batch->bucketHandle.bucketId,
+                                                  internal::BucketPrepareAction::kPrepare);
 
     if (isWriteBatchFinished(*batch)) {
         // Someone may have aborted it while we were waiting. Since we have the prepared batch, we
@@ -231,15 +228,12 @@ boost::optional<ClosedBucket> finish(BucketCatalog& catalog,
     auto& stripe = catalog.stripes[batch->bucketHandle.stripe];
     stdx::lock_guard stripeLock{stripe.mutex};
 
-    Bucket* bucket = internal::useBucketAndChangeState(
-        catalog.bucketStateRegistry,
-        stripe,
-        stripeLock,
-        batch->bucketHandle.bucketId,
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            invariant(input.has_value());
-            return input.value().unsetFlag(BucketStateFlag::kPrepared);
-        });
+    Bucket* bucket =
+        internal::useBucketAndChangePreparedState(catalog.bucketStateRegistry,
+                                                  stripe,
+                                                  stripeLock,
+                                                  batch->bucketHandle.bucketId,
+                                                  internal::BucketPrepareAction::kUnprepare);
     if (bucket) {
         bucket->preparedBatch.reset();
     }
@@ -313,51 +307,24 @@ void abort(BucketCatalog& catalog, std::shared_ptr<WriteBatch> batch, const Stat
 
 void directWriteStart(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid) {
     invariant(!ns.isTimeseriesBucketsCollection());
-    auto result = changeBucketState(
-        registry,
-        BucketId{ns, oid},
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            if (input.has_value()) {
-                if (input.value().isPrepared()) {
-                    return input.value();
-                }
-                return input.value().addDirectWrite();
-            }
-            // The underlying bucket isn't tracked by the catalog, but we need to insert a state
-            // here so that we can conflict reopening this bucket until we've completed our write
-            // and the reader has refetched.
-            return BucketState{}.setFlag(BucketStateFlag::kUntracked).addDirectWrite();
-        });
-    if (result.has_value() && result.value().isPrepared()) {
-        hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
-        throwWriteConflictException("Prepared bucket can no longer be inserted into.");
-    }
+    auto state = addDirectWrite(registry, BucketId{ns, oid});
     hangTimeseriesDirectModificationAfterStart.pauseWhileSet();
+
+    if (stdx::holds_alternative<DirectWriteCounter>(state)) {
+        // The direct write count was successfully incremented.
+        return;
+    }
+
+    // We cannot perform direct writes on prepared buckets.
+    invariant(isBucketStatePrepared(state));
+    hangTimeseriesDirectModificationBeforeWriteConflict.pauseWhileSet();
+    throwWriteConflictException("Prepared bucket can no longer be inserted into.");
 }
 
 void directWriteFinish(BucketStateRegistry& registry, const NamespaceString& ns, const OID& oid) {
     invariant(!ns.isTimeseriesBucketsCollection());
     hangTimeseriesDirectModificationBeforeFinish.pauseWhileSet();
-    (void)changeBucketState(
-        registry,
-        BucketId{ns, oid},
-        [](boost::optional<BucketState> input, std::uint64_t) -> boost::optional<BucketState> {
-            if (!input.has_value()) {
-                // We may have had multiple direct writes to this document in the same storage
-                // transaction. If so, a previous call to directWriteFinish may have cleaned up the
-                // state.
-                return boost::none;
-            }
-
-            auto& modified = input.value().removeDirectWrite();
-            if (!modified.isSet(BucketStateFlag::kPendingDirectWrite) &&
-                modified.isSet(BucketStateFlag::kUntracked)) {
-                // The underlying bucket is no longer tracked by the catalog, so we can clean up the
-                // state.
-                return boost::none;
-            }
-            return modified;
-        });
+    removeDirectWrite(registry, BucketId{ns, oid});
 }
 
 void clear(BucketCatalog& catalog, ShouldClearFn&& shouldClear) {

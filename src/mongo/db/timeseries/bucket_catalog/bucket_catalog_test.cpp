@@ -833,7 +833,7 @@ TEST_F(BucketCatalogTest, PrepareCommitOnClearedBatchWithAlreadyPreparedBatch) {
     ASSERT_EQ(batch1->bucketHandle.bucketId, batch2->bucketHandle.bucketId);
 
     // Now clear the bucket. Since there's a prepared batch it should conflict.
-    clear(*_bucketCatalog, _ns1);
+    clearBucketState(_bucketCatalog->bucketStateRegistry, batch1->bucketHandle.bucketId);
 
     // Now try to prepare the second batch. Ensure it aborts the batch.
     ASSERT(claimWriteBatchCommitRights(*batch2));
@@ -1038,6 +1038,7 @@ TEST_F(BucketCatalogTest, AbortingBatchEnsuresBucketIsEventuallyClosed) {
     // Wait for the batch 2 task to finish preparing commit. Since batch 1 finished, batch 2 should
     // be unblocked. Note that after aborting batch 3, batch 2 was not in a prepared state, so we
     // expect the prepareCommit() call to fail.
+    ASSERT_NOT_OK(prepareCommit(*_bucketCatalog, batch2));
     ASSERT(isWriteBatchFinished(*batch2));
 
     // Make sure a new batch ends up in a new bucket.

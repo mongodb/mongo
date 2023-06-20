@@ -14,7 +14,6 @@ env.Library(
         'bucket_catalog_server_status.cpp',
         'bucket_identifiers.cpp',
         'bucket_metadata.cpp',
-        'bucket_state.cpp',
         'bucket_state_registry.cpp',
         'closed_bucket.cpp',
         'execution_stats.cpp',
