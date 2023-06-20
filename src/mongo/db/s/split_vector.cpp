@@ -119,9 +119,10 @@ std::vector<BSONObj> splitVector(OperationContext* opCtx,
             maxChunkSizeBytes = dataSize;
         }
 
-        // We need a maximum size for the chunk.
+        // If the collection is empty, cannot use split with find or bounds option.
         if (!maxChunkSizeBytes || maxChunkSizeBytes.value() <= 0) {
-            uasserted(ErrorCodes::InvalidOptions, "need to specify the desired max chunk size");
+            uasserted(ErrorCodes::InvalidOptions,
+                      "cannot use split with find or bounds option on an empty collection");
         }
 
         // If there's not enough data for more than one chunk, no point continuing.
