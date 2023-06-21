@@ -69,6 +69,7 @@ const expectedParamDefaults = {
     internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
     deprioritizeUnboundedUserCollectionScans: true,
     deprioritizeUnboundedUserIndexScans: true,
+    documentSourceWriterBatchBuffer: 0,
 };
 
 function assertDefaultParameterValues() {
