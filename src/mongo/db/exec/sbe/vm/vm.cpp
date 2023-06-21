@@ -3778,7 +3778,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(A
         case value::TypeTags::Date: {
             std::string str = str::stream()
                 << TimeZoneDatabase::utcZone().formatDate(
-                       kISOFormatString,
+                       kIsoFormatStringZ,
                        Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(operandVal)));
             auto [strTag, strVal] = value::makeNewString(str);
             return {true, strTag, strVal};

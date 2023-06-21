@@ -47,7 +47,12 @@ struct _timelib_tzinfo;
 namespace mongo {
 
 using namespace std::string_literals;
-static constexpr StringData kISOFormatString = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
+
+/**
+ * Default format values for date-times, e.g. for $dateToString aggregations.
+ */
+static constexpr StringData kIsoFormatStringZ = "%Y-%m-%dT%H:%M:%S.%LZ"_sd;
+static constexpr StringData kIsoFormatStringNonZ = "%Y-%m-%dT%H:%M:%S.%L"_sd;
 
 /**
  * A set of standard measures of time used to express a length of time interval.

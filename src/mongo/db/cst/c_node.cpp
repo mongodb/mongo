@@ -126,8 +126,8 @@ auto printValue(const T& payload) {
             [](const UserDate& userDate) {
                 return "<UserDate "s +
                     [&] {
-                        if (auto string = TimeZoneDatabase::utcZone().formatDate(
-                                "%Y-%m-%dT%H:%M:%S.%LZ", userDate);
+                        if (auto string =
+                                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, userDate);
                             string.isOK())
                             return string.getValue();
                         else

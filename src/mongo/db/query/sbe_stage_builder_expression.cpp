@@ -1837,16 +1837,17 @@ public:
                               (expr->isOnNullSpecified() ? 1 : 0));
 
         // Get child expressions.
-        auto onNullExpression =
+        optimizer::ABT onNullExpression =
             expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
 
-        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
-                                                              : optimizer::Constant::str("UTC"_sd);
-        auto dateExpression = _context->popABTExpr();
-
-        auto formatExpression = expr->isFormatSpecified()
+        optimizer::ABT timezoneExpression = expr->isTimezoneSpecified()
             ? _context->popABTExpr()
-            : optimizer::Constant::str("%Y-%m-%dT%H:%M:%S.%LZ"_sd);
+            : optimizer::Constant::str("UTC"_sd);
+        optimizer::ABT dateExpression = _context->popABTExpr();
+
+        optimizer::ABT formatExpression = expr->isFormatSpecified()
+            ? _context->popABTExpr()
+            : optimizer::Constant::str(kIsoFormatStringZ);  // assumes UTC until disproven
 
         auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
@@ -1862,19 +1863,6 @@ public:
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto dateVar = makeVariable(dateName);
 
-        // Set parameters for an invocation of built-in "dateToString" function.
-        optimizer::ABTVector arguments;
-        arguments.push_back(timeZoneDBVar);
-        arguments.push_back(dateExpression);
-        arguments.push_back(formatExpression);
-        arguments.push_back(timezoneExpression);
-
-        // Create an expression to invoke built-in "dateToString" function.
-        auto dateToStringFunctionCall =
-            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
-        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto dateToStringVar = makeVariable(dateToStringName);
-
         // Create expressions to check that each argument to "dateToString" function exists, is not
         // null, and is of the correct type.
         std::vector<ABTCaseValuePair> inputValidationCases;
@@ -1888,6 +1876,37 @@ public:
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
             dateVar, ErrorCodes::Error{4997901}, "$dateToString"_sd, "date"_sd));
+
+        // "timezone" parameter validation.
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+            timezoneExpressionConst) {
+            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
+            if (!sbe::value::isNullish(timezoneTag)) {
+                // If the query did not specify a format string and a non-UTC timezone was
+                // specified, the default format should not use a 'Z' suffix.
+                if (!expr->isFormatSpecified() &&
+                    !(sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB).isUtcZone())) {
+                    formatExpression = optimizer::Constant::str(kIsoFormatStringNonZ);
+                }
+
+                // We don't want to error on null.
+                uassert(4997905,
+                        "$dateToString parameter 'timezone' must be a string",
+                        sbe::value::isString(timezoneTag));
+                uassert(4997906,
+                        "$dateToString parameter 'timezone' must be a valid timezone",
+                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+            }
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(timezoneExpression),
+                makeABTFail(ErrorCodes::Error{4997907},
+                            "$dateToString parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
+                makeABTFail(ErrorCodes::Error{4997908},
+                            "$dateToString parameter 'timezone' must be a valid timezone"));
+        }
 
         // "format" parameter validation.
         if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
@@ -1911,29 +1930,18 @@ public:
                             "$dateToString parameter 'format' must be a valid format"));
         }
 
-        // "timezone" parameter validation.
-        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
-            timezoneExpressionConst) {
-            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
-            if (!sbe::value::isNullish(timezoneTag)) {
-                // We don't want to error on null.
-                uassert(4997905,
-                        "$dateToString parameter 'timezone' must be a string",
-                        sbe::value::isString(timezoneTag));
-                uassert(4997906,
-                        "$dateToString parameter 'timezone' must be a valid timezone",
-                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
-            }
-        } else {
-            inputValidationCases.emplace_back(
-                generateABTNonStringCheck(timezoneExpression),
-                makeABTFail(ErrorCodes::Error{4997907},
-                            "$dateToString parameter 'timezone' must be a string"));
-            inputValidationCases.emplace_back(
-                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
-                makeABTFail(ErrorCodes::Error{4997908},
-                            "$dateToString parameter 'timezone' must be a valid timezone"));
-        }
+        // Set parameters for an invocation of built-in "dateToString" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(timeZoneDBVar);
+        arguments.push_back(dateExpression);
+        arguments.push_back(formatExpression);
+        arguments.push_back(timezoneExpression);
+
+        // Create an expression to invoke built-in "dateToString" function.
+        auto dateToStringFunctionCall =
+            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
+        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateToStringVar = makeVariable(dateToStringName);
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),

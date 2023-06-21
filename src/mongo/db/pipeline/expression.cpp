@@ -2048,7 +2048,8 @@ Value ExpressionDateToString::evaluate(const Document& root, Variables* variable
             timeZone->formatDate(formatValue.getStringData(), date.coerceToDate())));
     }
 
-    return Value(uassertStatusOK(timeZone->formatDate(kISOFormatString, date.coerceToDate())));
+    return Value(uassertStatusOK(timeZone->formatDate(
+        timeZone->isUtcZone() ? kIsoFormatStringZ : kIsoFormatStringNonZ, date.coerceToDate())));
 }
 
 /* ----------------------- ExpressionDateDiff ---------------------------- */
@@ -6556,7 +6557,7 @@ public:
         table[BSONType::Date][BSONType::String] = [](ExpressionContext* const expCtx,
                                                      Value inputValue) {
             auto dateString = uassertStatusOK(
-                TimeZoneDatabase::utcZone().formatDate(kISOFormatString, inputValue.getDate()));
+                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, inputValue.getDate()));
             return Value(dateString);
         };
         table[BSONType::Date][BSONType::Bool] = [](ExpressionContext* const expCtx,

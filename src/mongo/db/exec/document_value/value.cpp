@@ -666,7 +666,7 @@ string Value::coerceToString() const {
 
         case Date:
             return uassertStatusOKWithContext(
-                TimeZoneDatabase::utcZone().formatDate(kISOFormatString, getDate()),
+                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, getDate()),
                 "failed while coercing date to string");
 
         case EOO:
@@ -1235,7 +1235,7 @@ ostream& operator<<(ostream& out, const Value& val) {
             return out << "undefined";
         case Date:
             return out << [&] {
-                if (auto string = TimeZoneDatabase::utcZone().formatDate(kISOFormatString,
+                if (auto string = TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ,
                                                                          val.coerceToDate());
                     string.isOK())
                     return string.getValue();
