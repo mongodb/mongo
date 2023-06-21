@@ -215,7 +215,8 @@ Status initializeBucketState(BucketStateRegistry& registry,
     } else if (conflictsWithReopening(it->second)) {
         // If the bucket is cleared or we are currently performing direct writes on it we cannot
         // initialize the bucket to a normal state.
-        return {ErrorCodes::WriteConflict, "Bucket may be stale"};
+        return {ErrorCodes::WriteConflict,
+                "Bucket initialization failed: conflict with an exisiting bucket"};
     }
 
     invariant(!isBucketStatePrepared(it->second));
