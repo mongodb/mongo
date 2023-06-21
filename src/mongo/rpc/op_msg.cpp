@@ -292,7 +292,7 @@ void appendDollarDbAndTenant(BSONObjBuilder& builder,
                              boost::optional<TenantId> existingDollarTenant = boost::none) {
     if (!dbName.tenantId() ||
         appendDollarTenant(builder, dbName.tenantId().value(), existingDollarTenant)) {
-        builder.append("$db", dbName.db());
+        builder.append("$db", dbName.serializeWithoutTenantPrefix());
     } else {
         builder.append("$db", DatabaseNameUtil::serialize(dbName));
     }

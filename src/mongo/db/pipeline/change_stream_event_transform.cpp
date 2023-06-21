@@ -66,7 +66,7 @@ repl::OpTypeEnum getOplogOpType(const Document& oplog) {
 Value makeChangeStreamNsField(const NamespaceString& nss) {
     // For certain types, such as dropDatabase, the collection name may be empty and should be
     // omitted. We never report the NamespaceString's tenantId in change stream events.
-    return Value(Document{{"db", nss.dbName().db()},
+    return Value(Document{{"db", nss.dbName().serializeWithoutTenantPrefix()},
                           {"coll", (nss.coll().empty() ? Value() : Value(nss.coll()))}});
 }
 

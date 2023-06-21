@@ -1029,8 +1029,9 @@ void DocumentSourceLookUp::serializeToArray(std::vector<Value>& array,
     // Do not include the tenantId in serialized 'from' namespace.
     auto fromValue = (pExpCtx->ns.db() == _fromNs.db())
         ? Value(opts.serializeIdentifier(_fromNs.coll()))
-        : Value(Document{{"db", opts.serializeIdentifier(_fromNs.dbName().db())},
-                         {"coll", opts.serializeIdentifier(_fromNs.coll())}});
+        : Value(Document{
+              {"db", opts.serializeIdentifier(_fromNs.dbName().serializeWithoutTenantPrefix())},
+              {"coll", opts.serializeIdentifier(_fromNs.coll())}});
 
     MutableDocument output(Document{
         {getSourceName(), Document{{"from", fromValue}, {"as", opts.serializeFieldPath(_as)}}}});

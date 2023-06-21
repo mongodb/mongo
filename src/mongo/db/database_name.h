@@ -135,7 +135,9 @@ public:
 
         return TenantId{OID::from(&_data[kDataOffset])};
     }
-
+    /**
+     * This function is deprecated. TODO SERVER-77537 Make db() private.
+     */
     StringData db() const {
         auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
         return StringData{_data.data() + offset, _data.size() - offset};
@@ -155,6 +157,14 @@ public:
     }
     bool isExternalDB() const {
         return db() == DatabaseName::kExternal.db();
+    }
+
+    /**
+     * Serialize the db name to stirng, always ignoring the tenantId.
+     * This function should only be used when no available serialize context.
+     */
+    std::string serializeWithoutTenantPrefix() const {
+        return db().toString();
     }
 
     /**

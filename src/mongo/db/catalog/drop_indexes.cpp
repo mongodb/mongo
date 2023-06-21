@@ -612,7 +612,7 @@ Status dropIndexesForApplyOps(OperationContext* opCtx,
                               const NamespaceString& nss,
                               const BSONObj& cmdObj) try {
     BSONObjBuilder bob(cmdObj);
-    bob.append("$db", nss.dbName().db());
+    bob.append("$db", nss.dbName().serializeWithoutTenantPrefix());
     auto cmdObjWithDb = bob.obj();
     auto parsed = DropIndexes::parse(
         IDLParserContext{"dropIndexes", false /* apiStrict */, nss.tenantId()}, cmdObjWithDb);
