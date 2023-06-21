@@ -60,6 +60,7 @@ const expectedParamDefaults = {
     internalQuerySlotBasedExecutionDisableLookupPushdown: false,
     internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
+    documentSourceWriterBatchBuffer: 0,
 };
 
 function assertDefaultParameterValues() {

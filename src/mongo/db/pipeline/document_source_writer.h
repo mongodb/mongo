@@ -36,6 +36,7 @@
 #include "mongo/db/db_raii.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
@@ -245,13 +246,16 @@ DocumentSource::GetNextResult DocumentSourceWriter<B>::doGetNext() {
         // While most metadata attached to a command is limited to less than a KB,
         // Impersonation metadata may grow to an arbitrary size.
         // Ask the active Client how much impersonation metadata we'll use for it,
-        // and assume the rest can fit in the 16KB already built into BSONObjMaxUserSize.
+        // add in our own estimate of write header size, and assume that the rest can fit
+        // in the space reserved by BSONObjMaxUserSize's overhead plus
+        // the value from the server parameter: documentSourceWriterBatchBuffer.
         const auto estimatedMetadataSizeBytes =
             rpc::estimateImpersonatedUserMetadataSize(pExpCtx->opCtx);
 
         BatchedCommandRequest batchWrite = initializeBatchedWriteRequest();
         const auto writeHeaderSize = estimateWriteHeaderSize(batchWrite);
-        const auto initialRequestSize = estimatedMetadataSizeBytes + writeHeaderSize;
+        const auto initialRequestSize =
+            estimatedMetadataSizeBytes + writeHeaderSize + gDocumentSourceWriterBatchBufferBytes;
 
         uassert(7637800,
                 "Unable to proceed with write while metadata size ({}KB) exceeds {}KB"_format(
