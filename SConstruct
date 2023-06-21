@@ -2173,19 +2173,33 @@ use_libunwind = get_option("use-libunwind")
 use_system_libunwind = use_system_version_of_library("libunwind")
 
 # Assume system libunwind works if it's installed and selected.
-can_use_libunwind = (use_system_libunwind or env.TargetOSIs('linux') and
-                     (env['TARGET_ARCH'] in ('x86_64', 'aarch64', 'ppc64le', 's390x')))
+# TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
+can_use_libunwind_arch = env.TargetOSIs(
+    'linux') and env['TARGET_ARCH'] == 'aarch64' and not debugBuild
+can_use_libunwind = (use_system_libunwind
+                     or (env.TargetOSIs('linux')
+                         and env['TARGET_ARCH'] in ('x86_64', 'ppc64le', 's390x'))
+                     or can_use_libunwind_arch)
 
 if use_libunwind == "off":
     use_libunwind = False
     use_system_libunwind = False
 elif use_libunwind == "on":
     use_libunwind = True
+    # TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
     if not can_use_libunwind:
-        env.ConfError("libunwind not supported on target platform")
+        if not can_use_libunwind_arch:
+            env.ConfError(
+                "libunwind not supported on amd64 with debug build see SERVER-75120. Recompile with '--use-libunwind=off'"
+            )
+        env.ConfError("libunwind not supported on target platform.")
         Exit(1)
 elif use_libunwind == "auto":
     use_libunwind = can_use_libunwind
+
+# TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
+if not can_use_libunwind_arch:
+    env.Append(LINKFLAGS=['-rdynamic'])
 
 use_vendored_libunwind = use_libunwind and not use_system_libunwind
 if use_system_libunwind and not use_libunwind:
