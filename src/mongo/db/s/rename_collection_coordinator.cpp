@@ -520,14 +520,6 @@ ExecutorFuture<void> RenameCollectionCoordinator::_runImpl(
                     sharding_ddl_util::getCriticalSectionReasonForRename(fromNss, toNss);
 
                 try {
-                    uassert(ErrorCodes::IllegalOperation,
-                            "Renaming a timeseries collection is not allowed",
-                            !fromNss.isTimeseriesBucketsCollection());
-
-                    uassert(ErrorCodes::IllegalOperation,
-                            "Renaming to a bucket namespace is not allowed",
-                            !toNss.isTimeseriesBucketsCollection());
-
                     uassert(ErrorCodes::InvalidOptions,
                             "Cannot provide an expected collection UUID when renaming between "
                             "databases",
