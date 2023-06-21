@@ -35,6 +35,7 @@
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 
 namespace mongo {
@@ -64,7 +65,9 @@ public:
         const auto commandResponse = dbClient.runCommand([&] {
             write_ops::Insert insertOp(_storageNss);
             insertOp.setDocuments({task.toBSON()});
-            return insertOp.serialize({});
+            auto op = insertOp.serialize(
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions().toBSON()));
+            return op;
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -93,7 +96,8 @@ public:
             updateEntry.setUpsert(false);
             updateOp.setUpdates({updateEntry});
 
-            return updateOp.serialize({});
+            return updateOp.serialize(
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions().toBSON()));
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
@@ -124,7 +128,8 @@ public:
                 return entry;
             }()});
 
-            return deleteOp.serialize({});
+            return deleteOp.serialize(
+                BSON(WriteConcernOptions::kWriteConcernField << WriteConcernOptions().toBSON()));
         }());
 
         const auto commandReply = commandResponse->getCommandReply();
