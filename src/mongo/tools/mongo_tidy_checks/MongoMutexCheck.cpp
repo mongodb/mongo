@@ -38,20 +38,18 @@ MongoMutexCheck::MongoMutexCheck(StringRef Name, clang::tidy::ClangTidyContext* 
     : ClangTidyCheck(Name, Context) {}
 
 void MongoMutexCheck::registerMatchers(ast_matchers::MatchFinder* Finder) {
-    // TODO: SERVER-74929 Remove the NOLINT comment below after we remove _check_for_mongo_polyfill
-    // check from simplecpplint.py
     // This matcher finds variable declarations (outside of structs/classes) with a type of either
     // std::mutex or stdx::mutex. It works by matching variable declarations whose type, when
     // reduced to its canonical form, has a declaration named "::std::mutex".
     Finder->addMatcher(varDecl(hasType(qualType(hasCanonicalType(
-                                   hasDeclaration(namedDecl(hasName("::std::mutex")))))))  // NOLINT
+                                   hasDeclaration(namedDecl(hasName("::std::mutex")))))))
                            .bind("mutex_var"),
                        this);
 
     // This matcher finds field declarations (inside structs/classes) with a type of either
     // std::mutex or stdx::mutex.
-    Finder->addMatcher(fieldDecl(hasType(qualType(hasCanonicalType(hasDeclaration(
-                                     namedDecl(hasName("::std::mutex")))))))  // NOLINT
+    Finder->addMatcher(fieldDecl(hasType(qualType(hasCanonicalType(
+                                     hasDeclaration(namedDecl(hasName("::std::mutex")))))))
                            .bind("mutex_field"),
                        this);
 }
