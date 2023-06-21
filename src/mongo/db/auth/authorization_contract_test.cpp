@@ -192,7 +192,5 @@ TEST(AuthContractTest, NonTestModeCheck) {
                                             ActionType::reshardCollection)));
 }
 
-// TODO SERVER-77940 Add tests for forAnyNormalResource with boost::none vs tenantId.
-
 }  // namespace
 }  // namespace mongo
