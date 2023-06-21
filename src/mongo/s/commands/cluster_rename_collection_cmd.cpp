@@ -75,6 +75,21 @@ public:
                     "Can't rename a collection to itself",
                     fromNss != toNss);
 
+            if (fromNss.isTimeseriesBucketsCollection()) {
+                uassert(
+                    ErrorCodes::IllegalOperation,
+                    "Renaming system.buckets collections is not allowed",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                           ActionType::setUserWriteBlockMode));
+
+                uassert(ErrorCodes::IllegalOperation,
+                        str::stream()
+                            << "Cannot rename time-series buckets collection {" << fromNss.ns()
+                            << "} to a non-time-series buckets namespace {" << toNss.ns() << "}",
+                        toNss.isTimeseriesBucketsCollection());
+            }
+
             RenameCollectionRequest renameCollReq(request().getTo());
             renameCollReq.setStayTemp(request().getStayTemp());
             renameCollReq.setExpectedSourceUUID(request().getCollectionUUID());

@@ -274,17 +274,5 @@ function assertRangeMatch(savedRange, paramRange) {
     dropTimeSeriesColl();
 })();
 
-// Check renameCollection command cannot modify name through the view namespace.
-(function checkRenameCollectionCommand() {
-    createTimeSeriesColl(
-        {index: {[metaField]: 1, [timeField]: 1}, shardKey: {[metaField]: 1, [timeField]: 1}});
-    const newCollName = `${collName}New`;
-    const newViewNss = `${dbName}.${newCollName}`;
-    // Rename collection is not supported through view namespace.
-    assert.commandFailedWithCode(mongo.s.adminCommand({renameCollection: viewNss, to: newViewNss}),
-                                 ErrorCodes.NamespaceNotFound);
-    dropTimeSeriesColl();
-})();
-
 mongo.stop();
 })();

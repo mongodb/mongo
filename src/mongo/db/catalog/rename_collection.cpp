@@ -863,9 +863,18 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.views collection or renaming to system.views is not allowed",
             !source.isSystemDotViews() && !target.isSystemDotViews());
 
-    uassert(ErrorCodes::IllegalOperation,
-            "Renaming system.buckets collections is not allowed",
-            !source.isTimeseriesBucketsCollection());
+    if (source.isTimeseriesBucketsCollection()) {
+        uassert(ErrorCodes::IllegalOperation,
+                "Renaming system.buckets collections is not allowed",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                       ActionType::setUserWriteBlockMode));
+
+        uassert(ErrorCodes::IllegalOperation,
+                str::stream() << "Cannot rename time-series buckets collection {" << source.ns()
+                              << "} to a non-time-series buckets namespace {" << target.ns() << "}",
+                target.isTimeseriesBucketsCollection());
+    }
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,
