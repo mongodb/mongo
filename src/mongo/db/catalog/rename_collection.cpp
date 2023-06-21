@@ -863,9 +863,13 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
             "renaming system.views collection or renaming to system.views is not allowed",
             !source.isSystemDotViews() && !target.isSystemDotViews());
 
-    uassert(ErrorCodes::IllegalOperation,
-            "Renaming system.buckets collections is not allowed",
-            !source.isTimeseriesBucketsCollection());
+    if (source.isTimeseriesBucketsCollection() &&
+        !AuthorizationSession::get(opCtx->getClient())
+             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
+                                                ActionType::setUserWriteBlockMode)) {
+        uasserted(ErrorCodes::IllegalOperation,
+                  "Renaming system.buckets collections is not allowed");
+    }
 }
 
 void validateAndRunRenameCollection(OperationContext* opCtx,
