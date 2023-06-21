@@ -1184,6 +1184,20 @@ server_parameters:
       gte: 0
     on_update: plan_cache_util::clearSbeCacheOnParameterChange
 
+  deprioritizeUnboundedUserCollectionScans:
+   description: "Unbounded user collection scans are executed with low storage admission priority"
+   set_at: [ startup, runtime ]
+   cpp_varname: gDeprioritizeUnboundedUserCollectionScans
+   cpp_vartype: AtomicWord<bool>
+   default: true
+
+  deprioritizeUnboundedUserIndexScans:
+   description: "Unbounded user index scans are executed with low storage admission priority"
+   set_at: [ startup, runtime ]
+   cpp_varname: gDeprioritizeUnboundedUserIndexScans
+   cpp_vartype: AtomicWord<bool>
+   default: true
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

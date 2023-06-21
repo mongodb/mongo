@@ -220,8 +220,8 @@ void IndexScanStageBase::doDetachFromOperationContext() {
 }
 
 void IndexScanStageBase::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && _open && gDeprioritizeUnboundedUserIndexScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
     if (_cursor) {
@@ -284,8 +284,8 @@ void IndexScanStageBase::trackRead() {
 PlanState IndexScanStageBase::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_lowPriority && !_priority && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserIndexScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
 

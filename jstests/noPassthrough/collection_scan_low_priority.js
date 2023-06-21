@@ -21,7 +21,7 @@ const coll = db.coll;
 
 assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIterations: 1}));
 
-const runTest = function(options) {
+const runTest = function(options, deprioritize) {
     assert.commandWorked(db.createCollection(coll.getName(), options));
     assert.commandWorked(coll.insert({_id: 0}));
     assert.commandWorked(coll.insert({_id: 1}));
@@ -34,7 +34,11 @@ const runTest = function(options) {
     const testScanDeprioritized = function(direction) {
         const numLowPriorityBefore = numLowPriority();
         coll.find().hint({$natural: direction}).itcount();
-        assert.gt(numLowPriority(), numLowPriorityBefore);
+        if (deprioritize) {
+            assert.gt(numLowPriority(), numLowPriorityBefore);
+        } else {
+            assert.eq(numLowPriority(), numLowPriorityBefore);
+        }
     };
     testScanDeprioritized(1);
     testScanDeprioritized(-1);
@@ -42,7 +46,11 @@ const runTest = function(options) {
     const testScanSortLimitDeprioritized = function(direction) {
         const numLowPriorityBefore = numLowPriority();
         coll.find().hint({$natural: direction}).sort({_id: 1}).limit(1).itcount();
-        assert.gt(numLowPriority(), numLowPriorityBefore);
+        if (deprioritize) {
+            assert.gt(numLowPriority(), numLowPriorityBefore);
+        } else {
+            assert.eq(numLowPriority(), numLowPriorityBefore);
+        }
     };
     testScanSortLimitDeprioritized(1);
     testScanSortLimitDeprioritized(-1);
@@ -58,8 +66,13 @@ const runTest = function(options) {
     assert(coll.drop());
 };
 
-runTest({});
-runTest({clusteredIndex: {key: {_id: 1}, unique: true}});
+runTest({}, true);
+runTest({clusteredIndex: {key: {_id: 1}, unique: true}}, true);
+
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, deprioritizeUnboundedUserCollectionScans: false}));
+runTest({}, false);
+runTest({clusteredIndex: {key: {_id: 1}, unique: true}}, false);
 
 MongoRunner.stopMongod(conn);
 }());

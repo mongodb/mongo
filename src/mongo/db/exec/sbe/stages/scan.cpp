@@ -314,8 +314,8 @@ void ScanStage::doDetachFromOperationContext() {
 }
 
 void ScanStage::doAttachToOperationContext(OperationContext* opCtx) {
-    if (_lowPriority && _open && opCtx->getClient()->isFromUserConnection() &&
-        opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && _open && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx->getClient()->isFromUserConnection() && opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
     if (auto cursor = getActiveCursor()) {
@@ -417,8 +417,8 @@ value::OwnedValueAccessor* ScanStage::getFieldAccessor(StringData name, size_t o
 PlanState ScanStage::getNext() {
     auto optTimer(getOptTimer(_opCtx));
 
-    if (_lowPriority && !_priority && _opCtx->getClient()->isFromUserConnection() &&
-        _opCtx->lockState()->shouldWaitForTicket()) {
+    if (_lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        _opCtx->getClient()->isFromUserConnection() && _opCtx->lockState()->shouldWaitForTicket()) {
         _priority.emplace(_opCtx->lockState(), AdmissionContext::Priority::kLow);
     }
 

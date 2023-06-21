@@ -41,6 +41,7 @@
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -93,7 +94,8 @@ IndexScan::IndexScan(ExpressionContext* expCtx,
 }
 
 boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
-    if (_lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+    if (_lowPriority && gDeprioritizeUnboundedUserIndexScans.load() &&
+        opCtx()->getClient()->isFromUserConnection() &&
         opCtx()->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }
@@ -294,7 +296,8 @@ void IndexScan::doDetachFromOperationContext() {
 }
 
 void IndexScan::doReattachToOperationContext() {
-    if (_lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+    if (_lowPriority && gDeprioritizeUnboundedUserIndexScans.load() &&
+        opCtx()->getClient()->isFromUserConnection() &&
         opCtx()->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }

@@ -41,6 +41,7 @@
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/logv2/log.h"
@@ -139,7 +140,8 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_params.lowPriority && !_priority && opCtx()->getClient()->isFromUserConnection() &&
+    if (_params.lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx()->getClient()->isFromUserConnection() &&
         opCtx()->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }
@@ -473,7 +475,8 @@ void CollectionScan::doDetachFromOperationContext() {
 }
 
 void CollectionScan::doReattachToOperationContext() {
-    if (_params.lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+    if (_params.lowPriority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx()->getClient()->isFromUserConnection() &&
         opCtx()->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }
