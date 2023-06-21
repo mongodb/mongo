@@ -107,7 +107,7 @@ function testAnalyzeShardKeysUnshardedCollection(conn, mongodConns) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs,
         isUnique: false,
         numDistinctValues: numDocs,
@@ -173,7 +173,7 @@ function testAnalyzeShardKeysShardedCollection(st, mongodConns) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs,
         isUnique: false,
         numDistinctValues: numDocs,

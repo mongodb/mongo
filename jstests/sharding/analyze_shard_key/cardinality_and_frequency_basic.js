@@ -264,7 +264,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
         readWriteDistribution: false
     });
     if (testCase.expectMetrics) {
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0.keyCharacteristics, metrics0);
     } else {
         assert.commandFailedWithCode(res0, ErrorCodes.IllegalOperation);
     }
@@ -283,7 +283,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
         readWriteDistribution: false
     });
     if (testCase.expectMetrics) {
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1.keyCharacteristics, metrics1);
     } else {
         assert.commandFailedWithCode(res1, ErrorCodes.IllegalOperation);
     }
@@ -302,7 +302,7 @@ function testAnalyzeShardKeyNoUniqueIndex(conn, dbName, collName, currentShardKe
         readWriteDistribution: false
     });
     if (testCase.expectMetrics) {
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2.keyCharacteristics, metrics2);
     } else {
         assert.commandFailedWithCode(res2, ErrorCodes.IllegalOperation);
     }
@@ -366,7 +366,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, metrics0);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0.keyCharacteristics, metrics0);
     assert.commandWorked(coll.remove({}));
 
     // Analyze the shard key while the collection has exactly 'numMostCommonValues' distinct shard
@@ -381,7 +381,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, metrics1);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1.keyCharacteristics, metrics1);
     assert.commandWorked(coll.remove({}));
 
     // Analyze the shard key while the collection has more than 'numMostCommonValues' distinct shard
@@ -396,7 +396,7 @@ function testAnalyzeShardKeyUniqueIndex(conn, dbName, collName, currentShardKey,
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, metrics2);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2.keyCharacteristics, metrics2);
     assert.commandWorked(coll.remove({}));
 }
 
