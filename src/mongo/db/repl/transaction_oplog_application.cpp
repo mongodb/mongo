@@ -798,7 +798,10 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();
 
-            _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode);
+            // Ignore interruptions while reconstructing prepared transactions, so that we do not
+            // fassert and crash due to interruptions inside this call.
+            newOpCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                [&] { _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode); });
         }
     }
 }
