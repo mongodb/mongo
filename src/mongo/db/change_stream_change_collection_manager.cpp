@@ -616,17 +616,17 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
 namespace {
 std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
     OperationContext* opCtx,
-    const Collection* changeCollectionPtr,
+    const ScopedCollectionAcquisition& changeCollection,
     ConcurrentSharedValuesMap<UUID, ChangeCollectionTruncateMarkers, UUID::Hash>& truncateMap) {
-    auto rs = changeCollectionPtr->getRecordStore();
-    const auto& ns = changeCollectionPtr->ns();
-
-    WriteUnitOfWork wuow(opCtx);
+    const auto& ns = changeCollection.nss();
 
     auto minBytesPerMarker = gChangeCollectionTruncateMarkersMinBytes;
+
+    YieldableCollectionIterator iterator{opCtx, &changeCollection};
+
     CollectionTruncateMarkers::InitialSetOfMarkers initialSetOfMarkers =
-        CollectionTruncateMarkers::createFromExistingRecordStore(
-            opCtx, rs, ns, minBytesPerMarker, [](const Record& record) {
+        CollectionTruncateMarkers::createFromCollectionIterator(
+            opCtx, iterator, ns, minBytesPerMarker, [](const Record& record) {
                 const auto obj = record.data.toBson();
                 auto wallTime = obj[repl::OplogEntry::kWallClockTimeFieldName].Date();
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, wallTime};
@@ -635,24 +635,28 @@ std::shared_ptr<ChangeCollectionTruncateMarkers> initialiseTruncateMarkers(
     // markers and the latest collection size/count. This is susceptible to a race
     // condition, but metrics are already assumed to be approximate. Ignoring this issue is
     // a valid strategy here.
-    auto truncateMarkers = truncateMap.getOrEmplace(changeCollectionPtr->uuid(),
+    auto truncateMarkers = truncateMap.getOrEmplace(changeCollection.uuid(),
                                                     *ns.tenantId(),
                                                     std::move(initialSetOfMarkers.markers),
                                                     initialSetOfMarkers.leftoverRecordsCount,
                                                     initialSetOfMarkers.leftoverRecordsBytes,
                                                     minBytesPerMarker);
+
+    auto backScan = InternalPlanner::collectionScan(opCtx,
+                                                    &changeCollection,
+                                                    PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                    InternalPlanner::BACKWARD);
     // Update the truncate markers with the last collection entry's RecordId and wall time.
     // This is necessary for correct marker expiration. Otherwise the highest seen points
     // would be null. Nothing would expire since we have to maintain the last entry in the
     // change collection and null RecordId < any initialised RecordId. This would only get
     // fixed once an entry has been inserted, initialising the data points.
-    auto backCursor = rs->getCursor(opCtx, false);
-    if (auto obj = backCursor->next()) {
-        auto wallTime = obj->data.toBson()[repl::OplogEntry::kWallClockTimeFieldName].Date();
-        truncateMarkers->updateCurrentMarkerAfterInsertOnCommit(opCtx, 0, obj->id, wallTime, 0);
+    RecordId rId;
+    BSONObj doc;
+    if (backScan->getNext(&doc, &rId) == PlanExecutor::ADVANCED) {
+        auto wallTime = doc[repl::OplogEntry::kWallClockTimeFieldName].Date();
+        truncateMarkers->performPostInitialisation(opCtx, rId, wallTime);
     }
-
-    wuow.commit();
 
     return truncateMarkers;
 }
@@ -673,8 +677,7 @@ size_t ChangeStreamChangeCollectionManager::removeExpiredChangeCollectionsDocume
     if (!truncateMarkers) {
         writeConflictRetry(
             opCtx, "initialise change collection truncate markers", changeCollectionPtr->ns(), [&] {
-                truncateMarkers =
-                    initialiseTruncateMarkers(opCtx, changeCollectionPtr.get(), truncateMap);
+                truncateMarkers = initialiseTruncateMarkers(opCtx, changeCollection, truncateMap);
             });
     }
 

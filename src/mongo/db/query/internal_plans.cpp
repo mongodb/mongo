@@ -39,6 +39,8 @@
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/upsert_stage.h"
 #include "mongo/db/query/get_executor.h"
@@ -144,6 +146,38 @@ CollectionScanParams createCollectionScanParams(
     return params;
 }
 }  // namespace
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleCollection(
+    OperationContext* opCtx,
+    VariantCollectionPtrOrAcquisition collection,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    boost::optional<int64_t> numSamples) {
+    const auto& collectionPtr = collection.getCollectionPtr();
+    invariant(collectionPtr);
+
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+
+    auto rsRandCursor = collectionPtr->getRecordStore()->getRandomCursor(opCtx);
+    std::unique_ptr<PlanStage> root =
+        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), collectionPtr);
+    static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
+
+    if (numSamples) {
+        auto samples = *numSamples;
+        invariant(samples >= 0,
+                  "Number of samples must be >= 0, otherwise LimitStage it will never end");
+        root = std::make_unique<LimitStage>(expCtx.get(), samples, ws.get(), std::move(root));
+    }
+
+    auto statusWithPlanExecutor = plan_executor_factory::make(
+        expCtx, std::move(ws), std::move(root), collection, yieldPolicy, false);
+
+    invariant(statusWithPlanExecutor.isOK());
+    return std::move(statusWithPlanExecutor.getValue());
+}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,

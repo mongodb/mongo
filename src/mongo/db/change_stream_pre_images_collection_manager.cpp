@@ -412,7 +412,7 @@ size_t ChangeStreamPreImagesCollectionManager::_deleteExpiredPreImagesWithTrunca
 
     // Prevent unnecessary latency on an end-user write operation by intialising the truncate
     // markers lazily during the background cleanup.
-    _truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesColl.getCollectionPtr());
+    _truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesColl);
 
     auto truncateStats = _truncateManager.truncateExpiredPreImages(
         opCtx, tenantId, preImagesColl.getCollectionPtr());

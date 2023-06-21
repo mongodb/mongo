@@ -96,8 +96,11 @@ PreImagesTruncateMarkersPerNsUUID::PreImagesTruncateMarkersPerNsUUID(
 CollectionTruncateMarkers::RecordIdAndWallTime
 PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(const Record& record) {
     BSONObj preImageObj = record.data.toBson();
-    return CollectionTruncateMarkers::RecordIdAndWallTime(
-        record.id, preImageObj[ChangeStreamPreImage::kOperationTimeFieldName].date());
+    return CollectionTruncateMarkers::RecordIdAndWallTime(record.id, getWallTime(preImageObj));
+}
+
+Date_t PreImagesTruncateMarkersPerNsUUID::getWallTime(const BSONObj& preImageObj) {
+    return preImageObj[ChangeStreamPreImage::kOperationTimeFieldName].date();
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers
@@ -135,10 +138,11 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersFromSamples(
 }
 
 CollectionTruncateMarkers::InitialSetOfMarkers
-PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(OperationContext* opCtx,
-                                                                RecordStore* rs,
-                                                                const UUID& nsUUID,
-                                                                int64_t minBytesPerMarker) {
+PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
+    OperationContext* opCtx,
+    const ScopedCollectionAcquisition& collAcq,
+    const UUID& nsUUID,
+    int64_t minBytesPerMarker) {
     Timer scanningTimer;
 
     RecordIdBound minRecordIdBound =
@@ -149,28 +153,23 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(OperationContext
         change_stream_pre_image_util::getAbsoluteMaxPreImageRecordIdBoundForNs(nsUUID);
     RecordId maxRecordId = maxRecordIdBound.recordId();
 
-    auto cursor = rs->getCursor(opCtx, true);
-    auto record = cursor->seekNear(minRecordId);
-
-    // A forward seekNear will return the previous entry if one does not match exactly. In most
-    // cases, we will need to call next() to get our correct UUID.
-    while (record && record->id < minRecordId) {
-        record = cursor->next();
-    }
-
-    if (!record || (record && record->id > maxRecordId)) {
-        return CollectionTruncateMarkers::InitialSetOfMarkers{
-            {}, 0, 0, Microseconds{0}, MarkersCreationMethod::EmptyCollection};
-    }
-
+    auto exec = InternalPlanner::collectionScan(opCtx,
+                                                &collAcq,
+                                                PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                                InternalPlanner::Direction::FORWARD,
+                                                boost::none,
+                                                std::move(minRecordIdBound),
+                                                std::move(maxRecordIdBound));
     int64_t currentRecords = 0;
     int64_t currentBytes = 0;
     std::deque<CollectionTruncateMarkers::Marker> markers;
-    while (record && record->id < maxRecordId) {
+    BSONObj docOut;
+    RecordId rIdOut;
+    while (exec->getNext(&docOut, &rIdOut) == PlanExecutor::ADVANCED) {
         currentRecords++;
-        currentBytes += record->data.size();
+        currentBytes += docOut.objsize();
 
-        auto [rId, wallTime] = getRecordIdAndWallTime(*record);
+        auto wallTime = getWallTime(docOut);
         if (currentBytes >= minBytesPerMarker) {
             LOGV2_DEBUG(7500500,
                         1,
@@ -180,9 +179,13 @@ PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(OperationContext
                         "nsUuid"_attr = nsUUID);
 
             markers.emplace_back(
-                std::exchange(currentRecords, 0), std::exchange(currentBytes, 0), rId, wallTime);
+                std::exchange(currentRecords, 0), std::exchange(currentBytes, 0), rIdOut, wallTime);
         }
-        record = cursor->next();
+    }
+
+    if (currentRecords == 0 && markers.empty()) {
+        return CollectionTruncateMarkers::InitialSetOfMarkers{
+            {}, 0, 0, Microseconds{0}, MarkersCreationMethod::EmptyCollection};
     }
 
     return CollectionTruncateMarkers::InitialSetOfMarkers{

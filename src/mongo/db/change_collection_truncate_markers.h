@@ -52,6 +52,14 @@ public:
     // the last entry size and count to the next partial marker.
     void expirePartialMarker(OperationContext* opCtx, const Collection* changeCollection);
 
+    // Performs post initialisation work. The constructor doesn't specify the highest element seen,
+    // so we must update it after initialisation.
+    void performPostInitialisation(OperationContext* opCtx,
+                                   const RecordId& highestRecordId,
+                                   Date_t highestWallTime) {
+        updateCurrentMarker(opCtx, 0, highestRecordId, highestWallTime, 0);
+    }
+
 private:
     bool _hasExcessMarkers(OperationContext* opCtx) const override;
 

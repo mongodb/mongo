@@ -61,16 +61,16 @@ int64_t countTotalSamples(const NsUUIDToSamplesMap& samplesMap) {
     return totalSamples;
 }
 
-void appendSample(const Record& preImageRecord, NsUUIDToSamplesMap& samplesMap) {
-    auto uuid = change_stream_pre_image_util::getPreImageNsUUID(preImageRecord.data.toBson());
+void appendSample(const BSONObj& preImageObj, const RecordId& rId, NsUUIDToSamplesMap& samplesMap) {
+    auto uuid = change_stream_pre_image_util::getPreImageNsUUID(preImageObj);
     if (auto it = samplesMap.find(uuid); it != samplesMap.end()) {
-        it->second.push_back(
-            PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(preImageRecord));
+        it->second.push_back(CollectionTruncateMarkers::RecordIdAndWallTime{
+            rId, PreImagesTruncateMarkersPerNsUUID::getWallTime(preImageObj)});
     } else {
         // It's possible concurrent inserts have occurred since the initial point sampling
         // to establish the number of NsUUIDs.
-        samplesMap[uuid] = {
-            PreImagesTruncateMarkersPerNsUUID::getRecordIdAndWallTime(preImageRecord)};
+        samplesMap[uuid] = {CollectionTruncateMarkers::RecordIdAndWallTime{
+            rId, PreImagesTruncateMarkersPerNsUUID::getWallTime(preImageObj)}};
     }
 }
 
@@ -94,7 +94,7 @@ void sampleLastRecordPerNsUUID(OperationContext* opCtx,
         invariant(record);
         invariant(currentNsUUID ==
                   change_stream_pre_image_util::getPreImageNsUUID(record->data.toBson()));
-        appendSample(*record, samplesMap);
+        appendSample(record->data.toBson(), record->id, samplesMap);
     }
 }
 
@@ -124,33 +124,37 @@ int64_t getRecordsAccountedFor(
 //  (1) The result will contain at least 1 sample per 'nsUUID' in the pre-images collection.
 //  (2) For each 'nsUUID', the samples will be ordered as they appear in the underlying pre-images
 //  collection.
-NsUUIDToSamplesMap gatherOrderedSamplesAcrossNsUUIDs(OperationContext* opCtx,
-                                                     const CollectionPtr& preImagesCollectionPtr,
-                                                     int64_t numSamples) {
-    auto rs = preImagesCollectionPtr->getRecordStore();
-
+NsUUIDToSamplesMap gatherOrderedSamplesAcrossNsUUIDs(
+    OperationContext* opCtx,
+    const ScopedCollectionAcquisition& preImagesCollection,
+    int64_t numSamples) {
     // First, try to obtain 1 sample per 'nsUUID'.
     NsUUIDToSamplesMap samplesMap;
-    sampleLastRecordPerNsUUID(opCtx, rs, samplesMap);
+    sampleLastRecordPerNsUUID(
+        opCtx, preImagesCollection.getCollectionPtr()->getRecordStore(), samplesMap);
     auto numLastRecords = countTotalSamples(samplesMap);
 
     Timer lastProgressTimer;
+
     auto samplingLogIntervalSeconds = gCollectionSamplingLogIntervalSeconds.load();
     auto numSamplesRemaining = numSamples - numLastRecords;
-    auto cursor = rs->getRandomCursor(opCtx);
+    auto exec = InternalPlanner::sampleCollection(
+        opCtx, &preImagesCollection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+
+    BSONObj doc;
+    RecordId rId;
     for (int i = 0; i < numSamplesRemaining; i++) {
-        auto record = cursor->next();
-        if (!record) {
+        if (exec->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
             // This really shouldn't happen unless the collection is empty and the size storer was
             // really off on its collection size estimate.
             break;
         }
-        appendSample(*record, samplesMap);
+        appendSample(doc, rId, samplesMap);
         if (samplingLogIntervalSeconds > 0 &&
             lastProgressTimer.elapsed() >= Seconds(samplingLogIntervalSeconds)) {
             LOGV2(7658600,
                   "Pre-images collection random sampling progress",
-                  "namespace"_attr = preImagesCollectionPtr->ns(),
+                  "namespace"_attr = preImagesCollection.nss(),
                   "completed"_attr = (i + 1),
                   "totalRandomSamples"_attr = numSamplesRemaining,
                   "totalSamples"_attr = numSamples);
@@ -280,8 +284,8 @@ void distributeUnaccountedBytesAndRecords(
 PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTenantScanning(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const CollectionPtr& preImagesCollectionPtr) {
-    auto rs = preImagesCollectionPtr->getRecordStore();
+    const ScopedCollectionAcquisition& preImagesCollection) {
+    auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
 
     PreImagesTruncateManager::TenantTruncateMarkers truncateMap;
     auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
@@ -296,9 +300,12 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
     // collections.
     Date_t firstWallTime{};
     while ((currentCollectionUUID = change_stream_pre_image_util::findNextCollectionUUID(
-                opCtx, &preImagesCollectionPtr, currentCollectionUUID, firstWallTime))) {
+                opCtx,
+                &preImagesCollection.getCollectionPtr(),
+                currentCollectionUUID,
+                firstWallTime))) {
         auto initialSetOfMarkers = PreImagesTruncateMarkersPerNsUUID::createInitialMarkersScanning(
-            opCtx, rs, currentCollectionUUID.get(), minBytesPerMarker);
+            opCtx, preImagesCollection, currentCollectionUUID.get(), minBytesPerMarker);
 
         numBytesAcrossMarkers = numBytesAcrossMarkers + getBytesAccountedFor(initialSetOfMarkers);
         numRecordsAcrossMarkers =
@@ -325,7 +332,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
 PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTenantSampling(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const CollectionPtr& preImagesCollectionPtr,
+    const ScopedCollectionAcquisition& preImagesCollection,
     InitialSamplingEstimates&& initialEstimates) {
 
     uint64_t numSamples =
@@ -341,8 +348,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
     //  {nsUUID: <ordered samples, at least 1 per nsUUID>}
     //
     ///////////////////////////////////////////////////////////////
-    auto orderedSamples =
-        gatherOrderedSamplesAcrossNsUUIDs(opCtx, preImagesCollectionPtr, numSamples);
+    auto orderedSamples = gatherOrderedSamplesAcrossNsUUIDs(opCtx, preImagesCollection, numSamples);
     auto totalSamples = countTotalSamples(orderedSamples);
     if (totalSamples != (int64_t)numSamples) {
         // Given the distribution of pre-images to 'nsUUID', the number of samples collected cannot
@@ -352,7 +358,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
               "samples collected does not match the desired number of samples",
               "samplesTaken"_attr = totalSamples,
               "samplesDesired"_attr = numSamples);
-        return getInitialTruncateMarkersForTenantScanning(opCtx, tenantId, preImagesCollectionPtr);
+        return getInitialTruncateMarkersForTenantScanning(opCtx, tenantId, preImagesCollection);
     }
 
     ////////////////////////////////////////////////////////////////
@@ -372,7 +378,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
     //  not accounted for in the 'wholeMarkersCreated' and distribute them across the 'nsUUID's.
     //
     ////////////////////////////////////////////////////////////////
-    auto rs = preImagesCollectionPtr->getRecordStore();
+    auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
     distributeUnaccountedBytesAndRecords(
         opCtx, rs, initialEstimates, wholeMarkersCreated, tenantTruncateMarkers);
 
@@ -386,9 +392,9 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
 PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTenant(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const CollectionPtr& preImagesCollectionPtr) {
+    const ScopedCollectionAcquisition& preImageCollection) {
     auto minBytesPerMarker = gPreImagesCollectionTruncateMarkersMinBytes;
-    auto rs = preImagesCollectionPtr->getRecordStore();
+    auto rs = preImageCollection.getCollectionPtr()->getRecordStore();
     long long numRecords = rs->numRecords(opCtx);
     long long dataSize = rs->dataSize(opCtx);
 
@@ -402,14 +408,13 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
                "creationMethod"_attr = CollectionTruncateMarkers::toString(creationMethod),
                "datatSize"_attr = dataSize,
                "numRecords"_attr = numRecords,
-               "ns"_attr = preImagesCollectionPtr->ns());
+               "ns"_attr = preImageCollection.nss());
 
     switch (creationMethod) {
         case CollectionTruncateMarkers::MarkersCreationMethod::EmptyCollection:
             // Default to scanning since 'dataSize' and 'numRecords' could be incorrect.
         case CollectionTruncateMarkers::MarkersCreationMethod::Scanning:
-            return getInitialTruncateMarkersForTenantScanning(
-                opCtx, tenantId, preImagesCollectionPtr);
+            return getInitialTruncateMarkersForTenantScanning(opCtx, tenantId, preImageCollection);
         case CollectionTruncateMarkers::MarkersCreationMethod::Sampling: {
             // Use the collection's average record size to estimate the number of records in
             // each marker, and thus estimate the combined size of the records.
@@ -420,7 +425,7 @@ PreImagesTruncateManager::TenantTruncateMarkers getInitialTruncateMarkersForTena
             return getInitialTruncateMarkersForTenantSampling(
                 opCtx,
                 tenantId,
-                preImagesCollectionPtr,
+                preImageCollection,
                 InitialSamplingEstimates{numRecords,
                                          dataSize,
                                          (int64_t)estimatedRecordsPerMarker,
@@ -487,9 +492,10 @@ void truncateExpiredMarkersForNsUUID(
 }
 }  // namespace
 
-void PreImagesTruncateManager::ensureMarkersInitialized(OperationContext* opCtx,
-                                                        boost::optional<TenantId> tenantId,
-                                                        const CollectionPtr& preImagesColl) {
+void PreImagesTruncateManager::ensureMarkersInitialized(
+    OperationContext* opCtx,
+    boost::optional<TenantId> tenantId,
+    const ScopedCollectionAcquisition& preImagesColl) {
 
     auto tenantTruncateMarkers = _tenantMap.find(tenantId);
     if (!tenantTruncateMarkers) {
@@ -612,13 +618,13 @@ void PreImagesTruncateManager::updateMarkersOnInsert(OperationContext* opCtx,
 void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
     OperationContext* opCtx,
     boost::optional<TenantId> tenantId,
-    const CollectionPtr& preImagesCollectionPtr) {
+    const ScopedCollectionAcquisition& preImagesCollection) {
     // First register the 'tenantId' in the '_tenantMap' without any truncate markers. This allows
     // for concurrent inserts to be temporarily create their own truncate markers while
     // initialisation proceeds.
     auto tenantMapEntry = _tenantMap.getOrEmplace(tenantId);
     auto initialisedTenantTruncateMarkers =
-        getInitialTruncateMarkersForTenant(opCtx, tenantId, preImagesCollectionPtr);
+        getInitialTruncateMarkersForTenant(opCtx, tenantId, preImagesCollection);
 
     tenantMapEntry->updateWith(
         [&](const PreImagesTruncateManager::TenantTruncateMarkers& tenantMapEntryPlaceHolder) {
@@ -646,7 +652,7 @@ void PreImagesTruncateManager::_registerAndInitialiseMarkersForTenant(
     //
     // This step is also necessary for markers generated through samples, which are produced with
     // default highest recordId and wallTimes up to this point.
-    auto rs = preImagesCollectionPtr->getRecordStore();
+    auto rs = preImagesCollection.getCollectionPtr()->getRecordStore();
     NsUUIDToSamplesMap highestRecordIdAndWallTimeSamples;
     sampleLastRecordPerNsUUID(opCtx, rs, highestRecordIdAndWallTimeSamples);
     auto snapShottedTruncateMarkers = tenantMapEntry->getUnderlyingSnapshot();

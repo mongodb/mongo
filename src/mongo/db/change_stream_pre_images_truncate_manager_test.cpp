@@ -107,8 +107,7 @@ protected:
                                          AcquisitionPrerequisites::kRead),
             MODE_IS);
 
-        const auto& preImagesColl = preImagesCollRAII.getCollectionPtr();
-        truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesColl);
+        truncateManager.ensureMarkersInitialized(opCtx, tenantId, preImagesCollRAII);
     };
 
     void createPreImagesCollection(boost::optional<TenantId> tenantId) {

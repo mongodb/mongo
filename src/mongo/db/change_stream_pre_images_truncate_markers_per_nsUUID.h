@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 
@@ -79,10 +80,15 @@ public:
      * collection generated from 'nsUUID'.
      */
     static CollectionTruncateMarkers::InitialSetOfMarkers createInitialMarkersScanning(
-        OperationContext* opCtx, RecordStore* rs, const UUID& nsUUID, int64_t minBytesPerMarker);
+        OperationContext* opCtx,
+        const ScopedCollectionAcquisition& collPtr,
+        const UUID& nsUUID,
+        int64_t minBytesPerMarker);
 
     static CollectionTruncateMarkers::RecordIdAndWallTime getRecordIdAndWallTime(
         const Record& record);
+
+    static Date_t getWallTime(const BSONObj& doc);
 
     /**
      * Returns whether there are no more markers and no partial marker pending creation.

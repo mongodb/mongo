@@ -31,6 +31,7 @@
 
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 
@@ -78,7 +79,7 @@ public:
      */
     void ensureMarkersInitialized(OperationContext* opCtx,
                                   boost::optional<TenantId> tenantId,
-                                  const CollectionPtr& preImagesColl);
+                                  const ScopedCollectionAcquisition& preImagesColl);
 
     /*
      * Truncates expired pre-images spanning the 'preImagesColl' associated with the 'tenantId'.
@@ -111,9 +112,10 @@ public:
 private:
     friend class PreImagesTruncateManagerTest;
 
-    void _registerAndInitialiseMarkersForTenant(OperationContext* opCtx,
-                                                boost::optional<TenantId> tenantId,
-                                                const CollectionPtr& preImagesCollectionPtr);
+    void _registerAndInitialiseMarkersForTenant(
+        OperationContext* opCtx,
+        boost::optional<TenantId> tenantId,
+        const ScopedCollectionAcquisition& preImagesCollection);
     /**
      * Similar to the 'TenantTruncateMarkers' type, but with an added wrapper which enables copy on
      * write semantics.

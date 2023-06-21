@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include "mongo/db/curop.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/unittest/unittest.h"
@@ -101,11 +104,16 @@ public:
                         int numElements,
                         Timestamp timestampToUse) {
         AutoGetCollection coll(opCtx, nss, MODE_IX);
-        const auto insertedData = std::string(dataLength, 'a');
+        const auto correctedSize = dataLength -
+            BSON("x"
+                 << "")
+                .objsize();
+        invariant(correctedSize >= 0);
+        const auto objToInsert = BSON("x" << std::string(correctedSize, 'a'));
         WriteUnitOfWork wuow(opCtx);
         for (int i = 0; i < numElements; i++) {
             auto recordIdStatus = coll.getCollection()->getRecordStore()->insertRecord(
-                opCtx, insertedData.data(), insertedData.length(), timestampToUse);
+                opCtx, objToInsert.objdata(), objToInsert.objsize(), timestampToUse);
             ASSERT_OK(recordIdStatus);
         }
         wuow.commit();
@@ -367,8 +375,10 @@ TEST_F(CollectionMarkersTest, ScanningMarkerCreation) {
 
         AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
 
+        UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+
         auto result = CollectionTruncateMarkers::createMarkersByScanning(
-            opCtx.get(), coll->getRecordStore(), collNs, kMinBytes, [](const Record& record) {
+            opCtx.get(), iterator, collNs, kMinBytes, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
         ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
@@ -394,7 +404,7 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
         ASSERT_OK(createCollection(opCtx.get(), collNs));
         // Add documents of various sizes
         for (int round = 0; round < kNumRounds; round++) {
-            for (int numBytes = 0; numBytes < kElementSize; numBytes++) {
+            for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
                 insertElements(opCtx.get(), collNs, numBytes, 1, Timestamp(1, 0));
                 totalRecords++;
                 totalBytes += numBytes;
@@ -411,12 +421,10 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
         auto kMinBytesPerMarker = totalBytes / kNumMarkers;
         auto kRecordsPerMarker = totalRecords / kNumMarkers;
 
-        auto result = CollectionTruncateMarkers::createFromExistingRecordStore(
-            opCtx.get(),
-            coll->getRecordStore(),
-            collNs,
-            kMinBytesPerMarker,
-            [](const Record& record) {
+        UnyieldableCollectionIterator iterator(opCtx.get(), coll->getRecordStore());
+
+        auto result = CollectionTruncateMarkers::createFromCollectionIterator(
+            opCtx.get(), iterator, collNs, kMinBytesPerMarker, [](const Record& record) {
                 return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
             });
 
@@ -436,6 +444,105 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
 
         ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
         ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
+    }
+}
+
+// Tests that auto yielding with query plan iterators works
+TEST_F(CollectionMarkersTest, ScanningAutoYieldingWorks) {
+    static constexpr auto kNumElements = 5001;
+    static constexpr auto kElementSize = 15;
+    static constexpr auto kMinBytes = (kElementSize * 2) - 1;
+
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        insertElements(opCtx.get(), collNs, kElementSize, kNumElements, Timestamp(1, 0));
+    }
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+
+        AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+
+        YieldableCollectionIterator iterator(opCtx.get(), &coll.getCollection());
+
+        auto result = CollectionTruncateMarkers::createMarkersByScanning(
+            opCtx.get(), iterator, collNs, kMinBytes, [](const Record& record) {
+                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
+            });
+        ASSERT_EQ(result.leftoverRecordsBytes, kElementSize);
+        ASSERT_EQ(result.leftoverRecordsCount, 1);
+        ASSERT_EQ(result.markers.size(), kNumElements / 2);
+        for (const auto& marker : result.markers) {
+            ASSERT_EQ(marker.bytes, kElementSize * 2);
+            ASSERT_EQ(marker.records, 2);
+        }
+
+        ASSERT_EQ(CurOp::get(opCtx.get())->numYields(),
+                  kNumElements / internalQueryExecYieldIterations.load());
+    }
+}
+
+// Tests that auto yielding with query plan iterators works
+TEST_F(CollectionMarkersTest, SamplingAutoYieldingWorks) {
+    static constexpr auto kNumRounds = 5000;
+    static constexpr auto kElementSize = 15;
+    static constexpr auto kNumElements = kElementSize * kNumRounds;
+    static constexpr auto kNumElementsToSample =
+        kNumElements / 20;  // We only sample 5% of the collection.
+
+    int totalBytes = 0;
+    int totalRecords = 0;
+    auto collNs = NamespaceString::createNamespaceString_forTest("test", "coll");
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_OK(createCollection(opCtx.get(), collNs));
+        // Add documents of various sizes
+        for (int numBytes = kElementSize; numBytes < kElementSize * 2; numBytes++) {
+            insertElements(opCtx.get(), collNs, numBytes, kNumRounds, Timestamp(1, 0));
+            totalRecords += kNumRounds;
+            totalBytes += numBytes * kNumRounds;
+        }
+    }
+
+    ASSERT_EQ(totalRecords, kNumElements);
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+
+        AutoGetCollection coll(opCtx.get(), collNs, MODE_IS);
+
+        static constexpr auto kNumMarkers = 300;
+        auto kMinBytesPerMarker = totalBytes / kNumMarkers;
+        auto kRecordsPerMarker = totalRecords / kNumMarkers;
+
+        YieldableCollectionIterator iterator(opCtx.get(), &coll.getCollection());
+
+        auto result = CollectionTruncateMarkers::createFromCollectionIterator(
+            opCtx.get(), iterator, collNs, kMinBytesPerMarker, [](const Record& record) {
+                return CollectionTruncateMarkers::RecordIdAndWallTime{record.id, Date_t::now()};
+            });
+
+        ASSERT_EQ(result.methodUsed, CollectionTruncateMarkers::MarkersCreationMethod::Sampling);
+        const auto& firstMarker = result.markers.front();
+        auto recordCount = firstMarker.records;
+        auto recordBytes = firstMarker.bytes;
+        ASSERT_EQ(result.leftoverRecordsBytes, totalBytes % kMinBytesPerMarker);
+        ASSERT_EQ(result.leftoverRecordsCount, totalRecords % kRecordsPerMarker);
+        ASSERT_GT(recordCount, 0);
+        ASSERT_GT(recordBytes, 0);
+        ASSERT_EQ(result.markers.size(), kNumMarkers);
+        for (const auto& marker : result.markers) {
+            ASSERT_EQ(marker.bytes, recordBytes);
+            ASSERT_EQ(marker.records, recordCount);
+        }
+
+        ASSERT_EQ(recordBytes * kNumMarkers + result.leftoverRecordsBytes, totalBytes);
+        ASSERT_EQ(recordCount * kNumMarkers + result.leftoverRecordsCount, totalRecords);
+
+        ASSERT_EQ(CurOp::get(opCtx.get())->numYields(),
+                  kNumElementsToSample / internalQueryExecYieldIterations.load());
     }
 }
 }  // namespace mongo

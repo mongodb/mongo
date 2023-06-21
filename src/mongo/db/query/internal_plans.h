@@ -73,6 +73,20 @@ public:
     };
 
     /**
+     * Returns a sampling of the given collection with up to 'numSamples'. If the caller doesn't
+     * provide a value for 'numSamples' then the executor will return an infinite stream of random
+     * documents of the collection.
+     *
+     * Note that the set of documents returned can contain duplicates. Sampling is performed
+     * without memory of the previous results.
+     */
+    static std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> sampleCollection(
+        OperationContext* opCtx,
+        VariantCollectionPtrOrAcquisition collection,
+        PlanYieldPolicy::YieldPolicy yieldPolicy,
+        boost::optional<int64_t> numSamples = boost::none);
+
+    /**
      * Returns a collection scan. Refer to CollectionScanParams for usage of 'minRecord' and
      * 'maxRecord'.
      */

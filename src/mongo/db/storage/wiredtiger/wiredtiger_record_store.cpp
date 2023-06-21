@@ -146,7 +146,6 @@ boost::optional<NamespaceString> namespaceForUUID(OperationContext* opCtx,
     // TODO SERVER-73111: Remove the dependency on CollectionCatalog
     return CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid);
 }
-
 }  // namespace
 
 MONGO_FAIL_POINT_DEFINE(WTCompactRecordStoreEBUSY);
@@ -184,9 +183,10 @@ WiredTigerRecordStore::OplogTruncateMarkers::createOplogTruncateMarkers(Operatio
             fmt::format("Cannot create oplog of size less than {} bytes", numTruncateMarkersToKeep),
             minBytesPerTruncateMarker > 0);
 
-    auto initialSetOfMarkers = CollectionTruncateMarkers::createFromExistingRecordStore(
+    UnyieldableCollectionIterator iterator(opCtx, rs);
+    auto initialSetOfMarkers = CollectionTruncateMarkers::createFromCollectionIterator(
         opCtx,
-        rs,
+        iterator,
         ns,
         minBytesPerTruncateMarker,
         [](const Record& record) {

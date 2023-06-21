@@ -31,6 +31,8 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
@@ -152,15 +154,49 @@ public:
         int64_t minBytesPerMarker,
         boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
+    /**
+     * A collection iterator class meant to encapsulate how the collection is scanned/sampled. As
+     * the initialisation step is only concerned about getting either the next element of the
+     * collection or a random one, this allows the user to specify how to perform these steps. This
+     * allows one for example to avoid yielding and use raw cursors or to use the query framework so
+     * that yielding is performed and we don't affect server stability.
+     *
+     * If we were to use query framework scans here we would incur on a layering violation as the
+     * storage layer shouldn't have to interact with the query (higher) layer in here.
+     */
+    class CollectionIterator {
+    public:
+        // Returns the next element in the collection. Behaviour is the same as performing a normal
+        // collection scan.
+        virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() = 0;
+
+        // Returns a random document from the collection.
+        virtual boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() = 0;
+
+        virtual RecordStore* getRecordStore() const = 0;
+
+        // Reset the iterator. This will recreate any internal cursors used by the class so that
+        // calling getNext* will start from the beginning again.
+        virtual void reset(OperationContext* opCtx) = 0;
+
+        int64_t numRecords(OperationContext* opCtx) const {
+            return getRecordStore()->numRecords(opCtx);
+        }
+
+        int64_t dataSize(OperationContext* opCtx) const {
+            return getRecordStore()->dataSize(opCtx);
+        }
+    };
+
     // Creates the initial set of markers. This will decide whether to perform a collection scan or
     // sampling based on the size of the collection.
     //
     // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
     // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
     // reclaiming the oldest truncate markers.
-    static InitialSetOfMarkers createFromExistingRecordStore(
+    static InitialSetOfMarkers createFromCollectionIterator(
         OperationContext* opCtx,
-        RecordStore* rs,
+        CollectionIterator& collIterator,
         const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
@@ -170,7 +206,7 @@ public:
     // returned will have correct metrics.
     static InitialSetOfMarkers createMarkersByScanning(
         OperationContext* opCtx,
-        RecordStore* rs,
+        CollectionIterator& collIterator,
         const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
@@ -180,7 +216,7 @@ public:
     // the collection's size and record count divided by the number of markers.
     static InitialSetOfMarkers createMarkersBySampling(
         OperationContext* opCtx,
-        RecordStore* rs,
+        CollectionIterator& collIterator,
         const NamespaceString& ns,
         int64_t estimatedRecordsPerMarker,
         int64_t estimatedBytesPerMarker,
@@ -341,6 +377,98 @@ protected:
                              const RecordId& highestRecordId,
                              Date_t highestWallTime,
                              int64_t numRecordsAdded);
+};
+
+/**
+ * A Collection iterator meant to work with raw RecordStores. This iterator will not yield between
+ * calls to getNext()/getNextRandom().
+ *
+ * It is only safe to use when the user is not accepting any user operation. Some examples of when
+ * this class can be used are during oplog initialisation, repair, recovery, etc.
+ */
+class UnyieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
+public:
+    UnyieldableCollectionIterator(OperationContext* opCtx, RecordStore* rs) : _rs(rs) {
+        reset(opCtx);
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() final {
+        auto record = _directionalCursor->next();
+        if (!record) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(record->id), record->data.releaseToBson());
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final {
+        auto record = _randomCursor->next();
+        if (!record) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(record->id), record->data.releaseToBson());
+    }
+
+    virtual RecordStore* getRecordStore() const final {
+        return _rs;
+    }
+
+    virtual void reset(OperationContext* opCtx) final {
+        _directionalCursor = _rs->getCursor(opCtx);
+        _randomCursor = _rs->getRandomCursor(opCtx);
+    }
+
+private:
+    RecordStore* _rs;
+    std::unique_ptr<RecordCursor> _directionalCursor;
+    std::unique_ptr<RecordCursor> _randomCursor;
+};
+
+/**
+ * A collection iterator that can yield between calls to getNext()/getNextRandom()
+ */
+class YieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
+public:
+    YieldableCollectionIterator(OperationContext* opCtx, VariantCollectionPtrOrAcquisition coll)
+        : _collection(coll) {
+        reset(opCtx);
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() final {
+        RecordId rId;
+        BSONObj doc;
+        if (_collScanExecutor->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(rId), std::move(doc));
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final {
+        RecordId rId;
+        BSONObj doc;
+        if (_sampleExecutor->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(rId), std::move(doc));
+    }
+
+    virtual RecordStore* getRecordStore() const final {
+        return _collection.getCollectionPtr()->getRecordStore();
+    }
+
+    virtual void reset(OperationContext* opCtx) final {
+        _collScanExecutor =
+            InternalPlanner::collectionScan(opCtx,
+                                            _collection,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            InternalPlanner::Direction::FORWARD);
+        _sampleExecutor = InternalPlanner::sampleCollection(
+            opCtx, _collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    }
+
+private:
+    VariantCollectionPtrOrAcquisition _collection;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _collScanExecutor;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _sampleExecutor;
 };
 
 }  // namespace mongo
