@@ -1198,6 +1198,16 @@ server_parameters:
    cpp_vartype: AtomicWord<bool>
    default: true
 
+  documentSourceWriterBatchBuffer:
+    description: 'Space to reserve in document source writer batches for miscellaneous metadata'
+    set_at: startup
+    cpp_vartype: int
+    cpp_varname: gDocumentSourceWriterBatchBufferBytes
+    validator:
+      gte: 0
+      lte: 8388608 # 8MB
+    default: 0
+
 # Note for adding additional query knobs:
 #
 # When adding a new query knob, you should consider whether or not you need to add an 'on_update'

@@ -67,6 +67,7 @@ const expectedParamDefaults = {
     internalQueryColumnScanMinNumColumnFilters: 3,
     deprioritizeUnboundedUserCollectionScans: true,
     deprioritizeUnboundedUserIndexScans: true,
+    documentSourceWriterBatchBuffer: 0,
 };
 
 function assertDefaultParameterValues() {
