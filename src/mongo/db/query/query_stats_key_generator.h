@@ -39,6 +39,20 @@
 #include "mongo/rpc/metadata/client_metadata.h"
 
 namespace mongo {
+
+int64_t inline optionalObjSize(boost::optional<BSONObj> optionalObj) {
+    if (!optionalObj)
+        return 0;
+    return optionalObj->objsize();
+}
+
+template <typename T>
+int64_t optionalSize(boost::optional<T> optionalVal) {
+    if (!optionalVal)
+        return 0;
+    return optionalVal->size();
+}
+
 namespace query_stats {
 
 /**
@@ -67,6 +81,14 @@ public:
                                   SerializationOptions::kRepresentativeQueryShapeSerializeOptions);
         bob.doneFast();
         return absl::hash_internal::CityHash64(bob.bb().buf(), bob.bb().len());
+    }
+
+    int64_t size() const {
+        return doGetSize() +
+            _parseableQueryShape.objsize() + /* _collectionType is not owned here */
+            (_apiParams ? sizeof(*_apiParams) + optionalSize(_apiParams->getAPIVersion()) : 0) +
+            optionalObjSize(_clientMetaData) + _commentObj.objsize() +
+            optionalObjSize(_readPreference);
     }
 
 protected:
@@ -152,6 +174,15 @@ protected:
 
         bob.append("collectionType"_sd, _collectionType);
     }
+
+    /**
+     * Sub-classes should implement this to report how much memory is used. This is important to do
+     * carefully since we are under a budget in the query stats store and use this to do the
+     * accounting. Implementers should include sizeof(*derivedThis) and be sure to also include the
+     * size of any owned pointer-like objects such as BSONObj or NamespaceString which are
+     * indirectly using memory elsehwhere.
+     */
+    virtual int64_t doGetSize() const = 0;
 
     BSONObj _parseableQueryShape;
     StringData _collectionType;

@@ -321,10 +321,10 @@ void writeQueryStats(OperationContext* opCtx,
         tassert(7315200,
                 "keyGenerator cannot be null when writing a new entry to the telemetry store",
                 keyGenerator != nullptr);
-        size_t numEvicted = queryStatsStore.put(
-            *queryStatsKeyHash,
-            std::make_shared<QueryStatsEntry>(std::move(keyGenerator), CurOp::get(opCtx)->getNSS()),
-            partitionLock);
+        size_t numEvicted =
+            queryStatsStore.put(*queryStatsKeyHash,
+                                std::make_shared<QueryStatsEntry>(std::move(keyGenerator)),
+                                partitionLock);
         queryStatsEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*queryStatsKeyHash);
         if (!newMetrics.isOK()) {

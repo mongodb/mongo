@@ -99,7 +99,7 @@ TEST_F(QueryStatsStoreTest, BasicUsage) {
         std::shared_ptr<QueryStatsEntry> metrics;
         auto lookupResult = telStore.lookup(hash(key));
         if (!lookupResult.isOK()) {
-            telStore.put(hash(key), std::make_shared<QueryStatsEntry>(nullptr, NamespaceString{}));
+            telStore.put(hash(key), std::make_shared<QueryStatsEntry>(nullptr));
             lookupResult = telStore.lookup(hash(key));
         }
         metrics = *lookupResult.getValue();
@@ -152,7 +152,7 @@ TEST_F(QueryStatsStoreTest, EvictEntries) {
 
     for (int i = 0; i < 30; i++) {
         auto query = BSON("query" + std::to_string(i) << 1 << "xEquals" << 42);
-        telStore.put(hash(query), std::make_shared<QueryStatsEntry>(nullptr, NamespaceString{}));
+        telStore.put(hash(query), std::make_shared<QueryStatsEntry>(nullptr));
     }
     int numKeys = 0;
     telStore.forEach(
@@ -695,8 +695,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     auto queryShape = query_shape::extractQueryShape(
         *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
     QueryStatsEntry testMetrics{
-        std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind, queryShape),
-        parsedFind->findCommandRequest->getNamespaceOrUUID()};
+        std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind, queryShape)};
 
     auto hmacApplied =
         testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithm::kNone, std::string{});

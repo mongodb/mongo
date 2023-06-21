@@ -60,6 +60,11 @@ public:
     BSONObj generate(OperationContext* opCtx,
                      boost::optional<SerializationOptions::TokenizeIdentifierFunc>) const final;
 
+protected:
+    int64_t doGetSize() const final {
+        return sizeof(*this) + optionalObjSize(_readConcern);
+    }
+
 private:
     BSONObj makeQueryStatsKey(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                               const ParsedFindCommand& parsedRequest,

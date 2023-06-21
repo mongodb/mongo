@@ -96,15 +96,15 @@ struct AggregatedMetric {
 };
 
 extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
+const auto kKeySize = sizeof(std::size_t);
 // Used to aggregate the metrics for one query stats key over all its executions.
 class QueryStatsEntry {
 public:
-    QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator, NamespaceStringOrUUID nss)
-        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)), nss(nss) {
+    QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator)
+        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {
         // Increment by size of query stats store key (hash returns size_t) and value
         // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) +
-                                                         sizeof(std::size_t));
+        queryStatsStoreSizeEstimateBytesMetric.increment(kKeySize + size());
     }
 
     QueryStatsEntry(QueryStatsEntry& entry) = delete;
@@ -114,8 +114,7 @@ public:
     ~QueryStatsEntry() {
         // Decrement by size of query stats store key (hash returns size_t) and value
         // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.decrement(sizeof(QueryStatsEntry) +
-                                                         sizeof(std::size_t));
+        queryStatsStoreSizeEstimateBytesMetric.decrement(kKeySize + size());
     }
 
     BSONObj toBSON() const {
@@ -128,6 +127,10 @@ public:
         builder.append("firstSeenTimestamp", firstSeenTimestamp);
         builder.append("latestSeenTimestamp", latestSeenTimestamp);
         return builder.obj();
+    }
+
+    int64_t size() {
+        return sizeof(*this) + (keyGenerator ? keyGenerator->size() : 0);
     }
 
     /**
@@ -175,10 +178,7 @@ public:
      * The KeyGenerator that can generate the query stats key for this request.
      */
     std::unique_ptr<KeyGenerator> keyGenerator;
-
-    NamespaceStringOrUUID nss;
 };
-
 struct TelemetryPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
     std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
@@ -188,11 +188,7 @@ struct TelemetryPartitioner {
 
 struct QueryStatsStoreEntryBudgetor {
     size_t operator()(const std::size_t key, const std::shared_ptr<QueryStatsEntry>& value) {
-        // The buget estimator for <key,value> pair in LRU cache accounts for the size of the key
-        // and the size of the metrics, including the bson object used for generating the telemetry
-        // key at read time.
-
-        return sizeof(QueryStatsEntry) + sizeof(std::size_t);
+        return sizeof(decltype(key)) + value->size();
     }
 };
 using QueryStatsStore = PartitionedCache<std::size_t,

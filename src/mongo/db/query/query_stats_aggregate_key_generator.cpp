@@ -97,4 +97,115 @@ BSONObj AggregateKeyGenerator::_makeQueryStatsKeyHelper(
     return generateWithQueryShape(
         query_shape::extractQueryShape(_request, pipeline, opts, expCtx, _origNss), opts);
 }
+
+namespace {
+
+int64_t sum(const std::initializer_list<int64_t>& sizes) {
+    return std::accumulate(sizes.begin(), sizes.end(), 0, std::plus{});
+}
+
+int64_t size(const std::vector<BSONObj>& objects) {
+    return std::accumulate(objects.begin(), objects.end(), 0, [](int64_t total, const auto& obj) {
+        // Include the 'sizeof' to account for the variable number in the vector.
+        return total + sizeof(BSONObj) + obj.objsize();
+    });
+}
+
+int64_t size(const boost::optional<PassthroughToShardOptions>& passthroughToShardOpts) {
+    if (!passthroughToShardOpts) {
+        return 0;
+    }
+    return passthroughToShardOpts->getShard().size();
+}
+
+int64_t size(const boost::optional<ExchangeSpec>& exchange) {
+    if (!exchange) {
+        return 0;
+    }
+    return sum(
+        {exchange->getKey().objsize(),
+         (exchange->getBoundaries() ? size(exchange->getBoundaries().get()) : 0),
+         (exchange->getConsumerIds() ? 4 * static_cast<int64_t>(exchange->getConsumerIds()->size())
+                                     : 0)});
+}
+
+int64_t size(const boost::optional<EncryptionInformation>& encryptInfo) {
+    if (!encryptInfo) {
+        return 0;
+    }
+    tasserted(7659700,
+              "Unexpected encryption information - not expecting to collect query shape stats on "
+              "encrypted querys");
+}
+
+int64_t singleDataSourceSize(int64_t runningTotal, const ExternalDataSourceInfo& source) {
+    // Here we include the 'sizeof' since its expected to be contained in a vector, which will have
+    // a variable number of these.
+    return runningTotal + sizeof(ExternalDataSourceInfo) + source.getUrl().size();
+}
+
+int64_t size(const boost::optional<std::vector<ExternalDataSourceOption>>& externalDataSources) {
+    if (!externalDataSources) {
+        return 0;
+    }
+    // External data sources aren't currently expected to be used much in production Atlas clusters,
+    // so it's probably pretty unlikely that this code will ever be exercised. That said, there's
+    // not reason it shouldn't work and be tracked correctly.
+    return std::accumulate(
+        externalDataSources->begin(),
+        externalDataSources->end(),
+        0,
+        [](int64_t runningTotal, const ExternalDataSourceOption& opt) {
+            const auto& sources = opt.getDataSources();
+            return sum({runningTotal,
+                        // Include the 'sizeof' to account for the variable number in the vector.
+                        sizeof(ExternalDataSourceOption),
+                        static_cast<int64_t>(opt.getCollName().size()),
+                        std::accumulate(sources.begin(), sources.end(), 0, singleDataSourceSize)});
+        });
+}
+
+int64_t size(const boost::optional<DatabaseName>& dbName) {
+    if (!dbName) {
+        return 0;
+    }
+    return dbName->db().size();
+}
+
+int64_t size(const boost::optional<BSONObj>& obj) {
+    return optionalObjSize(obj);
+}
+
+// variadic base case.
+template <typename T>
+int64_t sumOfSizes(const T& t) {
+    return size(t);
+}
+
+// variadic recursive case. Making the compiler expand the pluses everywhere to give us good
+// formatting at the call site. sumOfSizes(x, y, z) rather than size(x) + size(y) + size(z).
+template <typename T, typename... Args>
+int64_t sumOfSizes(const T& t, const Args&... args) {
+    return size(t) + sumOfSizes(args...);
+}
+
+int64_t aggRequestSize(const AggregateCommandRequest& request) {
+    return sumOfSizes(request.getPipeline(),
+                      request.getLet(),
+                      request.getUnwrappedReadPref(),
+                      request.getExchange(),
+                      request.getPassthroughToShard(),
+                      request.getEncryptionInformation(),
+                      request.getExternalDataSources(),
+                      request.getDbName());
+}
+
+}  // namespace
+
+int64_t AggregateKeyGenerator::doGetSize() const {
+    return sum({sizeof(*this),
+                static_cast<int64_t>(_origNss.size()),
+                optionalObjSize(_initialQueryStatsKey),
+                aggRequestSize(_request)});
+}
 }  // namespace mongo::query_stats

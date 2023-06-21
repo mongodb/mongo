@@ -75,6 +75,9 @@ protected:
     void appendCommandSpecificComponents(BSONObjBuilder& bob,
                                          const SerializationOptions& opts) const final override;
 
+protected:
+    int64_t doGetSize() const final;
+
 private:
     BSONObj _makeQueryStatsKeyHelper(const SerializationOptions& opts,
                                      const boost::intrusive_ptr<ExpressionContext>& expCtx,
