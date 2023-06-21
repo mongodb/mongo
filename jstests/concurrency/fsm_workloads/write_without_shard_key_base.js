@@ -218,10 +218,11 @@ var $config = extendWorkload($config, function($config, $super) {
                 }
 
                 // This is a possible transient transaction error issue that could occur with
-                // concurrent moveChunks and transactions (if we happen to run a
+                // concurrent moveChunks and/or reshardings and transactions (if we happen to run a
                 // WouldChangeOwningShard update).
                 if (res.code === ErrorCodes.LockTimeout || res.code === ErrorCodes.StaleConfig ||
-                    res.code === ErrorCodes.ConflictingOperationInProgress) {
+                    res.code === ErrorCodes.ConflictingOperationInProgress ||
+                    res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld) {
                     if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
                         return false;
                     }
