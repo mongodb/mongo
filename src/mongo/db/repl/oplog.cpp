@@ -2148,7 +2148,7 @@ Status applyOperation_inlock(OperationContext* opCtx,
 
                 global_index::insertKey(
                     opCtx,
-                    collection,
+                    collectionAcquisition,
                     op.getObject().getObjectField(global_index::kOplogEntryIndexKeyFieldName),
                     op.getObject().getObjectField(global_index::kOplogEntryDocKeyFieldName));
 

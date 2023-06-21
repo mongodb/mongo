@@ -323,6 +323,14 @@ void Helpers::update(OperationContext* opCtx,
     ::mongo::update(opCtx, coll, request);
 }
 
+Status Helpers::insert(OperationContext* opCtx,
+                       const ScopedCollectionAcquisition& coll,
+                       const BSONObj& doc) {
+    OldClientContext context(opCtx, coll.nss());
+    return collection_internal::insertDocument(
+        opCtx, coll.getCollectionPtr(), InsertStatement{doc}, &CurOp::get(opCtx)->debug());
+}
+
 void Helpers::putSingleton(OperationContext* opCtx,
                            ScopedCollectionAcquisition& coll,
                            BSONObj obj) {

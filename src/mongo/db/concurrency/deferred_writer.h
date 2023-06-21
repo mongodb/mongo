@@ -36,7 +36,7 @@
 
 namespace mongo {
 
-class AutoGetCollection;
+class ScopedCollectionAcquisition;
 class ThreadPool;
 
 /**
@@ -131,12 +131,12 @@ private:
     /**
      * Ensure that the backing collection exists, and pass back a lock and handle to it.
      */
-    StatusWith<std::unique_ptr<AutoGetCollection>> _getCollection(OperationContext* opCtx);
+    StatusWith<ScopedCollectionAcquisition> _getCollection(OperationContext* opCtx);
 
     /**
      * The method that the worker thread will run.
      */
-    Status _worker(InsertStatement stmt) noexcept;
+    Status _worker(BSONObj doc) noexcept;
 
     /**
      * The options for the collection, in case we need to create it.

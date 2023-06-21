@@ -29,7 +29,6 @@
 
 #include "mongo/db/startup_recovery.h"
 
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/storage_repair_observer.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/logv2/log.h"
@@ -76,7 +76,7 @@ bool isWriteableStorageEngine() {
 
 // Attempt to restore the featureCompatibilityVersion document if it is missing.
 Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx) {
-    NamespaceString fcvNss(NamespaceString::kServerConfigurationNamespace);
+    const NamespaceString fcvNss(NamespaceString::kServerConfigurationNamespace);
 
     // If the admin database, which contains the server configuration collection with the
     // featureCompatibilityVersion document, does not exist, create it.
@@ -91,8 +91,7 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
     // If the server configuration collection, which contains the FCV document, does not exist, then
     // create it.
     auto catalog = CollectionCatalog::get(opCtx);
-    if (!catalog->lookupCollectionByNamespace(opCtx,
-                                              NamespaceString::kServerConfigurationNamespace)) {
+    if (!catalog->lookupCollectionByNamespace(opCtx, fcvNss)) {
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
         LOGV2(4926905,
               "Re-creating featureCompatibilityVersion document that was deleted. Creating new "
@@ -101,14 +100,19 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
         uassertStatusOK(createCollection(opCtx, fcvNss.dbName(), BSON("create" << fcvNss.coll())));
     }
 
-    const CollectionPtr fcvColl(catalog->lookupCollectionByNamespace(
-        opCtx, NamespaceString::kServerConfigurationNamespace));
-    invariant(fcvColl);
+    const auto fcvColl = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(fcvNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+    invariant(fcvColl.exists());
 
     // Restore the featureCompatibilityVersion document if it is missing.
     BSONObj featureCompatibilityVersion;
     if (!Helpers::findOne(opCtx,
-                          fcvColl,
+                          fcvColl.getCollectionPtr(),
                           BSON("_id" << multiversion::kParameterName),
                           featureCompatibilityVersion)) {
         // (Generic FCV reference): This FCV reference should exist across LTS binary versions.
@@ -123,14 +127,15 @@ Status restoreMissingFeatureCompatibilityVersionDocument(OperationContext* opCtx
 
         writeConflictRetry(opCtx, "insertFCVDocument", fcvNss, [&] {
             WriteUnitOfWork wunit(opCtx);
-            uassertStatusOK(collection_internal::insertDocument(
-                opCtx, fcvColl, InsertStatement(fcvDoc.toBSON()), nullptr /* OpDebug */, false));
+            uassertStatusOK(Helpers::insert(opCtx, fcvColl, fcvDoc.toBSON()));
             wunit.commit();
         });
     }
 
-    invariant(Helpers::findOne(
-        opCtx, fcvColl, BSON("_id" << multiversion::kParameterName), featureCompatibilityVersion));
+    invariant(Helpers::findOne(opCtx,
+                               fcvColl.getCollectionPtr(),
+                               BSON("_id" << multiversion::kParameterName),
+                               featureCompatibilityVersion));
 
     return Status::OK();
 }

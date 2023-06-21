@@ -34,18 +34,19 @@
 #include "mongo/base/init.h"
 #include "mongo/db/catalog/capped_collection_maintenance.h"
 #include "mongo/db/catalog/capped_utils.h"
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/ops/insert.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
@@ -102,19 +103,21 @@ public:
         OldClientContext ctx(opCtx, nss);
         Database* db = ctx.db();
 
+        auto collection = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
+
         WriteUnitOfWork wunit(opCtx);
         UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
-        CollectionPtr collection(
-            CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx, nss));
-        if (!collection) {
-            collection = CollectionPtr(db->createCollection(opCtx, nss));
-            uassert(ErrorCodes::CannotCreateCollection, "could not create collection", collection);
+        if (!collection.exists()) {
+            ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &collection);
+            db->createCollection(opCtx, nss);
         }
-        collection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, collection));
+        uassert(
+            ErrorCodes::CannotCreateCollection, "could not create collection", collection.exists());
 
-        OpDebug* const nullOpDebug = nullptr;
-        Status status = collection_internal::insertDocument(
-            opCtx, collection, InsertStatement(obj), nullOpDebug, false);
+        Status status = Helpers::insert(opCtx, collection, obj);
         if (status.isOK()) {
             wunit.commit();
         }
@@ -287,7 +290,11 @@ public:
             wuow.commit();
         }
 
-        AutoGetCollection autoColl(opCtx, kDurableHistoryTestNss, MODE_IX);
+        const auto collection =
+            acquireCollection(opCtx,
+                              CollectionAcquisitionRequest::fromOpCtx(
+                                  opCtx, kDurableHistoryTestNss, AcquisitionPrerequisites::kWrite),
+                              MODE_IX);
         WriteUnitOfWork wuow(opCtx);
 
         // Note, this write will replicate to secondaries, but a secondary will not in-turn pin the
@@ -298,11 +305,8 @@ public:
             uassertStatusOK(opCtx->getServiceContext()->getStorageEngine()->pinOldestTimestamp(
                 opCtx, kTestingDurableHistoryPinName, requestedPinTs, round));
 
-        uassertStatusOK(collection_internal::insertDocument(
-            opCtx,
-            *autoColl,
-            InsertStatement(fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()),
-            nullptr));
+        uassertStatusOK(Helpers::insert(
+            opCtx, collection, fixDocumentForInsert(opCtx, BSON("pinTs" << pinTs)).getValue()));
         wuow.commit();
 
         result.append("requestedPinTs", requestedPinTs);

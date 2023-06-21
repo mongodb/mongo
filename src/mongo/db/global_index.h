@@ -79,7 +79,7 @@ void insertKey(OperationContext* opCtx,
  * the above, this variant requires the call to be wrapped inside a writeConflictRetry.
  */
 void insertKey(OperationContext* opCtx,
-               const CollectionPtr& container,
+               const ScopedCollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey);
 

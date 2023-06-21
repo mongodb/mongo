@@ -31,10 +31,10 @@
 
 #include <string>
 
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/op_observer/op_observer_noop.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
@@ -46,6 +46,7 @@
 #include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/rs_rollback.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/str.h"
@@ -242,21 +243,25 @@ Collection* RollbackTest::_createCollection(OperationContext* opCtx,
 void RollbackTest::_insertDocument(OperationContext* opCtx,
                                    const NamespaceString& nss,
                                    const BSONObj& doc) {
+    const auto collection = [&]() {
+        while (true) {
+            auto collection = acquireCollection(opCtx,
+                                                CollectionAcquisitionRequest::fromOpCtx(
+                                                    opCtx, nss, AcquisitionPrerequisites::kWrite),
+                                                MODE_IX);
+            if (collection.exists()) {
+                return collection;
+            }
 
-    auto insertDoc = [opCtx, &doc](const CollectionPtr& collection) {
-        WriteUnitOfWork wuow(opCtx);
-        ASSERT_OK(collection_internal::insertDocument(
-            opCtx, collection, InsertStatement(doc), nullptr /* OpDebug */));
-        wuow.commit();
-    };
-    AutoGetCollection collection(opCtx, nss, MODE_X);
-    if (collection) {
-        insertDoc(collection.getCollection());
-    } else {
-        CollectionOptions options;
-        options.uuid = UUID::gen();
-        insertDoc(CollectionPtr(_createCollection(opCtx, nss, options)));
-    }
+            CollectionOptions options;
+            options.uuid = UUID::gen();
+            _createCollection(opCtx, nss, options);
+        }
+    }();
+
+    WriteUnitOfWork wuow(opCtx);
+    ASSERT_OK(Helpers::insert(opCtx, collection, doc));
+    wuow.commit();
 }
 
 Status RollbackTest::_insertOplogEntry(const BSONObj& doc) {

@@ -144,11 +144,7 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
                 collectionFrom.setNss(toNss);
 
                 mongo::deleteObjects(opCtx, collsColl, queryFrom, true);
-                uassertStatusOK(
-                    collection_internal::insertDocument(opCtx,
-                                                        collsColl.getCollectionPtr(),
-                                                        InsertStatement(collectionFrom.toBSON()),
-                                                        nullptr));
+                uassertStatusOK(Helpers::insert(opCtx, collsColl, collectionFrom.toBSON()));
             }
 
             if (toUuid) {
@@ -247,11 +243,7 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                 BSONObjBuilder builder(indexCatalogEntry.toBSON());
                 auto idStr = format(FMT_STRING("{}_{}"), collectionUUID.toString(), name);
                 builder.append("_id", idStr);
-                uassertStatusOK(collection_internal::insertDocument(opCtx,
-                                                                    idxColl.getCollectionPtr(),
-                                                                    InsertStatement{builder.obj()},
-                                                                    nullptr,
-                                                                    false));
+                uassertStatusOK(Helpers::insert(opCtx, idxColl, builder.obj()));
             }
 
             opCtx->getServiceContext()->getOpObserver()->onModifyCollectionShardingIndexCatalog(
@@ -434,12 +426,7 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                     auto idStr =
                         format(FMT_STRING("{}_{}"), uuid.toString(), i.getName().toString());
                     builder.append("_id", idStr);
-                    uassertStatusOK(
-                        collection_internal::insertDocument(opCtx,
-                                                            idxColl.getCollectionPtr(),
-                                                            InsertStatement{builder.done()},
-                                                            nullptr,
-                                                            false));
+                    uassertStatusOK(Helpers::insert(opCtx, idxColl, builder.done()));
                 }
             }
 
@@ -568,11 +555,7 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
                 repl::UnreplicatedWritesBlock unreplicatedWritesBlock(opCtx);
                 mongo::deleteObjects(opCtx, collsColl, query, true);
                 collection.setIndexVersion(boost::none);
-                uassertStatusOK(
-                    collection_internal::insertDocument(opCtx,
-                                                        collsColl.getCollectionPtr(),
-                                                        InsertStatement(collection.toBSON()),
-                                                        nullptr));
+                uassertStatusOK(Helpers::insert(opCtx, collsColl, collection.toBSON()));
             }
 
             {

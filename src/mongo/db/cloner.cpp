@@ -59,6 +59,7 @@
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
@@ -92,6 +93,17 @@ struct DefaultClonerImpl::BatchHandler {
         : lastLog(0), opCtx(opCtx), _dbName(dbName), numSeen(0), saveLast(0) {}
 
     void operator()(DBClientCursor& cursor) {
+        const auto acquireCollectionFn =
+            [&](OperationContext* opCtx) -> ScopedCollectionAcquisition {
+            return acquireCollection(
+                opCtx,
+                CollectionAcquisitionRequest(nss,
+                                             AcquisitionPrerequisites::kPretendUnsharded,
+                                             repl::ReadConcernArgs::get(opCtx),
+                                             AcquisitionPrerequisites::kWrite),
+                MODE_IX);
+        };
+
         boost::optional<Lock::DBLock> dbLock;
         // TODO SERVER-63111 Once the Cloner holds a DatabaseName obj, use _dbName directly
         DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _dbName);
@@ -106,8 +118,8 @@ struct DefaultClonerImpl::BatchHandler {
         auto databaseHolder = DatabaseHolder::get(opCtx);
         auto db = databaseHolder->openDb(opCtx, dbName);
         auto catalog = CollectionCatalog::get(opCtx);
-        auto collection = catalog->lookupCollectionByNamespace(opCtx, nss);
-        if (!collection) {
+        boost::optional<ScopedCollectionAcquisition> collection = acquireCollectionFn(opCtx);
+        if (!collection->exists()) {
             writeConflictRetry(opCtx, "createCollection", nss, [&] {
                 opCtx->checkForInterrupt();
 
@@ -120,11 +132,11 @@ struct DefaultClonerImpl::BatchHandler {
                           str::stream() << "collection creation failed during clone ["
                                         << nss.toStringForErrorMsg() << "]");
                 wunit.commit();
-                collection = catalog->lookupCollectionByNamespace(opCtx, nss);
-                invariant(collection,
-                          str::stream() << "Missing collection during clone ["
-                                        << nss.toStringForErrorMsg() << "]");
             });
+            collection.emplace(acquireCollectionFn(opCtx));
+            invariant(collection->exists(),
+                      str::stream() << "Missing collection during clone ["
+                                    << nss.toStringForErrorMsg() << "]");
         }
 
         while (cursor.moreInCurrentBatch()) {
@@ -138,6 +150,7 @@ struct DefaultClonerImpl::BatchHandler {
                 }
                 opCtx->checkForInterrupt();
 
+                collection.reset();
                 dbLock.reset();
 
                 CurOp::get(opCtx)->yielded();
@@ -161,11 +174,11 @@ struct DefaultClonerImpl::BatchHandler {
                         str::stream() << "Database " << _dbName << " dropped while cloning",
                         db != nullptr);
 
-                collection = catalog->lookupCollectionByNamespace(opCtx, nss);
+                collection.emplace(acquireCollectionFn(opCtx));
                 uassert(28594,
                         str::stream() << "Collection " << nss.toStringForErrorMsg()
                                       << " dropped while cloning",
-                        collection);
+                        collection->exists());
             }
 
             BSONObj tmp = cursor.nextSafe();
@@ -197,7 +210,7 @@ struct DefaultClonerImpl::BatchHandler {
 
                 BSONObj doc = tmp;
                 Status status = collection_internal::insertDocument(opCtx,
-                                                                    CollectionPtr(collection),
+                                                                    collection->getCollectionPtr(),
                                                                     InsertStatement(doc),
                                                                     nullptr /* OpDebug */,
                                                                     true);

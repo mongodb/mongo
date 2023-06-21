@@ -36,15 +36,16 @@
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/logv2/log.h"
@@ -347,7 +348,15 @@ bool ReshardingOplogFetcher::consume(Client* client,
             // * Parallize writing documents across multiple threads.
             // * Doing either of the above while still using the underlying message buffer of bson
             //   objects.
-            AutoGetCollection toWriteTo(opCtx, _toWriteInto, LockMode::MODE_IX);
+            const auto toWriteTo =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      _toWriteInto,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+
             for (const BSONObj& doc : batch) {
                 WriteUnitOfWork wuow(opCtx);
                 auto nextOplog = uassertStatusOK(repl::OplogEntry::parse(doc));
@@ -356,8 +365,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     ReshardingDonorOplogId::parse(IDLParserContext{"OplogFetcherParsing"},
                                                   nextOplog.get_id()->getDocument().toBson());
                 Timer insertTimer;
-                uassertStatusOK(collection_internal::insertDocument(
-                    opCtx, *toWriteTo, InsertStatement{doc}, nullptr));
+                uassertStatusOK(Helpers::insert(opCtx, toWriteTo, doc));
                 wuow.commit();
 
                 _env->metrics()->onLocalInsertDuringOplogFetching(
@@ -402,8 +410,7 @@ bool ReshardingOplogFetcher::consume(Client* client,
                     oplog.setOpTime(OplogSlot());
                     oplog.setWallClockTime(opCtx->getServiceContext()->getFastClockSource()->now());
 
-                    uassertStatusOK(collection_internal::insertDocument(
-                        opCtx, *toWriteTo, InsertStatement{oplog.toBSON()}, nullptr));
+                    uassertStatusOK(Helpers::insert(opCtx, toWriteTo, oplog.toBSON()));
                     wuow.commit();
 
                     // Also include synthetic oplog in the fetched count so it can match up with the

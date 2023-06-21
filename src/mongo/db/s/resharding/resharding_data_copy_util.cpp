@@ -47,6 +47,7 @@
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/redaction.h"
@@ -237,11 +238,14 @@ int insertBatch(OperationContext* opCtx,
                 const NamespaceString& nss,
                 std::vector<InsertStatement>& batch) {
     return writeConflictRetry(opCtx, "resharding::data_copy::insertBatch", nss, [&] {
-        AutoGetCollection outputColl(opCtx, nss, MODE_IX);
+        const auto outputColl = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, nss, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
         uassert(ErrorCodes::NamespaceNotFound,
                 str::stream() << "Collection '" << nss.toStringForErrorMsg()
                               << "' did not already exist",
-                outputColl);
+                outputColl.exists());
 
         int numBytes = 0;
         WriteUnitOfWork wuow(opCtx);
@@ -258,7 +262,7 @@ int insertBatch(OperationContext* opCtx,
         }
 
         uassertStatusOK(collection_internal::insertDocuments(
-            opCtx, *outputColl, batch.begin(), batch.end(), nullptr));
+            opCtx, outputColl.getCollectionPtr(), batch.begin(), batch.end(), nullptr));
         wuow.commit();
 
         return numBytes;

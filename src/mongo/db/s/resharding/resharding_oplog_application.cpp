@@ -298,11 +298,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
         opCtx, outputColl.getCollectionPtr(), idQuery, outputCollDoc);
 
     if (!foundDoc) {
-        uassertStatusOK(collection_internal::insertDocument(opCtx,
-                                                            outputColl.getCollectionPtr(),
-                                                            InsertStatement(oField),
-                                                            nullptr /* OpDebug */,
-                                                            false /* fromMigrate */));
+        uassertStatusOK(Helpers::insert(opCtx, outputColl, oField));
 
         return;
     }
@@ -330,11 +326,7 @@ void ReshardingOplogApplicationRules::_applyInsert_inlock(OperationContext* opCt
 
     // The doc does not belong to '_donorShardId' under the original shard key, so apply rule #4
     // and insert the contents of 'op' to the stash collection.
-    uassertStatusOK(collection_internal::insertDocument(opCtx,
-                                                        stashColl.getCollectionPtr(),
-                                                        InsertStatement(oField),
-                                                        nullptr /* OpDebug */,
-                                                        false /* fromMigrate */));
+    uassertStatusOK(Helpers::insert(opCtx, stashColl, oField));
 
     _applierMetrics->onWriteToStashCollections();
 }
@@ -590,11 +582,7 @@ void ReshardingOplogApplicationRules::_applyDelete(
         // Insert the doc we just deleted from one of the stash collections into the output
         // collection.
         if (!doc.isEmpty()) {
-            uassertStatusOK(collection_internal::insertDocument(opCtx,
-                                                                outputColl.getCollectionPtr(),
-                                                                InsertStatement(doc),
-                                                                nullptr /* OpDebug */,
-                                                                false /* fromMigrate */));
+            uassertStatusOK(Helpers::insert(opCtx, outputColl, doc));
         }
     });
 }

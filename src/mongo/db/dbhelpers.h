@@ -160,6 +160,13 @@ struct Helpers {
                        const BSONObj& updateMod,
                        bool fromMigrate = false);
 
+    /**
+     * Inserts document 'doc' into collection 'coll'.
+     */
+    static Status insert(OperationContext* opCtx,
+                         const ScopedCollectionAcquisition& coll,
+                         const BSONObj& doc);
+
     // TODO: this should be somewhere else probably
     /* Takes object o, and returns a new object with the
      * same field elements but the names stripped out.

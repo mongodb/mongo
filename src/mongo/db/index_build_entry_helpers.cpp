@@ -236,9 +236,16 @@ Status persistIndexCommitQuorum(OperationContext* opCtx, const IndexBuildEntry& 
 Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexBuildEntry) {
     return writeConflictRetry(
         opCtx, "addIndexBuildEntry", NamespaceString::kIndexBuildEntryNamespace, [&]() -> Status {
-            AutoGetCollection collection(
-                opCtx, NamespaceString::kIndexBuildEntryNamespace, MODE_IX);
-            if (!collection) {
+            const auto collection =
+                acquireCollection(opCtx,
+                                  CollectionAcquisitionRequest(
+                                      NamespaceString::kIndexBuildEntryNamespace,
+                                      PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                      repl::ReadConcernArgs::get(opCtx),
+                                      AcquisitionPrerequisites::kWrite),
+                                  MODE_IX);
+
+            if (!collection.exists()) {
                 str::stream ss;
                 ss << "Collection not found: " << NamespaceString::kIndexBuildEntryNamespace.ns();
                 return Status(ErrorCodes::NamespaceNotFound, ss);
@@ -252,7 +259,7 @@ Status addIndexBuildEntry(OperationContext* opCtx, const IndexBuildEntry& indexB
             auto oplogSlot = oplogInfo->getNextOpTimes(opCtx, 1U)[0];
             Status status = collection_internal::insertDocument(
                 opCtx,
-                *collection,
+                collection.getCollectionPtr(),
                 InsertStatement(kUninitializedStmtId, indexBuildEntry.toBSON(), oplogSlot),
                 nullptr);
 

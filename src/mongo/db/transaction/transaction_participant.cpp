@@ -60,6 +60,7 @@
 #include "mongo/db/server_recovery.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/db/stats/fill_locker_info.h"
 #include "mongo/db/storage/flow_control.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
@@ -394,8 +395,13 @@ void updateSessionEntry(OperationContext* opCtx,
 
     // TODO SERVER-58243: evaluate whether this is safe or whether acquiring the lock can block.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection collection(
-        opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IX);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(NamespaceString::kSessionTransactionsTableNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     uassert(
         40527,
@@ -403,11 +409,11 @@ void updateSessionEntry(OperationContext* opCtx,
                          "collection is missing. This indicates that the "
                       << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg()
                       << " collection has been manually deleted.",
-        collection.getCollection());
+        collection.exists());
 
     WriteUnitOfWork wuow(opCtx);
 
-    auto idIndex = collection->getIndexCatalog()->findIdIndex(opCtx);
+    auto idIndex = collection.getCollectionPtr()->getIndexCatalog()->findIdIndex(opCtx);
 
     uassert(
         40672,
@@ -415,20 +421,22 @@ void updateSessionEntry(OperationContext* opCtx,
                       << NamespaceString::kSessionTransactionsTableNamespace.toStringForErrorMsg(),
         idIndex);
 
-    const IndexCatalogEntry* entry = collection->getIndexCatalog()->getEntry(idIndex);
+    const IndexCatalogEntry* entry =
+        collection.getCollectionPtr()->getIndexCatalog()->getEntry(idIndex);
     auto indexAccess = entry->accessMethod()->asSortedData();
     // Since we are looking up a key inside the _id index, create a key object consisting of only
     // the _id field.
     auto idToFetch = updateRequest.getQuery().firstElement();
     auto toUpdateIdDoc = idToFetch.wrap();
     dassert(idToFetch.fieldNameStringData() == "_id"_sd);
-    auto recordId = indexAccess->findSingle(opCtx, *collection, entry, toUpdateIdDoc);
+    auto recordId =
+        indexAccess->findSingle(opCtx, collection.getCollectionPtr(), entry, toUpdateIdDoc);
     auto startingSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
 
     if (recordId.isNull()) {
         // Upsert case.
         auto status = collection_internal::insertDocument(
-            opCtx, *collection, InsertStatement(updateMod), nullptr, false);
+            opCtx, collection.getCollectionPtr(), InsertStatement(updateMod), nullptr, false);
 
         if (status == ErrorCodes::DuplicateKey) {
             throwWriteConflictException(
@@ -441,7 +449,8 @@ void updateSessionEntry(OperationContext* opCtx,
         return;
     }
 
-    auto originalRecordData = collection->getRecordStore()->dataFor(opCtx, recordId);
+    auto originalRecordData =
+        collection.getCollectionPtr()->getRecordStore()->dataFor(opCtx, recordId);
     auto originalDoc = originalRecordData.toBson();
 
     const auto parentLsidFieldName = SessionTxnRecord::kParentSessionIdFieldName;
@@ -453,7 +462,7 @@ void updateSessionEntry(OperationContext* opCtx,
         updateMod.getObjectField(parentLsidFieldName)
                 .woCompare(originalDoc.getObjectField(parentLsidFieldName)) == 0);
 
-    invariant(collection->getDefaultCollator() == nullptr);
+    invariant(collection.getCollectionPtr()->getDefaultCollator() == nullptr);
     boost::intrusive_ptr<ExpressionContext> expCtx(
         new ExpressionContext(opCtx, nullptr, updateRequest.getNamespaceString()));
 
@@ -473,7 +482,7 @@ void updateSessionEntry(OperationContext* opCtx,
     // Specify kUpdateNoIndexes because the sessions collection has two indexes: {_id: 1} and
     // {parentLsid: 1, _id.txnNumber: 1, _id: 1}, and none of the fields are mutable.
     collection_internal::updateDocument(opCtx,
-                                        *collection,
+                                        collection.getCollectionPtr(),
                                         recordId,
                                         Snapshotted<BSONObj>(startingSnapshotId, originalDoc),
                                         updateMod,

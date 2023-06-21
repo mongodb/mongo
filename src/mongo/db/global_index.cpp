@@ -31,10 +31,10 @@
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
@@ -212,14 +212,13 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
 }
 
 void insertKey(OperationContext* opCtx,
-               const CollectionPtr& container,
+               const ScopedCollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey) {
     const auto indexEntry = buildIndexEntry(key, docKey);
     invariant(!opCtx->writesAreReplicated());
 
-    uassertStatusOK(collection_internal::insertDocument(
-        opCtx, container, InsertStatement(indexEntry), nullptr));
+    uassertStatusOK(Helpers::insert(opCtx, container, indexEntry));
 }
 
 void insertKey(OperationContext* opCtx,
@@ -232,17 +231,19 @@ void insertKey(OperationContext* opCtx,
     // Insert the index entry.
     writeConflictRetry(opCtx, "insertGlobalIndexKey", ns, [&] {
         WriteUnitOfWork wuow(opCtx);
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        auto& container = autoColl.getCollection();
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         uassert(6789402,
                 str::stream() << "Global index container with UUID " << indexUUID
                               << " does not exist.",
-                container);
+                coll.exists());
 
         {
             repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
-            insertKey(opCtx, container, key, docKey);
+            insertKey(opCtx, coll, key, docKey);
         }
 
         opCtx->getServiceContext()->getOpObserver()->onInsertGlobalIndexKey(

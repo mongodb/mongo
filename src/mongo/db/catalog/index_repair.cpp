@@ -35,6 +35,7 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/logv2/log_debug.h"
 
 namespace mongo {
@@ -47,10 +48,17 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
     AutoGetCollection autoColl(opCtx, lostAndFoundNss, MODE_IX);
     auto catalog = CollectionCatalog::get(opCtx);
     auto originalCollection = catalog->lookupCollectionByNamespace(opCtx, nss);
-    CollectionPtr localCollection(catalog->lookupCollectionByNamespace(opCtx, lostAndFoundNss));
+
+    auto localCollection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(lostAndFoundNss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
 
     // Creates the collection if it doesn't exist.
-    if (!localCollection) {
+    if (!localCollection.exists()) {
         Status status =
             writeConflictRetry(opCtx, "createLostAndFoundCollection", lostAndFoundNss, [&]() {
                 // Ensure the database exists.
@@ -58,17 +66,14 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
                 invariant(db, lostAndFoundNss.toStringForErrorMsg());
 
                 WriteUnitOfWork wuow(opCtx);
+                ScopedLocalCatalogWriteFence scopedLocalCatalogWriteFence(opCtx, &localCollection);
 
                 // Since we are potentially deleting a document with duplicate _id values, we need
                 // to be able to insert into the lost and found collection without generating any
                 // duplicate key errors on the _id value.
                 CollectionOptions collOptions;
                 collOptions.setNoIdIndex();
-                localCollection =
-                    CollectionPtr(db->createCollection(opCtx, lostAndFoundNss, collOptions));
-
-                // Ensure the collection exists.
-                invariant(localCollection, lostAndFoundNss.toStringForErrorMsg());
+                db->createCollection(opCtx, lostAndFoundNss, collOptions);
 
                 wuow.commit();
                 return Status::OK();
@@ -78,7 +83,8 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
         }
     }
 
-    localCollection.makeYieldable(opCtx, LockedCollectionYieldRestore(opCtx, localCollection));
+    // Ensure the collection exists.
+    invariant(localCollection.exists(), lostAndFoundNss.toStringForErrorMsg());
 
     return writeConflictRetry(
         opCtx, "writeDupDocToLostAndFoundCollection", nss, [&]() -> StatusWith<int> {
@@ -94,7 +100,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
 
             // Write document to lost_and_found collection and delete from original collection.
             Status status = collection_internal::insertDocument(
-                opCtx, localCollection, InsertStatement(doc.value()), nullptr);
+                opCtx, localCollection.getCollectionPtr(), InsertStatement(doc.value()), nullptr);
             if (!status.isOK()) {
                 return status;
             }

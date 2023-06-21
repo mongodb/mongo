@@ -184,9 +184,14 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
     // the pre-images collection. There are no known cases where an operation holding an
     // exclusive lock on the pre-images collection also waits for oplog visibility.
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
-    AutoGetCollection preImagesCollectionRaii(
-        opCtx, preImagesCollectionNamespace, LockMode::MODE_IX);
-    auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
+    const auto changeStreamPreImagesCollection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(preImagesCollectionNamespace,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
     if (preImagesCollectionNamespace.tenantId() &&
         !change_stream_serverless_helpers::isChangeStreamEnabled(
             opCtx, *preImagesCollectionNamespace.tenantId())) {
@@ -194,11 +199,14 @@ void ChangeStreamPreImagesCollectionManager::insertPreImage(OperationContext* op
     }
     tassert(6646201,
             "The change stream pre-images collection is not present",
-            changeStreamPreImagesCollection);
+            changeStreamPreImagesCollection.exists());
 
     auto insertStatement = InsertStatement{preImage.toBSON()};
-    const auto insertionStatus = collection_internal::insertDocument(
-        opCtx, changeStreamPreImagesCollection, insertStatement, &CurOp::get(opCtx)->debug());
+    const auto insertionStatus =
+        collection_internal::insertDocument(opCtx,
+                                            changeStreamPreImagesCollection.getCollectionPtr(),
+                                            insertStatement,
+                                            &CurOp::get(opCtx)->debug());
     tassert(5868601,
             str::stream() << "Attempted to insert a duplicate document into the pre-images "
                              "collection. Pre-image id: "

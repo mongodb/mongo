@@ -124,6 +124,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        'dbhelpers',
         'index_builds_coordinator_interface',
         'query_exec',
         'shard_role',
@@ -1761,7 +1762,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'catalog/catalog_helpers',
         'catalog/collection_catalog',
-        'catalog/collection_crud',
         'catalog/collection_validation',
         'catalog/database_holder',
         'catalog/document_validation',

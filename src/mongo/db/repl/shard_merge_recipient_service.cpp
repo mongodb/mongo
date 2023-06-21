@@ -2275,16 +2275,23 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
     auto opCtx = opCtxHolder.get();
     const auto& nss = NamespaceString::kShardMergeRecipientsNamespace;
 
-    AutoGetCollection collection(opCtx, nss, MODE_IX);
+    const auto collection = acquireCollection(
+        opCtx,
+        CollectionAcquisitionRequest(nss,
+                                     PlacementConcern{boost::none, ShardVersion::UNSHARDED()},
+                                     repl::ReadConcernArgs::get(opCtx),
+                                     AcquisitionPrerequisites::kWrite),
+        MODE_IX);
+
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << nss.toStringForErrorMsg() << " does not exist",
-            collection);
+            collection.exists());
 
     writeConflictRetry(opCtx, "markShardMergeStateDocGarbageCollectable", nss, [&]() {
         WriteUnitOfWork wuow(opCtx);
         auto oplogSlot = LocalOplogInfo::get(opCtx)->getNextOpTimes(opCtx, 1U)[0];
         const auto originalRecordId =
-            Helpers::findById(opCtx, collection.getCollection(), BSON("_id" << _migrationUuid));
+            Helpers::findById(opCtx, collection.getCollectionPtr(), BSON("_id" << _migrationUuid));
 
         auto stateDoc = [&]() {
             stdx::lock_guard<Latch> lg(_mutex);
@@ -2323,19 +2330,19 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_durablyPersistCommitAbor
         if (originalRecordId.isNull()) {
             uassertStatusOK(collection_internal::insertDocument(
                 opCtx,
-                *collection,
+                collection.getCollectionPtr(),
                 InsertStatement(kUninitializedStmtId, stateDoc, oplogSlot),
                 nullptr));
 
         } else {
-            auto preImageDoc = collection->docFor(opCtx, originalRecordId);
+            auto preImageDoc = collection.getCollectionPtr()->docFor(opCtx, originalRecordId);
             CollectionUpdateArgs args{preImageDoc.value()};
             args.criteria = BSON("_id" << _migrationUuid);
             args.oplogSlots = {oplogSlot};
             args.update = stateDoc;
 
             collection_internal::updateDocument(opCtx,
-                                                *collection,
+                                                collection.getCollectionPtr(),
                                                 originalRecordId,
                                                 preImageDoc,
                                                 stateDoc,
