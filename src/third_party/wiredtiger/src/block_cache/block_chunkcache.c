@@ -275,13 +275,14 @@ __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid
     WT_CHUNKCACHE_HASHID hash_id;
     WT_DECL_RET;
     size_t already_read, remains_to_read, readable_in_chunk, size_copied;
-    uint64_t bucket_id, retries;
+    uint64_t bucket_id, retries, sleep_usec;
     bool chunk_cached;
 
     chunkcache = &S2C(session)->chunkcache;
     already_read = 0;
     remains_to_read = size;
     retries = 0;
+    sleep_usec = WT_THOUSAND;
 
     if (!chunkcache->configured)
         return (ENOTSUP);
@@ -303,18 +304,10 @@ retry:
                 /* If the chunk is there, but invalid, there is I/O in progress. Retry. */
                 if (!chunk->valid) {
                     __wt_spin_unlock(session, WT_BUCKET_LOCK(chunkcache, bucket_id));
-                    if (retries++ > WT_CHUNKCACHE_MAX_RETRIES) {
-                        __wt_verbose(session, WT_VERB_CHUNKCACHE,
-                          "lookup timed out after %" PRIu64 " retries", retries);
-                        WT_STAT_CONN_INCR(session, chunk_cache_toomany_retries);
-                        return (EAGAIN);
-                    }
-
-                    if (retries < WT_THOUSAND)
-                        __wt_yield();
-                    else
-                        __wt_sleep(0, WT_THOUSAND);
+                    __wt_spin_backoff(&retries, &sleep_usec);
                     WT_STAT_CONN_INCR(session, chunk_cache_retries);
+                    if (retries > WT_CHUNKCACHE_MAX_RETRIES)
+                        WT_STAT_CONN_INCR(session, chunk_cache_toomany_retries);
                     goto retry;
                 }
                 /* Found the needed chunk. */
