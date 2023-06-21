@@ -9,7 +9,7 @@ load("jstests/libs/sbe_util.js");
 
 const testDb = db.getSiblingDB(jsTestName());
 // This test is specifically verifying the behavior of the SBE plan cache.
-if (!checkSBEEnabled(testDb, ["featureFlagSbeFull"])) {
+if (!checkSBEEnabled(testDb)) {
     jsTestLog("Skipping test because SBE is not enabled");
     return;
 }

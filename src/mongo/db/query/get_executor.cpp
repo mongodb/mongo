@@ -1426,33 +1426,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getSlotBasedExe
 }  // getSlotBasedExecutor
 
 /**
- * Checks if the result of query planning is SBE compatible. If any of the query solutions in
- * 'planningResult' cannot currently be compiled to an SBE plan via the SBE stage builders, then we
- * will fall back to the classic engine.
- */
-bool shouldPlanningResultUseSbe(const SlotBasedPrepareExecutionResult& planningResult) {
-    // If we have an entry in the SBE plan cache, then we can use SBE.
-    if (planningResult.isRecoveredFromPlanCache()) {
-        return true;
-    }
-
-    const auto& solutions = planningResult.solutions();
-    if (solutions.empty()) {
-        // Query needs subplanning (plans are generated later, we don't have access yet). We can
-        // proceed with using SBE in this case.
-        invariant(planningResult.needsSubplanning());
-        return true;
-    }
-
-    // Check that all query solutions are SBE compatible.
-    return std::all_of(solutions.begin(), solutions.end(), [](const auto& solution) {
-        // We must have a solution, otherwise we would have early exited.
-        invariant(solution->root());
-        return isQueryPlanSbeCompatible(solution.get());
-    });
-}
-
-/**
  * Function which returns true if 'cq' uses features that are currently supported in SBE without
  * 'featureFlagSbeFull' being set; false otherwise.
  */
@@ -1518,9 +1491,6 @@ attemptToGetSlotBasedExecutor(
     // SBE-compatible query using SBE, even if the query uses features that are not on in SBE by
     // default. Either way, try to construct an SBE plan executor.
     if (canUseRegularSbe || sbeFull) {
-        // Create the SBE prepare execution helper and initialize the params for the planner. If
-        // planning results in any 'QuerySolution' which cannot be handled by the SBE stage builder,
-        // then we will fall back to the classic engine.
         stdx::variant<const Yieldable*, PlanYieldPolicy::YieldThroughAcquisitions> yieldable;
         if (collections.isAcquisition()) {
             yieldable = PlanYieldPolicy::YieldThroughAcquisitions{};
@@ -1536,24 +1506,22 @@ attemptToGetSlotBasedExecutor(
             return planningResultWithStatus.getStatus();
         }
 
-        if (shouldPlanningResultUseSbe(*planningResultWithStatus.getValue())) {
-            if (extractAndAttachPipelineStages) {
-                // We know now that we will use SBE, so we need to remove the pushed-down stages
-                // from the original pipeline object.
-                extractAndAttachPipelineStages(canonicalQuery.get(), false /* attachOnly */);
-            }
-            auto statusWithExecutor =
-                getSlotBasedExecutor(opCtx,
-                                     collections,
-                                     std::move(canonicalQuery),
-                                     std::move(sbeYieldPolicy),
-                                     plannerParams,
-                                     std::move(planningResultWithStatus.getValue()));
-            if (statusWithExecutor.isOK()) {
-                return std::move(statusWithExecutor.getValue());
-            } else {
-                return statusWithExecutor.getStatus();
-            }
+        if (extractAndAttachPipelineStages) {
+            // Given that we are using SBE, we need to remove the pushed-down stages
+            // from the original pipeline object.
+            extractAndAttachPipelineStages(canonicalQuery.get(), false /* attachOnly */);
+        }
+        auto statusWithExecutor =
+            getSlotBasedExecutor(opCtx,
+                                 collections,
+                                 std::move(canonicalQuery),
+                                 std::move(sbeYieldPolicy),
+                                 plannerParams,
+                                 std::move(planningResultWithStatus.getValue()));
+        if (statusWithExecutor.isOK()) {
+            return std::move(statusWithExecutor.getValue());
+        } else {
+            return statusWithExecutor.getStatus();
         }
     }
 
