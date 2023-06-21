@@ -2408,11 +2408,12 @@ struct __wt_connection {
      * handle from the configured session_max., an integer between \c 3 and \c 20; default \c 4.}
      * @config{ ),,}
      * @config{operation_timeout_ms, if non-zero\, a requested limit on the number of elapsed real
-     * time milliseconds application threads will take to complete database operations.  Time is
-     * measured from the start of each WiredTiger API call.  There is no guarantee any operation
-     * will not take longer than this amount of time.  If WiredTiger notices the limit has been
-     * exceeded\, an operation may return a WT_ROLLBACK error.  The default of 0 is to have no
-     * limit., an integer greater than or equal to \c 0; default \c 0.}
+     * time milliseconds application threads will take to complete database operations.  This
+     * setting only applies inside of a transaction.  Time is measured from the start of each
+     * WiredTiger API call.  There is no guarantee any operation will not take longer than this
+     * amount of time.  If WiredTiger notices the limit has been exceeded\, an operation may return
+     * a WT_ROLLBACK error.  The default of 0 is to have no limit., an integer greater than or equal
+     * to \c 0; default \c 0.}
      * @config{operation_tracking = (, enable tracking of performance-critical functions.  See @ref
      * operation_tracking for more information., a set of related configuration options defined as
      * follows.}
@@ -3245,11 +3246,11 @@ struct __wt_connection {
  * for primary processes and use RPC for secondary processes). <b>Not yet supported in
  * WiredTiger</b>., a boolean flag; default \c false.}
  * @config{operation_timeout_ms, if non-zero\, a requested limit on the number of elapsed real time
- * milliseconds application threads will take to complete database operations.  Time is measured
- * from the start of each WiredTiger API call.  There is no guarantee any operation will not take
- * longer than this amount of time.  If WiredTiger notices the limit has been exceeded\, an
- * operation may return a WT_ROLLBACK error.  The default of 0 is to have no limit., an integer
- * greater than or equal to \c 0; default \c 0.}
+ * milliseconds application threads will take to complete database operations.  This setting only
+ * applies inside of a transaction.  Time is measured from the start of each WiredTiger API call.
+ * There is no guarantee any operation will not take longer than this amount of time.  If WiredTiger
+ * notices the limit has been exceeded\, an operation may return a WT_ROLLBACK error.  The default
+ * of 0 is to have no limit., an integer greater than or equal to \c 0; default \c 0.}
  * @config{operation_tracking = (, enable tracking of performance-critical functions.  See @ref
  * operation_tracking for more information., a set of related configuration options defined as
  * follows.}
