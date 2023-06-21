@@ -32,6 +32,7 @@
 #include <boost/utility/in_place_factory.hpp>
 
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
@@ -421,7 +422,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
     auto status = initializeBucketState(
         catalog.bucketStateRegistry, bucket->bucketId, bucket.get(), targetEra);
 
-    // Forward the WriteConflict when the bucket has been cleared or has a pending direct write.
+    // Forward the WriteConflict if the bucket has been cleared or has a pending direct write.
     if (!status.isOK()) {
         return status;
     }
@@ -1135,7 +1136,11 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     stripe.openBucketsByKey[info.key].emplace(bucket);
 
     auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
-    invariant(status.isOK());
+    if (!status.isOK()) {
+        stripe.openBucketsByKey[info.key].erase(bucket);
+        stripe.openBucketsById.erase(it);
+        throwWriteConflictException(status.reason());
+    }
 
     catalog.numberOfActiveBuckets.fetchAndAdd(1);
     if (info.openedDuetoMetadata) {
