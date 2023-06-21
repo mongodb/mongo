@@ -159,7 +159,8 @@ public:
     std::vector<BSONObj> removeExistingIndexesNoChecks(
         OperationContext* opCtx,
         const CollectionPtr& collection,
-        const std::vector<BSONObj>& indexSpecsToBuild) const override;
+        const std::vector<BSONObj>& indexSpecsToBuild,
+        bool removeInProgressIndexBuilds) const override;
 
     void dropIndexes(OperationContext* opCtx,
                      Collection* collection,
