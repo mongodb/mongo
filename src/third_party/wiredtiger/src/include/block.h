@@ -249,7 +249,6 @@ struct __wt_block {
 
     TAILQ_ENTRY(__wt_block) q;     /* Linked list of handles */
     TAILQ_ENTRY(__wt_block) hashq; /* Hashed list of handles */
-    bool linked;
 
     WT_FH *fh;            /* Backing file handle */
     wt_off_t size;        /* File size */
