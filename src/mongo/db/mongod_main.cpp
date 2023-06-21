@@ -149,7 +149,9 @@
 #include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/db/s/move_primary/move_primary_recipient_service.h"
 #include "mongo/db/s/periodic_sharded_index_consistency_checker.h"
-#include "mongo/db/s/query_analysis_op_observer.h"
+#include "mongo/db/s/query_analysis_op_observer_configsvr.h"
+#include "mongo/db/s/query_analysis_op_observer_rs.h"
+#include "mongo/db/s/query_analysis_op_observer_shardsvr.h"
 #include "mongo/db/s/rename_collection_participant_service.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
 #include "mongo/db/s/resharding/resharding_donor_service.h"
@@ -1296,6 +1298,10 @@ void setUpObservers(ServiceContext* serviceContext) {
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
+        if (!gMultitenancySupport) {
+            opObserverRegistry->addObserver(
+                std::make_unique<analyze_shard_key::QueryAnalysisOpObserverShardSvr>());
+        }
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
@@ -1306,6 +1312,10 @@ void setUpObservers(ServiceContext* serviceContext) {
 
         opObserverRegistry->addObserver(std::make_unique<ConfigServerOpObserver>());
         opObserverRegistry->addObserver(std::make_unique<ReshardingOpObserver>());
+        if (!gMultitenancySupport) {
+            opObserverRegistry->addObserver(
+                std::make_unique<analyze_shard_key::QueryAnalysisOpObserverConfigSvr>());
+        }
     }
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
@@ -1321,6 +1331,12 @@ void setUpObservers(ServiceContext* serviceContext) {
             opObserverRegistry->addObserver(
                 std::make_unique<repl::ShardMergeRecipientOpObserver>());
         }
+
+        auto replCoord = repl::ReplicationCoordinator::get(serviceContext);
+        if (!gMultitenancySupport && replCoord && replCoord->isReplEnabled()) {
+            opObserverRegistry->addObserver(
+                std::make_unique<analyze_shard_key::QueryAnalysisOpObserverRS>());
+        }
     }
 
     opObserverRegistry->addObserver(std::make_unique<FallbackOpObserver>());
@@ -1330,7 +1346,6 @@ void setUpObservers(ServiceContext* serviceContext) {
         std::make_unique<repl::PrimaryOnlyServiceOpObserver>(serviceContext));
     opObserverRegistry->addObserver(std::make_unique<FcvOpObserver>());
     opObserverRegistry->addObserver(std::make_unique<ClusterServerParameterOpObserver>());
-    opObserverRegistry->addObserver(std::make_unique<analyze_shard_key::QueryAnalysisOpObserver>());
 
     setupFreeMonitoringOpObserver(opObserverRegistry.get());
 

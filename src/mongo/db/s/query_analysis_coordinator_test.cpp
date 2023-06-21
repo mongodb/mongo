@@ -31,7 +31,7 @@
 
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
-#include "mongo/db/s/query_analysis_op_observer.h"
+#include "mongo/db/s/query_analysis_op_observer_configsvr.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
@@ -56,7 +56,7 @@ public:
         ConfigServerTestFixture::setupOpObservers();
         auto opObserverRegistry =
             checked_cast<OpObserverRegistry*>(getServiceContext()->getOpObserver());
-        opObserverRegistry->addObserver(std::make_unique<QueryAnalysisOpObserver>());
+        opObserverRegistry->addObserver(std::make_unique<QueryAnalysisOpObserverConfigSvr>());
     }
 
 protected:
