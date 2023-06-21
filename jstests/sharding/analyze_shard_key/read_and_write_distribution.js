@@ -444,6 +444,8 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
             (numShardKeyUpdates >= testCase.metrics.writeDistribution.numShardKeyUpdates);
     });
 
+    jsTest.log("??? res " + tojson(res));
+
     return res;
 }
 
