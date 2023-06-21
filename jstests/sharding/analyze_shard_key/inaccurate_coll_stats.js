@@ -78,14 +78,14 @@ function runTest(conn, {rst, st}) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXBefore.keyCharacteristics, {
         numDocs: docs.length,
         isUnique: false,
         numDistinctValues: numDistinctXValues,
         mostCommonValues: mostCommonXValues,
         numMostCommonValues
     });
-    assert.eq(resXBefore.avgDocSizeBytes, Object.bsonsize(docs[0]));
+    assert.eq(resXBefore.keyCharacteristics.avgDocSizeBytes, Object.bsonsize(docs[0]));
 
     const resYBefore = assert.commandWorked(conn.adminCommand({
         analyzeShardKey: ns,
@@ -94,14 +94,14 @@ function runTest(conn, {rst, st}) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYBefore, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYBefore.keyCharacteristics, {
         numDocs: docs.length,
         isUnique: true,
         numDistinctValues: numDistinctYValues,
         mostCommonValues: mostCommonYValues,
         numMostCommonValues
     });
-    assert.eq(resYBefore.avgDocSizeBytes, Object.bsonsize(docs[0]));
+    assert.eq(resYBefore.keyCharacteristics.avgDocSizeBytes, Object.bsonsize(docs[0]));
 
     assert(rst || st);
     const rstToKill = rst ? rst : st.rs0;
@@ -149,14 +149,14 @@ function runTest(conn, {rst, st}) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXAfter, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resXAfter.keyCharacteristics, {
         numDocs: docs.length,
         isUnique: false,
         numDistinctValues: numDistinctXValues,
         mostCommonValues: mostCommonXValues,
         numMostCommonValues
     });
-    assert.eq(resXAfter.avgDocSizeBytes, Object.bsonsize({}));
+    assert.eq(resXAfter.keyCharacteristics.avgDocSizeBytes, Object.bsonsize({}));
 
     // The cardinality and frequency metrics for {y: 1} should be inaccurate since the metrics
     // calculation for a shard key that is unique depends on fast count (this is optimization that
@@ -172,14 +172,14 @@ function runTest(conn, {rst, st}) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYAfter, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(resYAfter.keyCharacteristics, {
         numDocs: numMostCommonValues,
         isUnique: true,
         numDistinctValues: numMostCommonValues,
         mostCommonValues: mostCommonYValues,
         numMostCommonValues
     });
-    assert.eq(resYAfter.avgDocSizeBytes, Object.bsonsize({}));
+    assert.eq(resYAfter.keyCharacteristics.avgDocSizeBytes, Object.bsonsize({}));
 
     let runAnalyzeShardKeyCmd = (host, ns, key) => {
         const conn = new Mongo(host);

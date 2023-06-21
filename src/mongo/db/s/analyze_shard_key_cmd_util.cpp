@@ -78,6 +78,13 @@ constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
 const int64_t kEmptyDocSizeBytes = BSONObj().objsize();
 
+const std::string kOrphanDocsWarningMessage = "If \"" +
+    KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
+    KeyCharacteristicsMetrics::kNumDocsTotalFieldName +
+    "\", you may want to rerun the command at some other time to get more accurate \"" +
+    KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
+    KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
+
 /**
  * Returns an aggregate command request for calculating the cardinality and frequency metrics for
  * the given shard key.
@@ -860,11 +867,12 @@ std::pair<BSONObj, Timestamp> generateSplitPoints(OperationContext* opCtx,
 
 }  // namespace
 
-KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
-                                                             const UUID& analyzeShardKeyId,
-                                                             const NamespaceString& nss,
-                                                             const UUID& collUuid,
-                                                             const KeyPattern& shardKey) {
+boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
+    OperationContext* opCtx,
+    const UUID& analyzeShardKeyId,
+    const NamespaceString& nss,
+    const UUID& collUuid,
+    const KeyPattern& shardKey) {
     KeyCharacteristicsMetrics metrics;
 
     auto shardKeyBson = shardKey.toBSON();
@@ -908,7 +916,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
             opCtx, *collection, collection->getIndexCatalog(), shardKeyBson);
 
         if (!indexSpec) {
-            return {};
+            return boost::none;
         }
 
         indexKeyBson = indexSpec->keyPattern.getOwned();
@@ -951,7 +959,7 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
           "Start calculating metrics about the cardinality and frequency of the shard key",
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId);
-    auto cardinalityFrequencyMetrics = *metrics.getIsUnique()
+    auto cardinalityFrequencyMetrics = metrics.getIsUnique()
         ? calculateCardinalityAndFrequencyUnique(
               opCtx, analyzeShardKeyId, nss, shardKeyBson, collStatsMetrics.numDocs)
         : calculateCardinalityAndFrequencyGeneric(
@@ -967,15 +975,19 @@ KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* o
             "Cannot analyze the characteristics of a shard key for an empty collection",
             cardinalityFrequencyMetrics.numDocs > 0);
 
-    metrics.setNumDocs(cardinalityFrequencyMetrics.numDocs);
-    metrics.setNumDistinctValues(cardinalityFrequencyMetrics.numDistinctValues);
-    metrics.setMostCommonValues(cardinalityFrequencyMetrics.mostCommonValues);
+    metrics.setNumDocsTotal(cardinalityFrequencyMetrics.numDocs);
+    if (collStatsMetrics.numOrphanDocs) {
+        metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
+        metrics.setNote(StringData(kOrphanDocsWarningMessage));
+    }
     // The average document size returned by $collStats can be inaccurate (or even zero) if there
     // has been an unclean shutdown since that can result in inaccurate fast data statistics. To
     // avoid nonsensical metrics, set the lower limit for the average document size to the size of
     // an empty document.
     metrics.setAvgDocSizeBytes(std::max(kEmptyDocSizeBytes, collStatsMetrics.avgDocSizeBytes));
-    metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
+
+    metrics.setNumDistinctValues(cardinalityFrequencyMetrics.numDistinctValues);
+    metrics.setMostCommonValues(cardinalityFrequencyMetrics.mostCommonValues);
 
     LOGV2(7790007,
           "Finished calculating metrics about the characteristics of the shard key",

@@ -41,7 +41,7 @@ function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
             // this test.
             readWriteDistribution: false
         }));
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, metrics);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, metrics);
     }
 }
 

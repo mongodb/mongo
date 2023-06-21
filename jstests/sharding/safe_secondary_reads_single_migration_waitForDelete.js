@@ -125,7 +125,7 @@ let testCases = {
         checkResults: function(res) {
             // The command should work and return correct results.
             assert.commandWorked(res);
-            assert.eq(res.numDocs, 1000, res);
+            assert.eq(res.keyCharacteristics.numDocsTotal, 1000, res);
         },
         behavior: "versioned"
     },

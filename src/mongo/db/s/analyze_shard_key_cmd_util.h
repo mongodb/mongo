@@ -40,11 +40,12 @@ namespace analyze_shard_key {
  * Returns metrics about the characteristics of the shard key (i.e. the cardinality, frequency
  * and monotonicity) if the shard key has a supporting index.
  */
-KeyCharacteristicsMetrics calculateKeyCharacteristicsMetrics(OperationContext* opCtx,
-                                                             const UUID& analyzeShardKeyId,
-                                                             const NamespaceString& nss,
-                                                             const UUID& collUuid,
-                                                             const KeyPattern& shardKey);
+boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
+    OperationContext* opCtx,
+    const UUID& analyzeShardKeyId,
+    const NamespaceString& nss,
+    const UUID& collUuid,
+    const KeyPattern& shardKey);
 
 /**
  * Returns metrics about the read and write distribution based on sampled queries.

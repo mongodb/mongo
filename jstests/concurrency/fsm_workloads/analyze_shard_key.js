@@ -464,10 +464,10 @@ var $config = extendWorkload($config, function($config, $super) {
      * Verifies that the metrics about the characteristics of the shard key are within acceptable
      * ranges.
      */
-    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(
-        metrics) {
+    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(res) {
         // Perform basic validation of the metrics.
-        AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(metrics);
+        AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res);
+        const metrics = res.keyCharacteristics;
         assert.eq(metrics.isUnique, this.shardKeyOptions.isUnique, metrics);
 
         // Validate the cardinality metrics. Due to the concurrent writes by other threads, it is
@@ -594,8 +594,8 @@ var $config = extendWorkload($config, function($config, $super) {
      * Verifies that the metrics about the read and write distribution are within acceptable ranges.
      */
     $config.data.assertReadWriteDistributionMetrics = function assertReadWriteDistributionMetrics(
-        metrics, isFinal) {
-        AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(metrics);
+        res, isFinal) {
+        AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res);
 
         let assertReadMetricsDiff = (actual, expected) => {
             const maxDiff = isFinal ? this.finalReadDistributionMetricsMaxDiff
@@ -609,36 +609,33 @@ var $config = extendWorkload($config, function($config, $super) {
         };
 
         const currentNumSampledQueries =
-            metrics.readDistribution.sampleSize.total + metrics.writeDistribution.sampleSize.total;
+            res.readDistribution.sampleSize.total + res.writeDistribution.sampleSize.total;
         this.previousNumSampledQueries = currentNumSampledQueries;
 
-        if (this.shouldValidateReadDistribution(metrics.readDistribution.sampleSize)) {
-            assertReadMetricsDiff(metrics.readDistribution.percentageOfSingleShardReads,
+        if (this.shouldValidateReadDistribution(res.readDistribution.sampleSize)) {
+            assertReadMetricsDiff(res.readDistribution.percentageOfSingleShardReads,
                                   this.readDistribution.percentageOfSingleShardReads);
-            assertReadMetricsDiff(metrics.readDistribution.percentageOfMultiShardReads,
+            assertReadMetricsDiff(res.readDistribution.percentageOfMultiShardReads,
                                   this.readDistribution.percentageOfMultiShardReads);
-            assertReadMetricsDiff(metrics.readDistribution.percentageOfScatterGatherReads,
+            assertReadMetricsDiff(res.readDistribution.percentageOfScatterGatherReads,
                                   this.readDistribution.percentageOfScatterGatherReads);
-            assert.eq(metrics.readDistribution.numReadsByRange.length,
-                      this.analyzeShardKeyNumRanges);
+            assert.eq(res.readDistribution.numReadsByRange.length, this.analyzeShardKeyNumRanges);
         }
 
-        if (this.shouldValidateWriteDistribution(metrics.writeDistribution.sampleSize)) {
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfSingleShardWrites,
+        if (this.shouldValidateWriteDistribution(res.writeDistribution.sampleSize)) {
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfSingleShardWrites,
                                    this.writeDistribution.percentageOfSingleShardWrites);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiShardWrites,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiShardWrites,
                                    this.writeDistribution.percentageOfMultiShardWrites);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfScatterGatherWrites,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfScatterGatherWrites,
                                    this.writeDistribution.percentageOfScatterGatherWrites);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfShardKeyUpdates,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfShardKeyUpdates,
                                    this.writeDistribution.percentageOfShardKeyUpdates);
-            assertWriteMetricsDiff(
-                metrics.writeDistribution.percentageOfSingleWritesWithoutShardKey,
-                this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiWritesWithoutShardKey,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfSingleWritesWithoutShardKey,
+                                   this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiWritesWithoutShardKey,
                                    this.writeDistribution.percentageOfMultiWritesWithoutShardKey);
-            assert.eq(metrics.writeDistribution.numWritesByRange.length,
-                      this.analyzeShardKeyNumRanges);
+            assert.eq(res.writeDistribution.numWritesByRange.length, this.analyzeShardKeyNumRanges);
         }
     };
 

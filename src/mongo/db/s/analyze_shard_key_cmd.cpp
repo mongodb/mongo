@@ -49,13 +49,6 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyFailBeforeMetricsCalculation);
 
-const std::string kOrphanDocsWarningMessage = "If \"" +
-    KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
-    KeyCharacteristicsMetrics::kNumDocsFieldName +
-    "\", you may want to rerun the command at some other time to get more accurate \"" +
-    KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
-    KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
-
 class AnalyzeShardKeyCmd : public TypedCommand<AnalyzeShardKeyCmd> {
 public:
     using Request = AnalyzeShardKey;
@@ -105,11 +98,7 @@ public:
             if (request().getAnalyzeKeyCharacteristics()) {
                 auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
                     opCtx, analyzeShardKeyId, nss, collUuid, key);
-                response.setKeyCharacteristics(keyCharacteristics);
-                if (response.getNumOrphanDocs()) {
-                    response.setNote(StringData(kOrphanDocsWarningMessage));
-                }
-                if (!response.getNumDocs()) {
+                if (!keyCharacteristics) {
                     // No calculation was performed. By design this must be because the shard key
                     // does not have a supporting index. If the command is not requesting the
                     // metrics about the read and write distribution, there are no metrics to
@@ -120,6 +109,7 @@ public:
                         "supporting index",
                         request().getAnalyzeReadWriteDistribution());
                 }
+                response.setKeyCharacteristics(keyCharacteristics);
             }
 
             // Calculate metrics about the read and write distribution from sampled queries. Query

@@ -38,7 +38,7 @@ function testAnalyzeShardKeyUnshardedCollection(conn) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs: 1,
         isUnique: false,
         numDistinctValues: 1,
@@ -87,7 +87,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs: 5,
         isUnique: false,
         numDistinctValues: 5,
@@ -100,8 +100,8 @@ function testAnalyzeShardKeyShardedCollection(st) {
         ],
         numMostCommonValues
     });
-    assert(res.hasOwnProperty("numOrphanDocs"), res);
-    assert.eq(res.numOrphanDocs, 0, res);
+    assert(res.keyCharacteristics.hasOwnProperty("numOrphanDocs"), res);
+    assert.eq(res.keyCharacteristics.numOrphanDocs, 0, res);
 
     // Pause range deletion on both shards.
     let suspendRangeDeletionFp0 = configureFailPoint(st.shard0, "suspendRangeDeletion");
@@ -120,7 +120,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs: 6,
         isUnique: false,
         numDistinctValues: 5,
@@ -133,8 +133,8 @@ function testAnalyzeShardKeyShardedCollection(st) {
         ],
         numMostCommonValues
     });
-    assert(res.hasOwnProperty("numOrphanDocs"), res);
-    assert.eq(res.numOrphanDocs, 1, res);
+    assert(res.keyCharacteristics.hasOwnProperty("numOrphanDocs"), res);
+    assert.eq(res.keyCharacteristics.numOrphanDocs, 1, res);
 
     // Analyze a shard key while two shards have orphan documents. Chunk distribution:
     // shard0: [MinKey, -5], [5, MaxKey]
@@ -149,7 +149,7 @@ function testAnalyzeShardKeyShardedCollection(st) {
         // this test.
         readWriteDistribution: false
     }));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, {
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, {
         numDocs: 8,
         isUnique: false,
         numDistinctValues: 5,
@@ -162,9 +162,9 @@ function testAnalyzeShardKeyShardedCollection(st) {
         ],
         numMostCommonValues
     });
-    assert(res.hasOwnProperty("numOrphanDocs"), res);
-    assert.eq(res.numOrphanDocs, 3, res);
-    assert(res.hasOwnProperty("note"), res);
+    assert(res.keyCharacteristics.hasOwnProperty("numOrphanDocs"), res);
+    assert.eq(res.keyCharacteristics.numOrphanDocs, 3, res);
+    assert(res.keyCharacteristics.hasOwnProperty("note"), res);
 
     suspendRangeDeletionFp0.off();
     suspendRangeDeletionFp1.off();
