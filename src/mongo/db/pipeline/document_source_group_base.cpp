@@ -512,7 +512,6 @@ void DocumentSourceGroupBase::processDocument(const Value& id, const Document& r
     vector<intrusive_ptr<AccumulatorState>>& group = (*_groups)[id];
     const bool inserted = _groups->size() != oldSize;
 
-    vector<uint64_t> oldAccumMemUsage(numAccumulators, 0);
     if (inserted) {
         _memoryTracker.set(_memoryTracker.currentMemoryBytes() + id.getApproximateSize());
 

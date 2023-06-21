@@ -95,10 +95,10 @@ boost::intrusive_ptr<DocumentSourceStreamingGroup> DocumentSourceStreamingGroup:
     for (auto&& statement : accumulationStatements) {
         groupStage->addAccumulator(statement);
     }
-    tassert(7026709,
+    uassert(7026709,
             "streaming group must have at least one monotonic id expression",
             !monotonicExpressionIndexes.empty());
-    tassert(7026710,
+    uassert(7026710,
             "streaming group monotonic expression indexes must correspond to id expressions",
             std::all_of(monotonicExpressionIndexes.begin(),
                         monotonicExpressionIndexes.end(),
@@ -250,7 +250,7 @@ bool DocumentSourceStreamingGroup::checkForBatchEndAndUpdateLastIdValues(
         // of the exact same array could appear in the input sequence, but with a different array in
         // the middle of them, and that would still be considered sorted. That would break our
         // batching group logic.
-        tassert(7026708,
+        uassert(7026708,
                 "Monotonic value should not be missing, null or an array",
                 !value.nullish() && !value.isArray());
         return value;
