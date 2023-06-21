@@ -215,6 +215,17 @@ lz4_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session, uint8_t *src, siz
           (int)prefix.compressed_len, (int)dst_len);
 
     if (decoded >= 0) {
+        /*
+         * In the majority of cases, when the compressor successfully decompresses the entire source
+         * data, the decoded bytes matches the useful length. However, there are some situations
+         * where the data is corrupted and the compressor is unable to decompress the entire source
+         * data, in which case it differs and we should return an error.
+         */
+        if ((uint32_t)decoded != prefix.useful_len) {
+            (void)wt_api->err_printf(wt_api, session,
+              "WT_COMPRESSOR.decompress: decoded length does not match the useful length");
+            return (WT_ERROR);
+        }
         *result_lenp = prefix.useful_len;
         return (0);
     }
