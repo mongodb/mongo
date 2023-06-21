@@ -447,6 +447,7 @@ protected:
 private:
     bool isVisible(const RecordId& id);
     void initCappedVisibility(OperationContext* opCtx);
+    void reportOutOfOrderRead(RecordId& id, bool failWithOutOfOrderForTest);
 
     /**
      * This value is used for visibility calculations on what oplog entries can be returned to a

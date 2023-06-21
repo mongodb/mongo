@@ -2050,48 +2050,7 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     if ((_forward && _lastReturnedId >= id) ||
         (!_forward && !_lastReturnedId.isNull() && id >= _lastReturnedId) ||
         MONGO_unlikely(failWithOutOfOrderForTest)) {
-        HealthLogEntry entry;
-        entry.setNss(namespaceForUUID(_opCtx, _uuid));
-        entry.setTimestamp(Date_t::now());
-        entry.setSeverity(SeverityEnum::Error);
-        entry.setScope(ScopeEnum::Collection);
-        entry.setOperation("WT_Cursor::next");
-        entry.setMsg("Cursor returned out-of-order keys");
-
-        BSONObjBuilder bob;
-        bob.append("forward", _forward);
-        bob.append("next", id.toString());
-        bob.append("last", _lastReturnedId.toString());
-        bob.append("ident", _ident);
-        bob.appendElements(getStackTrace().getBSONRepresentation());
-        entry.setData(bob.obj());
-
-        HealthLogInterface::get(_opCtx)->log(entry);
-
-        if (!failWithOutOfOrderForTest) {
-            // Crash when testing diagnostics are enabled and not explicitly uasserting on
-            // out-of-order keys.
-            invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
-        }
-
-        auto options = [&] {
-            if (_opCtx->recoveryUnit()->getDataCorruptionDetectionMode() ==
-                DataCorruptionDetectionMode::kThrow) {
-                // uassert with 'DataCorruptionDetected' after logging.
-                return logv2::LogOptions{
-                    logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
-            } else {
-                return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
-            }
-        }();
-        LOGV2_ERROR_OPTIONS(22406,
-                            options,
-                            "WT_Cursor::next -- returned out-of-order keys",
-                            "forward"_attr = _forward,
-                            "next"_attr = id,
-                            "last"_attr = _lastReturnedId,
-                            "ident"_attr = _ident,
-                            "ns"_attr = namespaceForUUID(_opCtx, _uuid));
+        reportOutOfOrderRead(id, failWithOutOfOrderForTest);
     }
 
     WT_ITEM value;
@@ -2105,6 +2064,53 @@ boost::optional<Record> WiredTigerRecordStoreCursorBase::next() {
     _lastReturnedId = id;
     return {{std::move(id), {static_cast<const char*>(value.data), static_cast<int>(value.size)}}};
 }
+
+void WiredTigerRecordStoreCursorBase::reportOutOfOrderRead(RecordId& id,
+                                                           bool failWithOutOfOrderForTest) {
+    HealthLogEntry entry;
+    entry.setNss(namespaceForUUID(_opCtx, _uuid));
+    entry.setTimestamp(Date_t::now());
+    entry.setSeverity(SeverityEnum::Error);
+    entry.setScope(ScopeEnum::Collection);
+    entry.setOperation("WT_Cursor::next");
+    entry.setMsg("Cursor returned out-of-order keys");
+
+    BSONObjBuilder bob;
+    bob.append("forward", _forward);
+    bob.append("next", id.toString());
+    bob.append("last", _lastReturnedId.toString());
+    bob.append("ident", _ident);
+    bob.appendElements(getStackTrace().getBSONRepresentation());
+    entry.setData(bob.obj());
+
+    HealthLogInterface::get(_opCtx)->log(entry);
+
+    if (!failWithOutOfOrderForTest) {
+        // Crash when testing diagnostics are enabled and not explicitly uasserting on
+        // out-of-order keys.
+        invariant(!TestingProctor::instance().isEnabled(), "cursor returned out-of-order keys");
+    }
+
+    auto options = [&] {
+        if (_opCtx->recoveryUnit()->getDataCorruptionDetectionMode() ==
+            DataCorruptionDetectionMode::kThrow) {
+            // uassert with 'DataCorruptionDetected' after logging.
+            return logv2::LogOptions{logv2::UserAssertAfterLog(ErrorCodes::DataCorruptionDetected)};
+        } else {
+            return logv2::LogOptions(logv2::LogComponent::kAutomaticDetermination);
+        }
+    }();
+
+    LOGV2_ERROR_OPTIONS(22406,
+                        options,
+                        "WT_Cursor::next -- returned out-of-order keys",
+                        "forward"_attr = _forward,
+                        "next"_attr = id,
+                        "last"_attr = _lastReturnedId,
+                        "ident"_attr = _ident,
+                        "ns"_attr = namespaceForUUID(_opCtx, _uuid));
+}
+
 
 boost::optional<Record> WiredTigerRecordStoreCursorBase::seekExact(const RecordId& id) {
     invariant(_hasRestored);
