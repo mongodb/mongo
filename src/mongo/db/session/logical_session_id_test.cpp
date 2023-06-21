@@ -275,9 +275,27 @@ TEST_F(LogicalSessionIdTest, GenWithoutAuthedUser) {
     ASSERT_THROWS(makeLogicalSessionId(_opCtx.get()), AssertionException);
 }
 
+OperationSessionInfoFromClient initializeOpSessionInfoWithRequestBody(
+    OperationContext* opCtx,
+    const BSONObj& requestBody,
+    bool requiresAuth,
+    bool attachToOpCtx,
+    bool isReplSetMemberOrMongos) {
+    auto opMsgRequest = OpMsgRequestBuilder::create(
+        DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
+        requestBody,
+        BSONObj());
+    return initializeOperationSessionInfo(
+        opCtx, opMsgRequest, requiresAuth, attachToOpCtx, isReplSetMemberOrMongos);
+}
+
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_NoSessionIdNoTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    initializeOperationSessionInfo(_opCtx.get(), BSON("TestCmd" << 1), true, true, true);
+    initializeOpSessionInfoWithRequestBody(_opCtx.get(),
+                                           BSON("TestCmd" << 1),
+                                           true /* requiresAuth */,
+                                           true /* attachToOpCtx */,
+                                           true /* isReplSetMemberOrMongos */);
 
     ASSERT(!_opCtx->getLogicalSessionId());
     ASSERT(!_opCtx->getTxnNumber());
@@ -288,12 +306,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
     LogicalSessionFromClient lsid{};
     lsid.setId(UUID::gen());
 
-    initializeOperationSessionInfo(_opCtx.get(),
-                                   BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "OtherField"
-                                                  << "TestField"),
-                                   true,
-                                   true,
-                                   true);
+    initializeOpSessionInfoWithRequestBody(_opCtx.get(),
+                                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON()
+                                                          << "OtherField"
+                                                          << "TestField"),
+                                           true /* requiresAuth */,
+                                           true /* attachToOpCtx */,
+                                           true /* isReplSetMemberOrMongos */);
 
     ASSERT(_opCtx->getLogicalSessionId());
     ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
@@ -303,15 +322,15 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdNoTransacti
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_MissingSessionIdWithTransactionNumber) {
     addSimpleUser(UserName("simple", "test"));
-    ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(_opCtx.get(),
-                                       BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
-                                                      << "TestField"),
-                                       true,
-                                       true,
-                                       true),
-        AssertionException,
-        ErrorCodes::InvalidOptions);
+    ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
+                           _opCtx.get(),
+                           BSON("TestCmd" << 1 << "txnNumber" << 100LL << "OtherField"
+                                          << "TestField"),
+                           true /* requiresAuth */,
+                           true /* attachToOpCtx */,
+                           true /* isReplSetMemberOrMongos */),
+                       AssertionException,
+                       ErrorCodes::InvalidOptions);
 }
 
 TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransactionNumber) {
@@ -319,13 +338,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SessionIdAndTransact
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());
 
-    initializeOperationSessionInfo(_opCtx.get(),
-                                   BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber"
-                                                  << 100LL << "OtherField"
-                                                  << "TestField"),
-                                   true,
-                                   true,
-                                   true);
+    initializeOpSessionInfoWithRequestBody(_opCtx.get(),
+                                           BSON("TestCmd" << 1 << "lsid" << lsid.toBSON()
+                                                          << "txnNumber" << 100LL << "OtherField"
+                                                          << "TestField"),
+                                           true /* requiresAuth */,
+                                           true /* attachToOpCtx */,
+                                           true /* isReplSetMemberOrMongos */);
 
     ASSERT(_opCtx->getLogicalSessionId());
     ASSERT_EQ(lsid.getId(), _opCtx->getLogicalSessionId()->getId());
@@ -340,13 +359,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IsReplSetMemberOrMon
     lsid.setId(UUID::gen());
 
     ASSERT_THROWS_CODE(
-        initializeOperationSessionInfo(_opCtx.get(),
-                                       BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber"
-                                                      << 100LL << "OtherField"
-                                                      << "TestField"),
-                                       true,
-                                       true,
-                                       false),
+        initializeOpSessionInfoWithRequestBody(
+            _opCtx.get(),
+            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
+                           << "TestField"),
+            true /* requiresAuth */,
+            true /* attachToOpCtx */,
+            false /* isReplSetMemberOrMongos */),
         AssertionException,
         ErrorCodes::IllegalOperation);
 }
@@ -358,13 +377,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfNoCache
 
     LogicalSessionCache::set(_opCtx->getServiceContext(), nullptr);
 
-    auto sessionInfo = initializeOperationSessionInfo(
+    auto sessionInfo = initializeOpSessionInfoWithRequestBody(
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
-        true,
-        true,
-        true);
+        true /* requiresAuth */,
+        true /* attachToOpCtx */,
+        true /* isReplSetMemberOrMongos */);
     ASSERT(sessionInfo.getSessionId() == boost::none);
     ASSERT(sessionInfo.getTxnNumber() == boost::none);
     ASSERT(sessionInfo.getStartTransaction() == boost::none);
@@ -376,13 +395,13 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_IgnoresInfoIfDoNotAt
     LogicalSessionFromClient lsid;
     lsid.setId(UUID::gen());
 
-    auto sessionInfo = initializeOperationSessionInfo(
+    auto sessionInfo = initializeOpSessionInfoWithRequestBody(
         _opCtx.get(),
         BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL << "OtherField"
                        << "TestField"),
-        true,
-        false,
-        true);
+        true /* requiresAuth */,
+        false /* attachToOpCtx */,
+        true /* isReplSetMemberOrMongos */);
 
     ASSERT(sessionInfo.getSessionId() == boost::none);
     ASSERT(sessionInfo.getTxnNumber() == boost::none);
@@ -401,12 +420,12 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_VerifyUIDEvenIfDoNot
     auto invalidDigest = SHA256Block::computeHash({ConstDataRange("hacker")});
     lsid.setUid(invalidDigest);
 
-    ASSERT_THROWS_CODE(initializeOperationSessionInfo(
+    ASSERT_THROWS_CODE(initializeOpSessionInfoWithRequestBody(
                            _opCtx.get(),
                            BSON("TestCmd" << 1 << "lsid" << lsid.toBSON() << "txnNumber" << 100LL),
-                           true,
-                           false,
-                           true),
+                           true /* requiresAuth */,
+                           false /* attachToOpCtx */,
+                           true /* isReplSetMemberOrMongos */),
                        AssertionException,
                        ErrorCodes::Unauthorized);
 }
@@ -427,7 +446,11 @@ TEST_F(LogicalSessionIdTest, InitializeOperationSessionInfo_SendingInfoFailsInDi
         commandBuilder.appendElements(param);
 
         ASSERT_THROWS_CODE(
-            initializeOperationSessionInfo(_opCtx.get(), commandBuilder.obj(), true, true, true),
+            initializeOpSessionInfoWithRequestBody(_opCtx.get(),
+                                                   commandBuilder.obj(),
+                                                   true /* requiresAuth */,
+                                                   true /* attachToOpCtx */,
+                                                   true /* isReplSetMemberOrMongos */),
             AssertionException,
             50891);
     }

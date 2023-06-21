@@ -1551,7 +1551,7 @@ void ExecCommandDatabase::_initiateCommand() {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     _sessionOptions = initializeOperationSessionInfo(opCtx,
-                                                     request.body,
+                                                     request,
                                                      command->requiresAuth(),
                                                      command->attachLogicalSessionsToOpCtx(),
                                                      replCoord->getReplicationMode() ==
@@ -1806,8 +1806,9 @@ void ExecCommandDatabase::_initiateCommand() {
             const bool hasDirectShardOperations = !authIsEnabled ||
                 ((AuthorizationSession::get(opCtx->getClient()) != nullptr &&
                   AuthorizationSession::get(opCtx->getClient())
-                      ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::issueDirectShardOperations)));
+                      ->isAuthorizedForActionsOnResource(
+                          ResourcePattern::forClusterResource(dbName.tenantId()),
+                          ActionType::issueDirectShardOperations)));
 
             if (!hasDirectShardOperations) {
                 bool timeUpdated = false;

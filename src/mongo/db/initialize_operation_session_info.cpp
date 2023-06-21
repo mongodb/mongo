@@ -55,16 +55,17 @@
 namespace mongo {
 
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
-                                                              const BSONObj& requestBody,
+                                                              const OpMsgRequest& opMsgRequest,
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
                                                               bool isReplSetMemberOrMongos) {
     auto osi = OperationSessionInfoFromClient::parse(IDLParserContext{"OperationSessionInfo"},
-                                                     requestBody);
+                                                     opMsgRequest.body);
     auto isAuthorizedForInternalClusterAction =
         AuthorizationSession::get(opCtx->getClient())
-            ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                               ActionType::internal);
+            ->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(opMsgRequest.getValidatedTenantId()),
+                ActionType::internal);
 
     if (opCtx->getClient()->isInDirectClient()) {
         uassert(50891,

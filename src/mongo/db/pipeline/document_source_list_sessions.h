@@ -87,11 +87,16 @@ public:
                                                  const BSONElement& spec) {
             return std::make_unique<LiteParsed>(
                 spec.fieldName(),
+                nss.tenantId(),
                 listSessionsParseSpec(DocumentSourceListSessions::kStageName, spec));
         }
 
-        explicit LiteParsed(std::string parseTimeName, const ListSessionsSpec& spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _spec(spec) {}
+        explicit LiteParsed(std::string parseTimeName,
+                            const boost::optional<TenantId>& tenantId,
+                            const ListSessionsSpec& spec)
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _spec(spec),
+              _privileges(listSessionsRequiredPrivileges(_spec, tenantId)) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -99,7 +104,7 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            return listSessionsRequiredPrivileges(_spec);
+            return _privileges;
         }
 
         bool isInitialSource() const final {
@@ -112,6 +117,7 @@ public:
 
     private:
         const ListSessionsSpec _spec;
+        const PrivilegeVector _privileges;
     };
 
     const char* getSourceName() const final {

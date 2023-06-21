@@ -53,12 +53,8 @@ OperationKiller::OperationKiller(Client* myClient) : _myClient(myClient) {
 
 bool OperationKiller::isGenerallyAuthorizedToKill() const {
     AuthorizationSession* authzSession = AuthorizationSession::get(_myClient);
-    if (authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::killop)) {
-        return true;
-    }
-
-    return false;
+    return authzSession->isAuthorizedForActionsOnResource(
+        ResourcePattern::forClusterResource(authzSession->getUserTenantId()), ActionType::killop);
 }
 
 bool OperationKiller::isAuthorizedToKill(const LockedClient& target) const {

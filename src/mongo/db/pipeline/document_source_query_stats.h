@@ -72,10 +72,15 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, TransformAlgorithmEnum algorithm, std::string hmacKey)
+        LiteParsed(std::string parseTimeName,
+                   const boost::optional<TenantId>& tenantId,
+                   TransformAlgorithmEnum algorithm,
+                   std::string hmacKey)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
               _algorithm(algorithm),
-              _hmacKey(hmacKey) {}
+              _hmacKey(hmacKey),
+              _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                     ActionType::queryStatsRead)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
             return stdx::unordered_set<NamespaceString>();
@@ -83,8 +88,7 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {Privilege(ResourcePattern::forClusterResource(), ActionType::queryStatsRead)};
-            ;
+            return _privileges;
         }
 
         bool allowedToPassthroughFromMongos() const final {
@@ -105,6 +109,8 @@ public:
         TransformAlgorithmEnum _algorithm;
 
         std::string _hmacKey;
+
+        const PrivilegeVector _privileges;
     };
 
     static boost::intrusive_ptr<DocumentSource> createFromBson(

@@ -61,24 +61,28 @@ static constexpr StringData kStageName = "$shardedDataDistribution"_sd;
 class LiteParsed final : public LiteParsedDocumentSource {
 public:
     static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss, const BSONElement& spec) {
-        return std::make_unique<LiteParsed>(spec.fieldName());
+        return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
     }
 
-    explicit LiteParsed(std::string parseTimeName)
-        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+    explicit LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
+        : LiteParsedDocumentSource(std::move(parseTimeName)),
+          _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                 ActionType::shardedDataDistribution)}) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {NamespaceString::kConfigsvrCollectionsNamespace};
     }
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
-        return {
-            Privilege(ResourcePattern::forClusterResource(), ActionType::shardedDataDistribution)};
+        return _privileges;
     }
 
     bool isInitialSource() const final {
         return true;
     }
+
+private:
+    const PrivilegeVector _privileges;
 };
 
 static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(

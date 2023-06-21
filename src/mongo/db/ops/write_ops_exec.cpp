@@ -456,9 +456,10 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 // perform. First item in the tuple determines whether to bypass document validation altogether,
 // second item determines if _safeContent_ array can be modified in an encrypted collection.
 std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
-                                                  const write_ops::WriteCommandRequestBase& req) {
+                                                  const write_ops::WriteCommandRequestBase& req,
+                                                  const boost::optional<TenantId>& tenantId) {
     auto& encryptionInfo = req.getEncryptionInformation();
-    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
+    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo, tenantId);
     return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
 }
 }  // namespace
@@ -558,13 +559,14 @@ bool handleError(OperationContext* opCtx,
 }
 
 bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo) {
+                         const boost::optional<EncryptionInformation>& encryptionInfo,
+                         const boost::optional<TenantId>& tenantId) {
     if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
         uassert(6666201,
                 "External users cannot have crudProcessed enabled",
                 AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(tenantId), ActionType::internal));
 
         return true;
     }
@@ -1042,8 +1044,8 @@ WriteResult performInserts(OperationContext* opCtx,
         uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
     }
 
-    const auto [disableDocumentValidation, fleCrudProcessed] =
-        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+    const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
+        opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);
@@ -1476,8 +1478,8 @@ WriteResult performUpdates(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    const auto [disableDocumentValidation, fleCrudProcessed] =
-        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+    const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
+        opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);
@@ -1749,8 +1751,8 @@ WriteResult performDeletes(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    const auto [disableDocumentValidation, fleCrudProcessed] =
-        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+    const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
+        opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);

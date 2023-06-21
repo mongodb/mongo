@@ -580,11 +580,8 @@ void ParseAndRunCommand::_parseCommand() {
     // Fill out all currentOp details.
     CurOp::get(opCtx)->setGenericOpRequestDetails(nss, command, request.body, _opType);
 
-    _osi.emplace(initializeOperationSessionInfo(opCtx,
-                                                request.body,
-                                                command->requiresAuth(),
-                                                command->attachLogicalSessionsToOpCtx(),
-                                                true));
+    _osi.emplace(initializeOperationSessionInfo(
+        opCtx, request, command->requiresAuth(), command->attachLogicalSessionsToOpCtx(), true));
 
     auto allowTransactionsOnConfigDatabase = !isMongos() || client->isFromSystemConnection();
     validateSessionOptions(*_osi, command->getName(), nss, allowTransactionsOnConfigDatabase);

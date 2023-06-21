@@ -36,7 +36,7 @@
 namespace mongo {
 
 /**
- * Parses the session information from the body of a request and stores the sessionId and txnNumber
+ * Parses the session information from a request and stores the sessionId and txnNumber
  * on the current operation context. Must only be called once per operation and should be done right
  * in the beginning. Note that the session info will be stored in the operation context and returned
  * only if the current request supports it. For example, if attachToOpCtx is false or this is called
@@ -52,7 +52,7 @@ namespace mongo {
  * this function will throw.
  */
 OperationSessionInfoFromClient initializeOperationSessionInfo(OperationContext* opCtx,
-                                                              const BSONObj& requestBody,
+                                                              const OpMsgRequest& opMsgRequest,
                                                               bool requiresAuth,
                                                               bool attachToOpCtx,
                                                               bool isReplSetMemberOrMongos);

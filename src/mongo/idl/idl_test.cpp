@@ -4913,8 +4913,10 @@ TEST(IDLAccessCheck, TestSimpleAccessCheck) {
 
 TEST(IDLAccessCheck, TestSimplePrivilegeAccessCheck) {
     AuthorizationContract ac;
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::addShard));
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::addShard));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::serverStatus));
 
     verifyContract(ac, AccessCheckSimplePrivilege::kAuthorizationContract);
 }
@@ -4922,8 +4924,10 @@ TEST(IDLAccessCheck, TestSimplePrivilegeAccessCheck) {
 TEST(IDLAccessCheck, TestComplexAccessCheck) {
     const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
     AuthorizationContract ac;
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::addShard));
-    ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::addShard));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::serverStatus));
 
     ac.addPrivilege(
         Privilege(ResourcePattern::forDatabaseName(kTestDB), ActionType::trafficRecord));

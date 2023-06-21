@@ -157,8 +157,9 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
 
     if (sourceColl->getCollectionOptions().encryptedFieldConfig &&
         !AuthorizationSession::get(opCtx->getClient())
-             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                ActionType::setUserWriteBlockMode)) {
+             ->isAuthorizedForActionsOnResource(
+                 ResourcePattern::forClusterResource(target.tenantId()),
+                 ActionType::setUserWriteBlockMode)) {
         return Status(ErrorCodes::IllegalOperation, "Cannot rename an encrypted collection");
     }
 
@@ -174,8 +175,9 @@ Status checkSourceAndTargetNamespaces(OperationContext* opCtx,
     } else {
         if (targetColl->getCollectionOptions().encryptedFieldConfig &&
             !AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::setUserWriteBlockMode)) {
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forClusterResource(target.tenantId()),
+                     ActionType::setUserWriteBlockMode)) {
             return Status(ErrorCodes::IllegalOperation,
                           "Cannot rename to an existing encrypted collection");
         }
@@ -898,8 +900,9 @@ void validateNamespacesForRenameCollection(OperationContext* opCtx,
 
     if (!source.isOutTmpBucketsCollection() && source.isTimeseriesBucketsCollection() &&
         !AuthorizationSession::get(opCtx->getClient())
-             ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                ActionType::setUserWriteBlockMode)) {
+             ->isAuthorizedForActionsOnResource(
+                 ResourcePattern::forClusterResource(target.tenantId()),
+                 ActionType::setUserWriteBlockMode)) {
         uasserted(ErrorCodes::IllegalOperation,
                   "Renaming system.buckets collections is not allowed");
     }

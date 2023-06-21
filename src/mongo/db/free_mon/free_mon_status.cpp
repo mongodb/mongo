@@ -57,8 +57,9 @@ public:
 
     Status checkAuthForOperation(OperationContext* opCtx) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::checkFreeMonitoringStatus)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(as->getUserTenantId()),
+                ActionType::checkFreeMonitoringStatus)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

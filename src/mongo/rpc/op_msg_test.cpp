@@ -63,7 +63,7 @@ public:
     static void grantUseTenant(Client& client) {
         User user(UserRequest(UserName("useTenant", "admin"), boost::none));
         user.setPrivileges(
-            {Privilege(ResourcePattern::forClusterResource(), ActionType::useTenant)});
+            {Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useTenant)});
         auto* as = dynamic_cast<AuthorizationSessionImpl*>(AuthorizationSession::get(client));
         if (as->_authenticatedUser != boost::none) {
             as->logoutAllDatabases(&client, "AuthorizationSessionImplTestHelper"_sd);

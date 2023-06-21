@@ -279,7 +279,15 @@ public:
             Client::initThread("test-insert-thread");
             auto innerOpCtx = Client::getCurrent()->makeOperationContext();
 
-            initializeOperationSessionInfo(innerOpCtx.get(), insertBuilder.obj(), true, true, true);
+            auto opMsgRequest = OpMsgRequestBuilder::create(
+                DatabaseName::createDatabaseName_forTest(boost::none, "test_unused_dbname"),
+                insertBuilder.obj(),
+                BSONObj());
+            initializeOperationSessionInfo(innerOpCtx.get(),
+                                           opMsgRequest,
+                                           true /* requiresAuth */,
+                                           true /* attachToOpCtx */,
+                                           true /* isReplSetMemberOrMongos */);
             auto mongoDSessionCatalog = MongoDSessionCatalog::get(innerOpCtx.get());
             auto sessionTxnState = mongoDSessionCatalog->checkOutSession(innerOpCtx.get());
             auto txnParticipant = TransactionParticipant::get(innerOpCtx.get());

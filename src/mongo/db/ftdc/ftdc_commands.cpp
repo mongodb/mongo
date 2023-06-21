@@ -80,12 +80,8 @@ public:
         auto* client = opCtx->getClient();
 
         if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::serverStatus)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        if (!AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                ResourcePattern::forClusterResource(), ActionType::replSetGetStatus)) {
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                {ActionType::serverStatus, ActionType::replSetGetStatus})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 

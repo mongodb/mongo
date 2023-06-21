@@ -95,7 +95,8 @@ bool handleError(OperationContext* opCtx,
                  WriteResult* out);
 
 bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo);
+                         const boost::optional<EncryptionInformation>& encryptionInfo,
+                         const boost::optional<TenantId>& tenantId);
 
 /**
  * Returns true if caller should try to insert more documents. Does nothing else if batch is empty.

@@ -130,7 +130,8 @@ std::vector<mongo::SHA256Block> mongo::listSessionsUsersToDigests(
     return ret;
 }
 
-mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsSpec& spec) {
+mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(
+    const ListSessionsSpec& spec, const boost::optional<TenantId>& tenantId) {
     const auto needsPrivs = ([spec]() {
         if (spec.getAllUsers()) {
             return true;
@@ -146,7 +147,7 @@ mongo::PrivilegeVector mongo::listSessionsRequiredPrivileges(const ListSessionsS
     })();
 
     if (needsPrivs) {
-        return {Privilege(ResourcePattern::forClusterResource(), ActionType::listSessions)};
+        return {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::listSessions)};
     } else {
         return PrivilegeVector();
     }

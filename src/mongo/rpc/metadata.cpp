@@ -84,8 +84,9 @@ void readRequestMetadata(OperationContext* opCtx, const OpMsg& opMsg, bool cmdRe
 
     if (clientOperationKeyElem &&
         (TestingProctor::instance().isEnabled() ||
-         authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal))) {
+         authSession->isAuthorizedForActionsOnResource(
+             ResourcePattern::forClusterResource(opMsg.getValidatedTenantId()),
+             ActionType::internal))) {
         auto opKey = uassertStatusOK(UUID::parse(clientOperationKeyElem));
         opCtx->setOperationKey(std::move(opKey));
         failIfOperationKeyMismatch.execute([&](const BSONObj& data) {

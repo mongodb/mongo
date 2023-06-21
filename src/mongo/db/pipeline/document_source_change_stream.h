@@ -157,8 +157,10 @@ public:
             }
         }
 
-    private:
+    protected:
         const NamespaceString _nss;
+
+    private:
         BSONElement _spec;
     };
 
@@ -361,12 +363,17 @@ public:
     LiteParsedDocumentSourceChangeStreamInternal(std::string parseTimeName,
                                                  NamespaceString nss,
                                                  const BSONElement& spec)
-        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss), spec) {}
+        : DocumentSourceChangeStream::LiteParsed(std::move(parseTimeName), std::move(nss), spec),
+          _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
+                                 ActionType::internal)}) {}
 
     PrivilegeVector requiredPrivileges(bool isMongos,
                                        bool bypassDocumentValidation) const override final {
-        return {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)};
+        return _privileges;
     }
+
+private:
+    const PrivilegeVector _privileges;
 };
 
 }  // namespace mongo
