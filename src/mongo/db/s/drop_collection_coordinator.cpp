@@ -271,7 +271,6 @@ void DropCollectionCoordinator::_enterCriticalSection(
     ShardsvrParticipantBlock blockCRUDOperationsRequest(nss());
     blockCRUDOperationsRequest.setBlockType(mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
     blockCRUDOperationsRequest.setReason(_critSecReason);
-    blockCRUDOperationsRequest.setAllowViews(true);
 
     async_rpc::GenericArgs args;
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
@@ -360,7 +359,6 @@ void DropCollectionCoordinator::_exitCriticalSection(
     ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss());
     unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
     unblockCRUDOperationsRequest.setReason(_critSecReason);
-    unblockCRUDOperationsRequest.setAllowViews(true);
 
     async_rpc::GenericArgs args;
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);

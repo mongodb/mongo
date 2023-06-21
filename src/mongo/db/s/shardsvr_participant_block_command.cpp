@@ -88,7 +88,6 @@ public:
                 auto blockType = request().getBlockType().get_value_or(
                     CriticalSectionBlockTypeEnum::kReadsAndWrites);
 
-                bool allowViews = request().getAllowViews();
                 auto service = ShardingRecoveryService::get(opCtx);
                 switch (blockType) {
                     case CriticalSectionBlockTypeEnum::kUnblock:
@@ -97,30 +96,17 @@ public:
                             ns(),
                             reason,
                             ShardingCatalogClient::kLocalWriteConcern,
-                            /* throwIfReasonDiffers */ true,
-                            allowViews);
+                            /* throwIfReasonDiffers */ true);
                         break;
                     case CriticalSectionBlockTypeEnum::kWrites:
                         service->acquireRecoverableCriticalSectionBlockWrites(
-                            opCtx,
-                            ns(),
-                            reason,
-                            ShardingCatalogClient::kLocalWriteConcern,
-                            allowViews);
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
                         break;
                     default:
                         service->acquireRecoverableCriticalSectionBlockWrites(
-                            opCtx,
-                            ns(),
-                            reason,
-                            ShardingCatalogClient::kLocalWriteConcern,
-                            allowViews);
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
                         service->promoteRecoverableCriticalSectionToBlockAlsoReads(
-                            opCtx,
-                            ns(),
-                            reason,
-                            ShardingCatalogClient::kLocalWriteConcern,
-                            allowViews);
+                            opCtx, ns(), reason, ShardingCatalogClient::kLocalWriteConcern);
                 };
             };
 

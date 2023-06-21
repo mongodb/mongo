@@ -144,8 +144,7 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
-    const WriteConcernOptions& writeConcern,
-    bool allowViews) {
+    const WriteConcernOptions& writeConcern) {
     LOGV2_DEBUG(5656600,
                 3,
                 "Acquiring recoverable critical section blocking writes",
@@ -167,14 +166,11 @@ void ShardingRecoveryService::acquireRecoverableCriticalSectionBlockWrites(
         if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_S);
         } else {
-            // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-            // construct collLock.
             collLock.emplace(opCtx,
                              nss,
                              MODE_S,
-                             (allowViews ? AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)
-                                         : AutoGetCollection::Options{}));
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
         }
 
         DBDirectClient dbClient(opCtx);
@@ -258,8 +254,7 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
     OperationContext* opCtx,
     const NamespaceString& nss,
     const BSONObj& reason,
-    const WriteConcernOptions& writeConcern,
-    bool allowViews) {
+    const WriteConcernOptions& writeConcern) {
     LOGV2_DEBUG(5656603,
                 3,
                 "Promoting recoverable critical section to also block reads",
@@ -280,14 +275,11 @@ void ShardingRecoveryService::promoteRecoverableCriticalSectionToBlockAlsoReads(
         if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-            // construct collLock.
             collLock.emplace(opCtx,
                              nss,
                              MODE_X,
-                             (allowViews ? AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)
-                                         : AutoGetCollection::Options{}));
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
         }
 
         DBDirectClient dbClient(opCtx);
@@ -388,8 +380,7 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
     const NamespaceString& nss,
     const BSONObj& reason,
     const WriteConcernOptions& writeConcern,
-    bool throwIfReasonDiffers,
-    bool allowViews) {
+    bool throwIfReasonDiffers) {
     LOGV2_DEBUG(5656606,
                 3,
                 "Releasing recoverable critical section",
@@ -410,14 +401,11 @@ void ShardingRecoveryService::releaseRecoverableCriticalSection(
         if (nsIsDbOnly(NamespaceStringUtil::serialize(nss))) {
             dbLock.emplace(opCtx, nss.dbName(), MODE_X);
         } else {
-            // TODO SERVER-68084 add the AutoGetCollectionViewMode::kViewsPermitted parameter to
-            // construct collLock.
             collLock.emplace(opCtx,
                              nss,
                              MODE_X,
-                             (allowViews ? AutoGetCollection::Options{}.viewMode(
-                                               auto_get_collection::ViewMode::kViewsPermitted)
-                                         : AutoGetCollection::Options{}));
+                             AutoGetCollection::Options{}.viewMode(
+                                 auto_get_collection::ViewMode::kViewsPermitted));
         }
 
         DBDirectClient dbClient(opCtx);

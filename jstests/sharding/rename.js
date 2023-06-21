@@ -59,8 +59,7 @@ jsTest.log("Testing that rename operations involving views are not allowed");
         toAView,
         [
             ErrorCodes.NamespaceExists,
-            ErrorCodes.CommandNotSupportedOnView,  // TODO SERVER-68084 remove this error code
-            ErrorCodes.NamespaceNotFound           // TODO SERVER-68084 remove this error code
+            ErrorCodes.CommandNotSupportedOnView,  // TODO SERVER-78217 remove this error code
         ],
         "renameCollection should fail with NamespaceExists when the target is view");
 
@@ -69,7 +68,6 @@ jsTest.log("Testing that rename operations involving views are not allowed");
         fromAView,
         [
             ErrorCodes.CommandNotSupportedOnView,
-            ErrorCodes.NamespaceNotFound  // TODO SERVER-68084 remove this error code
         ],
         "renameCollection should fail with CommandNotSupportedOnView when renaming a view");
 }

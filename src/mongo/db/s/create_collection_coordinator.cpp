@@ -913,22 +913,8 @@ bool CreateCollectionCoordinator::_timeseriesNssResolvedByCommandHandler() const
 }
 
 void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opCtx) {
-    // TODO SERVER-68084 call ShardingRecoveryService without the try/catch block
-    try {
-        ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
-            opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-    } catch (const ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-        if (_timeseriesNssResolvedByCommandHandler()) {
-            throw;
-        }
-
-        // In case we acquisition was rejected because it targets an existing view, the critical
-        // section is not needed and the error can be dropped because:
-        //   1. We will not shard the view namespace
-        //   2. This collection will remain a view since we are holding the DDL coll lock and
-        //   thus the collection can't be dropped.
-        _doc.setDisregardCriticalSectionOnOriginalNss(true);
-    }
+    ShardingRecoveryService::get(opCtx)->acquireRecoverableCriticalSectionBlockWrites(
+        opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     if (!_timeseriesNssResolvedByCommandHandler()) {
         // Preventively acquire the critical section protecting the buckets namespace that the
@@ -941,11 +927,8 @@ void CreateCollectionCoordinator::_acquireCriticalSections(OperationContext* opC
 
 void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
     OperationContext* opCtx) const {
-    // TODO SERVER-68084 call ShardingRecoveryService without the if blocks.
-    if (!_doc.getDisregardCriticalSectionOnOriginalNss()) {
-        ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
-            opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-    }
+    ShardingRecoveryService::get(opCtx)->promoteRecoverableCriticalSectionToBlockAlsoReads(
+        opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
 
     if (!_timeseriesNssResolvedByCommandHandler()) {
         const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
@@ -956,18 +939,12 @@ void CreateCollectionCoordinator::_promoteCriticalSectionsToBlockReads(
 
 void CreateCollectionCoordinator::_releaseCriticalSections(OperationContext* opCtx,
                                                            bool throwIfReasonDiffers) {
-    // TODO SERVER-68084 call ShardingRecoveryService without the try/catch block.
-    try {
-        ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-            opCtx,
-            originalNss(),
-            _critSecReason,
-            ShardingCatalogClient::kMajorityWriteConcern,
-            throwIfReasonDiffers);
-    } catch (ExceptionFor<ErrorCodes::CommandNotSupportedOnView>&) {
-        // Ignore the error (when it is raised, we can assume that no critical section for the view
-        // was previously acquired).
-    }
+    ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
+        opCtx,
+        originalNss(),
+        _critSecReason,
+        ShardingCatalogClient::kMajorityWriteConcern,
+        throwIfReasonDiffers);
 
     if (!_timeseriesNssResolvedByCommandHandler()) {
         const auto bucketsNamespace = originalNss().makeTimeseriesBucketsNamespace();
@@ -993,40 +970,6 @@ void CreateCollectionCoordinator::_createCollectionAndIndexes(
 
     // We need to implicitly create a timeseries view and underlying bucket collection.
     if (_collectionEmpty && _request.getTimeseries()) {
-        // TODO SERVER-68084 Remove viewLock and the whole if section that constructs it while
-        // releasing the critical section on the originalNss.
-        boost::optional<AutoGetCollection> viewLock;
-        if (auto criticalSectionAcquiredOnOriginalNss =
-                !_doc.getDisregardCriticalSectionOnOriginalNss();
-            !_timeseriesNssResolvedByCommandHandler() && criticalSectionAcquiredOnOriginalNss) {
-            // This is the subcase of a not yet existing pair of view (originalNss)+ bucket (nss)
-            // timeseries collection that the DDL will have to create. Due to the current
-            // constraints of the code:
-            // - Such creation cannot be performed while holding the critical section over the views
-            // namespace (once the view gets created, the CS will not be releasable); instead,
-            // exclusive access must be enforced through a collection lock
-            // - The critical section cannot be released while holding a collection lock, so this
-            // operation must be performed first (leaving a small window open to data races)
-            ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-                opCtx, originalNss(), _critSecReason, ShardingCatalogClient::kMajorityWriteConcern);
-            _doc.setDisregardCriticalSectionOnOriginalNss(true);
-            viewLock.emplace(opCtx,
-                             originalNss(),
-                             LockMode::MODE_X,
-                             AutoGetCollection::Options{}.viewMode(
-                                 auto_get_collection::ViewMode::kViewsPermitted));
-            // Once the exclusive access has been reacquired, ensure that no data race occurred.
-            auto catalog = CollectionCatalog::get(opCtx);
-            if (catalog->lookupView(opCtx, originalNss()) ||
-                catalog->lookupCollectionByNamespace(opCtx, originalNss())) {
-                _completeOnError = true;
-                uasserted(ErrorCodes::NamespaceExists,
-                          str::stream() << "A conflicting DDL operation was completed while trying "
-                                           "to shard collection: "
-                                        << originalNss().toStringForErrorMsg());
-            }
-        }
-
         const auto viewName = nss().getTimeseriesViewNamespace();
         auto createCmd = makeCreateCommand(viewName, collation, *_request.getTimeseries());
 

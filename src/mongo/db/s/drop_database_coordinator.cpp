@@ -216,7 +216,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         blockCRUDOperationsRequest.setBlockType(
             mongo::CriticalSectionBlockTypeEnum::kReadsAndWrites);
         blockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        blockCRUDOperationsRequest.setAllowViews(true);
         async_rpc::GenericArgs args;
         async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
         async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
@@ -262,7 +261,6 @@ void DropDatabaseCoordinator::_dropShardedCollection(
         ShardsvrParticipantBlock unblockCRUDOperationsRequest(nss);
         unblockCRUDOperationsRequest.setBlockType(CriticalSectionBlockTypeEnum::kUnblock);
         unblockCRUDOperationsRequest.setReason(getReasonForDropCollection(nss));
-        unblockCRUDOperationsRequest.setAllowViews(true);
         async_rpc::GenericArgs args;
         async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
         async_rpc::AsyncRPCCommandHelpers::appendOSI(args, getNewSession(opCtx));
