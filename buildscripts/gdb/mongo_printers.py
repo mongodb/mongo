@@ -215,11 +215,6 @@ class OplogEntryPrinter(object):
         """Initialize OplogEntryPrinter."""
         self.val = val
 
-    @staticmethod
-    def display_hint():
-        """Display hint."""
-        return 'string'
-
     def to_string(self):
         """Return OplogEntry for printing."""
         optime = self.val['_entry']['_opTimeBase']
@@ -227,7 +222,7 @@ class OplogEntryPrinter(object):
         return "OplogEntry(%s, %s, %s, %s)" % (
             str(self.val['_entry']['_durableReplOperation']['_opType']).split('::')[-1],
             str(self.val['_entry']['_commandType']).split('::')[-1],
-            self.val['_entry']['_durableReplOperation']['_nss']['_ns'], optime_str)
+            self.val['_entry']['_durableReplOperation']['_nss'], optime_str)
 
 
 class UUIDPrinter(object):
@@ -263,7 +258,7 @@ class OIDPrinter(object):
 
     def to_string(self):
         """Return OID for printing."""
-        raw_bytes = [int(self.val['_data'][i]) for i in range(12)]
+        raw_bytes = [int(self.val['_data'][i]) for i in range(OBJECT_ID_WIDTH)]
         oid_hex_bytes = [hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes]
         return "ObjectID('%s')" % "".join(oid_hex_bytes)
 
@@ -308,6 +303,55 @@ class RecordIdPrinter(object):
                                                                   str("".join(hex_bytes)))
         else:
             return "unknown RecordId format: %d" % rid_format
+
+
+TENANT_ID_MASK = 0x80
+OBJECT_ID_WIDTH = 12
+
+
+def extract_tenant_id(data):
+    raw_bytes = [int(data[i]) for i in range(1, OBJECT_ID_WIDTH + 1)]
+    return "".join([hex(b & 0xFF)[2:].zfill(2) for b in raw_bytes])
+
+
+class DatabaseNamePrinter(object):
+    """Pretty-printer for mongo::DatabaseName."""
+
+    def __init__(self, val):
+        """Initialize DatabaseNamePrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'string'
+
+    def to_string(self):
+        """Return string representation of DatabaseName."""
+        data = self.val['_data']['_M_dataplus']['_M_p']
+        if data[0] & TENANT_ID_MASK:
+            return f"{extract_tenant_id(data)}_{(data + OBJECT_ID_WIDTH + 1).string()}"
+        return (data + 1).string()
+
+
+class NamespaceStringPrinter(object):
+    """Pretty-printer for mongo::NamespaceString."""
+
+    def __init__(self, val):
+        """Initialize NamespaceStringPrinter."""
+        self.val = val
+
+    @staticmethod
+    def display_hint():
+        """Display hint."""
+        return 'string'
+
+    def to_string(self):
+        """Return string representation of NamespaceString."""
+        data = self.val['_data']['_M_dataplus']['_M_p']
+        if data[0] & TENANT_ID_MASK:
+            return f"{extract_tenant_id(data)}_{(data + OBJECT_ID_WIDTH + 1).string()}"
+        return (data + 1).string()
 
 
 class DecorablePrinter(object):
@@ -966,6 +1010,8 @@ def build_pretty_printer():
     """Build a pretty printer."""
     pp = MongoPrettyPrinterCollection()
     pp.add('BSONObj', 'mongo::BSONObj', False, BSONObjPrinter)
+    pp.add('DatabaseName', 'mongo::DatabaseName', False, DatabaseNamePrinter)
+    pp.add('NamespaceString', 'mongo::NamespaceString', False, NamespaceStringPrinter)
     pp.add('Decorable', 'mongo::Decorable', True, DecorablePrinter)
     pp.add('Status', 'mongo::Status', False, StatusPrinter)
     pp.add('StatusWith', 'mongo::StatusWith', True, StatusWithPrinter)

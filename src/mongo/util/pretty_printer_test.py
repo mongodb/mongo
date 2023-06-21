@@ -33,9 +33,23 @@ def test_decorable():
     search(static_member_pattern, gdb.execute('print testClass::static_member', to_string=True))
 
 
+def test_dbname_nss():
+    gdb.execute('run')
+    gdb.execute('frame function main')
+    dbname_str = gdb.execute('print dbName', to_string=True)
+    search("foo", dbname_str)
+    dbname_tid_str = gdb.execute('print dbNameWithTenantId', to_string=True)
+    search("6491a2112ef5c818703bf2a7_foo", dbname_tid_str)
+    nss_str = gdb.execute('print nss', to_string=True)
+    search("foo.bar", nss_str)
+    nss_tid_str = gdb.execute('print nssWithTenantId', to_string=True)
+    search("6491a2112ef5c818703bf2a7_foo.bar", nss_tid_str)
+
+
 if __name__ == '__main__':
     try:
         test_decorable()
+        test_dbname_nss()
         gdb.write('TEST PASSED\n')
     except Exception as err:
         gdb.write('TEST FAILED -- {!s}\n'.format(err))
