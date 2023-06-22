@@ -688,7 +688,7 @@ import_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2
 # The 2 arrays should be adjusted over time when newer branches are created,
 # or older branches are EOL.
 newer_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2)
-older_release_branches=(mongodb-4.2 mongodb-4.0)
+older_release_branches=(mongodb-4.2)
 
 # This array is used to generate compatible configuration files between releases, because
 # upgrade/downgrade test runs each build's format test program on the second build's
