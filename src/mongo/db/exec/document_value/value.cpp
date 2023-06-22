@@ -31,6 +31,7 @@
 
 #include "mongo/db/exec/document_value/value.h"
 
+#include <absl/hash/hash.h>
 #include <boost/functional/hash.hpp>
 #include <cmath>
 #include <limits>
@@ -886,6 +887,17 @@ int Value::compare(const Value& rL,
     MONGO_verify(false);
 }
 
+namespace {
+/**
+ * Hashes the given 'StringData', combines the resulting hash with 'seed', and returns the result.
+ */
+size_t hashStringData(StringData sd, size_t seed) {
+    size_t strHash = absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+    boost::hash_combine(seed, strHash);
+    return seed;
+}
+}  // namespace
+
 void Value::hash_combine(size_t& seed,
                          const StringData::ComparatorInterface* stringComparator) const {
     BSONType type = getType();
@@ -957,7 +969,7 @@ void Value::hash_combine(size_t& seed,
         case Code:
         case Symbol: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = hashStringData(sd, seed);
             break;
         }
 
@@ -966,7 +978,7 @@ void Value::hash_combine(size_t& seed,
             if (stringComparator) {
                 stringComparator->hash_combine(seed, sd);
             } else {
-                MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+                seed = hashStringData(sd, seed);
             }
             break;
         }
@@ -990,14 +1002,14 @@ void Value::hash_combine(size_t& seed,
 
         case BinData: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = hashStringData(sd, seed);
             boost::hash_combine(seed, _storage.binDataType());
             break;
         }
 
         case RegEx: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = hashStringData(sd, seed);
             break;
         }
 
