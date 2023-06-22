@@ -312,5 +312,33 @@ TEST(ValueComparatorTest, HashingCodeShouldNotRespectCollation) {
     ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
 }
 
+// This test was originally designed to reproduce SERVER-78126.
+TEST(ValueComparatorTest, ArraysDifferingByOneStringShouldHaveDifferentHashes) {
+    const ValueComparator comparator{};
+    const Value val1{std::vector<Value>{Value{std::string{"a"}}, Value{std::string{"x"}}}};
+    const Value val2{std::vector<Value>{Value{std::string{"b"}}, Value{std::string{"x"}}}};
+    ASSERT_NE(comparator.compare(val1, val2), 0);
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
+TEST(ValueComparatorTest, ArraysDifferingByOneStringShouldHaveDifferentHashesWithCollation) {
+    CollatorInterfaceMock collator(CollatorInterfaceMock::MockType::kReverseString);
+    const ValueComparator comparator{&collator};
+    const Value val1{std::vector<Value>{Value{std::string{"abc"}}, Value{std::string{"xyz"}}}};
+    const Value val2{std::vector<Value>{Value{std::string{"bcd"}}, Value{std::string{"xyz"}}}};
+    ASSERT_NE(comparator.compare(val1, val2), 0);
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
+TEST(ValueComparatorTest, ObjectsDifferingByOneStringShouldHaveDifferentHashes) {
+    const ValueComparator comparator{};
+    const Value val1(
+        Document({{"foo"_sd, Value{std::string{"abc"}}}, {"bar"_sd, Value{std::string{"xyz"}}}}));
+    const Value val2(
+        Document({{"foo"_sd, Value{std::string{"def"}}}, {"bar"_sd, Value{std::string{"xyz"}}}}));
+    ASSERT_NE(comparator.compare(val1, val2), 0);
+    ASSERT_NE(comparator.hash(val1), comparator.hash(val2));
+}
+
 }  // namespace
 }  // namespace mongo

@@ -45,6 +45,7 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 
@@ -926,7 +927,7 @@ void Value::hash_combine(size_t& seed,
         case Code:
         case Symbol: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = murmur3<sizeof(size_t)>(sd, seed);
             break;
         }
 
@@ -935,7 +936,7 @@ void Value::hash_combine(size_t& seed,
             if (stringComparator) {
                 stringComparator->hash_combine(seed, sd);
             } else {
-                MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+                seed = murmur3<sizeof(size_t)>(sd, seed);
             }
             break;
         }
@@ -959,14 +960,14 @@ void Value::hash_combine(size_t& seed,
 
         case BinData: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = murmur3<sizeof(size_t)>(sd, seed);
             boost::hash_combine(seed, _storage.binDataType());
             break;
         }
 
         case RegEx: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = murmur3<sizeof(size_t)>(sd, seed);
             break;
         }
 
