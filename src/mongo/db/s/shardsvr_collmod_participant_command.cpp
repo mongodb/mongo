@@ -42,6 +42,7 @@
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/grid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -107,13 +108,28 @@ public:
                                                                                          bucketNs)
                         ->clearFilteringMetadata(opCtx);
                 }
-
-                auto service = ShardingRecoveryService::get(opCtx);
+                // Starting from 7.1 In order to guarantee replay protection
+                // ShardsvrCollModParticipant will run within a retryable write. Any local
+                // transaction or retryable write spawned by this command (such as the release of
+                // the critical section) using the original operation context will cause a dead lock
+                // since the session has been already checked-out. We prevent the issue by using a
+                // new operation context with an empty session.
+                // Note for 7.0: this is done for multiversion compatibility with 7.1. No OSI is
+                // attached to a request for this version
+                auto newClient =
+                    getGlobalServiceContext()->makeClient("ShardsvrMovePrimaryExitCriticalSection");
+                AlternativeClientRegion acr(newClient);
+                auto newOpCtx = CancelableOperationContext(
+                    cc().makeOperationContext(),
+                    opCtx->getCancellationToken(),
+                    Grid::get(opCtx->getServiceContext())->getExecutorPool()->getFixedExecutor());
+                newOpCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+                auto service = ShardingRecoveryService::get(newOpCtx.get());
                 const auto reason = BSON("command"
                                          << "ShardSvrParticipantBlockCommand"
                                          << "ns" << bucketNs.toString());
                 service->releaseRecoverableCriticalSection(
-                    opCtx, bucketNs, reason, ShardingCatalogClient::kLocalWriteConcern);
+                    newOpCtx.get(), bucketNs, reason, ShardingCatalogClient::kLocalWriteConcern);
             }
 
             BSONObjBuilder builder;
@@ -126,6 +142,18 @@ public:
             uassertStatusOK(timeseries::processCollModCommandWithTimeSeriesTranslation(
                 opCtx, ns(), cmd, performViewChange, &builder));
             return CollModReply::parse(IDLParserContext("CollModReply"), builder.obj());
+
+            // Since no write that generated a retryable write oplog entry with this sessionId and
+            // txnNumber happened, we need to make a dummy write so that the session gets durably
+            // persisted on the oplog. This must be the last operation done on this command.
+            // Note for 7.0: this is done for multiversion compatibility with 7.1. No OSI is
+            // attached to a request for this version
+            DBDirectClient dbClient(opCtx);
+            dbClient.update(NamespaceString::kServerConfigurationNamespace,
+                            BSON("_id" << Request::kCommandName),
+                            BSON("$inc" << BSON("count" << 1)),
+                            true /* upsert */,
+                            false /* multi */);
         }
 
     private:
