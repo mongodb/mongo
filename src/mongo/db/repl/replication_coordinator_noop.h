@@ -179,6 +179,8 @@ public:
 
     std::vector<MemberConfig> getConfigVotingMembers() const final;
 
+    size_t getNumConfigVotingMembers() const final;
+
     std::int64_t getConfigTerm() const final;
 
     std::int64_t getConfigVersion() const final;

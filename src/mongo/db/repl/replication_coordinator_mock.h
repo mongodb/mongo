@@ -205,6 +205,8 @@ public:
 
     virtual std::vector<MemberConfig> getConfigVotingMembers() const override;
 
+    virtual size_t getNumConfigVotingMembers() const override;
+
     virtual std::int64_t getConfigTerm() const override;
 
     virtual std::int64_t getConfigVersion() const override;

@@ -407,6 +407,11 @@ std::vector<MemberConfig> ReplicationCoordinatorMock::getConfigVotingMembers() c
     return _getConfigReturnValue.votingMembers();
 }
 
+size_t ReplicationCoordinatorMock::getNumConfigVotingMembers() const {
+    stdx::lock_guard<Mutex> lock(_mutex);
+    return _getConfigReturnValue.votingMembers().size();
+}
+
 std::int64_t ReplicationCoordinatorMock::getConfigTerm() const {
     stdx::lock_guard<Mutex> lock(_mutex);
     return _getConfigReturnValue.getConfigTerm();

@@ -238,6 +238,8 @@ public:
 
     virtual std::vector<MemberConfig> getConfigVotingMembers() const override;
 
+    virtual size_t getNumConfigVotingMembers() const override;
+
     virtual std::int64_t getConfigTerm() const override;
 
     virtual std::int64_t getConfigVersion() const override;
@@ -1723,8 +1725,8 @@ private:
     // Set to true when we are in the process of shutting down replication.
     bool _inShutdown;  // (M)
 
-    // Election ID of the last election that resulted in this node becoming primary.
-    OID _electionId;  // (M)
+    // The term of the last election that resulted in this node becoming primary.
+    AtomicWord<int64_t> _electionIdTerm;  // (S)
 
     // Used to signal threads waiting for changes to _memberState.
     stdx::condition_variable _memberStateChange;  // (M)

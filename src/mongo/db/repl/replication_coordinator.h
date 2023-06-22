@@ -654,6 +654,11 @@ public:
     virtual std::vector<MemberConfig> getConfigVotingMembers() const = 0;
 
     /**
+     * Returns how many voting members there are for the current ReplSetConfig.
+     */
+    virtual size_t getNumConfigVotingMembers() const = 0;
+
+    /**
      * Returns the current ReplSetConfig's term.
      */
     virtual std::int64_t getConfigTerm() const = 0;

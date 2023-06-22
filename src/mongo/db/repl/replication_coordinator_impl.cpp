@@ -2055,7 +2055,6 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
     invariant(OperationContextSession::get(opCtx) == nullptr);
 
     Timer timer;
-    WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
 
     // We should never wait for replication if we are holding any locks, because this can
     // potentially block for long time while doing network activity.
@@ -2083,6 +2082,9 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
 
     auto future = [&] {
         stdx::lock_guard lock(_mutex);
+        WriteConcernOptions fixedWriteConcern =
+            _populateUnsetWriteConcernOptionsSyncMode(lock, writeConcern);
+
         return _startWaitingForReplication(lock, opTime, fixedWriteConcern);
     }();
     auto status = futureGetNoThrowWithDeadline(opCtx, future, wTimeoutDate, timeoutError);
@@ -2112,14 +2114,16 @@ ReplicationCoordinator::StatusAndDuration ReplicationCoordinatorImpl::awaitRepli
 
 SharedSemiFuture<void> ReplicationCoordinatorImpl::awaitReplicationAsyncNoWTimeout(
     const OpTime& opTime, const WriteConcernOptions& writeConcern) {
-    WriteConcernOptions fixedWriteConcern = populateUnsetWriteConcernOptionsSyncMode(writeConcern);
+    stdx::lock_guard lg(_mutex);
+
+    WriteConcernOptions fixedWriteConcern =
+        _populateUnsetWriteConcernOptionsSyncMode(lg, writeConcern);
 
     // The returned future won't account for wTimeout or wDeadline, so reject any write concerns
     // with either option to avoid misuse.
     invariant(fixedWriteConcern.wDeadline == Date_t::max());
     invariant(fixedWriteConcern.wTimeout == WriteConcernOptions::kNoTimeout);
 
-    stdx::lock_guard lg(_mutex);
     return _startWaitingForReplication(lg, opTime, fixedWriteConcern);
 }
 
@@ -3185,8 +3189,7 @@ bool ReplicationCoordinatorImpl::shouldRelaxIndexConstraints(OperationContext* o
 }
 
 OID ReplicationCoordinatorImpl::getElectionId() {
-    stdx::lock_guard<Latch> lock(_mutex);
-    return _electionId;
+    return OID::fromTerm(_electionIdTerm.load());
 }
 
 int ReplicationCoordinatorImpl::getMyId() const {
@@ -3315,6 +3318,11 @@ Milliseconds ReplicationCoordinatorImpl::getConfigElectionTimeoutPeriod() const 
 std::vector<MemberConfig> ReplicationCoordinatorImpl::getConfigVotingMembers() const {
     stdx::lock_guard<Latch> lock(_mutex);
     return _rsConfig.votingMembers();
+}
+
+size_t ReplicationCoordinatorImpl::getNumConfigVotingMembers() const {
+    stdx::lock_guard<Latch> lock(_mutex);
+    return _rsConfig.votingMembers().size();
 }
 
 std::int64_t ReplicationCoordinatorImpl::getConfigTerm() const {
@@ -4719,9 +4727,17 @@ void ReplicationCoordinatorImpl::_performPostMemberStateUpdateAction(
 
 void ReplicationCoordinatorImpl::_postWonElectionUpdateMemberState(WithLock lk) {
     invariant(_topCoord->getTerm() != OpTime::kUninitializedTerm);
-    _electionId = OID::fromTerm(_topCoord->getTerm());
+
+    // Get the term from the topology coordinator, which we then use to generate the election ID.
+    // We intentionally wait until the end of this function
+    int64_t electionIdTerm = _topCoord->getTerm();
+    OID electionId = OID::fromTerm(electionIdTerm);
+
+    ON_BLOCK_EXIT([&] { _electionIdTerm.store(electionIdTerm); });
+
     auto ts = VectorClockMutable::get(getServiceContext())->tickClusterTime(1).asTimestamp();
-    _topCoord->processWinElection(_electionId, ts);
+    _topCoord->processWinElection(electionId, ts);
+
     const PostMemberStateUpdateAction nextAction = _updateMemberStateFromTopologyCoordinator(lk);
 
     invariant(nextAction == kActionFollowerModeStateChange,

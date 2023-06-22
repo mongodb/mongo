@@ -309,6 +309,10 @@ std::vector<MemberConfig> ReplicationCoordinatorNoOp::getConfigVotingMembers() c
     MONGO_UNREACHABLE;
 }
 
+size_t ReplicationCoordinatorNoOp::getNumConfigVotingMembers() const {
+    MONGO_UNREACHABLE;
+}
+
 std::int64_t ReplicationCoordinatorNoOp::getConfigTerm() const {
     MONGO_UNREACHABLE;
 }

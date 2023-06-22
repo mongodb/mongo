@@ -337,6 +337,10 @@ std::vector<MemberConfig> ReplicationCoordinatorEmbedded::getConfigVotingMembers
     UASSERT_NOT_IMPLEMENTED;
 }
 
+size_t ReplicationCoordinatorEmbedded::getNumConfigVotingMembers() const {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 std::int64_t ReplicationCoordinatorEmbedded::getConfigTerm() const {
     UASSERT_NOT_IMPLEMENTED;
 }
