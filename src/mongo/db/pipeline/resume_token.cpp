@@ -87,7 +87,8 @@ bool ResumeTokenData::operator==(const ResumeTokenData& other) const {
     return clusterTime == other.clusterTime && version == other.version &&
         tokenType == other.tokenType && txnOpIndex == other.txnOpIndex &&
         fromInvalidate == other.fromInvalidate && uuid == other.uuid &&
-        (Value::compare(this->eventIdentifier, other.eventIdentifier, nullptr) == 0);
+        (Value::compare(this->eventIdentifier, other.eventIdentifier, nullptr) == 0) &&
+        fragmentNum == other.fragmentNum;
 }
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
@@ -101,7 +102,11 @@ std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData) {
         out << ", fromInvalidate: " << static_cast<bool>(tokenData.fromInvalidate);
     }
     out << ", uuid: " << tokenData.uuid;
-    out << ", eventIdentifier: " << tokenData.eventIdentifier << "}";
+    out << ", eventIdentifier: " << tokenData.eventIdentifier;
+    if (tokenData.version >= 2) {
+        out << ", fragmentNum: " << tokenData.fragmentNum;
+    }
+    out << "}";
     return out;
 }
 
@@ -161,6 +166,14 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
         builder.appendNull("");
     }
     data.eventIdentifier.addToBsonObj(&builder, "");
+
+    if (data.fragmentNum) {
+        uassert(7182504,
+                str::stream() << "Tokens of version " << data.version
+                              << " cannot have a fragmentNum",
+                data.version >= 2);
+        builder.appendNumber("", static_cast<long long>(*data.fragmentNum));
+    }
 
     auto keyObj = builder.obj();
     KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
@@ -283,6 +296,14 @@ ResumeTokenData ResumeToken::getData() const {
     uassert(6189503,
             "Resume Token eventIdentifier is not an object",
             result.eventIdentifier.getType() == BSONType::Object);
+
+    if (i.more() && result.version >= 2) {
+        auto fragmentNum = i.next();
+        uassert(7182501,
+                "Resume token 'fragmentNum' must be a non-negative integer.",
+                fragmentNum.type() == BSONType::NumberInt && fragmentNum.numberInt() >= 0);
+        result.fragmentNum = fragmentNum.numberInt();
+    }
 
     uassert(40646, "invalid oversized resume token", !i.more());
     return result;

@@ -107,6 +107,9 @@ struct ResumeTokenData {
     // The eventIdentifier can be either be a document key for CRUD operations, or a more
     // descriptive operation details for non-CRUD operations.
     Value eventIdentifier;
+
+    // Index of the current fragment, for oversized events that have been split.
+    boost::optional<size_t> fragmentNum;
 };
 
 std::ostream& operator<<(std::ostream& out, const ResumeTokenData& tokenData);
