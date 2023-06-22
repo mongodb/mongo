@@ -280,4 +280,11 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                                 GetWriteSizeFn getWriteSizeFn,
                                 TargetedBatchMap& batchMap);
 
+/**
+ * Returns a new write concern that has the copy of every field from the original
+ * document but with a w set to 1. This is intended for upgrading { w: 0 } write
+ * concern to { w: 1 }.
+ */
+BSONObj upgradeWriteConcern(const BSONObj& origWriteConcern);
+
 }  // namespace mongo

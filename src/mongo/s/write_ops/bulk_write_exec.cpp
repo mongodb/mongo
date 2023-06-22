@@ -61,6 +61,11 @@ namespace {
 // applies when no writes are occurring and metadata is not changing on reload.
 const int kMaxRoundsWithoutProgress(5);
 
+bool isVerboseWc(const BSONObj& wc) {
+    BSONElement wElem = wc["w"];
+    return !wElem.isNumber() || wElem.Number() != 0;
+}
+
 // Send and process the child batches. Each child batch is targeted at a unique shard: therefore
 // one shard will have only one batch incoming.
 void executeChildBatches(OperationContext* opCtx,
@@ -77,8 +82,16 @@ void executeChildBatches(OperationContext* opCtx,
             bulkReq.serialize(BSONObj(), &builder);
 
             logical_session_id_helpers::serializeLsidAndTxnNumber(opCtx, &builder);
-            builder.append(WriteConcernOptions::kWriteConcernField,
-                           opCtx->getWriteConcern().toBSON());
+
+            auto wc = opCtx->getWriteConcern().toBSON();
+            if (isVerboseWc(wc)) {
+                builder.append(WriteConcernOptions::kWriteConcernField,
+                               opCtx->getWriteConcern().toBSON());
+            } else {
+                // Mongos needs to send to the shard with w > 0 so it will be able to see the
+                // writeErrors
+                builder.append(WriteConcernOptions::kWriteConcernField, upgradeWriteConcern(wc));
+            }
 
             return builder.obj();
         }();
