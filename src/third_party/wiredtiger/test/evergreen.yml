@@ -3797,7 +3797,7 @@ tasks:
 
   - name: format-stress-sanitizer-lsm-test
     # FIXME-WT-6258: Re-enable the test once the outstanding issues with LSM are resolved.
-    # tags: ["stress-test-sanitizer-1"]
+    # tags: ["stress-test-sanitizer"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3963,28 +3963,28 @@ tasks:
     tags: ["stress-test-ppc-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-1
-    tags: ["stress-test-sanitizer-1"]
+    tags: ["stress-test-sanitizer"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-2
-    tags: ["stress-test-sanitizer-2"]
+    tags: ["stress-test-sanitizer"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-3
-    tags: ["stress-test-sanitizer-3"]
+    tags: ["stress-test-sanitizer"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-4
-    tags: ["stress-test-sanitizer-4"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-1
-    tags: ["stress-test-sanitizer-1"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-2
-    tags: ["stress-test-sanitizer-2"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-3
-    tags: ["stress-test-sanitizer-3"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-4
-    tags: ["stress-test-sanitizer-4"]
+    tags: ["stress-test-sanitizer"]
   - <<: *recovery-stress-test
     name: recovery-stress-test-1
     tags: ["stress-test-1", "stress-test-zseries-1"]
@@ -4032,7 +4032,7 @@ tasks:
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 360
 
   - name: format-stress-sanitizer-test-no-barrier
-    tags: ["stress-test-no-barrier-sanitizer"]
+    tags: ["stress-test-sanitizer"]
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
@@ -4048,7 +4048,7 @@ tasks:
             ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
 
   - name: race-condition-stress-sanitizer-test-no-barrier
-    tags: ["stress-test-no-barrier-sanitizer"]
+    tags: ["stress-test-sanitizer"]
     exec_timeout_secs: 25200
     commands:
       - func: "get project"
@@ -5354,7 +5354,7 @@ buildvariants:
 - name: ubuntu2004-stress-tests
   display_name: Ubuntu 20.04 Stress tests
   run_on:
-  - ubuntu2004-test
+  - ubuntu2004-small
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
@@ -5372,11 +5372,9 @@ buildvariants:
     - name: ".stress-test-3"
     - name: ".stress-test-4"
     - name: ".stress-test-no-barrier"
-    - name: ".stress-test-no-barrier-sanitizer"
-    - name: ".stress-test-sanitizer-1"
-    - name: ".stress-test-sanitizer-2"
-    - name: ".stress-test-sanitizer-3"
-    - name: ".stress-test-sanitizer-4"
+    - name: ".stress-test-sanitizer"
+      run_on:
+      - ubuntu2004-medium
     - name: format-abort-recovery-stress-test
     - name: ".stress-test-1-nonstandalone"
     - name: ".stress-test-2-nonstandalone"
