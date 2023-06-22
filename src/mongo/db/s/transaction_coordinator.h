@@ -190,6 +190,10 @@ private:
     // hasn't yet persisted it
     boost::optional<txn::CoordinatorCommitDecision> _decision;
 
+    // Set when the coordinator has heard back from all the participants and reached a commit
+    // decision.
+    std::vector<NamespaceString> _affectedNamespaces;
+
     // Set when the coordinator has durably persisted `_decision` to the `config.coordinators`
     // collection
     bool _decisionDurable{false};

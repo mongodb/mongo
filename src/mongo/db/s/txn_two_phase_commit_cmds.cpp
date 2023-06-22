@@ -67,19 +67,8 @@ public:
         return true;
     }
 
-    class PrepareTimestamp {
-    public:
-        PrepareTimestamp(Timestamp timestamp) : _timestamp(std::move(timestamp)) {}
-        void serialize(BSONObjBuilder* bob) const {
-            bob->append("prepareTimestamp", _timestamp);
-        }
-
-    private:
-        Timestamp _timestamp;
-    };
-
     using Request = PrepareTransaction;
-    using Response = PrepareTimestamp;
+    using Response = PrepareReply;
 
     class Invocation final : public InvocationBase {
     public:
@@ -166,16 +155,18 @@ public:
                     uasserted(ErrorCodes::HostUnreachable,
                               "returning network error because failpoint is on");
                 }
-                return PrepareTimestamp(prepareOpTime.getTimestamp());
+                return createResponse(prepareOpTime.getTimestamp(),
+                                      txnParticipant.affectedNamespaces());
             }
 
-            const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx, {});
+            auto [prepareTimestamp, affectedNamespaces] =
+                txnParticipant.prepareTransaction(opCtx, {});
             if (MONGO_unlikely(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic
                                    .shouldFail())) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
-            return PrepareTimestamp(std::move(prepareTimestamp));
+            return createResponse(std::move(prepareTimestamp), std::move(affectedNamespaces));
         }
 
     private:
@@ -185,6 +176,14 @@ public:
 
         NamespaceString ns() const override {
             return NamespaceString(request().getDbName());
+        }
+
+        Response createResponse(Timestamp prepareTimestamp,
+                                std::vector<NamespaceString> affectedNamespaces) {
+            Response response;
+            response.setPrepareTimestamp(std::move(prepareTimestamp));
+            response.setAffectedNamespaces(std::move(affectedNamespaces));
+            return response;
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {

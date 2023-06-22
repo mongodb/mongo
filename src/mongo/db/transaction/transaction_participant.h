@@ -82,7 +82,7 @@ class TransactionParticipant {
     struct ObservableState;
 
     /**
-     * Indicates the state of the current multi-document transaction, if any.  If the transaction is
+     * Indicates the state of the current multi-document transaction, if any. If the transaction is
      * in any state but kInProgress, no more operations can be collected. Once the transaction is in
      * kPrepared, the transaction is not allowed to abort outside of an 'abortTransaction' command.
      * At this point, aborting the transaction must log an 'abortTransaction' oplog entry.
@@ -346,6 +346,10 @@ public:
             return o().txnState.isInRetryableWriteMode();
         }
 
+        const std::vector<NamespaceString>& affectedNamespaces() const {
+            return o().affectedNamespaces;
+        }
+
         /**
          * If this session is holding stashed locks in txnResourceStash, reports the current state
          * of the session using the provided builder.
@@ -565,12 +569,13 @@ public:
         void unstashTransactionResources(OperationContext* opCtx, const std::string& cmdName);
 
         /**
-         * Puts a transaction into a prepared state and returns the prepareTimestamp.
+         * Puts a transaction into a prepared state and returns the prepareTimestamp and the list of
+         * affected namespaces.
          *
          * On secondary, the "prepareTimestamp" will be given in the oplog.
          */
-        Timestamp prepareTransaction(OperationContext* opCtx,
-                                     boost::optional<repl::OpTime> prepareOptime);
+        std::pair<Timestamp, std::vector<NamespaceString>> prepareTransaction(
+            OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime);
 
         /**
          * Sets the prepare optime used for recovery.
@@ -1162,6 +1167,9 @@ private:
 
         // Tracks and updates transaction metrics upon the appropriate transaction event.
         TransactionMetricsObserver transactionMetricsObserver;
+
+        // Contains a list of affected namespaces to be reported to transaction coordinator.
+        std::vector<NamespaceString> affectedNamespaces;
     } _o;
 
     /**

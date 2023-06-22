@@ -218,6 +218,7 @@ void PrepareVoteConsensus::registerVote(const PrepareResponse& vote) {
     if (vote.vote == PrepareVote::kCommit) {
         ++_numCommitVotes;
         _maxPrepareTimestamp = std::max(_maxPrepareTimestamp, *vote.prepareTimestamp);
+        _affectedNamespaces.insert(vote.affectedNamespaces.begin(), vote.affectedNamespaces.end());
     } else {
         vote.vote == PrepareVote::kAbort ? ++_numAbortVotes : ++_numNoVotes;
 
@@ -327,8 +328,9 @@ namespace {
 repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                                      const LogicalSessionId& lsid,
                                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
-                                     const std::vector<ShardId>& participantList,
-                                     const txn::CoordinatorCommitDecision& decision) {
+                                     std::vector<ShardId> participantList,
+                                     const txn::CoordinatorCommitDecision& decision,
+                                     std::vector<NamespaceString> affectedNamespaces) {
     const bool isCommit = decision.getDecision() == txn::CommitDecision::kCommit;
     LOGV2_DEBUG(22467,
                 3,
@@ -387,6 +389,9 @@ repl::OpTime persistDecisionBlocking(OperationContext* opCtx,
                 doc.setId(sessionInfo);
                 doc.setParticipants(std::move(participantList));
                 doc.setDecision(decision);
+                if (decision.getDecision() == CommitDecision::kCommit) {
+                    doc.setAffectedNamespaces(std::move(affectedNamespaces));
+                }
                 return doc.toBSON();
             }()));
 
@@ -433,14 +438,16 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                                      const LogicalSessionId& lsid,
                                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                      const txn::ParticipantsList& participants,
-                                     const txn::CoordinatorCommitDecision& decision) {
+                                     const txn::CoordinatorCommitDecision& decision,
+                                     const std::vector<NamespaceString>& affectedNamespaces) {
     return txn::doWhile(
         scheduler,
         boost::none /* no need for a backoff */,
         [](const StatusWith<repl::OpTime>& s) { return shouldRetryPersistingCoordinatorState(s); },
-        [&scheduler, lsid, txnNumberAndRetryCounter, participants, decision] {
+        [&scheduler, lsid, txnNumberAndRetryCounter, participants, decision, affectedNamespaces] {
             return scheduler.scheduleWork(
-                [lsid, txnNumberAndRetryCounter, participants, decision](OperationContext* opCtx) {
+                [lsid, txnNumberAndRetryCounter, participants, decision, affectedNamespaces](
+                    OperationContext* opCtx) {
                     // Do not acquire a storage ticket in order to avoid unnecessary serialization
                     // with other prepared transactions that are holding a storage ticket
                     // themselves; see SERVER-60682.
@@ -448,8 +455,12 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                         opCtx->lockState(), AdmissionContext::Priority::kImmediate);
                     getTransactionCoordinatorWorkerCurOpRepository()->set(
                         opCtx, lsid, txnNumberAndRetryCounter, CoordinatorAction::kWritingDecision);
-                    return persistDecisionBlocking(
-                        opCtx, lsid, txnNumberAndRetryCounter, participants, decision);
+                    return persistDecisionBlocking(opCtx,
+                                                   lsid,
+                                                   txnNumberAndRetryCounter,
+                                                   std::move(participants),
+                                                   decision,
+                                                   std::move(affectedNamespaces));
                 });
         });
 }
@@ -720,9 +731,9 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                     }
 
                     if (status.isOK()) {
-                        auto prepareTimestampField = response.data["prepareTimestamp"];
-                        if (prepareTimestampField.eoo() ||
-                            prepareTimestampField.timestamp().isNull()) {
+                        auto reply =
+                            PrepareReply::parse(IDLParserContext("PrepareReply"), response.data);
+                        if (!reply.getPrepareTimestamp()) {
                             Status abortStatus(ErrorCodes::Error(50993),
                                                str::stream()
                                                    << "Coordinator shard received an OK response "
@@ -739,7 +750,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                                   "error"_attr = redact(abortStatus));
 
                             return PrepareResponse{
-                                shardId, PrepareVote::kAbort, boost::none, abortStatus};
+                                shardId, PrepareVote::kAbort, boost::none, {}, abortStatus};
                         }
 
                         LOGV2_DEBUG(
@@ -752,12 +763,15 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                             "sessionId"_attr = lsid,
                             "txnNumberAndRetryCounter"_attr = txnNumberAndRetryCounter,
                             "shardId"_attr = shardId,
-                            "prepareTimestampField"_attr = prepareTimestampField.timestamp());
+                            "prepareTimestamp"_attr = reply.getPrepareTimestamp(),
+                            "affectedNamespaces"_attr = reply.getAffectedNamespaces());
 
-                        return PrepareResponse{shardId,
-                                               PrepareVote::kCommit,
-                                               prepareTimestampField.timestamp(),
-                                               boost::none};
+                        return PrepareResponse{
+                            shardId,
+                            PrepareVote::kCommit,
+                            *reply.getPrepareTimestamp(),
+                            reply.getAffectedNamespaces().value_or(std::vector<NamespaceString>{}),
+                            boost::none};
                     }
 
                     LOGV2_DEBUG(22479,
@@ -776,6 +790,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                             shardId,
                             PrepareVote::kAbort,
                             boost::none,
+                            {},
                             status.withContext(str::stream() << "from shard " << shardId)};
                     }
 
@@ -792,7 +807,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
                     // treat ShardNotFound as a vote to abort, which is always safe since the node
                     // must then send abort.
                     return Future<PrepareResponse>::makeReady(
-                        {shardId, CommitDecision::kAbort, boost::none, status});
+                        {shardId, CommitDecision::kAbort, boost::none, {}, status});
                 });
         });
 
@@ -809,6 +824,7 @@ Future<PrepareResponse> sendPrepareToShard(ServiceContext* service,
             return PrepareResponse{shardId,
                                    boost::none,
                                    boost::none,
+                                   {},
                                    Status(ErrorCodes::NoSuchTransaction, status.reason())};
         });
 }

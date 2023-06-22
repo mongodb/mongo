@@ -238,6 +238,11 @@ TransactionCoordinator::TransactionCoordinator(
                     }
 
                     if (_decision->getDecision() == CommitDecision::kCommit) {
+                        auto affectedNamespacesSet = consensus.releaseAffectedNamespaces();
+                        _affectedNamespaces.reserve(affectedNamespacesSet.size());
+                        std::move(affectedNamespacesSet.begin(),
+                                  affectedNamespacesSet.end(),
+                                  std::back_inserter(_affectedNamespaces));
                         LOGV2_DEBUG(
                             22446,
                             3,
@@ -288,8 +293,12 @@ TransactionCoordinator::TransactionCoordinator(
                     return Future<repl::OpTime>::makeReady(repl::OpTime());
             }
 
-            return txn::persistDecision(
-                *_scheduler, _lsid, _txnNumberAndRetryCounter, *_participants, *_decision);
+            return txn::persistDecision(*_scheduler,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        *_participants,
+                                        *_decision,
+                                        _affectedNamespaces);
         })
         .then([this](repl::OpTime opTime) {
             switch (_decision->getDecision()) {
@@ -411,6 +420,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
         _participantsDurable = true;
         _decision = std::move(doc.getDecision());
     }
+    _affectedNamespaces = doc.getAffectedNamespaces().get_value_or({});
 
     _kickOffCommitPromise.emplaceValue();
 }

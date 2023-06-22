@@ -73,6 +73,10 @@ public:
      */
     CoordinatorCommitDecision decision() const;
 
+    absl::flat_hash_set<NamespaceString> releaseAffectedNamespaces() {
+        return std::move(_affectedNamespaces);
+    }
+
 private:
     int _numShards;
 
@@ -81,7 +85,7 @@ private:
     int _numNoVotes{0};
 
     Timestamp _maxPrepareTimestamp;
-
+    absl::flat_hash_set<NamespaceString> _affectedNamespaces;
     boost::optional<Status> _abortStatus;
 };
 
@@ -135,7 +139,8 @@ Future<repl::OpTime> persistDecision(txn::AsyncWorkScheduler& scheduler,
                                      const LogicalSessionId& lsid,
                                      const TxnNumberAndRetryCounter& txnNumberAndRetryCounter,
                                      const txn::ParticipantsList& participants,
-                                     const txn::CoordinatorCommitDecision& decision);
+                                     const txn::CoordinatorCommitDecision& decision,
+                                     const std::vector<NamespaceString>& affectedNamespaces);
 
 /**
  * Sends commit to all shards and returns a future that will be resolved when all participants have
@@ -202,6 +207,9 @@ struct PrepareResponse {
 
     // Will only be set if the vote was kCommit
     boost::optional<Timestamp> prepareTimestamp;
+
+    // Will only be set if the vote was kCommit
+    std::vector<NamespaceString> affectedNamespaces;
 
     // Will only be set if the vote was kAbort or no value
     boost::optional<Status> abortReason;

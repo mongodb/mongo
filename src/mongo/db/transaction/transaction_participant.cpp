@@ -1610,7 +1610,8 @@ void TransactionParticipant::Participant::refreshLocksForPreparedTransaction(
     o(lk).txnResourceStash = TxnResources(lk, opCtx, stashStyle);
 }
 
-Timestamp TransactionParticipant::Participant::prepareTransaction(
+std::pair<Timestamp, std::vector<NamespaceString>>
+TransactionParticipant::Participant::prepareTransaction(
     OperationContext* opCtx, boost::optional<repl::OpTime> prepareOptime) {
 
     ScopeGuard abortGuard([&] {
@@ -1648,8 +1649,13 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     // collection multiple times: it is a costly check.
     auto transactionOperationUuids = completedTransactionOperations->getCollectionUUIDs();
     auto catalog = CollectionCatalog::get(opCtx);
+
+    std::vector<NamespaceString> affectedNamespaces;
+    affectedNamespaces.reserve(transactionOperationUuids.size());
+
     for (const auto& uuid : transactionOperationUuids) {
         auto collection = catalog->lookupCollectionByUUID(opCtx, uuid);
+        affectedNamespaces.emplace_back(collection->ns());
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 str::stream() << "prepareTransaction failed because one of the transaction "
                                  "operations was done against a temporary collection '"
@@ -1665,7 +1671,9 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
         // prepared) transaction is killed, but it still ends up in the prepared state
         opCtx->checkForInterrupt();
         o(lk).txnState.transitionTo(TransactionState::kPrepared);
+        o(lk).affectedNamespaces = affectedNamespaces;
     }
+
     std::vector<OplogSlot> reservedSlots;
     if (prepareOptime) {
         // On secondary, we just prepare the transaction and discard the buffered ops.
@@ -1749,7 +1757,7 @@ Timestamp TransactionParticipant::Participant::prepareTransaction(
     const bool unlocked = opCtx->lockState()->unlockRSTLforPrepare();
     invariant(unlocked);
 
-    return prepareOplogSlot.getTimestamp();
+    return {prepareOplogSlot.getTimestamp(), std::move(affectedNamespaces)};
 }
 
 void TransactionParticipant::Participant::setPrepareOpTimeForRecovery(OperationContext* opCtx,
