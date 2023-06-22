@@ -213,6 +213,12 @@ struct TransactionResources {
 
     ~TransactionResources();
 
+    static TransactionResources& get(OperationContext* opCtx);
+
+    static std::unique_ptr<TransactionResources> detachFromOpCtx(OperationContext* opCtx);
+    static void attachToOpCtx(OperationContext* opCtx,
+                              std::unique_ptr<TransactionResources> transactionResources);
+
     AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection);
     const AcquiredView& addAcquiredView(AcquiredView&& acquiredView);
 

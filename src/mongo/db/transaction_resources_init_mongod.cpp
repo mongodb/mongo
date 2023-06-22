@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2023-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -28,6 +28,7 @@
  */
 
 #include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/transaction_resources.h"
 
 namespace mongo {
 namespace {
@@ -44,6 +45,8 @@ public:
     void onCreateOperationContext(OperationContext* opCtx) final {
         auto service = opCtx->getServiceContext();
 
+        shard_role_details::TransactionResources::attachToOpCtx(
+            opCtx, std::make_unique<shard_role_details::TransactionResources>());
         opCtx->setLockState(std::make_unique<LockerImpl>(service));
 
         // There are a few cases where we don't have a storage engine available yet when creating an

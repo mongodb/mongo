@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include <memory>
 #include <vector>
 
-#include "mongo/db/service_context_fwd.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
