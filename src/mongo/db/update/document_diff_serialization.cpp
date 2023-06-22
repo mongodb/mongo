@@ -80,7 +80,9 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
     sizeTracker.addEntry(fieldName.size(), nodePtr);
 
     auto result = children.insert({fieldName.toString(), std::move(node)});
-    invariant(result.second);
+    uassert(7693400,
+            str::stream() << "Document already has a field named '" << fieldName << "'",
+            result.second);
     StringData storedFieldName = result.first->first;
     switch (nodePtr->type()) {
         case (NodeType::kArray):
