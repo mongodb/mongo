@@ -45,6 +45,9 @@ parameters:
 - key: antithesis_image_tag
   description: "The docker tag to use when pushing images to Antithesis"
 
+- key: build_patch_id
+  description: "Patch id of evergreen patch to pull binaries from for testing."
+
 ## Cron parameters.
 - key: project_required_suggested_cron
   value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC

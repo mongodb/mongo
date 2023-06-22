@@ -3273,12 +3273,6 @@ if not env.TargetOSIs('windows', 'macOS') and (env.ToolchainIs('GCC', 'clang')):
                     for flag_value in env[search_variable]):
                 env.Append(CCFLAGS=[f'{targeting_flag}{targeting_flag_value}'])
 
-# Needed for auth tests since key files are stored in git with mode 644.
-if not env.TargetOSIs('windows'):
-    for keysuffix in ["1", "2", "ForRollover"]:
-        keyfile = "jstests/libs/key%s" % keysuffix
-        os.chmod(keyfile, stat.S_IWUSR | stat.S_IRUSR)
-
 # boostSuffixList is used when using system boost to select a search sequence
 # for boost libraries.
 boostSuffixList = ["-mt", ""]

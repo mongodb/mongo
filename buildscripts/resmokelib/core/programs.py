@@ -454,6 +454,11 @@ def _set_keyfile_permissions(opts):
     We can't permanently set the keyfile permissions because git is not
     aware of them.
     """
+    for keysuffix in ["1", "2", "ForRollover"]:
+        keyfile = "jstests/libs/key%s" % keysuffix
+        if os.path.exists(keyfile):
+            os.chmod(keyfile, stat.S_IRUSR | stat.S_IWUSR)
+
     if "keyFile" in opts:
         os.chmod(opts["keyFile"], stat.S_IRUSR | stat.S_IWUSR)
     if "encryptionKeyFile" in opts:
