@@ -2315,9 +2315,19 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
     WT_CURSOR* c = _cursor->get();
     auto key = makeCursorKey(_lastReturnedId, _keyFormat);
     setKey(c, &key);
+    // Use a bounded cursor to avoid unnecessarily traversing deleted records while repositioning
+    // the cursor. This is particularly useful in capped collections when we're making a lot of
+    // deletes and the cursor traverses many deleted records to reposition itself.
+    if (_forward) {
+        invariantWTOK(c->bound(c, "bound=lower"), c->session);
+    } else {
+        invariantWTOK(c->bound(c, "bound=upper"), c->session);
+    }
 
     int cmp;
     int ret = wiredTigerPrepareConflictRetry(_opCtx, [&] { return c->search_near(c, &cmp); });
+    invariantWTOK(c->bound(c, "action=clear"), c->session);
+
     if (ret == WT_NOTFOUND) {
         _eof = true;
 
@@ -2349,6 +2359,9 @@ bool WiredTigerRecordStoreCursorBase::restore(bool tolerateCappedRepositioning) 
         _skipNextAdvance = true;
     } else if (!_forward && cmp < 0) {
         _skipNextAdvance = true;
+    } else {
+        // Check that the cursor hasn't landed before _lastReturnedId
+        dassert(_forward ? cmp >= 0 : cmp <= 0);
     }
 
     return true;
