@@ -589,6 +589,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -1016,6 +1017,7 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1127,6 +1129,7 @@ buildvariants:
   - name: .encrypt !.no_debug_mode
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1267,6 +1270,7 @@ buildvariants:
   - name: feature_flag_multiversion_gen
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
   - name: jsCore_min_batch_repeat_queries_ese_gsm
@@ -1401,6 +1405,7 @@ buildvariants:
   - name: check_for_todos
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1466,6 +1471,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns_and_balancer_gen
   - name: concurrency_sharded_initial_sync_gen
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
   - name: jsCore_txns
   - name: .multi_shard
@@ -2019,6 +2025,7 @@ buildvariants:
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common !.sbe_only
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
@@ -2098,6 +2105,7 @@ buildvariants:
   - name: free_monitoring
   - name: generate_buildid_to_debug_symbols_mapping
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
   - name: jsCore_min_batch_repeat_queries_ese_gsm

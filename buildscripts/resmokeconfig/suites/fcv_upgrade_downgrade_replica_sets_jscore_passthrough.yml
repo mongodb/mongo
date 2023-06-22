@@ -1,0 +1,99 @@
+test_kind: js_test
+
+# Cloned from buildscripts/resmokeconfig/suites/replica_sets_jscore_passthrough.yml
+# to run FCV upgrade downgrade in the background
+
+selector:
+  roots:
+  - jstests/core/**/*.js
+  - jstests/fle2/**/*.js
+  - jstests/aggregation/**/*.js
+  - src/mongo/db/modules/*/jstests/fle/**/*.js
+  exclude_with_any_tags:
+  - assumes_standalone_mongod
+  # columnstore indexes are under development and cannot be used without enabling the feature flag
+  - featureFlagColumnstoreIndexes
+  # TODO SERVER-52419 Remove this tag.
+  - featureFlagBulkWriteCommand
+  - featureFlagFLE2CleanupCommand
+  # Transactions are aborted upon fcv upgrade or downgrade.
+  - uses_transactions
+  # Exclude tests with the latest fcv.
+  - requires_fcv_71
+
+  exclude_files:
+  # The set_param1.js test attempts to compare the response from running the {getParameter: "*"}
+  # command multiple times, which may observe the change to the "transactionLifetimeLimitSeconds"
+  # server parameter.
+  - jstests/core/**/set_param1.js
+  # Different explain format
+  - jstests/core/**/or_to_in.js
+  # SERVER-34772 Tailable Cursors are not allowed with snapshot readconcern.
+  - jstests/core/**/awaitdata_getmore_cmd.js
+  - jstests/core/**/getmore_cmd_maxtimems.js
+  - jstests/core/**/tailable_cursor_invalidation.js
+  - jstests/core/**/tailable_getmore_batch_size.js
+
+  # TODO (SERVER-78220): Investigate failing api version tests in the fcv jscore passthrough suite.
+  - jstests/core/api/api_version_unstable_indexes.js
+
+  # TODO (SERVER-78202): Investigate failing timeseries tests in the fcv jscore passthrough suite.
+  - jstests/core/timeseries/timeseries_update.js
+  - jstests/core/timeseries/timeseries_update_concurrent.js
+
+  # These use "columnstore indexes are under development and cannot be used without enabling the feature flag"
+  - jstests/core/query/null_query_semantics.js
+  - jstests/core/query/project/projection_semantics.js
+  - jstests/core/index/hidden_index.js
+
+  # TODO: Remove after fixing SERVER-78201: the following received command without explicit readConcern.
+  - jstests/aggregation/sources/densify/internal_parse.js
+  - jstests/aggregation/api_version_stage_allowance_checks.js
+
+  # TODO (SERVER-78200): The tests below sometimes hang when they run concurrently with a setFCV command.
+  - src/mongo/db/modules/enterprise/jstests/fle/fle_admin_e2e.js
+  - src/mongo/db/modules/enterprise/jstests/fle/fle_implicit_encryption.js
+  - src/mongo/db/modules/enterprise/jstests/fle/fle_use_cases.js
+  - src/mongo/db/modules/enterprise/jstests/fle/fle_drivers_integration.js
+
+  # TODO (SERVER-77387): The tests below sometimes hit an index build invariant failure when they run concurrently with a setFCV command.
+  - jstests/core/query/array/arrayfind7.js
+  - jstests/core/index/indexu.js
+  - jstests/core/index/geo/geo_invalid_polygon.js
+  - jstests/core/index/geo/geo_s2disjoint_holes.js
+  - jstests/core/index/geo/geo_big_polygon2.js
+
+  # Expected failures due to unexpected query execution stats from restarted operations from fcv upgrade.
+  - jstests/aggregation/sources/lookup/lookup_query_stats.js
+  - jstests/aggregation/sources/facet/facet_stats.js
+  - jstests/aggregation/sources/unionWith/unionWith_query_stats.js
+
+  # The tests below use transactions (which are aborted on fcv upgrade/downgrade) and thus are expected to fail.
+  - jstests/core/role_management_helpers.js
+  - jstests/core/roles_info.js
+  - jstests/core/views/views_all_commands.js
+
+executor:
+  archive:
+    hooks:
+      - CheckReplDBHash
+      - CheckReplOplogs
+      - ValidateCollections
+      - FCVUpgradeDowngradeInBackground
+  config:
+    shell_options:
+      eval: "testingReplication = true;"
+  hooks:
+  - class: CheckReplOplogs
+  - class: CheckReplDBHash
+  - class: ValidateCollections
+  - class: FCVUpgradeDowngradeInBackground
+  - class: CleanEveryN
+    n: 20
+  fixture:
+    class: ReplicaSetFixture
+    mongod_options:
+      set_parameters:
+        enableTestCommands: 1
+        disableTransitionFromLatestToLastContinuous: False
+    num_nodes: 2

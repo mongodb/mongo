@@ -6558,6 +6558,12 @@ tasks:
     vars:
       suite: ssl_x509
 
+- <<: *gen_task_template
+  name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+  tags: ["jscore"]
+  commands:
+  - func: "generate resmoke tasks"
+
 - <<: *task_template
   name: jsCore_decimal
   tags: ["jscore", "common", "decimal"]
