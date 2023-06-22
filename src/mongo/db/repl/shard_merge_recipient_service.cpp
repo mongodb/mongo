@@ -1255,6 +1255,12 @@ SemiFuture<void> ShardMergeRecipientService::Instance::_getStartOpTimesFromDonor
 void ShardMergeRecipientService::Instance::_processCommittedTransactionEntry(const BSONObj& entry) {
     auto sessionTxnRecord = SessionTxnRecord::parse(IDLParserContext("SessionTxnRecord"), entry);
     auto sessionId = sessionTxnRecord.getSessionId();
+    uassert(
+        ErrorCodes::RetryableInternalTransactionNotSupported,
+        str::stream() << "Shard merge doesn't support retryable internal transaction. SessionId:: "
+                      << sessionId.toBSON(),
+        !isInternalSessionForRetryableWrite(sessionId));
+
     auto txnNumber = sessionTxnRecord.getTxnNum();
     auto optTxnRetryCounter = sessionTxnRecord.getTxnRetryCounter();
     uassert(ErrorCodes::InvalidOptions,
