@@ -250,15 +250,16 @@ Status BalancerPolicy::isShardSuitableReceiver(const ClusterStatistics::ShardSta
     return Status::OK();
 }
 
-ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
-                                                     const DistributionStatus& distribution,
-                                                     const string& tag,
-                                                     const set<ShardId>& excludedShards) {
+ShardId BalancerPolicy::_getLeastLoadedReceiverShard(
+    const ShardStatisticsVector& shardStats,
+    const DistributionStatus& distribution,
+    const string& tag,
+    const stdx::unordered_set<ShardId>& availableShards) {
     ShardId best;
     unsigned minChunks = numeric_limits<unsigned>::max();
 
     for (const auto& stat : shardStats) {
-        if (excludedShards.count(stat.shardId))
+        if (!availableShards.count(stat.shardId))
             continue;
 
         auto status = isShardSuitableReceiver(stat, tag);
@@ -278,15 +279,16 @@ ShardId BalancerPolicy::_getLeastLoadedReceiverShard(const ShardStatisticsVector
     return best;
 }
 
-ShardId BalancerPolicy::_getMostOverloadedShard(const ShardStatisticsVector& shardStats,
-                                                const DistributionStatus& distribution,
-                                                const string& chunkTag,
-                                                const set<ShardId>& excludedShards) {
+ShardId BalancerPolicy::_getMostOverloadedShard(
+    const ShardStatisticsVector& shardStats,
+    const DistributionStatus& distribution,
+    const string& chunkTag,
+    const stdx::unordered_set<ShardId>& availableShards) {
     ShardId worst;
     unsigned maxChunks = 0;
 
     for (const auto& stat : shardStats) {
-        if (excludedShards.count(stat.shardId))
+        if (!availableShards.count(stat.shardId))
             continue;
 
         const unsigned shardChunkCount =
@@ -368,7 +370,7 @@ MigrateInfo chooseRandomMigration(const ShardStatisticsVector& shardStats,
 
 vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            std::set<ShardId>* usedShards,
+                                            stdx::unordered_set<ShardId>* availableShards,
                                             bool forceJumbo) {
     vector<MigrateInfo> migrations;
 
@@ -390,7 +392,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
             if (!stat.isDraining)
                 continue;
 
-            if (usedShards->count(stat.shardId))
+            if (!availableShards->count(stat.shardId))
                 continue;
 
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
@@ -412,7 +414,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 const string tag = distribution.getTagForChunk(chunk);
 
                 const ShardId to =
-                    _getLeastLoadedReceiverShard(shardStats, distribution, tag, *usedShards);
+                    _getLeastLoadedReceiverShard(shardStats, distribution, tag, *availableShards);
                 if (!to.isValid()) {
                     if (migrations.empty()) {
                         LOGV2_WARNING(21889,
@@ -428,8 +430,8 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 invariant(to != stat.shardId);
                 migrations.emplace_back(
                     to, chunk, MoveChunkRequest::ForceJumbo::kForceBalancer, MigrateInfo::drain);
-                invariant(usedShards->insert(stat.shardId).second);
-                invariant(usedShards->insert(to).second);
+                invariant(availableShards->erase(stat.shardId));
+                invariant(availableShards->erase(to));
                 break;
             }
 
@@ -441,13 +443,17 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                               "shardId"_attr = stat.shardId,
                               "numJumboChunks"_attr = numJumboChunks);
             }
+
+            if (availableShards->size() < 2) {
+                return migrations;
+            }
         }
     }
 
     // 2) Check for chunks, which are on the wrong shard and must be moved off of it
     if (!distribution.tags().empty()) {
         for (const auto& stat : shardStats) {
-            if (usedShards->count(stat.shardId))
+            if (!availableShards->count(stat.shardId))
                 continue;
 
             const vector<ChunkType>& chunks = distribution.getChunks(stat.shardId);
@@ -472,7 +478,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                 }
 
                 const ShardId to =
-                    _getLeastLoadedReceiverShard(shardStats, distribution, tag, *usedShards);
+                    _getLeastLoadedReceiverShard(shardStats, distribution, tag, *availableShards);
                 if (!to.isValid()) {
                     if (migrations.empty()) {
                         LOGV2_WARNING(21892,
@@ -491,9 +497,13 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                                         forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
                                                    : MoveChunkRequest::ForceJumbo::kDoNotForce,
                                         MigrateInfo::zoneViolation);
-                invariant(usedShards->insert(stat.shardId).second);
-                invariant(usedShards->insert(to).second);
+                invariant(availableShards->erase(stat.shardId));
+                invariant(availableShards->erase(to));
                 break;
+            }
+
+            if (availableShards->size() < 2) {
+                return migrations;
             }
         }
     }
@@ -542,7 +552,7 @@ vector<MigrateInfo> BalancerPolicy::balance(const ShardStatisticsVector& shardSt
                                   tag,
                                   idealNumberOfChunksPerShardForTag,
                                   &migrations,
-                                  usedShards,
+                                  availableShards,
                                   forceJumbo ? MoveChunkRequest::ForceJumbo::kForceBalancer
                                              : MoveChunkRequest::ForceJumbo::kDoNotForce))
             ;
@@ -557,8 +567,16 @@ boost::optional<MigrateInfo> BalancerPolicy::balanceSingleChunk(
     const DistributionStatus& distribution) {
     const string tag = distribution.getTagForChunk(chunk);
 
+    stdx::unordered_set<ShardId> availableShards;
+    std::transform(shardStats.begin(),
+                   shardStats.end(),
+                   std::inserter(availableShards, availableShards.end()),
+                   [](const ClusterStatistics::ShardStatistics& shardStatistics) -> ShardId {
+                       return shardStatistics.shardId;
+                   });
+
     ShardId newShardId =
-        _getLeastLoadedReceiverShard(shardStats, distribution, tag, set<ShardId>());
+        _getLeastLoadedReceiverShard(shardStats, distribution, tag, availableShards);
     if (!newShardId.isValid() || newShardId == chunk.getShard()) {
         return boost::optional<MigrateInfo>();
     }
@@ -572,9 +590,9 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
                                         const string& tag,
                                         size_t idealNumberOfChunksPerShardForTag,
                                         vector<MigrateInfo>* migrations,
-                                        set<ShardId>* usedShards,
+                                        stdx::unordered_set<ShardId>* availableShards,
                                         MoveChunkRequest::ForceJumbo forceJumbo) {
-    const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag, *usedShards);
+    const ShardId from = _getMostOverloadedShard(shardStats, distribution, tag, *availableShards);
     if (!from.isValid())
         return false;
 
@@ -584,7 +602,8 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
     if (max <= idealNumberOfChunksPerShardForTag)
         return false;
 
-    const ShardId to = _getLeastLoadedReceiverShard(shardStats, distribution, tag, *usedShards);
+    const ShardId to =
+        _getLeastLoadedReceiverShard(shardStats, distribution, tag, *availableShards);
     if (!to.isValid()) {
         if (migrations->empty()) {
             LOGV2(21882,
@@ -637,8 +656,8 @@ bool BalancerPolicy::_singleZoneBalance(const ShardStatisticsVector& shardStats,
         }
 
         migrations->emplace_back(to, chunk, forceJumbo, MigrateInfo::chunksImbalance);
-        invariant(usedShards->insert(chunk.getShard()).second);
-        invariant(usedShards->insert(to).second);
+        invariant(availableShards->erase(chunk.getShard()));
+        invariant(availableShards->erase(to));
         return true;
     }
 

@@ -29,7 +29,7 @@
 
 #pragma once
 
-#include <set>
+#include <unordered_set>
 #include <vector>
 
 #include "mongo/bson/bsonobj.h"
@@ -231,13 +231,13 @@ public:
      * any of the shards have chunks, which are sufficiently higher than this number, suggests
      * moving chunks to shards, which are under this number.
      *
-     * The usedShards parameter is in/out and it contains the set of shards, which have already been
-     * used for migrations. Used so we don't return multiple conflicting migrations for the same
-     * shard.
+     * The availableShards parameter is in/out and it contains the set of shards, which are still
+     * available to participate on a migration. Used so we don't return multiple conflicting
+     * migrations for the same shard.
      */
     static std::vector<MigrateInfo> balance(const ShardStatisticsVector& shardStats,
                                             const DistributionStatus& distribution,
-                                            std::set<ShardId>* usedShards,
+                                            stdx::unordered_set<ShardId>* availableShards,
                                             bool forceJumbo);
 
     /**
@@ -253,10 +253,11 @@ private:
      * Return the shard with the specified tag, which has the least number of chunks. If the tag is
      * empty, considers all shards.
      */
-    static ShardId _getLeastLoadedReceiverShard(const ShardStatisticsVector& shardStats,
-                                                const DistributionStatus& distribution,
-                                                const std::string& tag,
-                                                const std::set<ShardId>& excludedShards);
+    static ShardId _getLeastLoadedReceiverShard(
+        const ShardStatisticsVector& shardStats,
+        const DistributionStatus& distribution,
+        const std::string& tag,
+        const stdx::unordered_set<ShardId>& availableShards);
 
     /**
      * Return the shard which has the least number of chunks with the specified tag. If the tag is
@@ -265,7 +266,7 @@ private:
     static ShardId _getMostOverloadedShard(const ShardStatisticsVector& shardStats,
                                            const DistributionStatus& distribution,
                                            const std::string& chunkTag,
-                                           const std::set<ShardId>& excludedShards);
+                                           const stdx::unordered_set<ShardId>& availableShards);
 
     /**
      * Selects one chunk for the specified zone (if appropriate) to be moved in order to bring the
@@ -284,7 +285,7 @@ private:
                                    const std::string& tag,
                                    size_t idealNumberOfChunksPerShardForTag,
                                    std::vector<MigrateInfo>* migrations,
-                                   std::set<ShardId>* usedShards,
+                                   stdx::unordered_set<ShardId>* availableShards,
                                    MoveChunkRequest::ForceJumbo forceJumbo);
 };
 

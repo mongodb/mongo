@@ -76,7 +76,7 @@ private:
         OperationContext* opCtx,
         const NamespaceString& nss,
         const ShardStatisticsVector& shardStats,
-        std::set<ShardId>* usedShards);
+        stdx::unordered_set<ShardId>* availableShards);
 
     // Source for obtaining cluster statistics. Not owned and must not be destroyed before the
     // policy object is destroyed.
