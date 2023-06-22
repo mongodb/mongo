@@ -325,10 +325,12 @@ function testUpdateOne({
     initialDocList,
     updateQuery,
     updateObj,
+    c,
     resultDocList,
     nMatched,
     nModified = nMatched,
     upsert = false,
+    upsertedDoc,
     failCode
 }) {
     const collName = getCallerName();
@@ -338,19 +340,35 @@ function testUpdateOne({
     const coll = testDB.getCollection(collName);
     prepareCollection({collName, initialDocList});
 
+    let upd = {q: updateQuery, u: updateObj, multi: false, upsert: upsert};
+    if (c) {
+        upd["c"] = c;
+        upd["upsertSupplied"] = true;
+    }
     const updateCommand = {
         update: coll.getName(),
-        updates: [{q: updateQuery, u: updateObj, multi: false, upsert: upsert}]
+        updates: [upd],
     };
+
     const res = failCode ? assert.commandFailedWithCode(testDB.runCommand(updateCommand), failCode)
                          : assert.commandWorked(testDB.runCommand(updateCommand));
     if (!failCode) {
-        if (upsert) {
+        if (upsertedDoc) {
             assert.eq(1, res.n, tojson(res));
             assert.eq(0, res.nModified, tojson(res));
+            assert(res.hasOwnProperty("upserted"), tojson(res));
+            assert.eq(1, res.upserted.length);
+
+            if (upsertedDoc.hasOwnProperty("_id")) {
+                assert.eq(upsertedDoc._id, res.upserted[0]._id);
+            } else {
+                upsertedDoc["_id"] = res.upserted[0]._id;
+            }
+            resultDocList.push(upsertedDoc);
         } else {
             assert.eq(nMatched, res.n, tojson(res));
             assert.eq(nModified, res.nModified, tojson(res));
+            assert(!res.hasOwnProperty("upserted"), tojson(res));
         }
     }
 

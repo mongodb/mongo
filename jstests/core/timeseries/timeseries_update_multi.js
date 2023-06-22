@@ -738,13 +738,11 @@ if (!db.getMongo().isMongos()) {
     });
 })();
 
-// TODO (SERVER-77132): Enable the upsert tests.
 /**
  * Tests upsert with multi:true.
  */
-/*
 // Run an upsert that doesn't include an _id.
-// Skip tests changing the shard key value in sharding.
+// Skip upsert tests in sharding as the query has to be on the shard key field.
 if (!db.getMongo().isMongos()) {
     (function testUpsertWithNoId() {
         testUpdate({
@@ -762,11 +760,7 @@ if (!db.getMongo().isMongos()) {
             upsertedDoc: {[metaFieldName]: {z: "Z"}, [timeFieldName]: dateTime},
         });
     })();
-}
-
-// Run an upsert that includes an _id.
-// Skip tests changing the shard key value in sharding.
-if (!db.getMongo().isMongos()) {
+    // Run an upsert that includes an _id.
     (function testUpsertWithId() {
         testUpdate({
             initialDocList: [doc_id_1_a_b_no_metrics],
@@ -782,39 +776,36 @@ if (!db.getMongo().isMongos()) {
             upsertedDoc: {_id: 100, [timeFieldName]: dateTime},
         });
     })();
-}
 
-// Run an upsert that updates documents and skips the upsert.
-(function testUpsertUpdatesDocs() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
-        updateList: [{
-            q: {[metaFieldName + ".a"]: "A"},
-            u: {$set: {f: 10}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [
-            {
-                _id: 1,
-                [timeFieldName]: dateTime,
-                [metaFieldName]: {a: "A", b: "B"},
-                f: 10,
-            },
-            {
-                _id: 2,
-                [timeFieldName]: dateTime,
-                [metaFieldName]: {a: "A", b: "B"},
-                f: 10,
-            }
-        ],
-        nMatched: 2,
-    });
-})();
+    // Run an upsert that updates documents and skips the upsert.
+    (function testUpsertUpdatesDocs() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
+            updateList: [{
+                q: {[metaFieldName + ".a"]: "A"},
+                u: {$set: {f: 10}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [
+                {
+                    _id: 1,
+                    [timeFieldName]: dateTime,
+                    [metaFieldName]: {a: "A", b: "B"},
+                    f: 10,
+                },
+                {
+                    _id: 2,
+                    [timeFieldName]: dateTime,
+                    [metaFieldName]: {a: "A", b: "B"},
+                    f: 10,
+                }
+            ],
+            nMatched: 2,
+        });
+    })();
 
-// Run an upsert that matches documents with no-op updates and skips the upsert.
-// Skip tests changing the shard key value in sharding.
-if (!db.getMongo().isMongos()) {
+    // Run an upsert that matches documents with no-op updates and skips the upsert.
     (function testUpsertMatchesDocs() {
         testUpdate({
             initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
@@ -829,12 +820,9 @@ if (!db.getMongo().isMongos()) {
             nModified: 0,
         });
     })();
-}
 
-// Run an upsert that matches a bucket but no documents in it, and inserts the document into a
-// bucket with the same parameters.
-// Skip tests changing the shard key value in sharding.
-if (!db.getMongo().isMongos()) {
+    // Run an upsert that matches a bucket but no documents in it, and inserts the document into a
+    // bucket with the same parameters.
     (function testUpsertIntoMatchedBucket() {
         testUpdate({
             initialDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
@@ -848,85 +836,84 @@ if (!db.getMongo().isMongos()) {
             resultDocList: [doc_id_1_a_b_no_metrics, doc_id_2_a_b_array_metric],
         });
     })();
+
+    // Run an upsert that doesn't insert a time field.
+    (function testUpsertNoTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[metaFieldName]: {z: "Z"}},
+                u: {$set: {f: 10}},
+                upsert: true,
+                multi: true,
+            }],
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+            failCode: ErrorCodes.BadValue,
+        });
+    })();
+
+    // Run an upsert where the time field is provided in the query.
+    (function testUpsertQueryOnTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[timeFieldName]: dateTimeUpdated},
+                u: {$set: {f: 10}},
+                upsert: true,
+                multi: true,
+            }],
+            upsertedDoc: {
+                [timeFieldName]: dateTimeUpdated,
+                f: 10,
+            },
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+        });
+    })();
+
+    // Run an upsert where a document to insert is supplied by the request.
+    (function testUpsertSupplyDoc() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[timeFieldName]: dateTimeUpdated},
+                u: [{$set: {f: 10}}],
+                upsert: true,
+                multi: true,
+                upsertSupplied: true,
+                c: {new: {[timeFieldName]: dateTime, f: 100}}
+            }],
+            upsertedDoc: {
+                [timeFieldName]: dateTime,
+                f: 100,
+            },
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+        });
+    })();
+
+    // Run an upsert where a document to insert is supplied by the request and does not have a time
+    // field.
+    (function testUpsertSupplyDocNoTimeField() {
+        testUpdate({
+            initialDocList: [doc_id_1_a_b_no_metrics],
+            updateList: [{
+                q: {[timeFieldName]: dateTimeUpdated},
+                u: [{$set: {f: 10}}],
+                upsert: true,
+                multi: true,
+                upsertSupplied: true,
+                c: {new: {[metaFieldName]: {a: "A"}, f: 100}}
+            }],
+            resultDocList: [
+                doc_id_1_a_b_no_metrics,
+            ],
+            failCode: ErrorCodes.BadValue,
+        });
+    })();
 }
-
-// Run an upsert that doesn't insert a time field.
-(function testUpsertNoTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[metaFieldName]: {z: "Z"}},
-            u: {$set: {f: 10}},
-            upsert: true,
-            multi: true,
-        }],
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-        failCode: ErrorCodes.BadValue,
-    });
-})();
-
-// Run an upsert where the time field is provided in the query.
-(function testUpsertQueryOnTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[timeFieldName]: dateTimeUpdated},
-            u: {$set: {f: 10}},
-            upsert: true,
-            multi: true,
-        }],
-        upsertedDoc: {
-            [timeFieldName]: dateTimeUpdated,
-            f: 10,
-        },
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-    });
-})();
-
-// Run an upsert where a document to insert is supplied by the request.
-(function testUpsertSupplyDoc() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[timeFieldName]: dateTimeUpdated},
-            u: [{$set: {f: 10}}],
-            upsert: true,
-            multi: true,
-            upsertSupplied: true,
-            c: {new: {[timeFieldName]: dateTime, f: 100}}
-        }],
-        upsertedDoc: {
-            [timeFieldName]: dateTime,
-            f: 100,
-        },
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-    });
-})();
-
-// Run an upsert where a document to insert is supplied by the request and does not have a time
-// field.
-(function testUpsertSupplyDocNoTimeField() {
-    testUpdate({
-        initialDocList: [doc_id_1_a_b_no_metrics],
-        updateList: [{
-            q: {[timeFieldName]: dateTimeUpdated},
-            u: [{$set: {f: 10}}],
-            upsert: true,
-            multi: true,
-            upsertSupplied: true,
-            c: {new: {[metaFieldName]: {a: "A"}, f: 100}}
-        }],
-        resultDocList: [
-            doc_id_1_a_b_no_metrics,
-        ],
-        failCode: ErrorCodes.BadValue,
-    });
-})();
-*/
 })();
