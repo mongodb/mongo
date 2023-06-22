@@ -13,6 +13,8 @@
  *   does_not_support_stepdowns,
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   # Implicit index creation may change the plan/engine used.
+ *   assumes_no_implicit_index_creation,
  * ]
  */
 (function() {
@@ -26,12 +28,6 @@ load("jstests/libs/feature_flag_util.js");
 
 const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());
-
-// TODO SERVER-73509 The test doesn't work yet, even though this feature flag is gone.
-if (true /* previously guarded by featureFlagLastPointQuery */) {
-    jsTestLog("Skipping the test.");
-    return;
-}
 
 /**
  * Returns a lastpoint $group stage of the form:
