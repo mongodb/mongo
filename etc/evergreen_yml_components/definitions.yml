@@ -1750,8 +1750,8 @@ functions:
       args:
       - "./src/evergreen/selinux_run_test.sh"
       env:
-        test_list: ${test_list}
-        user: ec2-user
+        TEST_LIST: ${test_list}
+        SELINUX_USER: ec2-user
 
 
   ### Process & archive remote EC2 artifacts ###
