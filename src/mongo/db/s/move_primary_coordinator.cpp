@@ -774,8 +774,14 @@ void MovePrimaryCoordinator::blockReads(OperationContext* opCtx) const {
 void MovePrimaryCoordinator::unblockReadsAndWrites(OperationContext* opCtx) const {
     // The release of the critical section will clear db metadata on secondaries
     clearDbMetadataOnPrimary(opCtx);
+    // In case of step-down, this operation could be re-executed and trigger the invariant in case
+    // the new primary runs a DDL that acquires the critical section in the old primary shard
     ShardingRecoveryService::get(opCtx)->releaseRecoverableCriticalSection(
-        opCtx, NamespaceString(_dbName), _csReason, ShardingCatalogClient::kLocalWriteConcern);
+        opCtx,
+        NamespaceString(_dbName),
+        _csReason,
+        ShardingCatalogClient::kLocalWriteConcern,
+        false /*throwIfReasonDiffers*/);
 }
 
 void MovePrimaryCoordinator::enterCriticalSectionOnRecipient(OperationContext* opCtx) {
