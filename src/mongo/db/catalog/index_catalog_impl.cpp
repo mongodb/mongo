@@ -540,7 +540,8 @@ StatusWith<BSONObj> IndexCatalogImpl::prepareSpecForCreate(
 std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
     OperationContext* const opCtx,
     const CollectionPtr& collection,
-    const std::vector<BSONObj>& indexSpecsToBuild) const {
+    const std::vector<BSONObj>& indexSpecsToBuild,
+    bool removeInProgressIndexBuilds) const {
     std::vector<BSONObj> result;
     // Filter out ready and in-progress index builds, and any non-_id indexes if 'buildIndexes' is
     // set to false in the replica set's config.
@@ -552,12 +553,11 @@ std::vector<BSONObj> IndexCatalogImpl::removeExistingIndexesNoChecks(
 
         // _doesSpecConflictWithExisting currently does more work than we require here: we are only
         // interested in the index already exists error.
+        auto inclusionPolicy = removeInProgressIndexBuilds
+            ? IndexCatalog::InclusionPolicy::kReady | IndexCatalog::InclusionPolicy::kUnfinished
+            : IndexCatalog::InclusionPolicy::kReady;
         if (ErrorCodes::IndexAlreadyExists ==
-            _doesSpecConflictWithExisting(opCtx,
-                                          collection,
-                                          spec,
-                                          IndexCatalog::InclusionPolicy::kReady |
-                                              IndexCatalog::InclusionPolicy::kUnfinished)) {
+            _doesSpecConflictWithExisting(opCtx, collection, spec, inclusionPolicy)) {
             continue;
         }
 

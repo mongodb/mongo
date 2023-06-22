@@ -412,11 +412,15 @@ public:
      *
      * This should only be used when we are confident in the specs, such as when specs are received
      * via replica set cloning or chunk migrations.
+     *
+     * 'removeInProgressIndexBuilds' controls whether in-progress index builds are also filtered
+     * out.
      */
     virtual std::vector<BSONObj> removeExistingIndexesNoChecks(
         OperationContext* opCtx,
         const CollectionPtr& collection,
-        const std::vector<BSONObj>& indexSpecsToBuild) const = 0;
+        const std::vector<BSONObj>& indexSpecsToBuild,
+        bool removeInProgressIndexBuilds = true) const = 0;
 
     /**
      * Drops indexes in the index catalog that returns true when it's descriptor returns true for
