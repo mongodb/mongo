@@ -229,6 +229,8 @@ public:
 
     std::vector<repl::MemberConfig> getConfigVotingMembers() const override;
 
+    size_t getNumConfigVotingMembers() const override;
+
     std::int64_t getConfigTerm() const override;
 
     std::int64_t getConfigVersion() const override;
