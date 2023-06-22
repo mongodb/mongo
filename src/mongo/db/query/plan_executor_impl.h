@@ -116,6 +116,7 @@ public:
     UpdateResult executeUpdate() override;
     UpdateResult getUpdateResult() const override;
     long long executeDelete() override;
+    long long getDeleteResult() const override;
     BatchedDeleteStats getBatchedDeleteStats() override;
     void markAsKilled(Status killStatus) final;
     void dispose(OperationContext* opCtx) final;

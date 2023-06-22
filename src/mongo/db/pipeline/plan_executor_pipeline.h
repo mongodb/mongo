@@ -111,6 +111,9 @@ public:
     long long executeDelete() override {
         MONGO_UNREACHABLE;
     }
+    long long getDeleteResult() const override {
+        MONGO_UNREACHABLE;
+    }
     BatchedDeleteStats getBatchedDeleteStats() override {
         MONGO_UNREACHABLE;
     }

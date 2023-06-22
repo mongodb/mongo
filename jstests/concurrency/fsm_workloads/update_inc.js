@@ -34,6 +34,7 @@ var $config = (function() {
             var updateDoc = this.getUpdateArgument(this.fieldName);
 
             var res = db[collName].update({_id: this.id}, updateDoc);
+            assert.commandWorked(res);
             assertAlways.eq(0, res.nUpserted, tojson(res));
 
             if (isMongod(db)) {

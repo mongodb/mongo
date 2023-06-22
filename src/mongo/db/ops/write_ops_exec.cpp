@@ -870,7 +870,7 @@ long long writeConflictRetryRemove(OperationContext* opCtx,
     opDebug->setPlanSummaryMetrics(summaryStats);
 
     // Fill out OpDebug with the number of deleted docs.
-    auto nDeleted = exec->executeDelete();
+    auto nDeleted = exec->getDeleteResult();
     opDebug->additiveMetrics.ndeleted = nDeleted;
 
     if (curOp->shouldDBProfile()) {

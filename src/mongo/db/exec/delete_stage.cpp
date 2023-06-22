@@ -334,7 +334,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         return PlanStage::ADVANCED;
     }
 
-    return PlanStage::NEED_TIME;
+    return isEOF() ? PlanStage::IS_EOF : PlanStage::NEED_TIME;
 }
 
 void DeleteStage::doRestoreStateRequiresCollection() {
@@ -344,6 +344,14 @@ void DeleteStage::doRestoreStateRequiresCollection() {
                           << ns.toStringForErrorMsg(),
             !opCtx()->writesAreReplicated() ||
                 repl::ReplicationCoordinator::get(opCtx())->canAcceptWritesFor(opCtx(), ns));
+
+    // Single deletes never yield after having already deleted one document. Otherwise restore could
+    // fail (e.g. due to a sharding placement change) and we'd fail to report in the response the
+    // already deleted documents.
+    const bool singleDeleteAndAlreadyDeleted = !_params->isMulti && _specificStats.docsDeleted > 0;
+    tassert(7711600,
+            "Single delete should never restore after having already deleted one document.",
+            !singleDeleteAndAlreadyDeleted || _params->isExplain);
 
     _preWriteFilter.restoreState();
 }

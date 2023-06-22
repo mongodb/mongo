@@ -212,7 +212,7 @@ assertCommandPropogatesPlanExecutorKillReason({find: coll.getName(), filter: {a:
                                               {usesIndex: true});
 
 assertCommandPropogatesPlanExecutorKillReason(
-    {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}}]},
+    {update: coll.getName(), updates: [{q: {a: {$gte: 0}}, u: {$set: {a: 1}}, multi: true}]},
     {curOpFilter: {op: 'update'}, usesIndex: true});
 
 assertCommandPropogatesPlanExecutorKillReason(

@@ -305,7 +305,7 @@ public:
      * If this plan executor has already executed an update operation, returns the an 'UpdateResult'
      * describing the outcome of the update. Illegal to call if either 1) the PlanExecutor is not
      * an update PlanExecutor, or 2) the PlanExecutor has not yet been executed either with
-     * 'executeUpdate()' or by calling 'getNext()' until end-of-stream.
+     * 'executeUpdate()' or by calling 'getNext()' until ADVANCED or end-of-stream.
      */
     virtual UpdateResult getUpdateResult() const = 0;
 
@@ -315,6 +315,14 @@ public:
      * that were deleted. Illegal to call on other plan executors.
      */
     virtual long long executeDelete() = 0;
+
+    /**
+     * If this plan executor has already executed a delete operation, returns the the number of
+     * documents that were deleted. Illegal to call if either 1) the PlanExecutor is not a delete
+     * PlanExecutor, or 2) the PlanExecutor has not yet been executed either with 'executeDelete()'
+     * or by calling 'getNext()' until ADVANCED or end-of-stream.
+     */
+    virtual long long getDeleteResult() const = 0;
 
     /**
      * If this plan executor has already executed a batched delete operation, returns the

@@ -102,6 +102,11 @@ public:
         MONGO_UNREACHABLE;
     }
 
+    long long getDeleteResult() const override {
+        // Using SBE to execute a delete command is not yet supported.
+        MONGO_UNREACHABLE;
+    }
+
     BatchedDeleteStats getBatchedDeleteStats() override {
         // Using SBE to execute a batched delete command is not yet supported.
         MONGO_UNREACHABLE;

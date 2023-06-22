@@ -565,7 +565,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::ADVANCED;
         }
 
-        return PlanStage::NEED_TIME;
+        return isEOF() ? PlanStage::IS_EOF : PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == status) {
         // The child is out of results, and therefore so are we.
         return PlanStage::IS_EOF;
@@ -589,6 +589,15 @@ void UpdateStage::doRestoreStateRequiresCollection() {
                   str::stream() << "Demoted from primary while performing update on "
                                 << nsString.toStringForErrorMsg());
     }
+
+    // Single updates never yield after having already modified one document. Otherwise restore
+    // could fail (e.g. due to a sharding placement change) and we'd fail to report in the response
+    // the already modified documents.
+    const bool singleUpdateAndAlreadyWrote = !_params.request->isMulti() &&
+        (_specificStats.nModified > 0 || _specificStats.nUpserted > 0);
+    tassert(7711601,
+            "Single update should never restore after having already modified one document.",
+            !singleUpdateAndAlreadyWrote || request.explain());
 
     _preWriteFilter.restoreState();
 }

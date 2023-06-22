@@ -636,7 +636,10 @@ UpdateResult PlanExecutorImpl::getUpdateResult() const {
 
 long long PlanExecutorImpl::executeDelete() {
     _executePlan();
+    return getDeleteResult();
+}
 
+long long PlanExecutorImpl::getDeleteResult() const {
     // If we're deleting from a non-existent collection, then the delete plan may have an EOF as
     // the root stage.
     if (_root->stageType() == STAGE_EOF) {
