@@ -618,7 +618,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
                                      accessMethod->getSortedDataInterface()->getKeyStringVersion(),
                                      accessMethod->getSortedDataInterface()->getOrdering());
 
-    auto keyPattern = descriptor->keyPattern();
+    auto keyPattern = ixn->index.keyPattern;
 
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
@@ -817,7 +817,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     sbe::value::SlotId recordIdSlot;
     ParameterizedIndexScanSlots parameterizedScanSlots;
 
-    auto keyPattern = descriptor->keyPattern();
+    auto keyPattern = ixn->index.keyPattern;
 
     // Determine the set of fields from the index required to apply the filter and union those with
     // the set of fields from the index required by the parent stage.
