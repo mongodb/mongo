@@ -487,7 +487,7 @@ private:
      * Idempotent method, which cleans up any previously initialized state. It is safe to be called
      * at any time, but no methods should be called after it.
      */
-    void _cleanup();
+    void _cleanup(bool wasSuccessful);
 
     /**
      * Synchronously invokes the recipient shard with the specified command and either returns the

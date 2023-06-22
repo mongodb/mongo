@@ -458,7 +458,7 @@ StatusWith<BSONObj> MigrationChunkClonerSource::commitClone(OperationContext* op
     }());
 
     if (responseStatus.isOK()) {
-        _cleanup();
+        _cleanup(true);
 
         if (_sessionCatalogSource && _sessionCatalogSource->hasMoreOplog()) {
             return {ErrorCodes::SessionTransferIncomplete,
@@ -497,7 +497,7 @@ void MigrationChunkClonerSource::cancelClone(OperationContext* opCtx) noexcept {
             [[fallthrough]];
         }
         case kNew:
-            _cleanup();
+            _cleanup(false);
             break;
         default:
             MONGO_UNREACHABLE;
@@ -955,11 +955,17 @@ Status MigrationChunkClonerSource::nextModsBatch(OperationContext* opCtx, BSONOb
     return Status::OK();
 }
 
-void MigrationChunkClonerSource::_cleanup() {
+void MigrationChunkClonerSource::_cleanup(bool wasSuccessful) {
     stdx::unique_lock<Latch> lk(_mutex);
     _state = kDone;
 
     _drainAllOutstandingOperationTrackRequests(lk);
+
+    if (wasSuccessful) {
+        invariant(_reload.empty());
+        invariant(_deleted.empty());
+        invariant(_deferredReloadOrDeletePreImageDocKeys.empty());
+    }
 
     _reload.clear();
     _untransferredUpsertsCounter = 0;
