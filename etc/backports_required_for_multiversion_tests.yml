@@ -401,6 +401,8 @@ last-continuous:
     ticket: SERVER-60466
   - test_file: jstests/sharding/move_chunk_deferred_lookup.js
     ticket: SERVER-78050
+  - test_file: jstests/replsets/tenant_migrations_back_to_back_2.js
+    ticket: SERVER-78176
   suites: null
 last-lts:
   all:
@@ -888,4 +890,6 @@ last-lts:
     ticket: SERVER-77386
   - test_file: jstests/core/timeseries/timeseries_resume_after.js
     ticket: SERVER-77386
+  - test_file: jstests/replsets/tenant_migrations_back_to_back_2.js
+    ticket: SERVER-78176
   suites: null

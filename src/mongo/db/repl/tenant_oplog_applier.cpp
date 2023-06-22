@@ -158,6 +158,10 @@ Timestamp TenantOplogApplier::getResumeBatchingTs() const {
 }
 
 void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime) {
+    LOGV2(7817600,
+          "setting cloneFinishedRecipientOpTime.",
+          "opTime"_attr = _cloneFinishedRecipientOpTime);
+
     stdx::lock_guard lk(_mutex);
     invariant(!_isActive_inlock());
     invariant(!cloneFinishedRecipientOpTime.isNull());
@@ -519,45 +523,49 @@ void TenantOplogApplier::_writeRetryableWriteEntryNoOp(
                              "for transaction "
                           << txnNumber << " on session " << sessionId,
             txnParticipant);
-    // beginOrContinue throws on failure, which will abort the migration. Failure should
-    // only result from out-of-order processing, which should not happen.
-    TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
-    txnParticipant.beginOrContinue(opCtx,
-                                   txnNumberAndRetryCounter,
-                                   boost::none /* autocommit */,
-                                   boost::none /* startTransaction */);
 
-    // We could have an existing lastWriteOpTime for the same retryable write chain from a
-    // previously aborted migration. This could also happen if the tenant being migrated has
-    // previously resided in this replica set. So we want to start a new history chain
-    // instead of linking the newly generated no-op to the existing chain before the current
-    // migration starts. Otherwise, we could have duplicate entries for the same stmtId.
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
     invariant(!_cloneFinishedRecipientOpTime.isNull());
     if (txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime) {
-        noopEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
-    } else {
-        noopEntry.setPrevWriteOpTimeInTransaction(OpTime());
-
-        // Before we start a new history chain, reset the in-memory retryable write
-        // state in the txnParticipant so it can be built up from scratch again with
-        // the new chain.
-        LOGV2_DEBUG(5709800,
-                    2,
-                    "Tenant oplog applier resetting existing retryable write state",
-                    "lastWriteOpTime"_attr = txnParticipant.getLastWriteOpTime(),
-                    "_cloneFinishedRecipientOpTime"_attr = _cloneFinishedRecipientOpTime,
-                    "sessionId"_attr = sessionId,
-                    "txnNumber"_attr = txnNumber,
-                    "statementIds"_attr = stmtIds,
-                    "protocol"_attr = _protocol,
-                    "migrationId"_attr = _migrationUuid);
-        txnParticipant.invalidate(opCtx);
-        txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
-        TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
+        // Out-of-order processing within a migration lifetime is not possible,
+        // except in recipient failovers. However, merge and tenant migration
+        // are not resilient to recipient failovers. If attempted, beginOrContinue()
+        // will throw ErrorCodes::TransactionTooOld.
         txnParticipant.beginOrContinue(opCtx,
                                        txnNumberAndRetryCounter,
                                        boost::none /* autocommit */,
                                        boost::none /* startTransaction */);
+        noopEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
+    } else {
+        // We can end up here under the following circumstances:
+        // 1) LastWriteOpTime is not null.
+        //    - During a back-to-back migration (rs0->rs1->rs0) or a migration retry,
+        //      when 'txnNum'== txnParticipant.o().activeTxnNumber and rs0 already has
+        //      the oplog chain.
+        //
+        // 2) LastWriteOpTime is null.
+        //    - During a back-to-back migration (rs0->rs1->rs0) when
+        //      'txnNum' < txnParticipant.o().activeTxnNumber and last activeTxnNumber corresponds
+        //      to a no-op session write, like, no-op retryable update, read transaction, etc.
+        //    - New session with no transaction started yet on this node (this will be a no-op).
+        LOGV2_DEBUG(5709800,
+                    2,
+                    "Tenant oplog applier resetting existing retryable write state",
+                    "lastWriteOpTime"_attr = txnParticipant.getLastWriteOpTime(),
+                    "lastActiveTxnNumber"_attr =
+                        txnParticipant.getActiveTxnNumberAndRetryCounter().toBSON());
+
+        // Reset the statements executed list in the txnParticipant.
+        txnParticipant.invalidate(opCtx);
+        txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
+
+        txnParticipant.beginOrContinue(opCtx,
+                                       txnNumberAndRetryCounter,
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+
+        // Reset the retryable write history chain.
+        noopEntry.setPrevWriteOpTimeInTransaction(OpTime());
     }
 
     // We should never process the same donor statement twice, except in failover
