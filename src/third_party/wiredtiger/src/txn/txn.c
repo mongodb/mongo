@@ -1497,6 +1497,7 @@ __txn_mod_compare(const void *a, const void *b)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+    WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
@@ -1514,6 +1515,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     bool cannot_fail, locked, prepare, readonly, update_durable_ts;
 
     conn = S2C(session);
+    cache = conn->cache;
     cursor = NULL;
     txn = session->txn;
     txn_global = &conn->txn_global;
@@ -1651,7 +1653,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  * transaction timestamp. Those records should already have the original time window
                  * when they are inserted into the history store.
                  */
-                if (conn->cache->hs_fileid != 0 && op->btree->id == conn->cache->hs_fileid)
+                if (cache->hs_fileid != 0 && op->btree->id == cache->hs_fileid)
                     break;
 
                 __wt_txn_op_set_timestamp(session, op);
