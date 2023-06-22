@@ -1129,6 +1129,10 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
 
     /* Resolve the prepared update to be a committed update. */
     __txn_resolve_prepared_update(session, upd);
+
+    /* Sleep for 100ms in the prepared resolution path if configured. */
+    if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
+        __wt_sleep(0, 100000);
     WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
 }
 
@@ -1674,7 +1678,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  * the total mod_count.
                  */
                 if ((i * 36) % txn->mod_count == 0)
-                    __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION, NULL);
+                    __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION_1, NULL);
 
 #ifdef HAVE_DIAGNOSTIC
                 ++prepare_count;
