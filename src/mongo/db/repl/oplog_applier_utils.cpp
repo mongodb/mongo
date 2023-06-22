@@ -76,12 +76,12 @@ CachedCollectionProperties::getCollectionProperties(OperationContext* opCtx,
 
 namespace {
 /**
- * Updates a CRUD op's hash and isForCappedCollection field if necessary.
+ * Populates a CRUD op's idHash and updates the isForCappedCollection field if necessary.
  */
 void processCrudOp(OperationContext* opCtx,
                    OplogEntry* op,
-                   uint32_t* hash,
-                   const CachedCollectionProperties::CollectionProperties& collProperties) {
+                   const CachedCollectionProperties::CollectionProperties& collProperties,
+                   boost::optional<size_t>& idHash) {
     // Include the _id of the document in the hash so we get parallelism even if all writes are to a
     // single collection.
     //
@@ -99,8 +99,7 @@ void processCrudOp(OperationContext* opCtx,
         }();
         BSONElementComparator elementHasher(BSONElementComparator::FieldNamesMode::kIgnore,
                                             collProperties.collator);
-        const size_t idHash = elementHasher.hash(id);
-        MurmurHash3_x86_32(&idHash, sizeof(idHash), *hash, hash);
+        idHash.emplace(elementHasher.hash(id));
     }
 
     if (op->getOpType() == OpTypeEnum::kInsert && collProperties.isCapped) {
@@ -119,20 +118,17 @@ uint32_t getWriterId(OperationContext* opCtx,
                      CachedCollectionProperties* collPropertiesCache,
                      uint32_t numWriters,
                      boost::optional<uint32_t> forceWriterId = boost::none) {
+    boost::optional<size_t> idHash;
     NamespaceString nss = op->isGlobalIndexCrudOpType()
         ? NamespaceString::makeGlobalIndexNSS(op->getUuid().value())
         : op->getNss();
 
-    // Reduce the hash from 64bit down to 32bit, just to allow combinations with murmur3 later
-    // on. Bit depth not important, we end up just doing integer modulo with this in the end.
-    // The hash function should provide entropy in the lower bits as it's used in hash tables.
-    auto hashedNs = absl::Hash<NamespaceString>{}(nss);
-    auto hash = static_cast<uint32_t>(hashedNs);
-
     if (op->isCrudOpType()) {
         auto collProperties = collPropertiesCache->getCollectionProperties(opCtx, nss);
-        processCrudOp(opCtx, op, &hash, collProperties);
+        processCrudOp(opCtx, op, collProperties, idHash);
     }
+
+    auto hash = idHash ? absl::HashOf(nss, *idHash) : absl::HashOf(nss);
 
     return (forceWriterId ? *forceWriterId : hash) % numWriters;
 }
