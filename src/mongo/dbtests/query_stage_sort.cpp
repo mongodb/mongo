@@ -180,7 +180,7 @@ public:
                                                             std::move(keyGenStage));
 
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
+            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
 
         // Must fetch so we can look at the doc as a BSONObj.
         auto statusWithPlanExecutor =
@@ -633,7 +633,7 @@ public:
                                                             std::move(keyGenStage));
 
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, coll);
+            _expCtx.get(), ws.get(), std::move(sortStage), nullptr, &coll);
 
         // We don't get results back since we're sorting some parallel arrays.
         auto statusWithPlanExecutor =

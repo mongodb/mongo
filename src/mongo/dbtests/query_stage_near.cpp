@@ -111,7 +111,7 @@ public:
                     "MOCK_DISTANCE_SEARCH_STAGE",
                     STAGE_UNKNOWN,
                     workingSet,
-                    coll,
+                    &coll,
                     indexDescriptor),
           _pos(0) {}
 
@@ -119,9 +119,8 @@ public:
         _intervals.push_back(std::make_unique<MockInterval>(data, min, max));
     }
 
-    std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
-                                                  WorkingSet* workingSet,
-                                                  const CollectionPtr& collection) final {
+    virtual std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
+                                                          WorkingSet* workingSet) final {
         if (_pos == static_cast<int>(_intervals.size()))
             return nullptr;
 

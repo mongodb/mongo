@@ -176,7 +176,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -237,7 +237,7 @@ public:
             std::move(batchedDeleteParams),
             ws,
             coll,
-            new CollectionScan(expCtx, coll.getCollectionPtr(), collScanParams, ws, nullptr));
+            new CollectionScan(expCtx, &coll, collScanParams, ws, nullptr));
     }
 
 protected:

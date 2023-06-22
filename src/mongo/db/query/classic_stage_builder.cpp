@@ -73,6 +73,8 @@ namespace mongo::stage_builder {
 std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* root) {
     auto* const expCtx = _cq.getExpCtxRaw();
 
+    const auto& collectionPtr = _collection.getCollectionPtr();
+
     switch (root->getType()) {
         case STAGE_COLLSCAN: {
             const CollectionScanNode* csn = static_cast<const CollectionScanNode*>(root);
@@ -96,11 +98,11 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_IXSCAN: {
             const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
-            invariant(_collection);
-            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, ixn->index.identifier.catalogName);
             invariant(descriptor,
-                      str::stream() << "Namespace: " << _collection->ns().toStringForErrorMsg()
+                      str::stream() << "Namespace: " << collectionPtr->ns().toStringForErrorMsg()
                                     << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
                                     << ", IndexEntry: " << ixn->index.toString());
 
@@ -252,8 +254,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            invariant(_collection);
-            const IndexDescriptor* twoDIndex = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            const IndexDescriptor* twoDIndex = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
@@ -269,8 +271,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            invariant(_collection);
-            const IndexDescriptor* s2Index = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            const IndexDescriptor* s2Index = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
@@ -292,8 +294,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         }
         case STAGE_TEXT_MATCH: {
             auto node = static_cast<const TextMatchNode*>(root);
-            tassert(5432200, "collection object is not provided", _collection);
-            auto catalog = _collection->getIndexCatalog();
+            tassert(5432200, "collection object is not provided", collectionPtr);
+            auto catalog = collectionPtr->getIndexCatalog();
             tassert(5432201, "index catalog is unavailable", catalog);
             auto desc = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
             tassert(5432202,
@@ -324,20 +326,19 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
             auto childStage = build(fn->children[0].get());
 
-            auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
-                _opCtx, _collection->ns());
+            auto shardFilterer = _collection.getShardingFilter(_opCtx);
+            invariant(shardFilterer,
+                      "Attempting to use shard filter when there's no shard filter available for "
+                      "the collection");
+
             return std::make_unique<ShardFilterStage>(
-                expCtx,
-                scopedCss->getOwnershipFilter(
-                    _opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
-                _ws,
-                std::move(childStage));
+                expCtx, std::move(*shardFilterer), _ws, std::move(childStage));
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
-            invariant(_collection);
-            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, dn->index.identifier.catalogName);
             invariant(descriptor);
 
@@ -357,8 +358,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_COUNT_SCAN: {
             const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
-            invariant(_collection);
-            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, csn->index.identifier.catalogName);
             invariant(descriptor);
 

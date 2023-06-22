@@ -104,7 +104,7 @@ public:
         // Make a scan and have the runner own it.
         std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
-            _expCtx.get(), collection.getCollection(), params, ws.get(), filterExpr.get());
+            _expCtx.get(), &collection.getCollection(), params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -136,7 +136,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -232,7 +232,7 @@ public:
         params.maxRecord = RecordIdBound(maxRecord);
 
         WorkingSet ws;
-        auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+        auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
 
         int count = 0;
         while (!scan->isEOF()) {
@@ -277,7 +277,7 @@ public:
         params.boundInclusion = boundInclusion;
 
         WorkingSet ws;
-        auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter);
+        auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, filter);
 
         int idx = 0;
         while (!scan->isEOF()) {
@@ -357,7 +357,7 @@ TEST_F(QueryStageCollectionScanTest,
     params.shouldReturnEofOnFilterMismatch = true;
     WorkingSet ws;
     LTEMatchExpression filter{"foo"_sd, Value(threshold)};
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, &filter);
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, &filter);
 
     // Scan all matching documents.
     WorkingSetID id = WorkingSet::INVALID_ID;
@@ -380,7 +380,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderForward) {
     // Make a scan and have the runner own it.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
-        _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
+        _expCtx.get(), &collection.getCollection(), params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor =
         plan_executor_factory::make(_expCtx,
@@ -413,7 +413,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanObjectsInOrderBackward) {
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
-        _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
+        _expCtx.get(), &collection.getCollection(), params, ws.get(), nullptr);
 
     auto statusWithPlanExecutor =
         plan_executor_factory::make(_expCtx,
@@ -452,7 +452,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObject) {
     params.tailable = false;
 
     WorkingSet ws;
-    std::unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), coll, params, &ws, nullptr));
+    std::unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), &coll, params, &ws, nullptr));
 
     int count = 0;
     while (count < 10) {
@@ -505,7 +505,7 @@ TEST_F(QueryStageCollectionScanTest, QueryStageCollscanDeleteUpcomingObjectBackw
     params.tailable = false;
 
     WorkingSet ws;
-    std::unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), coll, params, &ws, nullptr));
+    std::unique_ptr<PlanStage> scan(new CollectionScan(_expCtx.get(), &coll, params, &ws, nullptr));
 
     int count = 0;
     while (count < 10) {
@@ -564,7 +564,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekSuc
     // Create plan stage.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> ps = std::make_unique<CollectionScan>(
-        _expCtx.get(), collection.getCollection(), params, ws.get(), nullptr);
+        _expCtx.get(), &collection.getCollection(), params, ws.get(), nullptr);
 
     // Run the rest of the scan and verify the results.
     auto statusWithPlanExecutor =
@@ -613,7 +613,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanResumeAfterRecordIdSeekFai
     // Create plan stage.
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> ps =
-        std::make_unique<CollectionScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
+        std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
 
     WorkingSetID id = WorkingSet::INVALID_ID;
 
@@ -642,7 +642,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMax) {
     params.maxRecord = RecordIdBound(recordIds[recordIds.size() - 1]);
 
     WorkingSet ws;
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
 
     // Expect to see all RecordIds.
     int count = 0;
@@ -804,7 +804,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxDateExclusi
 
         WorkingSet ws;
         auto scan =
-            std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter.get());
+            std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, filter.get());
 
         int count = 0;
         while (!scan->isEOF()) {
@@ -849,7 +849,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredReverse) {
     params.maxRecord = RecordIdBound(recordIds[0]);
 
     WorkingSet ws;
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
 
     // Expect to see all RecordIds.
     int count = 0;
@@ -893,7 +893,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredMinMaxFullObjectI
     params.maxRecord = RecordIdBound(record_id_helpers::keyForOID(OID::max()));
 
     WorkingSet ws;
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
 
     // Expect to see all RecordIds.
     int count = 0;
@@ -941,7 +941,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRange) {
     params.maxRecord = RecordIdBound(recordIds[endOffset]);
 
     WorkingSet ws;
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
 
     int count = 0;
     while (!scan->isEOF()) {
@@ -1005,7 +1005,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
     auto filter = std::move(swMatch.getValue());
 
     WorkingSet ws;
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter.get());
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, filter.get());
 
     // The expected range should not include the first or last records.
     std::vector<RecordId> expectedIds{recordIds.begin() + startOffset + 1,
@@ -1072,7 +1072,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanClusteredInnerRangeExclusi
     auto filter = std::move(swMatch.getValue());
 
     WorkingSet ws;
-    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, filter.get());
+    auto scan = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, filter.get());
 
     // The expected range should not include the first or last records.
     std::vector<RecordId> expectedIds{recordIds.begin() + startOffset + 1,
@@ -1378,7 +1378,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionGetLatestO
     params.direction = CollectionScanParams::FORWARD;
     params.shouldTrackLatestOplogTimestamp = true;
     WorkingSet ws;
-    auto scanStage = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    auto scanStage = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
     WorkingSetID id = WorkingSet::INVALID_ID;
     auto advance = [&]() {
         PlanStage::StageState state;
@@ -1421,7 +1421,7 @@ TEST_F(QueryStageCollectionScanTest, QueryTestCollscanChangeCollectionLatestTime
     params.direction = CollectionScanParams::FORWARD;
     params.shouldTrackLatestOplogTimestamp = true;
     WorkingSet ws;
-    auto scanStage = std::make_unique<CollectionScan>(_expCtx.get(), coll, params, &ws, nullptr);
+    auto scanStage = std::make_unique<CollectionScan>(_expCtx.get(), &coll, params, &ws, nullptr);
     WorkingSetID id = WorkingSet::INVALID_ID;
     auto advance = [&]() {
         PlanStage::StageState state;

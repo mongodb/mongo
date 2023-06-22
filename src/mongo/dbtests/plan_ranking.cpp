@@ -118,12 +118,12 @@ public:
         ASSERT_GREATER_THAN_OR_EQUALS(solutions.size(), 1U);
 
         // Fill out the MPR.
-        _mps.reset(new MultiPlanStage(_expCtx.get(), collection.getCollection(), cq));
+        _mps.reset(new MultiPlanStage(_expCtx.get(), &collection.getCollection(), cq));
         std::unique_ptr<WorkingSet> ws(new WorkingSet());
         // Put each solution from the planner into the MPR.
         for (size_t i = 0; i < solutions.size(); ++i) {
             auto&& root = stage_builder::buildClassicExecutableTree(
-                &_opCtx, collection.getCollection(), *cq, *solutions[i], ws.get());
+                &_opCtx, &collection.getCollection(), *cq, *solutions[i], ws.get());
             _mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
         }
         // This is what sets a backup plan, should we test for it.

@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/shard_role.h"
 
 namespace mongo {

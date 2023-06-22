@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/shard_role.h"
 
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/shard_role.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {
@@ -68,6 +67,22 @@ const CollectionPtr& VariantCollectionPtrOrAcquisition::getCollectionPtr() const
                             },
                         },
                         _collectionPtrOrAcquisition);
+}
+
+boost::optional<ScopedCollectionFilter> VariantCollectionPtrOrAcquisition::getShardingFilter(
+    OperationContext* opCtx) const {
+    return stdx::visit(
+        OverloadedVisitor{
+            [&](const CollectionPtr* collPtr) -> boost::optional<ScopedCollectionFilter> {
+                auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
+                    opCtx, collPtr->get()->ns());
+                return scopedCss->getOwnershipFilter(
+                    opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup);
+            },
+            [](const ScopedCollectionAcquisition* acq) -> boost::optional<ScopedCollectionFilter> {
+                return acq->getShardingFilter();
+            }},
+        _collectionPtrOrAcquisition);
 }
 
 }  // namespace mongo

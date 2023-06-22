@@ -71,7 +71,7 @@ public:
                 size_t keyPrefixSize,
                 WorkingSet* ws,
                 const MatchExpression* filter,
-                const CollectionPtr& collection);
+                VariantCollectionPtrOrAcquisition collection);
 
     void addChild(std::unique_ptr<PlanStage> child);
 

@@ -38,6 +38,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/restore_context.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 
 namespace mongo {
 
@@ -55,11 +56,26 @@ public:
     VariantCollectionPtrOrAcquisition(const ScopedCollectionAcquisition* collection)
         : _collectionPtrOrAcquisition(collection) {}
 
-    const stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>& get() {
+    const stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>& get() const {
         return _collectionPtrOrAcquisition;
     };
 
     const CollectionPtr& getCollectionPtr() const;
+
+    bool isCollectionPtr() const {
+        return stdx::holds_alternative<const CollectionPtr*>(_collectionPtrOrAcquisition);
+    }
+
+    bool isAcquisition() const {
+        return stdx::holds_alternative<const ScopedCollectionAcquisition*>(
+            _collectionPtrOrAcquisition);
+    }
+
+    const ScopedCollectionAcquisition* getAcquisition() const {
+        return stdx::get<const ScopedCollectionAcquisition*>(_collectionPtrOrAcquisition);
+    }
+
+    boost::optional<ScopedCollectionFilter> getShardingFilter(OperationContext* opCtx) const;
 
 private:
     stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>

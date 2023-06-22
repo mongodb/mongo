@@ -77,7 +77,7 @@ PlanStage::StageState UpsertStage::doWork(WorkingSetID* out) {
     }
 
     boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
-    if (collection()->ns().isImplicitlyReplicated()) {
+    if (collectionPtr()->ns().isImplicitlyReplicated()) {
         // Implictly replicated collections do not replicate updates.
         unReplBlock.emplace(opCtx());
     }
@@ -158,8 +158,8 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
                 uasserted(WouldChangeOwningShardInfo(_params.request->getQuery(),
                                                      newDocument,
                                                      true /* upsert */,
-                                                     collection()->ns(),
-                                                     collection()->uuid()),
+                                                     collectionPtr()->ns(),
+                                                     collectionPtr()->uuid()),
                           "The document we are inserting belongs on a different shard");
             }
         }
@@ -170,20 +170,20 @@ void UpsertStage::_performInsert(BSONObj newDocument) {
             &hangBeforeUpsertPerformsInsert, opCtx(), "hangBeforeUpsertPerformsInsert");
     }
 
-    writeConflictRetry(opCtx(), "upsert", collection()->ns(), [&] {
+    writeConflictRetry(opCtx(), "upsert", collectionPtr()->ns(), [&] {
         WriteUnitOfWork wunit(opCtx());
         InsertStatement insertStmt(_params.request->getStmtIds(), newDocument);
 
         auto replCoord = repl::ReplicationCoordinator::get(opCtx());
-        if (collection()->isCapped() &&
-            !replCoord->isOplogDisabledFor(opCtx(), collection()->ns())) {
+        if (collectionPtr()->isCapped() &&
+            !replCoord->isOplogDisabledFor(opCtx(), collectionPtr()->ns())) {
             auto oplogInfo = LocalOplogInfo::get(opCtx());
             auto oplogSlots = oplogInfo->getNextOpTimes(opCtx(), /*batchSize=*/1);
             insertStmt.oplogSlot = oplogSlots.front();
         }
 
         uassertStatusOK(collection_internal::insertDocument(opCtx(),
-                                                            collection(),
+                                                            collectionPtr(),
                                                             insertStmt,
                                                             _params.opDebug,
                                                             _params.request->source() ==

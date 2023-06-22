@@ -50,7 +50,7 @@ class RequiresIndexStage : public RequiresCollectionStage {
 public:
     RequiresIndexStage(const char* stageType,
                        ExpressionContext* expCtx,
-                       const CollectionPtr& collection,
+                       VariantCollectionPtrOrAcquisition collection,
                        const IndexDescriptor* indexDescriptor,
                        WorkingSet* workingSet);
 

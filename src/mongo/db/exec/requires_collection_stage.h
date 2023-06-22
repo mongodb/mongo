@@ -50,12 +50,13 @@ class RequiresCollectionStage : public PlanStage {
 public:
     RequiresCollectionStage(const char* stageType,
                             ExpressionContext* expCtx,
-                            const CollectionPtr& coll)
+                            VariantCollectionPtrOrAcquisition coll)
         : PlanStage(stageType, expCtx),
-          _collection(&coll),
-          _collectionUUID(coll->uuid()),
+          _collection(coll),
+          _collectionPtr(&coll.getCollectionPtr()),
+          _collectionUUID(coll.getCollectionPtr()->uuid()),
           _catalogEpoch(getCatalogEpoch()),
-          _nss(coll->ns()) {}
+          _nss(coll.getCollectionPtr()->ns()) {}
 
     virtual ~RequiresCollectionStage() = default;
 
@@ -74,8 +75,12 @@ protected:
      */
     virtual void doRestoreStateRequiresCollection() = 0;
 
-    const CollectionPtr& collection() const {
-        return *_collection;
+    const VariantCollectionPtrOrAcquisition& collection() const {
+        return _collection;
+    }
+
+    const CollectionPtr& collectionPtr() const {
+        return *_collectionPtr;
     }
 
     UUID uuid() const {
@@ -92,7 +97,8 @@ private:
     // helper. It needs to stay valid until the PlanExecutor saves its state. To avoid this pointer
     // from dangling it needs to be reset when doRestoreState() is called and it is reset to a
     // different CollectionPtr.
-    const CollectionPtr* _collection;
+    VariantCollectionPtrOrAcquisition _collection;
+    const CollectionPtr* _collectionPtr;
     const UUID _collectionUUID;
     const uint64_t _catalogEpoch;
 
@@ -107,8 +113,7 @@ public:
     RequiresWritableCollectionStage(const char* stageType,
                                     ExpressionContext* expCtx,
                                     const ScopedCollectionAcquisition& coll)
-        : RequiresCollectionStage(stageType, expCtx, coll.getCollectionPtr()),
-          _collectionAcquisition(coll) {}
+        : RequiresCollectionStage(stageType, expCtx, &coll), _collectionAcquisition(coll) {}
 
     const ScopedCollectionAcquisition& collectionAcquisition() const {
         return _collectionAcquisition;

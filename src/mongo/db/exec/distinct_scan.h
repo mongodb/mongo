@@ -98,7 +98,7 @@ struct DistinctParams {
 class DistinctScan final : public RequiresIndexStage {
 public:
     DistinctScan(ExpressionContext* expCtx,
-                 const CollectionPtr& collection,
+                 VariantCollectionPtrOrAcquisition collection,
                  DistinctParams params,
                  WorkingSet* workingSet);
 

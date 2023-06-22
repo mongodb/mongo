@@ -93,7 +93,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), _coll, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &_coll, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -217,14 +217,14 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new IndexScan(_expCtx.get(), _coll, params, ws, expr);
+        return new IndexScan(_expCtx.get(), &_coll, params, ws, expr);
     }
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {
         CollectionScanParams params;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new CollectionScan(_expCtx.get(), _coll, params, ws, expr);
+        return new CollectionScan(_expCtx.get(), &_coll, params, ws, expr);
     }
 
     static const char* ns() {

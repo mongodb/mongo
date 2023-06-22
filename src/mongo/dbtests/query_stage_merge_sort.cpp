@@ -179,14 +179,14 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -248,13 +248,13 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -316,13 +316,13 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -388,15 +388,15 @@ public:
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         params.bounds.startKey = objWithMaxKey(1);
         params.bounds.endKey = objWithMinKey(1);
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -458,15 +458,15 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         // b:51 (EOF)
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
         params.bounds.startKey = BSON("" << 51 << "" << MinKey);
         params.bounds.endKey = BSON("" << 51 << "" << MaxKey);
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -524,10 +524,10 @@ public:
         for (int i = 0; i < numIndices; ++i) {
             auto params = makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec[i], coll));
             ms->addChild(
-                std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+                std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
         }
         unique_ptr<FetchStage> fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -586,7 +586,7 @@ public:
         for (int i = 0; i < numIndices; ++i) {
             auto params =
                 makeIndexScanParams(&_opCtx, coll, getIndex(indexSpec[i], ctx.getCollection()));
-            ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr));
+            ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr));
         }
 
         set<RecordId> recordIds;
@@ -712,9 +712,9 @@ public:
             auto fetchStage = std::make_unique<FetchStage>(
                 _expCtx.get(),
                 &ws,
-                std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr),
+                std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr),
                 nullptr,
-                coll);
+                &coll);
             ms->addChild(std::move(fetchStage));
         }
 
@@ -726,9 +726,9 @@ public:
             auto fetchStage = std::make_unique<FetchStage>(
                 _expCtx.get(),
                 &ws,
-                std::make_unique<IndexScan>(_expCtx.get(), coll, params, &ws, nullptr),
+                std::make_unique<IndexScan>(_expCtx.get(), &coll, params, &ws, nullptr),
                 nullptr,
-                coll);
+                &coll);
             ms->addChild(std::move(fetchStage));
         }
 
@@ -812,14 +812,14 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr));
+        ms->addChild(std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr));
 
         auto fetchStage =
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, coll);
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ms), nullptr, &coll);
         // Must fetch if we want to easily pull out an obj.
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,
@@ -884,19 +884,19 @@ public:
 
         // a:1
         auto params = makeIndexScanParams(&_opCtx, coll, getIndex(firstIndex, coll));
-        auto idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
+        auto idxScan = std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
 
         // Wrap 'idxScan' with a FETCH stage so a document is fetched and MERGE_SORT is forced to
         // use the provided collator 'collator'. Also, this permits easier retrieval of result
         // objects in the result verification code.
         ms->addChild(
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, &coll));
 
         // b:1
         params = makeIndexScanParams(&_opCtx, coll, getIndex(secondIndex, coll));
-        idxScan = std::make_unique<IndexScan>(_expCtx.get(), coll, params, ws.get(), nullptr);
+        idxScan = std::make_unique<IndexScan>(_expCtx.get(), &coll, params, ws.get(), nullptr);
         ms->addChild(
-            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, coll));
+            make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(idxScan), nullptr, &coll));
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,

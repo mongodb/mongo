@@ -155,8 +155,8 @@ unique_ptr<PlanStage> getIxScanPlan(ExpressionContext* expCtx,
     ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
     ixparams.direction = 1;
 
-    auto ixscan = std::make_unique<IndexScan>(expCtx, coll, ixparams, sharedWs, nullptr);
-    return std::make_unique<FetchStage>(expCtx, sharedWs, std::move(ixscan), nullptr, coll);
+    auto ixscan = std::make_unique<IndexScan>(expCtx, &coll, ixparams, sharedWs, nullptr);
+    return std::make_unique<FetchStage>(expCtx, sharedWs, std::move(ixscan), nullptr, &coll);
 }
 
 unique_ptr<MatchExpression> makeMatchExpressionFromFilter(ExpressionContext* expCtx,
@@ -176,7 +176,7 @@ unique_ptr<PlanStage> getCollScanPlan(ExpressionContext* expCtx,
     CollectionScanParams csparams;
     csparams.direction = CollectionScanParams::FORWARD;
 
-    unique_ptr<PlanStage> root(new CollectionScan(expCtx, coll, csparams, sharedWs, matchExpr));
+    unique_ptr<PlanStage> root(new CollectionScan(expCtx, &coll, csparams, sharedWs, matchExpr));
 
     return root;
 }
@@ -206,7 +206,7 @@ std::unique_ptr<MultiPlanStage> runMultiPlanner(ExpressionContext* expCtx,
     // Hand the plans off to the MPS.
     auto cq = makeCanonicalQuery(expCtx->opCtx, nss, BSON("foo" << desiredFooValue));
 
-    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(expCtx, coll, cq.get());
+    unique_ptr<MultiPlanStage> mps = std::make_unique<MultiPlanStage>(expCtx, &coll, cq.get());
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -260,7 +260,7 @@ TEST_F(QueryStageMultiPlanTest, MPSCollectionScanVsHighlySelectiveIXScan) {
     auto cq = makeCanonicalQuery(_opCtx.get(), nss, filterObj);
 
     unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_expCtx.get(), &ctx.getCollection(), cq.get());
     mps->addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     mps->addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -418,12 +418,12 @@ TEST_F(QueryStageMultiPlanTest, MPSBackupPlan) {
 
     // Fill out the MultiPlanStage.
     unique_ptr<MultiPlanStage> mps(
-        new MultiPlanStage(_expCtx.get(), collection.getCollection(), cq.get()));
+        new MultiPlanStage(_expCtx.get(), &collection.getCollection(), cq.get()));
     unique_ptr<WorkingSet> ws(new WorkingSet());
     // Put each solution from the planner into the MPR.
     for (size_t i = 0; i < solutions.size(); ++i) {
         auto&& root = stage_builder::buildClassicExecutableTree(
-            _opCtx.get(), collection.getCollection(), *cq, *solutions[i], ws.get());
+            _opCtx.get(), &collection.getCollection(), *cq, *solutions[i], ws.get());
         mps->addPlan(std::move(solutions[i]), std::move(root), ws.get());
     }
 
@@ -509,7 +509,7 @@ TEST_F(QueryStageMultiPlanTest, MPSExplainAllPlans) {
     findCommand->setFilter(BSON("x" << 1));
     auto cq = uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     unique_ptr<MultiPlanStage> mps =
-        std::make_unique<MultiPlanStage>(_expCtx.get(), ctx.getCollection(), cq.get());
+        std::make_unique<MultiPlanStage>(_expCtx.get(), &ctx.getCollection(), cq.get());
 
     // Put each plan into the MultiPlanStage. Takes ownership of 'firstPlan' and 'secondPlan'.
     mps->addPlan(std::make_unique<QuerySolution>(), std::move(firstPlan), ws.get());
@@ -639,7 +639,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfExceedsTimeLimitDuringPlannin
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     MultiPlanStage multiPlanStage(
-        _expCtx.get(), coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
+        _expCtx.get(), &coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -680,7 +680,7 @@ TEST_F(QueryStageMultiPlanTest, ShouldReportErrorIfKilledDuringPlanning) {
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     MultiPlanStage multiPlanStage(
-        _expCtx.get(), coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
+        _expCtx.get(), &coll.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
     multiPlanStage.addPlan(createQuerySolution(), std::move(ixScanRoot), sharedWs.get());
     multiPlanStage.addPlan(createQuerySolution(), std::move(collScanRoot), sharedWs.get());
 
@@ -725,7 +725,7 @@ TEST_F(QueryStageMultiPlanTest, AddsContextDuringException) {
     auto canonicalQuery =
         uassertStatusOK(CanonicalQuery::canonicalize(opCtx(), std::move(findCommand)));
     MultiPlanStage multiPlanStage(
-        _expCtx.get(), ctx.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
+        _expCtx.get(), &ctx.getCollection(), canonicalQuery.get(), PlanCachingMode::NeverCache);
     unique_ptr<WorkingSet> sharedWs(new WorkingSet());
     multiPlanStage.addPlan(
         createQuerySolution(), std::make_unique<ThrowyPlanStage>(_expCtx.get()), sharedWs.get());

@@ -143,7 +143,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     // only enable in-place mutations if the underlying storage engine offers support for
     // writing damage events.
     _doc.reset(oldObjValue,
-               (collection()->updateWithDamagesSupported()
+               (collectionPtr()->updateWithDamagesSupported()
                     ? mutablebson::Document::kInPlaceEnabled
                     : mutablebson::Document::kInPlaceDisabled));
 
@@ -204,7 +204,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
 
     // Skip adding _id field if the collection is capped (since capped collection documents can
     // neither grow nor shrink).
-    const auto createIdField = !collection()->isCapped();
+    const auto createIdField = !collectionPtr()->isCapped();
 
     // Ensure _id is first if it exists, and generate a new OID if appropriate.
     update::ensureIdFieldIsFirst(&_doc, createIdField);
@@ -266,7 +266,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 WriteUnitOfWork wunit(opCtx());
                 newObj = uassertStatusOK(collection_internal::updateDocumentWithDamages(
                     opCtx(),
-                    collection(),
+                    collectionPtr(),
                     recordId,
                     oldObj,
                     source,
@@ -298,7 +298,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 WriteUnitOfWork wunit(opCtx());
                 collection_internal::updateDocument(
                     opCtx(),
-                    collection(),
+                    collectionPtr(),
                     recordId,
                     oldObj,
                     newObj,
@@ -349,7 +349,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     }
 
     boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
-    if (collection()->ns().isImplicitlyReplicated() && !_isUserInitiatedWrite) {
+    if (collectionPtr()->ns().isImplicitlyReplicated() && !_isUserInitiatedWrite) {
         // Implictly replicated collections do not replicate updates.
         // However, user-initiated writes and some background maintenance tasks are allowed
         // to replicate as they cannot be derived from the oplog.
@@ -413,7 +413,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             "UpdateStage ensureStillMatches",
             [&] {
                 docStillMatches = write_stage_common::ensureStillMatches(
-                    collection(), opCtx(), _ws, id, _params.canonicalQuery);
+                    collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
                 return PlanStage::NEED_TIME;
             },
             [&] {
@@ -442,7 +442,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
                 member->doc.value(),
                 "update"_sd,
-                collection()->ns(),
+                collectionPtr()->ns(),
                 [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                     planExecutorShardingCriticalSectionFuture(opCtx()) =
                         ex->getCriticalSectionSignal();
@@ -532,7 +532,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             expCtx(),
             "UpdateStage restoreState",
             [&] {
-                child()->restoreState(&collection());
+                child()->restoreState(&collectionPtr());
                 return PlanStage::NEED_TIME;
             },
             [&] {
@@ -711,11 +711,13 @@ void UpdateStage::checkUpdateChangesReshardingKey(const ShardingWriteRouter& sha
     auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
     auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
 
-    uassert(
-        WouldChangeOwningShardInfo(
-            oldObj.value(), newObj, false /* upsert */, collection()->ns(), collection()->uuid()),
-        "This update would cause the doc to change owning shards under the new shard key",
-        oldRecipShard == newRecipShard);
+    uassert(WouldChangeOwningShardInfo(oldObj.value(),
+                                       newObj,
+                                       false /* upsert */,
+                                       collectionPtr()->ns(),
+                                       collectionPtr()->uuid()),
+            "This update would cause the doc to change owning shards under the new shard key",
+            oldRecipShard == newRecipShard);
 }
 
 void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
@@ -732,7 +734,7 @@ void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collectionPtr()->ns());
     checkUpdateChangesExistingShardKey(newObj, oldObj);
     checkUpdateChangesReshardingKey(shardingWriteRouter, newObj, oldObj);
 }
@@ -778,8 +780,8 @@ void UpdateStage::checkUpdateChangesExistingShardKey(const BSONObj& newObj,
         uasserted(WouldChangeOwningShardInfo(oldObj.value(),
                                              newObj,
                                              false /* upsert */,
-                                             collection()->ns(),
-                                             collection()->uuid()),
+                                             collectionPtr()->ns(),
+                                             collectionPtr()->uuid()),
                   "This update would cause the doc to change owning shards");
     }
 }

@@ -51,13 +51,13 @@ public:
     IDHackStage(ExpressionContext* expCtx,
                 CanonicalQuery* query,
                 WorkingSet* ws,
-                const CollectionPtr& collection,
+                VariantCollectionPtrOrAcquisition collection,
                 const IndexDescriptor* descriptor);
 
     IDHackStage(ExpressionContext* expCtx,
                 const BSONObj& key,
                 WorkingSet* ws,
-                const CollectionPtr& collection,
+                VariantCollectionPtrOrAcquisition collection,
                 const IndexDescriptor* descriptor);
 
     ~IDHackStage();

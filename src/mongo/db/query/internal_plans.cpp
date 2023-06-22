@@ -162,7 +162,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleColl
 
     auto rsRandCursor = collectionPtr->getRecordStore()->getRandomCursor(opCtx);
     std::unique_ptr<PlanStage> root =
-        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), collectionPtr);
+        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), collection);
     static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
 
     if (numSamples) {
@@ -493,7 +493,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
 
     auto idHackStage =
-        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collectionPtr, descriptor);
+        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), &collection, descriptor);
 
     const bool isUpsert = params.request->isUpsert();
     auto root = (isUpsert ? std::make_unique<UpsertStage>(
@@ -521,7 +521,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const auto& collection = *coll;
     invariant(collection);
 
-    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, filter);
+    return std::make_unique<CollectionScan>(expCtx.get(), coll, params, ws, filter);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
@@ -547,10 +547,10 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     params.shouldDedup = descriptor->getEntry()->isMultikey(expCtx->opCtx, collection);
 
     std::unique_ptr<PlanStage> root =
-        std::make_unique<IndexScan>(expCtx.get(), collection, std::move(params), ws, nullptr);
+        std::make_unique<IndexScan>(expCtx.get(), coll, std::move(params), ws, nullptr);
 
     if (InternalPlanner::IXSCAN_FETCH & options) {
-        root = std::make_unique<FetchStage>(expCtx.get(), ws, std::move(root), nullptr, collection);
+        root = std::make_unique<FetchStage>(expCtx.get(), ws, std::move(root), nullptr, coll);
     }
 
     return root;

@@ -36,7 +36,7 @@ namespace mongo {
 const char* RecordStoreFastCountStage::kStageType = "RECORD_STORE_FAST_COUNT";
 
 RecordStoreFastCountStage::RecordStoreFastCountStage(ExpressionContext* expCtx,
-                                                     const CollectionPtr& collection,
+                                                     VariantCollectionPtrOrAcquisition collection,
                                                      long long skip,
                                                      long long limit)
     : RequiresCollectionStage(kStageType, expCtx, collection), _skip(skip), _limit(limit) {
@@ -54,7 +54,7 @@ PlanStage::StageState RecordStoreFastCountStage::doWork(WorkingSetID* out) {
     // This stage never returns a working set member.
     *out = WorkingSet::INVALID_ID;
 
-    long long nCounted = collection()->numRecords(opCtx());
+    long long nCounted = collectionPtr()->numRecords(opCtx());
 
     if (_skip) {
         nCounted -= _skip;

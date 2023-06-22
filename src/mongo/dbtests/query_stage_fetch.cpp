@@ -143,7 +143,7 @@ public:
         }
 
         auto fetchStage =
-            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, coll);
+            std::make_unique<FetchStage>(_expCtx.get(), &ws, std::move(mockStage), nullptr, &coll);
 
         WorkingSetID id = WorkingSet::INVALID_ID;
         PlanStage::StageState state;
@@ -210,7 +210,7 @@ public:
 
         // Matcher requires that foo==6 but we only have data with foo==5.
         auto fetchStage = std::make_unique<FetchStage>(
-            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), coll);
+            _expCtx.get(), &ws, std::move(mockStage), filterExpr.get(), &coll);
 
         // First call should return a fetch request as it's not in memory.
         WorkingSetID id = WorkingSet::INVALID_ID;

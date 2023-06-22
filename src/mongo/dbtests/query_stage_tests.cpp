@@ -92,7 +92,7 @@ public:
 
         unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
         unique_ptr<IndexScan> ix = std::make_unique<IndexScan>(
-            _expCtx.get(), ctx.getCollection(), params, ws.get(), filterExpr.get());
+            _expCtx.get(), &ctx.getCollection(), params, ws.get(), filterExpr.get());
 
         auto statusWithPlanExecutor =
             plan_executor_factory::make(_expCtx,

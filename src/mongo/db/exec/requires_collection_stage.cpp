@@ -41,15 +41,21 @@ void RequiresCollectionStage::doSaveState() {
 
 void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
     if (context.type() == RestoreContext::RestoreType::kExternal) {
-        // RequiresCollectionStage requires a collection to be provided in restore. However, it may
-        // be null in case the collection got dropped or renamed.
-        auto collPtr = context.collection();
-        invariant(collPtr);
-        _collection = collPtr;
+        // Restore the CollectionPtr only if we're still using the legacy approach. If we're using
+        // ScopedCollectionAcquisition it means the restoration is performed outside of this method
+        // and the pointers are still valid since it will survive across external yields.
+        if (_collection.isCollectionPtr()) {
+            // RequiresCollectionStage requires a collection to be provided in restore. However, it
+            // may be null in case the collection got dropped or renamed.
+            auto collPtr = context.collection();
+            invariant(collPtr);
+            _collection = VariantCollectionPtrOrAcquisition{collPtr};
+        }
 
         // If we restore externally and get a null Collection we need to figure out if this was a
         // drop or rename. The external lookup could have been done for UUID or namespace.
-        const auto& coll = *collPtr;
+        const auto& coll = _collection.getCollectionPtr();
+        _collectionPtr = &coll;
 
         // If collection exists uuid does not match assume lookup was over namespace and treat this
         // as a drop.
@@ -68,7 +74,7 @@ void RequiresCollectionStage::doRestoreState(const RestoreContext& context) {
         }
     }
 
-    const auto& coll = *_collection;
+    const auto& coll = *_collectionPtr;
 
     if (!coll) {
         PlanYieldPolicy::throwCollectionDroppedError(_collectionUUID);

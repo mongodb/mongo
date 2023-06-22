@@ -76,7 +76,7 @@ public:
         ASSERT_OK(statusWithCQ.getStatus());
 
         stage_builder::ClassicStageBuilder builder{
-            opCtx(), CollectionPtr::null, *statusWithCQ.getValue(), *querySolution, workingSet()};
+            opCtx(), &CollectionPtr::null, *statusWithCQ.getValue(), *querySolution, workingSet()};
         return builder.build(querySolution->root());
     }
 

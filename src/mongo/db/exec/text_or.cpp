@@ -57,7 +57,7 @@ TextOrStage::TextOrStage(ExpressionContext* expCtx,
                          size_t keyPrefixSize,
                          WorkingSet* ws,
                          const MatchExpression* filter,
-                         const CollectionPtr& collection)
+                         VariantCollectionPtrOrAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _keyPrefixSize(keyPrefixSize),
       _ws(ws),
@@ -155,7 +155,7 @@ PlanStage::StageState TextOrStage::initStage(WorkingSetID* out) {
         expCtx(),
         "TextOrStage initStage",
         [&] {
-            _recordCursor = collection()->getCursor(opCtx());
+            _recordCursor = collectionPtr()->getCursor(opCtx());
             _internalState = State::kReadingTerms;
             return PlanStage::NEED_TIME;
         },
@@ -266,8 +266,8 @@ PlanStage::StageState TextOrStage::addTerm(WorkingSetID wsid, WorkingSetID* out)
                                              _ws,
                                              wsid,
                                              _recordCursor.get(),
-                                             collection(),
-                                             collection()->ns())) {
+                                             collectionPtr(),
+                                             collectionPtr()->ns())) {
                     _ws->free(wsid);
                     textRecordData->score = -1;
                     return NEED_TIME;

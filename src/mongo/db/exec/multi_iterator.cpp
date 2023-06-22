@@ -46,7 +46,7 @@ const char* MultiIteratorStage::kStageType = "MULTI_ITERATOR";
 
 MultiIteratorStage::MultiIteratorStage(ExpressionContext* expCtx,
                                        WorkingSet* ws,
-                                       const CollectionPtr& collection)
+                                       VariantCollectionPtrOrAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection), _ws(ws) {}
 
 void MultiIteratorStage::addIterator(unique_ptr<RecordCursor> it) {

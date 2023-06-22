@@ -172,7 +172,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         "DeleteStage ensureStillMatches",
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
-                collection(), opCtx(), _ws, id, _params->canonicalQuery);
+                collectionPtr(), opCtx(), _ws, id, _params->canonicalQuery);
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -201,7 +201,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
             member->doc.value(),
             "delete"_sd,
-            collection()->ns(),
+            collectionPtr()->ns(),
             [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                 planExecutorShardingCriticalSectionFuture(opCtx()) = ex->getCriticalSectionSignal();
                 memberFreer.dismiss();  // Keep this member around so we can retry deleting it.
@@ -247,7 +247,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
                     WriteUnitOfWork wunit(opCtx());
                     collection_internal::deleteDocument(
                         opCtx(),
-                        collection(),
+                        collectionPtr(),
                         Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
                         _params->stmtId,
                         recordId,
@@ -302,7 +302,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
         expCtx(),
         "DeleteStage restoreState",
         [&] {
-            child()->restoreState(&collection());
+            child()->restoreState(&collectionPtr());
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -338,7 +338,7 @@ PlanStage::StageState DeleteStage::doWork(WorkingSetID* out) {
 }
 
 void DeleteStage::doRestoreStateRequiresCollection() {
-    const NamespaceString& ns = collection()->ns();
+    const NamespaceString& ns = collectionPtr()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
             str::stream() << "Demoted from primary while removing from "
                           << ns.toStringForErrorMsg(),

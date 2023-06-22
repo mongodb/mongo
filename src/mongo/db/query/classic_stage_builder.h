@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/stage_builder.h"
 
 namespace mongo::stage_builder {
@@ -41,7 +42,7 @@ public:
     using PlanType = std::unique_ptr<PlanStage>;
 
     ClassicStageBuilder(OperationContext* opCtx,
-                        const CollectionPtr& collection,
+                        VariantCollectionPtrOrAcquisition collection,
                         const CanonicalQuery& cq,
                         const QuerySolution& solution,
                         WorkingSet* ws)
@@ -50,7 +51,7 @@ public:
     PlanType build(const QuerySolutionNode* root) final;
 
 private:
-    const CollectionPtr& _collection;
+    VariantCollectionPtrOrAcquisition _collection;
     WorkingSet* _ws;
 
     boost::optional<size_t> _ftsKeyPrefixSize;

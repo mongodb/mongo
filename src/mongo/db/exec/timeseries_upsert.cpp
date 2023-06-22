@@ -117,18 +117,19 @@ PlanStage::StageState TimeseriesUpsertStage::doWork(WorkingSetID* out) {
 
 void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
     if (_isUserInitiatedUpdate) {
-        if (const auto& collDesc = collectionAcquisition().getShardingDescription();
-            collDesc.isSharded()) {
-            auto newBucket = timeseries::makeBucketDocument({newMeasurement},
-                                                            collection()->ns(),
-                                                            *collection()->getTimeseriesOptions(),
-                                                            collection()->getDefaultCollator());
+        const auto& acq = collectionAcquisition();
+        if (const auto& collDesc = acq.getShardingDescription(); collDesc.isSharded()) {
+            auto newBucket =
+                timeseries::makeBucketDocument({newMeasurement},
+                                               acq.nss(),
+                                               *collectionPtr()->getTimeseriesOptions(),
+                                               collectionPtr()->getDefaultCollator());
 
             //  The shard key fields may not have arrays at any point along their paths.
             update::assertPathsNotArray(mutablebson::Document{newBucket},
                                         collDesc.getKeyPatternFields());
 
-            const auto& collFilter = collectionAcquisition().getShardingFilter();
+            const auto& collFilter = acq.getShardingFilter();
             invariant(collFilter);
 
             auto newShardKey = collDesc.getShardKeyPattern().extractShardKeyFromDoc(newBucket);
@@ -151,16 +152,16 @@ void TimeseriesUpsertStage::_performInsert(BSONObj newMeasurement) {
                 uasserted(WouldChangeOwningShardInfo(_originalPredicate->serialize(),
                                                      newBucket,
                                                      true,  // upsert
-                                                     collection()->ns(),
-                                                     collection()->uuid(),
+                                                     acq.nss(),
+                                                     acq.uuid(),
                                                      newMeasurement),
                           "The document we are inserting belongs on a different shard");
             }
         }
     }
-    writeConflictRetry(opCtx(), "TimeseriesUpsert", collection()->ns(), [&] {
+    writeConflictRetry(opCtx(), "TimeseriesUpsert", collectionPtr()->ns(), [&] {
         timeseries::performAtomicWritesForUpdate(opCtx(),
-                                                 collection(),
+                                                 collectionPtr(),
                                                  RecordId{},
                                                  boost::none,
                                                  {newMeasurement},

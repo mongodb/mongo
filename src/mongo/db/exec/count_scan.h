@@ -90,7 +90,7 @@ struct CountScanParams {
 class CountScan final : public RequiresIndexStage {
 public:
     CountScan(ExpressionContext* expCtx,
-              const CollectionPtr& collection,
+              VariantCollectionPtrOrAcquisition collection,
               CountScanParams params,
               WorkingSet* workingSet);
 

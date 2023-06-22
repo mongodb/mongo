@@ -560,7 +560,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
     // Build a MultiIteratorStage and pass it the random-sampling RecordCursor.
     auto ws = std::make_unique<WorkingSet>();
     std::unique_ptr<PlanStage> root =
-        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), coll);
+        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), &coll);
     static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
 
     TrialStage* trialStage = nullptr;
@@ -646,7 +646,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             gTimeseriesBucketMaxCount);
 
         std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
-            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
+            expCtx.get(), &coll, CollectionScanParams{}, ws.get(), nullptr);
 
         if (isSharded) {
             // In the sharded case, we need to add a shard-filterer stage to the backup plan to
@@ -698,7 +698,7 @@ StatusWith<unique_ptr<PlanExecutor, PlanExecutor::Deleter>> PipelineD::createRan
             expCtx.get(), *optOwnershipFilter, ws.get(), std::move(root));
         // The backup plan is SHARDING_FILTER-COLLSCAN.
         std::unique_ptr<PlanStage> collScanPlan = std::make_unique<CollectionScan>(
-            expCtx.get(), coll, CollectionScanParams{}, ws.get(), nullptr);
+            expCtx.get(), &coll, CollectionScanParams{}, ws.get(), nullptr);
         collScanPlan = std::make_unique<ShardFilterStage>(
             expCtx.get(), *optOwnershipFilter, ws.get(), std::move(collScanPlan));
         // Place a TRIAL stage at the root of the plan tree, and pass it the trial and backup plans.

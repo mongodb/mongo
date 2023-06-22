@@ -58,7 +58,7 @@ using std::vector;
 const char* SubplanStage::kStageType = "SUBPLAN";
 
 SubplanStage::SubplanStage(ExpressionContext* expCtx,
-                           const CollectionPtr& collection,
+                           VariantCollectionPtrOrAcquisition collection,
                            WorkingSet* ws,
                            const QueryPlannerParams& params,
                            CanonicalQuery* cq)
@@ -188,7 +188,7 @@ Status SubplanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     // Plan each branch of the $or.
     auto subplanningStatus = QueryPlanner::planSubqueries(
-        expCtx()->opCtx, getSolutionCachedData, collection(), *_query, _plannerParams);
+        expCtx()->opCtx, getSolutionCachedData, collectionPtr(), *_query, _plannerParams);
     if (!subplanningStatus.isOK()) {
         return choosePlanWholeQuery(yieldPolicy);
     }

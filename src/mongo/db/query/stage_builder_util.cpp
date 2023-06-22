@@ -38,7 +38,7 @@
 
 namespace mongo::stage_builder {
 std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
-                                                      const CollectionPtr& collection,
+                                                      VariantCollectionPtrOrAcquisition collection,
                                                       const CanonicalQuery& cq,
                                                       const QuerySolution& solution,
                                                       WorkingSet* ws) {
@@ -48,7 +48,8 @@ std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,
     // execute the query.
     invariant(solution.root());
     invariant(ws);
-    auto builder = std::make_unique<ClassicStageBuilder>(opCtx, collection, cq, solution, ws);
+    auto builder =
+        std::make_unique<ClassicStageBuilder>(opCtx, std::move(collection), cq, solution, ws);
     return builder->build(solution.root());
 }
 

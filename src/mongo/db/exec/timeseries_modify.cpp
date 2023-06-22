@@ -331,8 +331,8 @@ void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& n
         uasserted(WouldChangeOwningShardInfo(oldMeasurement,
                                              newBucket,
                                              false,
-                                             collection()->ns(),
-                                             collection()->uuid(),
+                                             collectionPtr()->ns(),
+                                             collectionPtr()->uuid(),
                                              newMeasurement),
                   "This update would cause the doc to change owning shards");
     }
@@ -370,8 +370,8 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(
             WouldChangeOwningShardInfo(oldMeasurement,
                                        newBucket,
                                        false,
-                                       collection()->ns(),
-                                       collection()->uuid(),
+                                       collectionPtr()->ns(),
+                                       collectionPtr()->uuid(),
                                        newMeasurement),
             "This update would cause the doc to change owning shards under the new shard key");
     }
@@ -389,7 +389,7 @@ void TimeseriesModifyStage::_checkUpdateChangesShardKeyFields(const BSONObj& new
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
     _checkUpdateChangesExistingShardKey(newBucket, oldBucket, newMeasurement, oldMeasurement);
-    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collectionPtr()->ns());
     _checkUpdateChangesReshardingKey(
         shardingWriteRouter, newBucket, oldBucket, newMeasurement, oldMeasurement);
 }
@@ -419,9 +419,9 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     if (isUpdate && _isUserInitiatedUpdate && !modifiedMeasurements.empty()) {
         _checkUpdateChangesShardKeyFields(
             timeseries::makeBucketDocument({modifiedMeasurements[0]},
-                                           collection()->ns(),
-                                           *collection()->getTimeseriesOptions(),
-                                           collection()->getDefaultCollator()),
+                                           collectionPtr()->ns(),
+                                           *collectionPtr()->getTimeseriesOptions(),
+                                           collectionPtr()->getDefaultCollator()),
             _bucketUnpacker.bucket(),
             modifiedMeasurements[0],
             matchedMeasurements[0]);
@@ -476,7 +476,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
             [&] {
                 if (isUpdate) {
                     timeseries::performAtomicWritesForUpdate(opCtx(),
-                                                             collection(),
+                                                             collectionPtr(),
                                                              recordId,
                                                              unchangedMeasurements,
                                                              modifiedMeasurements,
@@ -484,7 +484,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
                                                              _params.stmtId);
                 } else {
                     timeseries::performAtomicWritesForDelete(opCtx(),
-                                                             collection(),
+                                                             collectionPtr(),
                                                              recordId,
                                                              unchangedMeasurements,
                                                              bucketFromMigrate,
@@ -527,7 +527,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         expCtx(),
         "TimeseriesModifyStage restoreState",
         [&] {
-            child()->restoreState(&collection());
+            child()->restoreState(&collectionPtr());
             return PlanStage::NEED_TIME;
         },
         // yieldHandler
@@ -552,7 +552,7 @@ TimeseriesModifyStage::_checkIfWritingToOrphanedBucket(ScopeGuard<F>& bucketFree
     }
     return _preWriteFilter.checkIfNotWritable(_ws->get(id)->doc.value(),
                                               "timeseries "_sd + _specificStats.opType,
-                                              collection()->ns(),
+                                              collectionPtr()->ns(),
                                               [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                                                   planExecutorShardingCriticalSectionFuture(
                                                       opCtx()) = ex->getCriticalSectionSignal();
@@ -583,7 +583,7 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
         "TimeseriesModifyStage:: ensureStillMatches",
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
-                collection(), opCtx(), _ws, id, _params.canonicalQuery);
+                collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -708,7 +708,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 }
 
 void TimeseriesModifyStage::doRestoreStateRequiresCollection() {
-    const NamespaceString& ns = collection()->ns();
+    const NamespaceString& ns = collectionPtr()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
             "Demoted from primary while removing from {}"_format(ns.toStringForErrorMsg()),
             !opCtx()->writesAreReplicated() ||

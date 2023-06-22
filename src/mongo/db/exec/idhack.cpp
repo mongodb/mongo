@@ -53,7 +53,7 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          CanonicalQuery* query,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         VariantCollectionPtrOrAcquisition collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
@@ -65,7 +65,7 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const BSONObj& key,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         VariantCollectionPtrOrAcquisition collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
@@ -91,7 +91,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
         [&] {
             // Look up the key by going directly to the index.
             auto recordId = indexAccessMethod()->asSortedData()->findSingle(
-                opCtx(), collection(), indexDescriptor()->getEntry(), _key);
+                opCtx(), collectionPtr(), indexDescriptor()->getEntry(), _key);
 
             // Key not found.
             if (recordId.isNull()) {
@@ -108,7 +108,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
             member->recordId = std::move(recordId);
             _workingSet->transitionToRecordIdAndIdx(id);
 
-            const auto& coll = collection();
+            const auto& coll = collectionPtr();
             if (!_recordCursor)
                 _recordCursor = coll->getCursor(opCtx());
 

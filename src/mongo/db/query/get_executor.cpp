@@ -948,7 +948,7 @@ class ClassicPrepareExecutionHelper final
                                     false /* DeferExecutionTreeGeneration */> {
 public:
     ClassicPrepareExecutionHelper(OperationContext* opCtx,
-                                  const CollectionPtr& collection,
+                                  VariantCollectionPtrOrAcquisition collection,
                                   WorkingSet* ws,
                                   CanonicalQuery* cq,
                                   PlanYieldPolicy* yieldPolicy,
@@ -958,7 +958,7 @@ public:
           _ws{ws} {}
 
     const CollectionPtr& getMainCollection() const override {
-        return _collection;
+        return _collection.getCollectionPtr();
     }
 
 protected:
@@ -967,10 +967,11 @@ protected:
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildIdHackPlan() {
-        if (!isIdHackEligibleQuery(_collection, *_cq))
+        if (!isIdHackEligibleQuery(getMainCollection(), *_cq))
             return nullptr;
 
-        const IndexDescriptor* descriptor = _collection->getIndexCatalog()->findIdIndex(_opCtx);
+        const IndexDescriptor* descriptor =
+            getMainCollection()->getIndexCatalog()->findIdIndex(_opCtx);
         if (!descriptor)
             return nullptr;
 
@@ -985,14 +986,13 @@ protected:
 
         // Might have to filter out orphaned docs.
         if (_plannerParams.options & QueryPlannerParams::INCLUDE_SHARD_FILTER) {
+            auto shardFilterer = _collection.getShardingFilter(_opCtx);
+            invariant(shardFilterer,
+                      "Attempting to use shard filter when there's no shard filter available for "
+                      "the collection");
+
             stage = std::make_unique<ShardFilterStage>(
-                _cq->getExpCtxRaw(),
-                CollectionShardingState::assertCollectionLockedAndAcquire(_opCtx, _cq->nss())
-                    ->getOwnershipFilter(
-                        _opCtx,
-                        CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
-                _ws,
-                std::move(stage));
+                _cq->getExpCtxRaw(), std::move(*shardFilterer), _ws, std::move(stage));
         }
 
         const auto* cqProjection = _cq->getProj();
@@ -1042,7 +1042,7 @@ protected:
     }
 
     PlanCacheKey buildPlanCacheKey() const {
-        return plan_cache_key_factory::make<PlanCacheKey>(*_cq, _collection);
+        return plan_cache_key_factory::make<PlanCacheKey>(*_cq, getMainCollection());
     }
 
     std::unique_ptr<ClassicPrepareExecutionResult> buildCachedPlan(
@@ -1060,7 +1060,7 @@ protected:
 
         if (shouldCacheQuery(*_cq)) {
             // Try to look up a cached solution for the query.
-            if (auto cs = CollectionQueryInfo::get(_collection)
+            if (auto cs = CollectionQueryInfo::get(getMainCollection())
                               .getPlanCache()
                               ->getCacheEntryIfActive(planCacheKey)) {
                 planCacheCounters.incrementClassicHitsCounter();
@@ -1131,7 +1131,7 @@ protected:
     }
 
 private:
-    const CollectionPtr& _collection;
+    VariantCollectionPtrOrAcquisition _collection;
     WorkingSet* _ws;
 };
 
@@ -1233,12 +1233,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getClassicExecu
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     const QueryPlannerParams& plannerParams) {
     auto ws = std::make_unique<WorkingSet>();
-    ClassicPrepareExecutionHelper helper{opCtx,
-                                         collection.getCollectionPtr(),
-                                         ws.get(),
-                                         canonicalQuery.get(),
-                                         nullptr,
-                                         plannerParams};
+    ClassicPrepareExecutionHelper helper{
+        opCtx, collection, ws.get(), canonicalQuery.get(), nullptr, plannerParams};
     auto executionResult = helper.prepare();
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
@@ -1839,7 +1835,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
                 LOGV2_DEBUG(20928, 2, "Using idhack", "query"_attr = redact(unparsedQuery));
 
                 auto idHackStage = std::make_unique<IDHackStage>(
-                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), collectionPtr, descriptor);
+                    expCtx.get(), unparsedQuery["_id"].wrap(), ws.get(), &coll, descriptor);
                 std::unique_ptr<DeleteStage> root =
                     std::make_unique<DeleteStage>(expCtx.get(),
                                                   std::move(deleteStageParams),
@@ -1891,7 +1887,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorDele
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionPtr, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, &coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2095,7 +2091,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorUpda
 
     const size_t defaultPlannerOptions = QueryPlannerParams::DEFAULT;
     ClassicPrepareExecutionHelper helper{
-        opCtx, collectionPtr, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
+        opCtx, &coll, ws.get(), cq.get(), nullptr, defaultPlannerOptions};
     auto executionResult = helper.prepare();
 
     if (!executionResult.isOK()) {
@@ -2474,7 +2470,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
 
     if (useRecordStoreCount) {
         std::unique_ptr<PlanStage> root =
-            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), collection, skip, limit);
+            std::make_unique<RecordStoreFastCountStage>(expCtx.get(), &collection, skip, limit);
         return plan_executor_factory::make(expCtx,
                                            std::move(ws),
                                            std::move(root),
@@ -2490,8 +2486,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorCoun
         plannerOptions |= QueryPlannerParams::INCLUDE_SHARD_FILTER;
     }
 
-    ClassicPrepareExecutionHelper helper{
-        opCtx, collection, ws.get(), cq.get(), nullptr, plannerOptions};
+    ClassicPrepareExecutionHelper helper{opCtx, coll, ws.get(), cq.get(), nullptr, plannerOptions};
     auto executionResult = helper.prepare();
     if (!executionResult.isOK()) {
         return executionResult.getStatus();
@@ -2783,7 +2778,6 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
     const QueryPlannerParams& plannerParams,
     PlanYieldPolicy::YieldPolicy yieldPolicy,
     ParsedDistinct* parsedDistinct) {
-    const auto& collectionPtr = coll.getCollectionPtr();
 
     invariant(parsedDistinct->getQuery());
     auto collator = parsedDistinct->getQuery()->getCollator();
@@ -2824,7 +2818,7 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutorForS
 
     std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
     auto&& root = stage_builder::buildClassicExecutableTree(
-        opCtx, collectionPtr, *parsedDistinct->getQuery(), *soln, ws.get());
+        opCtx, coll, *parsedDistinct->getQuery(), *soln, ws.get());
 
     auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                             std::move(ws),
@@ -2865,7 +2859,6 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
                                       ParsedDistinct* parsedDistinct,
                                       bool flipDistinctScanDirection,
                                       size_t plannerOptions) {
-    const auto& collectionPtr = coll.getCollectionPtr();
     const bool strictDistinctOnly = (plannerOptions & QueryPlannerParams::STRICT_DISTINCT_ONLY);
 
     // We look for a solution that has an ixscan we can turn into a distinctixscan
@@ -2878,7 +2871,7 @@ getExecutorDistinctFromIndexSolutions(OperationContext* opCtx,
             std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
             std::unique_ptr<QuerySolution> currentSolution = std::move(solutions[i]);
             auto&& root = stage_builder::buildClassicExecutableTree(
-                opCtx, collectionPtr, *parsedDistinct->getQuery(), *currentSolution, ws.get());
+                opCtx, coll, *parsedDistinct->getQuery(), *currentSolution, ws.get());
 
             auto exec = plan_executor_factory::make(parsedDistinct->releaseQuery(),
                                                     std::move(ws),

@@ -62,7 +62,7 @@ namespace mongo {
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
 CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
-                                 const CollectionPtr& collection,
+                                 VariantCollectionPtrOrAcquisition collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,
@@ -213,9 +213,9 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        const auto& coll = collection();
-        auto cache = CollectionQueryInfo::get(coll).getPlanCache();
-        cache->deactivate(plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, coll));
+        auto cache = CollectionQueryInfo::get(collectionPtr()).getPlanCache();
+        cache->deactivate(
+            plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, collectionPtr()));
     }
 
     // Use the query planning module to plan the whole query.

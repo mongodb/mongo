@@ -57,15 +57,17 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
-const char* getStageName(const CollectionPtr& coll, const CollectionScanParams& params) {
-    return (!coll->ns().isOplog() && (params.minRecord || params.maxRecord)) ? "CLUSTERED_IXSCAN"
-                                                                             : "COLLSCAN";
+const char* getStageName(const VariantCollectionPtrOrAcquisition& coll,
+                         const CollectionScanParams& params) {
+    return (!coll.getCollectionPtr()->ns().isOplog() && (params.minRecord || params.maxRecord))
+        ? "CLUSTERED_IXSCAN"
+        : "COLLSCAN";
 }
 }  // namespace
 
 
 CollectionScan::CollectionScan(ExpressionContext* expCtx,
-                               const CollectionPtr& collection,
+                               VariantCollectionPtrOrAcquisition collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
@@ -73,6 +75,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _params(params) {
+    const auto& collPtr = collection.getCollectionPtr();
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.minRecord = params.minRecord;
@@ -82,10 +85,10 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
         // applies only to forwards scans of the oplog and scans on clustered collections.
         invariant(!params.resumeAfterRecordId);
-        if (collection->ns().isOplogOrChangeCollection()) {
+        if (collPtr->ns().isOplogOrChangeCollection()) {
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
-            invariant(collection->isClustered());
+            invariant(collPtr->isClustered());
         }
     }
 
@@ -95,7 +98,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         tassert(6125000,
                 "Only collection scans on clustered collections may specify recordId "
                 "BoundInclusion policies",
-                collection->isClustered());
+                collPtr->isClustered());
 
         if (filter) {
             // The filter is applied after the ScanBoundInclusion is considered.
@@ -113,8 +116,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 "max"_attr = (!_params.maxRecord) ? "none" : _params.maxRecord->toString());
     tassert(6521000,
             "Expected an oplog or a change collection with 'shouldTrackLatestOplogTimestamp'",
-            !_params.shouldTrackLatestOplogTimestamp ||
-                collection->ns().isOplogOrChangeCollection());
+            !_params.shouldTrackLatestOplogTimestamp || collPtr->ns().isOplogOrChangeCollection());
 
     if (params.assertTsHasNotFallenOff) {
         tassert(6521001,
@@ -148,6 +150,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
     boost::optional<Record> record;
     const bool needToMakeCursor = !_cursor;
+    const auto& collPtr = collectionPtr();
 
     const auto ret = handlePlanStageYield(
         expCtx(),
@@ -168,14 +171,13 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     // sure that we are using a fresh storage engine snapshot while waiting.
                     // Otherwise, we will end up reading from the snapshot where the oplog entries
                     // are not yet visible even after the wait.
-                    invariant(!_params.tailable && collection()->ns().isOplog());
+                    invariant(!_params.tailable && collPtr->ns().isOplog());
 
                     opCtx()->recoveryUnit()->abandonSnapshot();
-                    collection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
-                        opCtx());
+                    collPtr->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx());
                 }
 
-                _cursor = collection()->getCursor(opCtx(), forward);
+                _cursor = collPtr->getCursor(opCtx(), forward);
 
                 if (!_lastSeenId.isNull()) {
                     invariant(_params.tailable);
@@ -256,7 +258,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
         // For change collections, advance '_latestOplogEntryTimestamp' to the current snapshot
         // timestamp, i.e. the latest available timestamp in the global oplog.
-        if (_params.shouldTrackLatestOplogTimestamp && collection()->ns().isChangeCollection()) {
+        if (_params.shouldTrackLatestOplogTimestamp && collPtr->ns().isChangeCollection()) {
             setLatestOplogEntryTimestampToReadTimestamp();
         }
         _priority.reset();
@@ -284,7 +286,7 @@ void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
     // Since this method is only ever called when iterating a change collection, the following check
     // effectively disables optime advancement in Serverless, for reasons outlined in SERVER-76288.
     // TODO SERVER-76309: re-enable optime advancement to support sharding in Serverless.
-    if (collection()->ns().isChangeCollection()) {
+    if (collectionPtr()->ns().isChangeCollection()) {
         return;
     }
 

@@ -61,7 +61,7 @@ public:
      * when possible. If 'shouldCache' is false, the plan cache will never be written.
      */
     MultiPlanStage(ExpressionContext* expCtx,
-                   const CollectionPtr& collection,
+                   VariantCollectionPtrOrAcquisition collection,
                    CanonicalQuery* cq,
                    PlanCachingMode cachingMode = PlanCachingMode::AlwaysCache);
 

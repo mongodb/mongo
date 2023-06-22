@@ -207,7 +207,7 @@ protected:
         // If this is the first call to doGetNext, we must create the COLLSCAN.
         if (!_collScan) {
             _collScan = std::make_unique<CollectionScan>(
-                pExpCtx.get(), _collectionPtr, _params, &_ws, _filter.get());
+                pExpCtx.get(), &_collectionPtr, _params, &_ws, _filter.get());
         }
         while (true) {
             // If the next result is a pause, return it and don't collscan.

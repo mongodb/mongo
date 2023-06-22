@@ -73,13 +73,12 @@ public:
     GeoNear2DStage(const GeoNearParams& nearParams,
                    ExpressionContext* expCtx,
                    WorkingSet* workingSet,
-                   const CollectionPtr& collection,
+                   VariantCollectionPtrOrAcquisition collection,
                    const IndexDescriptor* twoDIndex);
 
 protected:
     std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
-                                                  WorkingSet* workingSet,
-                                                  const CollectionPtr& collection) final;
+                                                  WorkingSet* workingSet) final;
 
     double computeDistance(WorkingSetMember* member) final;
 
@@ -90,7 +89,7 @@ protected:
 private:
     class DensityEstimator {
     public:
-        DensityEstimator(const CollectionPtr& collection,
+        DensityEstimator(const VariantCollectionPtrOrAcquisition* collection,
                          PlanStage::Children* children,
                          BSONObj infoObj,
                          const GeoNearParams* nearParams,
@@ -107,7 +106,8 @@ private:
                             WorkingSet* workingSet,
                             const IndexDescriptor* twoDIndex);
 
-        const CollectionPtr& _collection;
+        const VariantCollectionPtrOrAcquisition*
+            _collection;                   // Points to the internal stage _collection.
         PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
         const GeoNearParams* _nearParams;  // Not owned here.
         const R2Annulus& _fullBounds;
@@ -142,13 +142,12 @@ public:
     GeoNear2DSphereStage(const GeoNearParams& nearParams,
                          ExpressionContext* expCtx,
                          WorkingSet* workingSet,
-                         const CollectionPtr& collection,
+                         VariantCollectionPtrOrAcquisition collection,
                          const IndexDescriptor* s2Index);
 
 protected:
     std::unique_ptr<CoveredInterval> nextInterval(OperationContext* opCtx,
-                                                  WorkingSet* workingSet,
-                                                  const CollectionPtr& collection) final;
+                                                  WorkingSet* workingSet) final;
 
     double computeDistance(WorkingSetMember* member) final;
 
@@ -160,7 +159,7 @@ private:
     // Estimate the density of data by search the nearest cells level by level around center.
     class DensityEstimator {
     public:
-        DensityEstimator(const CollectionPtr& collection,
+        DensityEstimator(const VariantCollectionPtrOrAcquisition* collection,
                          PlanStage::Children* children,
                          const GeoNearParams* nearParams,
                          const S2IndexingParams& indexParams,
@@ -179,7 +178,8 @@ private:
                             WorkingSet* workingSet,
                             const IndexDescriptor* s2Index);
 
-        const CollectionPtr& _collection;
+        const VariantCollectionPtrOrAcquisition*
+            _collection;                   // Points to the internal stage _collection
         PlanStage::Children* _children;    // Points to PlanStage::_children in the NearStage.
         const GeoNearParams* _nearParams;  // Not owned here.
         const S2IndexingParams _indexParams;

@@ -48,7 +48,7 @@ using std::vector;
 const char* DistinctScan::kStageType = "DISTINCT_SCAN";
 
 DistinctScan::DistinctScan(ExpressionContext* expCtx,
-                           const CollectionPtr& collection,
+                           VariantCollectionPtrOrAcquisition collection,
                            DistinctParams params,
                            WorkingSet* workingSet)
     : RequiresIndexStage(kStageType, expCtx, collection, params.indexDescriptor, workingSet),

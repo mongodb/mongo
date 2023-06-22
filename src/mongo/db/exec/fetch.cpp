@@ -54,7 +54,7 @@ FetchStage::FetchStage(ExpressionContext* expCtx,
                        WorkingSet* ws,
                        std::unique_ptr<PlanStage> child,
                        const MatchExpression* filter,
-                       const CollectionPtr& collection)
+                       VariantCollectionPtrOrAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _ws(ws),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
@@ -104,7 +104,7 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
                 expCtx(),
                 "FetchStage",
                 [&] {
-                    const auto& coll = collection();
+                    const auto& coll = collectionPtr();
                     if (!_cursor)
                         _cursor = coll->getCursor(opCtx());
 

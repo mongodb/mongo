@@ -109,7 +109,7 @@ HistogramServerStatusMetric classicNumPlansHistogram(
 }  // namespace
 
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
-                               const CollectionPtr& collection,
+                               VariantCollectionPtrOrAcquisition collection,
                                CanonicalQuery* cq,
                                PlanCachingMode cachingMode)
     : RequiresCollectionStage(kStageType, expCtx, collection),
@@ -166,9 +166,9 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
         LOGV2_DEBUG(20588, 5, "Best plan errored, switching to backup plan");
 
-        CollectionQueryInfo::get(collection())
+        CollectionQueryInfo::get(collectionPtr())
             .getPlanCache()
-            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collection()));
+            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collectionPtr()));
 
         switchToBackupPlan();
         return _candidates[_bestPlanIdx].root->work(out);
@@ -206,7 +206,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     const size_t numWorks =
         trial_period::getTrialPeriodMaxWorks(opCtx(),
-                                             collection(),
+                                             collectionPtr(),
                                              internalQueryPlanEvaluationWorks.load(),
                                              internalQueryPlanEvaluationCollFraction.load());
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
@@ -270,8 +270,13 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
     }
 
+    const auto& coll = collection();
+    auto multipleCollection = coll.isAcquisition()
+        ? MultipleCollectionAccessor{coll.getAcquisition()}
+        : MultipleCollectionAccessor{coll.getCollectionPtr()};
+
     plan_cache_util::updatePlanCacheFromCandidates(expCtx()->opCtx,
-                                                   MultipleCollectionAccessor(collection()),
+                                                   std::move(multipleCollection),
                                                    _cachingMode,
                                                    *_query,
                                                    std::move(ranking),

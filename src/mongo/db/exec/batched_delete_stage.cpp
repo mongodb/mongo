@@ -353,7 +353,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
                 // Different documents may have different snapshots.
                 const bool docStillMatches = ensureStillMatchesAndUpdateStats(
-                    collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
+                    collectionPtr(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
 
                 // Warning: if docStillMatches is false, the WSM's underlaying Document/BSONObj is
                 // no longer valid.
@@ -363,7 +363,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // Determine whether the document being deleted is owned by this shard, and the
                 // action to undertake if it isn't.
                 return _preWriteFilter.computeActionAndLogSpecialCases(
-                    member->doc.value(), "batched delete"_sd, collection()->ns());
+                    member->doc.value(), "batched delete"_sd, collectionPtr()->ns());
             }();
 
             // Skip the document, as it either no longer exists, or has been filtered by the
@@ -395,7 +395,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
 
         collection_internal::deleteDocument(
             opCtx(),
-            collection(),
+            collectionPtr(),
             Snapshotted(memberDoc.snapshotId(), bsonObjDoc),
             _params->stmtId,
             member->recordId,
@@ -423,7 +423,7 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
                 // Assume nDocs is positive.
                 const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns"_sd);
                 return data.hasField("sleepMs") && !fpNss.isEmpty() &&
-                    collection()->ns() == fpNss && data.hasField("nDocs") &&
+                    collectionPtr()->ns() == fpNss && data.hasField("nDocs") &&
                     _specificStats.docsDeleted + *docsDeleted >=
                     static_cast<unsigned int>(data.getIntField("nDocs"));
             });
@@ -492,7 +492,7 @@ PlanStage::StageState BatchedDeleteStage::_tryRestoreState(WorkingSetID* out) {
         expCtx(),
         "BatchedDeleteStage::_tryRestoreState",
         [&] {
-            child()->restoreState(&collection());
+            child()->restoreState(&collectionPtr());
             return PlanStage::NEED_TIME;
         },
         [&] {
