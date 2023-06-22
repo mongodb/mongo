@@ -12,7 +12,7 @@ podman run \
   -w $(pwd) \
   --env-host \
   ${UPLOAD_LOCK_IMAGE} \
-  -key=${build_id}/packages/${packagesfile} -tag=task-id=${EVERGREEN_TASK_ID} ${packagesfile}
+  -key=${version_id}/${build_id}/packages/${packagesfile} -tag=task-id=${EVERGREEN_TASK_ID} ${packagesfile}
 
 cd src
 
