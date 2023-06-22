@@ -51,7 +51,8 @@ namespace mongo::sbe {
  * The "output" slots are
  *   - 'recordSlot': the "KeyString" representing the index entry,
  *   - 'recordIdSlot': a reference that can be used to fetch the entire document,
- *   - 'snapshotIdSlot': the storage snapshot that this index scan is reading from, and
+ *   - 'snapshotIdSlot': the storage snapshot that this index scan is reading from,
+ *   - 'indexIdSlot': the name of the index being read from, and
  *   - 'vars': one slot for each value in the index key that should be "projected" out of the entry.
  *
  * The 'indexKeysToInclude' bitset determines which values are included in the projection based
@@ -63,10 +64,11 @@ namespace mongo::sbe {
  *
  * Debug string representation:
  *
- *   ixscan recordSlot? recordIdSlot? snapshotIdSlot? [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
+ *   ixscan recordSlot? recordIdSlot? snapshotIdSlot? indexIdSlot?
+ *                      [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
  *                      collectionUuid indexName forward
  *
- *   ixseek lowKey highKey recordSlot? recordIdSlot? snapshotIdSlot?
+ *   ixseek lowKey highKey recordSlot? recordIdSlot? snapshotIdSlot? indexIdSlot?
  *          [slot_1 = fieldNo_1, ..., slot2 = fieldNo_n]
  *          collectionUuid indexName forward
  */
@@ -78,6 +80,7 @@ public:
                    boost::optional<value::SlotId> recordSlot,
                    boost::optional<value::SlotId> recordIdSlot,
                    boost::optional<value::SlotId> snapshotIdSlot,
+                   boost::optional<value::SlotId> indexIdSlot,
                    IndexKeysInclusionSet indexKeysToInclude,
                    value::SlotVector vars,
                    boost::optional<value::SlotId> seekKeySlotLow,
@@ -125,6 +128,7 @@ private:
     const boost::optional<value::SlotId> _recordSlot;
     const boost::optional<value::SlotId> _recordIdSlot;
     const boost::optional<value::SlotId> _snapshotIdSlot;
+    const boost::optional<value::SlotId> _indexIdSlot;
     const IndexKeysInclusionSet _indexKeysToInclude;
     const value::SlotVector _vars;
     const boost::optional<value::SlotId> _seekKeySlotLow;
@@ -140,6 +144,14 @@ private:
     std::unique_ptr<value::OwnedValueAccessor> _recordAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _recordIdAccessor;
     std::unique_ptr<value::OwnedValueAccessor> _snapshotIdAccessor;
+
+    value::OwnedValueAccessor _indexIdAccessor;
+    value::ViewOfValueAccessor _indexIdViewAccessor;
+
+    // This field holds the latest snapshot ID that we've received from _opCtx->recoveryUnit().
+    // This field gets initialized by prepare(), and it gets updated each time doRestoreState() is
+    // called.
+    uint64_t _latestSnapshotId{0};
 
     // One accessor and slot for each key component that this stage will bind from an index entry's
     // KeyString. The accessors are in the same order as the key components they bind to.

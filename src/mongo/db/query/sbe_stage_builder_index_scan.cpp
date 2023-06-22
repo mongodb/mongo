@@ -283,10 +283,6 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
                      makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("l"_sd)));
     projects.emplace(highKeySlot,
                      makeFunction("getField"_sd, makeVariable(unwindSlot), makeConstant("h"_sd)));
-    if (indexIdSlot) {
-        // Construct a copy of 'indexName' to project for use in the index consistency check.
-        projects.emplace(*indexIdSlot, makeConstant(indexName));
-    }
 
     if (indexKeyPatternSlot) {
         auto [bsonObjTag, bsonObjVal] =
@@ -300,20 +296,13 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
     auto project =
         sbe::makeS<sbe::ProjectStage>(std::move(unwind), std::move(projects), planNodeId);
 
-    // Whereas 'snapshotIdSlot' is used by the caller to inspect the snapshot id of the latest index
-    // key, 'indexSnapshotSlot' is updated by the IndexScan below during yield to obtain the latest
-    // snapshot id.
-    boost::optional<sbe::value::SlotId> indexSnapshotSlot;
-    if (snapshotIdSlot) {
-        indexSnapshotSlot = slotIdGenerator->generate();
-    }
-
     auto stage = sbe::makeS<sbe::IndexScanStage>(collection->uuid(),
                                                  indexName,
                                                  forward,
                                                  recordSlot,
                                                  recordIdSlot,
-                                                 indexSnapshotSlot,
+                                                 snapshotIdSlot,
+                                                 indexIdSlot,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
                                                  lowKeySlot,
@@ -321,19 +310,7 @@ generateOptimizedMultiIntervalIndexScan(StageBuilderState& state,
                                                  yieldPolicy,
                                                  planNodeId);
 
-    // Add a project on top of the index scan to remember the snapshotId of the most recent index
-    // key returned by the IndexScan above. Otherwise, the index key's snapshot id would be
-    // overwritten during yield.
-    if (snapshotIdSlot) {
-        stage = sbe::makeProjectStage(
-            std::move(stage), planNodeId, *snapshotIdSlot, makeVariable(*indexSnapshotSlot));
-    }
-
     auto outerSv = sbe::makeSV();
-    if (indexIdSlot) {
-        outerSv.push_back(*indexIdSlot);
-    }
-
     if (indexKeyPatternSlot) {
         outerSv.push_back(*indexKeyPatternSlot);
     }
@@ -425,10 +402,6 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
     // contain a value from the stack spool. See below for details.
     sbe::value::SlotMap<std::unique_ptr<sbe::EExpression>> projects;
     projects.emplace(lowKeySlot, makeVariable(seekKeySlot));
-    if (indexIdSlot) {
-        // Construct a copy of 'indexName' to project for use in the index consistency check.
-        projects.emplace(*indexIdSlot, makeConstant(indexName));
-    }
 
     if (indexKeyPatternSlot) {
         auto [bsonObjTag, bsonObjVal] = sbe::value::copyValue(
@@ -449,6 +422,7 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                                   resultSlot,
                                                   recordIdSlot,
                                                   snapshotIdSlot,
+                                                  indexIdSlot,
                                                   indexKeysToInclude,
                                                   std::move(savedIndexKeySlots),
                                                   lowKeySlot,
@@ -458,10 +432,6 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
 
     // Get the low key from the outer side and feed it to the inner side (ixscan).
     sbe::value::SlotVector outerSv = sbe::makeSV();
-    if (indexIdSlot) {
-        outerSv.push_back(*indexIdSlot);
-    }
-
     if (indexKeyPatternSlot) {
         outerSv.push_back(*indexKeyPatternSlot);
     }
@@ -474,19 +444,11 @@ makeRecursiveBranchForGenericIndexScan(const CollectionPtr& collection,
                                               planNodeId);
 
     sbe::value::SlotVector correlatedSv = sbe::makeSV(seekKeySlot);
-    if (indexIdSlot) {
-        correlatedSv.push_back(*indexIdSlot);
-    }
-
     if (indexKeyPatternSlot) {
         correlatedSv.push_back(*indexKeyPatternSlot);
     }
 
     auto spoolValsSV = sbe::makeSV(seekKeySlot);
-    if (indexIdSlot) {
-        spoolValsSV.push_back(*indexIdSlot);
-    }
-
     if (indexKeyPatternSlot) {
         spoolValsSV.push_back(*indexKeyPatternSlot);
     }
@@ -844,11 +806,6 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
     auto lowKeySlot = makeKeySlot(std::move(lowKey));
     auto highKeySlot = makeKeySlot(std::move(highKey));
 
-    if (indexIdSlot) {
-        // Construct a copy of 'indexName' to project for use in the index consistency check.
-        projects.emplace(*indexIdSlot, makeConstant(indexName));
-    }
-
     if (indexKeyPatternSlot) {
         auto [bsonObjTag, bsonObjVal] =
             sbe::value::copyValue(sbe::value::TypeTags::bsonObject,
@@ -883,14 +840,6 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
             planNodeId);
     }();
 
-    // Whereas 'snapshotIdSlot' is used by the caller to inspect the snapshot id of the latest index
-    // key, 'indexSnapshotSlot' is updated by the IndexScan below during yield to obtain the latest
-    // snapshot id.
-    boost::optional<sbe::value::SlotId> indexSnapshotSlot;
-    if (snapshotIdSlot) {
-        indexSnapshotSlot = slotIdGenerator->generate();
-    }
-
     // Scan the index in the range {'lowKeySlot', 'highKeySlot'} (subject to inclusive or
     // exclusive boundaries), and produce a single field recordIdSlot that can be used to
     // position into the collection.
@@ -899,7 +848,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                                  forward,
                                                  recordSlot,
                                                  recordIdSlot,
-                                                 indexSnapshotSlot,
+                                                 snapshotIdSlot,
+                                                 indexIdSlot,
                                                  indexKeysToInclude,
                                                  std::move(indexKeySlots),
                                                  lowKeySlot,
@@ -907,19 +857,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                                  yieldPolicy,
                                                  planNodeId);
 
-    // Add a project on top of the index scan to remember the snapshotId of the most recent index
-    // key returned by the IndexScan above. Otherwise, the index key's snapshot id would be
-    // overwritten during yield.
-    if (snapshotIdSlot) {
-        stage = sbe::makeProjectStage(
-            std::move(stage), planNodeId, *snapshotIdSlot, makeVariable(*indexSnapshotSlot));
-    }
-
     auto outerSv = sbe::makeSV();
-    if (indexIdSlot) {
-        outerSv.push_back(*indexIdSlot);
-    }
-
     if (indexKeyPatternSlot) {
         outerSv.push_back(*indexKeyPatternSlot);
     }
@@ -942,7 +880,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& originalIndexKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    StringMap<const IndexAccessMethod*>* iamMap,
+    bool doIndexConsistencyCheck,
     bool needsCorruptionCheck) {
 
     auto indexName = ixn->index.identifier.catalogName;
@@ -980,15 +918,12 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     auto indexKeySlots = state.slotIdGenerator->generateMultiple(indexKeyBitset.count());
     sbe::value::SlotVector relevantSlots;
 
-    // Generate the relevant slots and add the access method corresponding to 'indexName' to
-    // 'iamMap' if a parent stage needs to execute a consistency check.
+    // Generate the relevant slots.
     boost::optional<sbe::value::SlotId> snapshotIdSlot;
     boost::optional<sbe::value::SlotId> indexIdSlot;
     boost::optional<sbe::value::SlotId> indexKeySlot;
 
-    if (iamMap) {
-        iamMap->insert({indexName, accessMethod});
-
+    if (doIndexConsistencyCheck) {
         snapshotIdSlot = state.slotId();
         outputs.set(PlanStageSlots::kSnapshotId, *snapshotIdSlot);
         relevantSlots.push_back(*snapshotIdSlot);
@@ -1188,7 +1123,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& originalIndexKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    StringMap<const IndexAccessMethod*>* iamMap,
+    bool doIndexConsistencyCheck,
     bool needsCorruptionCheck) {
     const bool forward = ixn->direction == 1;
     auto indexName = ixn->index.identifier.catalogName;
@@ -1202,11 +1137,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     // Find the IndexAccessMethod which corresponds to the 'indexName'.
     auto accessMethod = descriptor->getEntry()->accessMethod()->asSortedData();
 
-    // Add the access method corresponding to 'indexName' to the 'iamMap' if a parent stage needs to
-    // execute a consistency check.
-    if (iamMap) {
-        iamMap->insert({indexName, accessMethod});
-    }
     PlanStageSlots outputs;
     sbe::value::SlotVector relevantSlots;
     std::unique_ptr<sbe::PlanStage> stage;
@@ -1251,9 +1181,9 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
             nullptr,
             indexKeyBitset,
             outputIndexKeySlots,
-            makeSlot(iamMap, PlanStageSlots::kSnapshotId),
-            makeSlot(iamMap, PlanStageSlots::kIndexId),
-            makeSlot(iamMap, PlanStageSlots::kIndexKey),
+            makeSlot(doIndexConsistencyCheck, PlanStageSlots::kSnapshotId),
+            makeSlot(doIndexConsistencyCheck, PlanStageSlots::kIndexId),
+            makeSlot(doIndexConsistencyCheck, PlanStageSlots::kIndexKey),
             makeSlot(needsCorruptionCheck, PlanStageSlots::kIndexKeyPattern),
             yieldPolicy,
             ixn->nodeId());
@@ -1291,11 +1221,11 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
         };
 
         auto [genericIndexScanSnapshotIdSlot, optimizedIndexScanSnapshotIdSlot] =
-            makeSlotsForThenElseBranches(iamMap, PlanStageSlots::kSnapshotId);
+            makeSlotsForThenElseBranches(doIndexConsistencyCheck, PlanStageSlots::kSnapshotId);
         auto [genericIndexScanIndexIdSlot, optimizedIndexScanIndexIdSlot] =
-            makeSlotsForThenElseBranches(iamMap, PlanStageSlots::kIndexId);
+            makeSlotsForThenElseBranches(doIndexConsistencyCheck, PlanStageSlots::kIndexId);
         auto [genericIndexScanIndexKeySlot, optimizedIndexScanIndexKeySlot] =
-            makeSlotsForThenElseBranches(iamMap, PlanStageSlots::kIndexKey);
+            makeSlotsForThenElseBranches(doIndexConsistencyCheck, PlanStageSlots::kIndexKey);
 
         // Generate a slot for an index key pattern if a parent stage needs to execute a
         // corruption check.

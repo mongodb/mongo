@@ -63,7 +63,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& indexKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    StringMap<const IndexAccessMethod*>* iamMap,
+    bool doIndexConsistencyCheck,
     bool needsCorruptionCheck);
 
 /**
@@ -164,6 +164,6 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScanWith
     const IndexScanNode* ixn,
     const sbe::IndexKeysInclusionSet& indexKeyBitset,
     PlanYieldPolicy* yieldPolicy,
-    StringMap<const IndexAccessMethod*>* iamMap,
+    bool doIndexConsistencyCheck,
     bool needsCorruptionCheck);
 }  // namespace mongo::stage_builder

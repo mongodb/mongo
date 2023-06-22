@@ -209,6 +209,7 @@ void ScanStage::doSaveState(bool relinquishCursor) {
         cursor->setSaveStorageCursorOnDetachFromOperationContext(!relinquishCursor);
     }
 
+    _indexCatalogEntryMap.clear();
     _coll.reset();
 }
 
@@ -391,9 +392,14 @@ PlanState ScanStage::getNext() {
     }
 
     // Return EOF if the index key is found to be inconsistent.
-    if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-        !_scanCallbacks.indexKeyConsistencyCheckCallBack(
-            _opCtx, _snapshotIdAccessor, _indexIdAccessor, _indexKeyAccessor, _coll, *nextRecord)) {
+    if (_scanCallbacks.indexKeyConsistencyCheckCallback &&
+        !_scanCallbacks.indexKeyConsistencyCheckCallback(_opCtx,
+                                                         _indexCatalogEntryMap,
+                                                         _snapshotIdAccessor,
+                                                         _indexIdAccessor,
+                                                         _indexKeyAccessor,
+                                                         _coll,
+                                                         *nextRecord)) {
         return trackPlanState(PlanState::IS_EOF);
     }
 
@@ -457,6 +463,7 @@ void ScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
+    _indexCatalogEntryMap.clear();
     _cursor.reset();
     _randomCursor.reset();
     _coll.reset();
@@ -742,6 +749,7 @@ void ParallelScanStage::doSaveState(bool relinquishCursor) {
         _cursor->save();
     }
 
+    _indexCatalogEntryMap.clear();
     _coll.reset();
 }
 
@@ -899,8 +907,9 @@ PlanState ParallelScanStage::getNext() {
         }
 
         // Return EOF if the index key is found to be inconsistent.
-        if (_scanCallbacks.indexKeyConsistencyCheckCallBack &&
-            !_scanCallbacks.indexKeyConsistencyCheckCallBack(_opCtx,
+        if (_scanCallbacks.indexKeyConsistencyCheckCallback &&
+            !_scanCallbacks.indexKeyConsistencyCheckCallback(_opCtx,
+                                                             _indexCatalogEntryMap,
                                                              _snapshotIdAccessor,
                                                              _indexIdAccessor,
                                                              _indexKeyAccessor,
@@ -956,6 +965,7 @@ void ParallelScanStage::close() {
     auto optTimer(getOptTimer(_opCtx));
 
     trackClose();
+    _indexCatalogEntryMap.clear();
     _cursor.reset();
     _coll.reset();
     _open = false;

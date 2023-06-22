@@ -1011,6 +1011,7 @@ std::unique_ptr<sbe::PlanStage> SBENodeLowering::walk(const IndexScanNode& n, co
                                                   resultSlot,
                                                   ridSlot,
                                                   boost::none,
+                                                  boost::none,
                                                   indexKeysToInclude,
                                                   vars,
                                                   seekKeySlotLower,

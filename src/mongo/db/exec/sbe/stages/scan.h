@@ -45,11 +45,11 @@ struct ScanCallbacks {
                   IndexKeyConsistencyCheckCallback indexKeyConsistencyCheck = {},
                   ScanOpenCallback scanOpen = {})
         : indexKeyCorruptionCheckCallback(std::move(indexKeyCorruptionCheck)),
-          indexKeyConsistencyCheckCallBack(std::move(indexKeyConsistencyCheck)),
+          indexKeyConsistencyCheckCallback(std::move(indexKeyConsistencyCheck)),
           scanOpenCallback(std::move(scanOpen)) {}
 
     IndexKeyCorruptionCheckCallback indexKeyCorruptionCheckCallback;
-    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallBack;
+    IndexKeyConsistencyCheckCallback indexKeyConsistencyCheckCallback;
     ScanOpenCallback scanOpenCallback;
 };
 
@@ -83,12 +83,12 @@ struct ScanCallbacks {
  *
  * Debug string representations:
  *
- *  scan recordSlot|none recordIdSlot|none snapshotIdSlot|none indexIdSlot|none indexKeySlot|none
- *       indexKeyPatternSlot|none [slot1 = fieldName1, ... slot_n = fieldName_n] collectionUuid
+ *  scan recordSlot? recordIdSlot? snapshotIdSlot? indexIdSlot? indexKeySlot?
+ *       indexKeyPatternSlot? [slot1 = fieldName1, ... slot_n = fieldName_n] collectionUuid
  *       forward needOplogSlotForTs
  *
- *  seek seekKeySlot recordSlot|none recordIdSlot|none snapshotIdSlot|none indexIdSlot|none
- *       indexKeySlot|none indexKeyPatternSlot|none [slot1 = fieldName1, ... slot_n = fieldName_n]
+ *  seek seekKeySlot recordSlot? recordIdSlot? snapshotIdSlot? indexIdSlot? indexKeySlot?
+ *       indexKeyPatternSlot? [slot1 = fieldName1, ... slot_n = fieldName_n]
  *       collectionUuid forward needOplogSlotForTs
  */
 class ScanStage final : public PlanStage {
@@ -196,6 +196,8 @@ private:
     // Flag set upon restoring the stage that indicates whether the cursor's position in the
     // collection is still valid. Only relevant to capped collections.
     bool _needsToCheckCappedPositionLost = false;
+
+    StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between
@@ -310,6 +312,8 @@ private:
     bool _open{false};
 
     std::unique_ptr<SeekableRecordCursor> _cursor;
+
+    StringMap<const IndexCatalogEntry*> _indexCatalogEntryMap;
 
 #if defined(MONGO_CONFIG_DEBUG_BUILD)
     // Debug-only buffer used to track the last thing returned from the stage. Between

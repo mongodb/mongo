@@ -329,9 +329,6 @@ struct PlanStageData {
     // This holds the output slots produced by SBE plan (resultSlot, recordIdSlot, etc).
     PlanStageSlots outputs;
 
-    // Map from index name to IAM.
-    StringMap<const IndexAccessMethod*> iamMap;
-
     // The CompileCtx object owns the RuntimeEnvironment. The RuntimeEnvironment owns various
     // SlotAccessors which are accessed when the SBE plan is executed.
     sbe::RuntimeEnvironment* env{nullptr};
@@ -379,7 +376,6 @@ private:
     // RuntimeEnvironment and CompileCtx.
     void copyFrom(const PlanStageData& other) {
         outputs = other.outputs;
-        iamMap = other.iamMap;
         shouldTrackLatestOplogTimestamp = other.shouldTrackLatestOplogTimestamp;
         shouldTrackResumeToken = other.shouldTrackResumeToken;
         shouldUseTailableScan = other.shouldUseTailableScan;

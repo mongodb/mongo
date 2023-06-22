@@ -539,7 +539,6 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
                      sbe::value::SlotId indexKeySlot,
                      sbe::value::SlotId indexKeyPatternSlot,
                      const CollectionPtr& collToFetch,
-                     StringMap<const IndexAccessMethod*> iamMap,
                      PlanNodeId planNodeId,
                      sbe::value::SlotVector slotsToForward,
                      sbe::value::SlotIdGenerator& slotIdGenerator);

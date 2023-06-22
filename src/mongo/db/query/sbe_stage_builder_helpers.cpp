@@ -876,12 +876,13 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
  * or that the index keys are still part of the underlying index.
  */
 bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
-                                      StringMap<const IndexAccessMethod*> iamTable,
+                                      StringMap<const IndexCatalogEntry*>& entryMap,
                                       sbe::value::SlotAccessor* snapshotIdAccessor,
                                       sbe::value::SlotAccessor* indexIdAccessor,
                                       sbe::value::SlotAccessor* indexKeyAccessor,
                                       const CollectionPtr& collection,
                                       const Record& nextRecord) {
+    // The index consistency check is only performed when 'snapshotIdAccessor' is set.
     if (snapshotIdAccessor) {
         auto currentSnapshotId = opCtx->recoveryUnit()->getSnapshotId();
         auto [snapshotIdTag, snapshotIdVal] = snapshotIdAccessor->getViewOfValue();
@@ -912,14 +913,29 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             auto indexId = sbe::value::getStringView(indexIdTag, indexIdVal);
             tassert(5290712, "KeyString does not exist", keyString);
 
-            auto it = iamTable.find(indexId);
-            tassert(5290713,
-                    str::stream() << "IndexAccessMethod not found for index " << indexId,
-                    it != iamTable.end());
+            auto it = entryMap.find(indexId);
 
-            auto iam = it->second->asSortedData();
+            // If 'entryMap' doesn't contain an entry for 'indexId', create one.
+            if (it == entryMap.end()) {
+                auto indexCatalog = collection->getIndexCatalog();
+                auto indexDesc = indexCatalog->findIndexByName(opCtx, indexId);
+                auto entry = indexDesc ? indexDesc->getEntry() : nullptr;
+
+                // Throw an error if we can't get the IndexDescriptor or the IndexCatalogEntry
+                // (or if the index is dropped).
+                uassert(ErrorCodes::QueryPlanKilled,
+                        str::stream() << "query plan killed :: index dropped: " << indexId,
+                        indexDesc && entry && !entry->isDropped());
+
+                auto [newIt, _] = entryMap.emplace(indexId, entry);
+
+                it = newIt;
+            }
+
+            auto entry = it->second;
+            auto iam = entry->accessMethod()->asSortedData();
             tassert(5290709,
-                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index "
+                    str::stream() << "Expected to find SortedDataIndexAccessMethod for index: "
                                   << indexId,
                     iam);
 
@@ -947,6 +963,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             return keys->count(*keyString);
         }
     }
+
     return true;
 }
 
@@ -958,7 +975,6 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
                      sbe::value::SlotId indexKeySlot,
                      sbe::value::SlotId indexKeyPatternSlot,
                      const CollectionPtr& collToFetch,
-                     StringMap<const IndexAccessMethod*> iamMap,
                      PlanNodeId planNodeId,
                      sbe::value::SlotVector slotsToForward,
                      sbe::value::SlotIdGenerator& slotIdGenerator) {
@@ -970,10 +986,7 @@ makeLoopJoinForFetch(std::unique_ptr<sbe::PlanStage> inputStage,
     auto resultSlot = slotIdGenerator.generate();
     auto recordIdSlot = slotIdGenerator.generate();
 
-    using namespace std::placeholders;
-    sbe::ScanCallbacks callbacks(
-        indexKeyCorruptionCheckCallback,
-        std::bind(indexKeyConsistencyCheckCallback, _1, std::move(iamMap), _2, _3, _4, _5, _6));
+    sbe::ScanCallbacks callbacks(indexKeyCorruptionCheckCallback, indexKeyConsistencyCheckCallback);
 
     // Scan the collection in the range [seekKeySlot, Inf).
     auto scanStage = sbe::makeS<sbe::ScanStage>(collToFetch->uuid(),

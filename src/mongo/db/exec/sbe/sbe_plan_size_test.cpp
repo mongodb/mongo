@@ -169,6 +169,7 @@ TEST_F(PlanSizeTest, IndexScan) {
                                        generateSlotId(),
                                        generateSlotId(),
                                        generateSlotId(),
+                                       generateSlotId(),
                                        IndexKeysInclusionSet(1),
                                        mockSV(),
                                        generateSlotId(),

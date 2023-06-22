@@ -45,6 +45,7 @@ IndexScanStage::IndexScanStage(UUID collUuid,
                                boost::optional<value::SlotId> recordSlot,
                                boost::optional<value::SlotId> recordIdSlot,
                                boost::optional<value::SlotId> snapshotIdSlot,
+                               boost::optional<value::SlotId> indexIdSlot,
                                IndexKeysInclusionSet indexKeysToInclude,
                                value::SlotVector vars,
                                boost::optional<value::SlotId> seekKeySlotLow,
@@ -58,6 +59,7 @@ IndexScanStage::IndexScanStage(UUID collUuid,
       _recordSlot(recordSlot),
       _recordIdSlot(recordIdSlot),
       _snapshotIdSlot(snapshotIdSlot),
+      _indexIdSlot(indexIdSlot),
       _indexKeysToInclude(indexKeysToInclude),
       _vars(std::move(vars)),
       _seekKeySlotLow(seekKeySlotLow),
@@ -76,6 +78,7 @@ std::unique_ptr<PlanStage> IndexScanStage::clone() const {
                                             _recordSlot,
                                             _recordIdSlot,
                                             _snapshotIdSlot,
+                                            _indexIdSlot,
                                             _indexKeysToInclude,
                                             _vars,
                                             _seekKeySlotLow,
@@ -128,10 +131,17 @@ void IndexScanStage::prepare(CompileCtx& ctx) {
             static_cast<bool>(entry));
     _ordering = entry->ordering();
 
+    auto [indexIdTag, indexIdVal] = value::makeNewString(StringData(_indexName));
+    _indexIdAccessor.reset(indexIdTag, indexIdVal);
+
+    if (_indexIdSlot) {
+        _indexIdViewAccessor.reset(indexIdTag, indexIdVal);
+    } else {
+        _indexIdViewAccessor.reset();
+    }
+
     if (_snapshotIdAccessor) {
-        _snapshotIdAccessor->reset(
-            value::TypeTags::NumberInt64,
-            value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+        _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
     }
 }
 
@@ -146,6 +156,10 @@ value::SlotAccessor* IndexScanStage::getAccessor(CompileCtx& ctx, value::SlotId 
 
     if (_snapshotIdSlot && *_snapshotIdSlot == slot) {
         return _snapshotIdAccessor.get();
+    }
+
+    if (_indexIdSlot && *_indexIdSlot == slot) {
+        return &_indexIdViewAccessor;
     }
 
     if (auto it = _accessorMap.find(slot); it != _accessorMap.end()) {
@@ -219,9 +233,7 @@ void IndexScanStage::doRestoreState(bool relinquishCursor) {
     // Yield is the only time during plan execution that the snapshotId can change. As such, we
     // update it accordingly as part of yield recovery.
     if (_snapshotIdAccessor) {
-        _snapshotIdAccessor->reset(
-            value::TypeTags::NumberInt64,
-            value::bitcastFrom<uint64_t>(_opCtx->recoveryUnit()->getSnapshotId().toNumber()));
+        _latestSnapshotId = _opCtx->recoveryUnit()->getSnapshotId().toNumber();
     }
 }
 
@@ -385,6 +397,12 @@ PlanState IndexScanStage::getNext() {
             false, value::TypeTags::RecordId, value::bitcastFrom<RecordId*>(&_nextRecord->loc));
     }
 
+    if (_snapshotIdAccessor) {
+        // Copy the latest snapshot ID into the 'snapshotId' slot.
+        _snapshotIdAccessor->reset(value::TypeTags::NumberInt64,
+                                   value::bitcastFrom<uint64_t>(_latestSnapshotId));
+    }
+
     if (_accessors.size()) {
         _valuesBuffer.reset();
         readKeyStringValueIntoAccessors(
@@ -422,6 +440,9 @@ std::unique_ptr<PlanStageStats> IndexScanStage::getStats(bool includeDebugInfo) 
         }
         if (_snapshotIdSlot) {
             bob.appendNumber("snapshotIdSlot", static_cast<long long>(*_snapshotIdSlot));
+        }
+        if (_indexIdSlot) {
+            bob.appendNumber("indexIdSlot", static_cast<long long>(*_indexIdSlot));
         }
         if (_seekKeySlotLow) {
             bob.appendNumber("seekKeySlotLow", static_cast<long long>(*_seekKeySlotLow));
@@ -467,6 +488,12 @@ std::vector<DebugPrinter::Block> IndexScanStage::debugPrint() const {
 
     if (_snapshotIdSlot) {
         DebugPrinter::addIdentifier(ret, _snapshotIdSlot.get());
+    } else {
+        DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
+    }
+
+    if (_indexIdSlot) {
+        DebugPrinter::addIdentifier(ret, _indexIdSlot.value());
     } else {
         DebugPrinter::addIdentifier(ret, DebugPrinter::kNoneKeyword);
     }
