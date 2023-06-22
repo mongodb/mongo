@@ -78,6 +78,7 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
@@ -6393,6 +6394,16 @@ bool ReplicationCoordinatorImpl::isRetryableWrite(OperationContext* opCtx) const
     auto txnParticipant = TransactionParticipant::get(opCtx);
     return txnParticipant &&
         (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
+}
+
+boost::optional<UUID> ReplicationCoordinatorImpl::getInitialSyncId(OperationContext* opCtx) {
+    BSONObj initialSyncId = _replicationProcess->getConsistencyMarkers()->getInitialSyncId(opCtx);
+    if (initialSyncId.hasField(InitialSyncIdDocument::k_idFieldName)) {
+        InitialSyncIdDocument initialSyncIdDoc =
+            InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), initialSyncId);
+        return initialSyncIdDoc.get_id();
+    }
+    return boost::none;
 }
 
 }  // namespace repl

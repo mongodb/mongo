@@ -12,6 +12,7 @@
 
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
 load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
+load("jstests/libs/feature_flag_util.js");
 
 const clustered = db.clusteredColl;
 const nonClustered = db.normalColl;
@@ -32,7 +33,7 @@ const docs = [{_id: 1, a: 1}, {_id: 2, a: 2}, {_id: 3, a: 3}];
 assert.commandWorked(clustered.insertMany(docs));
 assert.commandWorked(nonClustered.insertMany(docs));
 
-function validateFailedResumeAfter({collName, resumeAfterSpec, errorCode, explainFail}) {
+function validateFailedResumeAfterInFind({collName, resumeAfterSpec, errorCode, explainFail}) {
     const spec = {
         find: collName,
         filter: {},
@@ -49,65 +50,90 @@ function validateFailedResumeAfter({collName, resumeAfterSpec, errorCode, explai
     }
 }
 
-//  Confirm $_resumeAfter will fail for clustered collections if the recordId is Long.
-validateFailedResumeAfter({
-    collName: clusteredName,
-    resumeAfterSpec: {'$recordId': NumberLong(2)},
-    errorCode: 7738600,
-    explainFail: true
-});
-
-// Confirm $_resumeAfter will fail with 'KeyNotFound' if given a non existent recordId.
-validateFailedResumeAfter({
-    collName: clusteredName,
-    resumeAfterSpec: {'$recordId': BinData(5, '1234')},
-    errorCode: ErrorCodes.KeyNotFound
-});
-
-// TODO SERVER-78103: Added test for $recordId:null
-
-// Confirm $_resumeAfter will fail for normal collections if it is of type BinData.
-validateFailedResumeAfter({
-    collName: nonClusteredName,
-    resumeAfterSpec: {'$recordId': BinData(5, '1234')},
-    errorCode: 7738600,
-    explainFail: true
-});
-
-// Confirm $_resumeAfter token will fail with 'KeyNotFound' if given a non existent recordId.
-validateFailedResumeAfter({
-    collName: nonClusteredName,
-    resumeAfterSpec: {'$recordId': NumberLong(8)},
-    errorCode: ErrorCodes.KeyNotFound
-});
-
-if (isSBEEnabled) {
-    validateFailedResumeAfter({
-        collName: nonClusteredName,
-        resumeAfterSpec: {'$recordId': null},
-        errorCode: ErrorCodes.KeyNotFound
-    });
-} else {
-    assert.commandWorked(db.runCommand({
-        find: nonClusteredName,
-        filter: {},
+function validateFailedResumeAfterInAggregate({collName, resumeAfterSpec, errorCode, explainFail}) {
+    const spec = {
+        aggregate: collName,
+        pipeline: [],
         $_requestResumeToken: true,
-        $_resumeAfter: {'$recordId': null},
-        hint: {$natural: 1}
-    }));
+        $_resumeAfter: resumeAfterSpec,
+        hint: {$natural: 1},
+        cursor: {}
+    };
+    assert.commandFailedWithCode(db.runCommand(spec), errorCode);
+    // Run the same query under an explain.
+    if (explainFail) {
+        assert.commandFailedWithCode(db.runCommand({explain: spec}), errorCode);
+    } else {
+        assert.commandWorked(db.runCommand({explain: spec}));
+    }
 }
 
-// Confirm $_resumeAfter will fail to parse if collection does not exist.
-validateFailedResumeAfter({
-    collName: "random",
-    resumeAfterSpec: {'$recordId': null, "anotherField": null},
-    errorCode: ErrorCodes.BadValue,
-    explainFail: true
-});
-validateFailedResumeAfter({
-    collName: "random",
-    resumeAfterSpec: "string",
-    errorCode: ErrorCodes.TypeMismatch,
-    explainFail: true
-});
+function testResumeAfter(validateFunction) {
+    //  Confirm $_resumeAfter will fail for clustered collections if the recordId is Long.
+    validateFunction({
+        collName: clusteredName,
+        resumeAfterSpec: {'$recordId': NumberLong(2)},
+        errorCode: 7738600,
+        explainFail: true
+    });
+
+    // Confirm $_resumeAfter will fail with 'KeyNotFound' if given a non existent recordId.
+    validateFunction({
+        collName: clusteredName,
+        resumeAfterSpec: {'$recordId': BinData(5, '1234')},
+        errorCode: ErrorCodes.KeyNotFound
+    });
+
+    // TODO SERVER-78103: Added test for $recordId:null
+
+    // Confirm $_resumeAfter will fail for normal collections if it is of type BinData.
+    validateFunction({
+        collName: nonClusteredName,
+        resumeAfterSpec: {'$recordId': BinData(5, '1234')},
+        errorCode: 7738600,
+        explainFail: true
+    });
+
+    // Confirm $_resumeAfter token will fail with 'KeyNotFound' if given a non existent recordId.
+    validateFunction({
+        collName: nonClusteredName,
+        resumeAfterSpec: {'$recordId': NumberLong(8)},
+        errorCode: ErrorCodes.KeyNotFound
+    });
+
+    if (isSBEEnabled) {
+        validateFunction({
+            collName: nonClusteredName,
+            resumeAfterSpec: {'$recordId': null},
+            errorCode: ErrorCodes.KeyNotFound
+        });
+    } else {
+        assert.commandWorked(db.runCommand({
+            find: nonClusteredName,
+            filter: {},
+            $_requestResumeToken: true,
+            $_resumeAfter: {'$recordId': null},
+            hint: {$natural: 1}
+        }));
+    }
+
+    // Confirm $_resumeAfter will fail to parse if collection does not exist.
+    validateFunction({
+        collName: "random",
+        resumeAfterSpec: {'$recordId': null, "anotherField": null},
+        errorCode: ErrorCodes.BadValue,
+        explainFail: true
+    });
+    validateFunction({
+        collName: "random",
+        resumeAfterSpec: "string",
+        errorCode: ErrorCodes.TypeMismatch,
+        explainFail: true
+    });
+}
+
+testResumeAfter(validateFailedResumeAfterInFind);
+if (FeatureFlagUtil.isEnabled(db, "ReshardingImprovements")) {
+    testResumeAfter(validateFailedResumeAfterInAggregate);
+}
 }());

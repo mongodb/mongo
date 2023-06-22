@@ -519,18 +519,27 @@ void ReplicationConsistencyMarkersImpl::setInitialSyncIdIfNotSet(OperationContex
                                                   _initialSyncIdNss,
                                                   TimestampedBSONObj{doc, Timestamp()},
                                                   OpTime::kUninitializedTerm));
+        _initialSyncId = doc;
     } else if (!prevId.isOK()) {
         fassertFailedWithStatus(4608504, prevId.getStatus());
+    } else {
+        _initialSyncId = prevId.getValue();
     }
 }
 
 void ReplicationConsistencyMarkersImpl::clearInitialSyncId(OperationContext* opCtx) {
     fassert(4608501, _storageInterface->dropCollection(opCtx, _initialSyncIdNss));
+    _initialSyncId = BSONObj();
 }
 
 BSONObj ReplicationConsistencyMarkersImpl::getInitialSyncId(OperationContext* opCtx) {
+    if (!_initialSyncId.isEmpty()) {
+        return _initialSyncId;
+    }
+
     auto idStatus = _storageInterface->findSingleton(opCtx, _initialSyncIdNss);
     if (idStatus.isOK()) {
+        _initialSyncId = idStatus.getValue();
         return idStatus.getValue();
     }
     if (idStatus.getStatus() != ErrorCodes::CollectionIsEmpty &&

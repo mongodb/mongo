@@ -1014,6 +1014,15 @@ Status runAggregate(OperationContext* opCtx,
                 uuid = collections.getMainCollection()->uuid();
             }
         }
+        if (request.getResumeAfter()) {
+            uassert(ErrorCodes::InvalidPipelineOperator,
+                    "$_resumeAfter is not supported on view",
+                    !ctx->getView());
+            const auto& collection = ctx->getCollection();
+            const bool isClusteredCollection = collection && collection->isClustered();
+            uassertStatusOK(query_request_helper::validateResumeAfter(*request.getResumeAfter(),
+                                                                      isClusteredCollection));
+        }
 
         auto parsePipeline = [&](std::unique_ptr<CollatorInterface> collator) {
             expCtx =

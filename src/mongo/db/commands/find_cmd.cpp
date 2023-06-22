@@ -128,6 +128,7 @@
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"

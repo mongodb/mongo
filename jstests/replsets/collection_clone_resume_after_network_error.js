@@ -26,7 +26,7 @@ function checkNoResumeAfter() {
 
 // Verify the 'find' command received by the primary has resumeAfter set with the given recordId.
 function checkHasResumeAfter(recordId) {
-    checkLog.contains(primary, `"$_resumeAfter":{"$recordId":${recordId}}`);
+    checkLog.contains(primary, new RegExp(`"\\$_resumeAfter":\\{.*"\\$recordId":${recordId}.*\\}`));
 }
 
 const beforeRetryFailPointName = "hangBeforeRetryingClonerStage";

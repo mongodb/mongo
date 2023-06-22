@@ -1203,6 +1203,12 @@ public:
      */
     virtual bool isRetryableWrite(OperationContext* opCtx) const = 0;
 
+    /**
+     * Returns the in-memory initialSyncId from last initial sync. boost::none will be returned if
+     * there is no initial sync.
+     */
+    virtual boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) = 0;
+
 protected:
     ReplicationCoordinator();
 };

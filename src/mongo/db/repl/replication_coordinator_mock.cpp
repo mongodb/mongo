@@ -830,5 +830,9 @@ SplitPrepareSessionManager* ReplicationCoordinatorMock::getSplitPrepareSessionMa
     return &_splitSessionManager;
 }
 
+boost::optional<UUID> ReplicationCoordinatorMock::getInitialSyncId(OperationContext* opCtx) {
+    return boost::none;
+}
+
 }  // namespace repl
 }  // namespace mongo

@@ -1221,7 +1221,8 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
     }
 
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection, frameworkControl) &&
-        !request.getRequestReshardingResumeToken().has_value() && !request.getExchange();
+        !request.getRequestReshardingResumeToken().has_value() && !request.getExchange() &&
+        !request.getRequestResumeToken();
 
     // Early return to avoid unnecessary work of walking the input pipeline.
     if (!commandOptionsEligible) {

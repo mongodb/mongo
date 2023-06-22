@@ -357,6 +357,8 @@ public:
 
     virtual bool isRetryableWrite(OperationContext* opCtx) const override;
 
+    boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
+
 private:
     ServiceContext* const _service;
 };

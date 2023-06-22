@@ -38,6 +38,7 @@
 #include "mongo/db/query/plan_insert_listener.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/resume_token_gen.h"
 #include "mongo/util/duration.h"
 
@@ -403,6 +404,14 @@ BSONObj PlanExecutorSBE::getPostBatchResumeToken() const {
                     tag == sbe::value::TypeTags::RecordId);
             BSONObjBuilder builder;
             sbe::value::getRecordIdView(val)->serializeToken("$recordId", &builder);
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                auto initialSyncId =
+                    repl::ReplicationCoordinator::get(_opCtx)->getInitialSyncId(_opCtx);
+                if (initialSyncId) {
+                    initialSyncId.value().appendToBuilder(&builder, "$initialSyncId");
+                }
+            }
             return builder.obj();
         }
     }

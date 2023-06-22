@@ -362,6 +362,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << AggregateCommandRequest::kFromMongosFieldName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.getNeedsMerge() && !request.getFromMongos());
+    uassert(ErrorCodes::BadValue,
+            "Aggregate queries on mongoS may not request or provide a resume token",
+            !request.getRequestResumeToken() && !request.getResumeAfter());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         const auto [resolvedNsCM, _] =

@@ -42,6 +42,7 @@
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -1359,10 +1360,18 @@ TEST(QueryRequestTest, ConvertToAggregationWithAllowPartialResultsFails) {
     ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
 }
 
-TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenFails) {
+TEST(QueryRequestTest, ConvertToAggregationWithRequestResumeTokenSucceeds) {
+    RAIIServerParameterControllerForTest featureFlagController("featureFlagReshardingImprovements",
+                                                               true);
     FindCommandRequest findCommand(testns);
     findCommand.setRequestResumeToken(true);
-    ASSERT_NOT_OK(query_request_helper::asAggregationCommand(findCommand));
+    findCommand.setHint(BSON("$natural" << 1));
+    const auto agg = query_request_helper::asAggregationCommand(findCommand);
+    ASSERT_OK(agg);
+    auto aggCmd = OpMsgRequest::fromDBAndBody(testns.db(), agg.getValue()).body;
+    auto ar = aggregation_request_helper::parseFromBSONForTests(testns, aggCmd);
+    ASSERT_OK(ar.getStatus());
+    ASSERT(ar.getValue().getRequestResumeToken());
 }
 
 TEST(QueryRequestTest, ConvertToAggregationWithResumeAfterFails) {

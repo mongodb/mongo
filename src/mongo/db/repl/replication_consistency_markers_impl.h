@@ -160,6 +160,9 @@ private:
     // serialization that exists in setting the oplog truncate after point.
     boost::optional<Timestamp> _lastNoHolesOplogTimestamp;
     boost::optional<OpTimeAndWallTime> _lastNoHolesOplogOpTimeAndWallTime;
+
+    // Cached initialSyncId from last initial sync. Will only be set on startup or initial sync.
+    BSONObj _initialSyncId;
 };
 
 }  // namespace repl

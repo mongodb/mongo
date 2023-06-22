@@ -448,6 +448,8 @@ public:
         return false;
     }
 
+    boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
+
 private:
     void _setMyLastAppliedOpTimeAndWallTime(WithLock lk,
                                             const OpTimeAndWallTime& opTimeAndWallTime);

@@ -656,5 +656,9 @@ bool ReplicationCoordinatorEmbedded::isRetryableWrite(OperationContext* opCtx) c
     return false;
 }
 
+boost::optional<UUID> ReplicationCoordinatorEmbedded::getInitialSyncId(OperationContext* opCtx) {
+    UASSERT_NOT_IMPLEMENTED;
+}
+
 }  // namespace embedded
 }  // namespace mongo

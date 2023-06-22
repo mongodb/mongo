@@ -625,5 +625,9 @@ bool ReplicationCoordinatorNoOp::isRetryableWrite(OperationContext* opCtx) const
     MONGO_UNREACHABLE;
 }
 
+boost::optional<UUID> ReplicationCoordinatorNoOp::getInitialSyncId(OperationContext* opCtx) {
+    MONGO_UNREACHABLE;
+}
+
 }  // namespace repl
 }  // namespace mongo

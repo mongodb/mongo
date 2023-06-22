@@ -42,6 +42,7 @@
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/platform/basic.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 
 namespace mongo {
 namespace aggregation_request_helper {
@@ -204,6 +205,30 @@ void validate(OperationContext* opCtx,
                           << " must only be set for the oplog namespace, not "
                           << nss.toStringForErrorMsg(),
             !hasRequestReshardingResumeToken || nss.isOplog());
+
+    auto requestResumeTokenElem = cmdObj[AggregateCommandRequest::kRequestResumeTokenFieldName];
+    uassert(ErrorCodes::InvalidOptions,
+            "$_requestResumeToken is not supported without Resharding Improvements",
+            !requestResumeTokenElem ||
+                resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility));
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
+                          << " must be a boolean type",
+            !requestResumeTokenElem || requestResumeTokenElem.isBoolean());
+    bool hasRequestResumeToken = requestResumeTokenElem && requestResumeTokenElem.boolean();
+    uassert(ErrorCodes::FailedToParse,
+            str::stream() << AggregateCommandRequest::kRequestResumeTokenFieldName
+                          << " must be set for non-oplog namespace",
+            !hasRequestResumeToken || !nss.isOplog());
+    if (hasRequestResumeToken) {
+        auto hintElem = cmdObj[AggregateCommandRequest::kHintFieldName];
+        uassert(ErrorCodes::BadValue,
+                "hint must be {$natural:1} if 'requestResumeToken' is enabled",
+                hintElem && hintElem.isABSONObj() &&
+                    SimpleBSONObjComparator::kInstance.evaluate(
+                        hintElem.Obj() == BSON(query_request_helper::kNaturalSortField << 1)));
+    }
 }
 
 void validateRequestForAPIVersion(const OperationContext* opCtx,

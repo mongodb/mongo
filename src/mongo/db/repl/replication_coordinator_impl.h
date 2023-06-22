@@ -594,6 +594,8 @@ public:
 
     bool isRetryableWrite(OperationContext* opCtx) const override;
 
+    boost::optional<UUID> getInitialSyncId(OperationContext* opCtx) override;
+
 private:
     using CallbackFn = executor::TaskExecutor::CallbackFn;
 

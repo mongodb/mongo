@@ -38,6 +38,9 @@
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
+
+#define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
@@ -90,18 +93,30 @@ Status validateResumeAfter(const mongo::BSONObj& resumeAfter, bool isClusteredCo
     }
 
     BSONType recordIdType = resumeAfter["$recordId"].type();
-    if (resumeAfter.nFields() != 1 ||
-        (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
-         recordIdType != BSONType::jstNULL)) {
+    if (mongo::resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (resumeAfter.nFields() > 2 ||
+            (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
+             recordIdType != BSONType::jstNULL) ||
+            (resumeAfter.nFields() == 2 &&
+             (resumeAfter["$initialSyncId"].type() != BSONType::BinData ||
+              resumeAfter["$initialSyncId"].binDataType() != BinDataType::newUUID))) {
+            return Status(ErrorCodes::BadValue,
+                          "Malformed resume token: the '_resumeAfter' object must contain"
+                          " '$recordId', of type NumberLong, BinData or jstNULL and"
+                          " optional '$initialSyncId of type BinData.");
+        }
+    } else if (resumeAfter.nFields() != 1 ||
+               (recordIdType != BSONType::NumberLong && recordIdType != BSONType::BinData &&
+                recordIdType != BSONType::jstNULL)) {
         return Status(ErrorCodes::BadValue,
                       "Malformed resume token: the '_resumeAfter' object must contain"
                       " exactly one field named '$recordId', of type NumberLong, BinData "
                       "or jstNULL.");
     }
 
-    // Clustered collections can only have accept '$_resumeAfter' parameter of type
-    // BinData. Non clustered collections should only accept '$_resumeAfter' of type
-    // Long.
+    // Clustered collections can only accept '$_resumeAfter' parameter of type BinData. Non
+    // clustered collections should only accept '$_resumeAfter' of type Long.
     if ((isClusteredCollection && recordIdType == BSONType::NumberLong) ||
         (!isClusteredCollection && recordIdType == BSONType::BinData)) {
         return Status(ErrorCodes::Error(7738600),
@@ -313,16 +328,19 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
                               << " not supported in aggregation."};
     }
 
-    if (findCommand.getRequestResumeToken()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
-                              << " not supported in aggregation."};
-    }
+    if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (findCommand.getRequestResumeToken()) {
+            return {ErrorCodes::InvalidPipelineOperator,
+                    str::stream() << "Option " << FindCommandRequest::kRequestResumeTokenFieldName
+                                  << " not supported in aggregation."};
+        }
 
-    if (!findCommand.getResumeAfter().isEmpty()) {
-        return {ErrorCodes::InvalidPipelineOperator,
-                str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
-                              << " not supported in aggregation."};
+        if (!findCommand.getResumeAfter().isEmpty()) {
+            return {ErrorCodes::InvalidPipelineOperator,
+                    str::stream() << "Option " << FindCommandRequest::kResumeAfterFieldName
+                                  << " not supported in aggregation."};
+        }
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.
@@ -396,6 +414,17 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
     }
     if (findCommand.getLet()) {
         aggregationBuilder.append(FindCommandRequest::kLetFieldName, *findCommand.getLet());
+    }
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        if (findCommand.getRequestResumeToken()) {
+            aggregationBuilder.append(FindCommandRequest::kRequestResumeTokenFieldName,
+                                      findCommand.getRequestResumeToken().value_or(false));
+        }
+        if (!findCommand.getResumeAfter().isEmpty()) {
+            aggregationBuilder.append(FindCommandRequest::kResumeAfterFieldName,
+                                      findCommand.getResumeAfter());
+        }
     }
     return StatusWith<BSONObj>(aggregationBuilder.obj());
 }

@@ -236,6 +236,10 @@ std::unique_ptr<FindCommandRequest> createFindCommand(
     if (aggRequest) {
         findCommand->setAllowDiskUse(aggRequest->getAllowDiskUse());
         findCommand->setHint(aggRequest->getHint().value_or(BSONObj()).getOwned());
+        findCommand->setRequestResumeToken(aggRequest->getRequestResumeToken());
+        if (aggRequest->getResumeAfter()) {
+            findCommand->setResumeAfter(*aggRequest->getResumeAfter());
+        }
     }
 
     // The collation on the ExpressionContext has been resolved to either the user-specified
