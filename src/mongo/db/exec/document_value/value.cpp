@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <absl/hash/hash.h>
 #include <boost/container_hash/extensions.hpp>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
@@ -59,7 +60,6 @@
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/murmur3.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
 
@@ -901,6 +901,17 @@ int Value::compare(const Value& rL,
     MONGO_verify(false);
 }
 
+namespace {
+/**
+ * Hashes the given 'StringData', combines the resulting hash with 'seed', and returns the result.
+ */
+size_t hashStringData(StringData sd, size_t seed) {
+    size_t strHash = absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+    boost::hash_combine(seed, strHash);
+    return seed;
+}
+}  // namespace
+
 void Value::hash_combine(size_t& seed,
                          const StringData::ComparatorInterface* stringComparator) const {
     BSONType type = getType();
@@ -972,7 +983,7 @@ void Value::hash_combine(size_t& seed,
         case Code:
         case Symbol: {
             StringData sd = getRawData();
-            seed = murmur3<sizeof(size_t)>(sd, seed);
+            seed = hashStringData(sd, seed);
             break;
         }
 
@@ -981,7 +992,7 @@ void Value::hash_combine(size_t& seed,
             if (stringComparator) {
                 stringComparator->hash_combine(seed, sd);
             } else {
-                seed = murmur3<sizeof(size_t)>(sd, seed);
+                seed = hashStringData(sd, seed);
             }
             break;
         }
@@ -1005,14 +1016,14 @@ void Value::hash_combine(size_t& seed,
 
         case BinData: {
             StringData sd = getRawData();
-            seed = murmur3<sizeof(size_t)>(sd, seed);
+            seed = hashStringData(sd, seed);
             boost::hash_combine(seed, _storage.binDataType());
             break;
         }
 
         case RegEx: {
             StringData sd = getRawData();
-            seed = murmur3<sizeof(size_t)>(sd, seed);
+            seed = hashStringData(sd, seed);
             break;
         }
 
