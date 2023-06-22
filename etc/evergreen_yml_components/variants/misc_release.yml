@@ -2682,7 +2682,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: unittest_shell_hang_analyzer_gen
   - name: push
 
 - name: macos-arm64
@@ -2738,7 +2737,6 @@ buildvariants:
   - name: .sharding .txns
   - name: .ssl
   - name: .stitch
-  - name: unittest_shell_hang_analyzer_gen
   - name: push
 
 - name: enterprise-macos
