@@ -91,7 +91,7 @@ public:
             auto response = uassertStatusOK(
                 executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    dbName.db(),
+                    DatabaseNameUtil::serialize(dbName),
                     dbInfo,
                     applyReadWriteConcern(
                         opCtx,

@@ -79,7 +79,7 @@ MovePrimaryDatabaseCloner::MovePrimaryDatabaseCloner(
           this,
           &MovePrimaryDatabaseCloner::listExistingCollectionsOnRecipientStage),
       _catalogClient(catalogClient) {
-    invariant(!_dbName.db().empty());
+    invariant(!_dbName.isEmpty());
     _opCtxHolder = cc().makeOperationContext();
     if (!_catalogClient) {
         _catalogClient = Grid::get(_opCtxHolder.get())->catalogClient();

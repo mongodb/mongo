@@ -1306,7 +1306,7 @@ HistoricalPlacement ShardingCatalogClientImpl::getShardsThatOwnDataForDbAtCluste
 
     uassert(ErrorCodes::InvalidOptions,
             "A full db namespace must be specified",
-            dbName.coll().empty() && !dbName.db().empty());
+            dbName.coll().empty() && !dbName.isEmpty());
 
     if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         return getHistoricalPlacement(opCtx, clusterTime, dbName);

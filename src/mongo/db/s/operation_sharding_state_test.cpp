@@ -45,7 +45,7 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleDbVersion) {
     ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, boost::none, dbv);
 
     auto& oss = OperationShardingState::get(operationContext());
-    ASSERT_EQ(dbv, *oss.getDbVersion(kNss.db()));
+    ASSERT_EQ(dbv, *oss.getDbVersion(kNss.dbName()));
 }
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleShardVersion) {
@@ -101,7 +101,7 @@ TEST_F(OperationShardingStateTest, ScopedSetShardRoleIgnoresFixedDbVersion) {
     ScopedSetShardRole scopedSetShardRole(operationContext(), kNss, boost::none, dbv);
 
     auto& oss = OperationShardingState::get(operationContext());
-    ASSERT_FALSE(oss.getDbVersion(kNss.db()));
+    ASSERT_FALSE(oss.getDbVersion(kNss.dbName()));
 }
 
 TEST_F(OperationShardingStateTest, ScopedSetShardRoleAllowedShardVersionsWithFixedDbVersion) {

@@ -85,7 +85,7 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
       _ars(std::make_unique<AsyncRequestsSender>(
           opCtx,
           std::move(executor),
-          dbName.db(),
+          DatabaseNameUtil::serialize(dbName),
           attachTxnDetails(opCtx, requests),
           readPreference,
           retryPolicy,

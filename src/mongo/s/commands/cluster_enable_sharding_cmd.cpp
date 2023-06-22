@@ -70,9 +70,10 @@ public:
             const auto dbName = getDbName();
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName.db()); });
+            ScopeGuard purgeDatabaseOnExit(
+                [&] { catalogCache->purgeDatabase(DatabaseNameUtil::serialize(dbName)); });
 
-            ConfigsvrCreateDatabase configsvrCreateDatabase{dbName.db().toString()};
+            ConfigsvrCreateDatabase configsvrCreateDatabase{DatabaseNameUtil::serialize(dbName)};
             configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
 
@@ -91,7 +92,7 @@ public:
 
             auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
                 IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
-            catalogCache->onStaleDatabaseVersion(dbName.db(),
+            catalogCache->onStaleDatabaseVersion(DatabaseNameUtil::serialize(dbName),
                                                  createDbResponse.getDatabaseVersion());
             purgeDatabaseOnExit.dismiss();
         }

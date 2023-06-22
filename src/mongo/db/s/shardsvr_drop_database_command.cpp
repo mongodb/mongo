@@ -84,7 +84,8 @@ public:
                 CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(ns().dbName()));
 
             auto service = ShardingDDLCoordinatorService::getService(opCtx);
-            const auto requestVersion = OperationShardingState::get(opCtx).getDbVersion(ns().db());
+            const auto requestVersion =
+                OperationShardingState::get(opCtx).getDbVersion(ns().dbName());
             auto dropDatabaseCoordinator = [&]() {
                 while (true) {
                     // TODO SERVER-73627: Remove once 7.0 becomes last LTS.

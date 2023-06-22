@@ -360,7 +360,8 @@ void ShardingCatalogManager::commitMovePrimary(OperationContext* opCtx,
         const auto updateDatabaseEntryOp = [&] {
             const auto query = [&] {
                 BSONObjBuilder bsonBuilder;
-                bsonBuilder.append(DatabaseType::kNameFieldName, dbName.db());
+                bsonBuilder.append(DatabaseType::kNameFieldName,
+                                   DatabaseNameUtil::serialize(dbName));
                 // Include the version in the update filter to be resilient to potential network
                 // retries and delayed messages.
                 for (const auto [fieldName, fieldValue] : expectedDbVersion.toBSON()) {

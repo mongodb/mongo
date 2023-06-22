@@ -187,7 +187,7 @@ public:
                 auto aggCmdOnView =
                     uassertStatusOK(query_request_helper::asAggregationCommand(*findCommand));
                 auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
+                    OpMsgRequestBuilder::create(_dbName, aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                     opCtx,
@@ -261,7 +261,7 @@ public:
                 auto aggCmdOnView = uassertStatusOK(
                     query_request_helper::asAggregationCommand(cq->getFindCommandRequest()));
                 auto viewAggregationCommand =
-                    OpMsgRequest::fromDBAndBody(_dbName.db(), aggCmdOnView).body;
+                    OpMsgRequestBuilder::create(_dbName, aggCmdOnView).body;
 
                 auto aggRequestOnView = aggregation_request_helper::parseFromBSON(
                     opCtx,

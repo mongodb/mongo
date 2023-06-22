@@ -502,9 +502,9 @@ CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx
 
     // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
     PlacementConcern placementConcern = nssOrUUID.nss()
-        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()),
+        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()),
                            oss.getShardVersion(*nssOrUUID.nss())}
-        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()), {}};
+        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
     return CollectionOrViewAcquisitionRequest(
         nssOrUUID, placementConcern, readConcern, operationType, viewMode);
@@ -520,7 +520,7 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
 
     return CollectionAcquisitionRequest(nss,
                                         expectedUUID,
-                                        {oss.getDbVersion(nss.db()), oss.getShardVersion(nss)},
+                                        {oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)},
                                         readConcern,
                                         operationType);
 }
@@ -534,9 +534,9 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
 
     // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
     PlacementConcern placementConcern = nssOrUUID.nss()
-        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()),
+        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()),
                            oss.getShardVersion(*nssOrUUID.nss())}
-        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()), {}};
+        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
 }

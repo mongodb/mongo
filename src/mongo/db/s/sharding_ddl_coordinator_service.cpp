@@ -271,7 +271,7 @@ ShardingDDLCoordinatorService::getOrCreateInstance(OperationContext* opCtx, BSON
 
     if (!nss.isConfigDB() && !nss.isAdminDB()) {
         // Check that the operation context has a database version for this namespace
-        const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.db());
+        const auto clientDbVersion = OperationShardingState::get(opCtx).getDbVersion(nss.dbName());
         uassert(ErrorCodes::IllegalOperation,
                 "Request sent without attaching database version",
                 clientDbVersion);

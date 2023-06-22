@@ -127,8 +127,8 @@ Status refreshDbMetadata(OperationContext* opCtx,
     });
 
     // Force a refresh of the cached database metadata from the config server.
-    const auto swDbMetadata =
-        Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(opCtx, dbName.db());
+    const auto swDbMetadata = Grid::get(opCtx)->catalogCache()->getDatabaseWithRefresh(
+        opCtx, DatabaseNameUtil::serialize(dbName));
 
     // Before setting the database metadata, exit early if the database version received by the
     // config server is not newer than the cached one. This is a best-effort optimization to reduce

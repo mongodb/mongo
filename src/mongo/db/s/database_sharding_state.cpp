@@ -56,7 +56,7 @@ public:
 
     struct DSSAndLock {
         DSSAndLock(const DatabaseName& dbName)
-            : dssMutex("DSSMutex::" + dbName.db()),
+            : dssMutex("DSSMutex::" + DatabaseNameUtil::serialize(dbName)),
               dss(std::make_unique<DatabaseShardingState>(dbName)) {}
 
         const Lock::ResourceMutex dssMutex;
@@ -159,8 +159,7 @@ std::vector<DatabaseName> DatabaseShardingState::getDatabaseNames(OperationConte
 
 void DatabaseShardingState::assertMatchingDbVersion(OperationContext* opCtx,
                                                     const DatabaseName& dbName) {
-    const auto receivedVersion =
-        OperationShardingState::get(opCtx).getDbVersion(DatabaseNameUtil::serialize(dbName));
+    const auto receivedVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
     if (!receivedVersion) {
         return;
     }
@@ -210,8 +209,7 @@ void DatabaseShardingState::assertIsPrimaryShardForDb(OperationContext* opCtx,
         return;
     }
 
-    auto expectedDbVersion =
-        OperationShardingState::get(opCtx).getDbVersion(DatabaseNameUtil::serialize(dbName));
+    auto expectedDbVersion = OperationShardingState::get(opCtx).getDbVersion(dbName);
 
     uassert(ErrorCodes::IllegalOperation,
             str::stream() << "Received request without the version for the database "

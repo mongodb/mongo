@@ -73,12 +73,13 @@ void sendSetUserWriteBlockModeCmdToAllShards(OperationContext* opCtx,
     const auto shardsvrSetUserWriteBlockModeCmd =
         makeShardsvrSetUserWriteBlockModeCommand(block, phase);
 
-    sharding_util::sendCommandToShards(opCtx,
-                                       shardsvrSetUserWriteBlockModeCmd.getDbName().db(),
-                                       CommandHelpers::appendMajorityWriteConcern(
-                                           shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
-                                       allShards,
-                                       executor);
+    sharding_util::sendCommandToShards(
+        opCtx,
+        DatabaseNameUtil::serialize(shardsvrSetUserWriteBlockModeCmd.getDbName()),
+        CommandHelpers::appendMajorityWriteConcern(
+            shardsvrSetUserWriteBlockModeCmd.toBSON(osi.toBSON())),
+        allShards,
+        executor);
 }
 
 }  // namespace

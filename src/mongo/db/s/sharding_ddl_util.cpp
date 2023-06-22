@@ -626,8 +626,8 @@ void performNoopMajorityWriteLocally(OperationContext* opCtx) {
     const auto updateOp = buildNoopWriteRequestCommand();
 
     DBDirectClient client(opCtx);
-    const auto commandResponse = client.runCommand(
-        OpMsgRequest::fromDBAndBody(updateOp.getDbName().db(), updateOp.toBSON({})));
+    const auto commandResponse =
+        client.runCommand(OpMsgRequestBuilder::create(updateOp.getDbName(), updateOp.toBSON({})));
 
     const auto commandReply = commandResponse->getCommandReply();
     uassertStatusOK(getStatusFromWriteCommandReply(commandReply));

@@ -141,7 +141,7 @@ public:
      * If 'db' matches the 'db' in the namespace the client sent versions for, returns the database
      * version sent by the client (if any), else returns boost::none.
      */
-    boost::optional<DatabaseVersion> getDbVersion(StringData dbName) const;
+    boost::optional<DatabaseVersion> getDbVersion(const DatabaseName& dbName) const;
 
     /**
      * This method implements a best-effort attempt to wait for the critical section to complete

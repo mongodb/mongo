@@ -133,7 +133,7 @@ public:
 
         auto shardResponses = scatterGatherUnversionedTargetAllShards(
             opCtx,
-            dbName.db(),
+            DatabaseNameUtil::serialize(dbName),
             applyReadWriteConcern(
                 opCtx, this, CommandHelpers::filterCommandRequestForPassthrough(cmdObj)),
             ReadPreferenceSetting::get(opCtx),
@@ -143,7 +143,7 @@ public:
             uasserted(ErrorCodes::OperationFailed, errmsg);
         }
 
-        output.append("db", dbName.db());
+        output.append("db", DatabaseNameUtil::serialize(dbName));
         aggregateResults(cmd.getScale(), shardResponses, output);
         return true;
     }

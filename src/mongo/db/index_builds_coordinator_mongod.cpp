@@ -423,7 +423,7 @@ IndexBuildsCoordinatorMongod::_startIndexBuild(OperationContext* opCtx,
                           startPromise = std::move(startPromise),
                           startTimestamp,
                           shardVersion = oss.getShardVersion(nss),
-                          dbVersion = oss.getDbVersion(DatabaseNameUtil::serialize(dbName)),
+                          dbVersion = oss.getDbVersion(dbName),
                           resumeInfo,
                           impersonatedClientAttrs = std::move(impersonatedClientAttrs),
                           forwardableOpMetadata =
