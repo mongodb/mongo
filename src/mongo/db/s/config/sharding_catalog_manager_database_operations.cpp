@@ -39,6 +39,7 @@
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern.h"
@@ -210,6 +211,14 @@ DatabaseType ShardingCatalogManager::createDatabase(
                     opCtx, selectShardForNewDatabase(opCtx, shardRegistry)));
             }
 
+            ShardingLogging::get(opCtx)->logChange(opCtx,
+                                                   "createDatabase.start",
+                                                   dbName,
+                                                   /* details */ BSONObj(),
+                                                   ShardingCatalogClient::kMajorityWriteConcern,
+                                                   _localConfigShard,
+                                                   _localCatalogClient.get());
+
             const auto now = VectorClock::get(opCtx)->getTime();
             const auto clusterTime = now.clusterTime().asTimestamp();
 
@@ -287,6 +296,15 @@ DatabaseType ShardingCatalogManager::createDatabase(
                               "db"_attr = db,
                               "err"_attr = notificationOutcome);
             }
+
+            ShardingLogging::get(opCtx)->logChange(opCtx,
+                                                   "createDatabase",
+                                                   dbName,
+                                                   /* details */ BSONObj(),
+                                                   ShardingCatalogClient::kMajorityWriteConcern,
+                                                   _localConfigShard,
+                                                   _localCatalogClient.get());
+
             return std::make_pair(resolvedPrimaryShard, db);
         }
     }();
