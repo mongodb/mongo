@@ -2108,10 +2108,7 @@ class OpObserverServerlessTransactionTest : public OpObserverTransactionTest {
 private:
     // Needs to override to set serverless mode.
     repl::ReplSettings createReplSettings() override {
-        repl::ReplSettings settings;
-        settings.setOplogSizeBytes(5 * 1024 * 1024);
-        settings.setServerlessMode();
-        return settings;
+        return repl::createServerlessReplSettings();
     }
 };
 
@@ -4345,10 +4342,7 @@ class OpObserverServerlessTest : public OpObserverTest {
 private:
     // Need to set serverless.
     repl::ReplSettings createReplSettings() override {
-        repl::ReplSettings settings;
-        settings.setOplogSizeBytes(5 * 1024 * 1024);
-        settings.setServerlessMode();
-        return settings;
+        return repl::createServerlessReplSettings();
     }
 };
 

@@ -53,13 +53,6 @@ static const std::string kDefaultRecipientConnStr = "recipient-rs/localhost:5678
 static const std::string kDefaultEmptyTenantStr = "";
 static const UUID kMigrationId = UUID::gen();
 
-repl::ReplSettings createReplSettingsForServerlessTest() {
-    repl::ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setServerlessMode();
-    return settings;
-}
-
 }  // namespace
 
 class TenantMigrationAccessBlockerUtilTest : public ServiceContextTest {
@@ -72,9 +65,8 @@ public:
         _opCtx = makeOperationContext();
         auto service = getServiceContext();
 
-        repl::ReplicationCoordinator::set(service,
-                                          std::make_unique<repl::ReplicationCoordinatorMock>(
-                                              service, createReplSettingsForServerlessTest()));
+        repl::ReplicationCoordinator::set(
+            service, std::make_unique<repl::ReplicationCoordinatorMock>(service, _replSettings));
 
         TenantMigrationAccessBlockerRegistry::get(getServiceContext()).startup();
     }
@@ -89,7 +81,7 @@ public:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    const repl::ReplSettings _replSettings = createReplSettingsForServerlessTest();
+    const repl::ReplSettings _replSettings = repl::createServerlessReplSettings();
 };
 
 
@@ -330,11 +322,7 @@ protected:
 
 private:
     ServiceContext::UniqueOperationContext _opCtx;
-    const repl::ReplSettings _replSettings = []() {
-        repl::ReplSettings settings;
-        settings.setServerlessMode();
-        return settings;
-    }();
+    const repl::ReplSettings _replSettings = repl::createServerlessReplSettings();
 };
 
 TEST_F(RecoverAccessBlockerTest, ShardMergeRecipientBlockerStarted) {

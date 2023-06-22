@@ -46,6 +46,13 @@ struct ConnectionPoolStats;
 
 namespace repl {
 
+inline repl::ReplSettings createServerlessReplSettings() {
+    repl::ReplSettings settings;
+    settings.setOplogSizeBytes(5 * 1024 * 1024);
+    settings.setServerlessMode();
+    return settings;
+}
+
 /**
  * A mock ReplicationCoordinator.  Currently it is extremely simple and exists solely to link
  * into dbtests.

@@ -45,13 +45,6 @@
 namespace mongo {
 namespace {
 
-repl::ReplSettings createReplSettingsForServerlessTest() {
-    repl::ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setServerlessMode();
-    return settings;
-}
-
 class ShardSplitDonorOpObserverTest : public ServiceContextMongoDTest {
 public:
     void setUp() override {
@@ -64,7 +57,7 @@ public:
 
             // Set up ReplicationCoordinator and create oplog.
             auto coordinatorMock = std::make_unique<repl::ReplicationCoordinatorMock>(
-                service, createReplSettingsForServerlessTest());
+                service, repl::createServerlessReplSettings());
             _replicationCoordinatorMock = coordinatorMock.get();
 
             repl::ReplicationCoordinator::set(service, std::move(coordinatorMock));

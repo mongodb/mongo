@@ -88,13 +88,6 @@ namespace mongo {
  */
 namespace {
 
-repl::ReplSettings createReplSettingsForServerlessTest() {
-    repl::ReplSettings settings;
-    settings.setOplogSizeBytes(5 * 1024 * 1024);
-    settings.setServerlessMode();
-    return settings;
-}
-
 StatusWith<ShardSplitDonorDocument> getStateDocument(OperationContext* opCtx,
                                                      const UUID& shardSplitId) {
     // Use kLastApplied so that we can read the state document as a secondary.
@@ -450,7 +443,7 @@ protected:
         _net->exitNetwork();
     }
 
-    const repl::ReplSettings _replSettings = createReplSettingsForServerlessTest();
+    const repl::ReplSettings _replSettings = repl::createServerlessReplSettings();
     UUID _uuid = UUID::gen();
     MockReplicaSet _replSet{
         "donorSetForTest", 3, true /* hasPrimary */, false /* dollarPrefixHosts */};
