@@ -2198,7 +2198,7 @@ elif use_libunwind == "auto":
     use_libunwind = can_use_libunwind
 
 # TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
-if not can_use_libunwind_arch:
+if not can_use_libunwind_arch and env.TargetOSIs('linux'):
     env.Append(LINKFLAGS=['-rdynamic'])
 
 use_vendored_libunwind = use_libunwind and not use_system_libunwind
