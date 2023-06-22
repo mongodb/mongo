@@ -94,10 +94,10 @@ public:
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,
-                 StringData collectionType,
+                 boost::optional<StringData> collectionType = boost::none,
                  boost::optional<query_shape::QueryShapeHash> queryShapeHash = boost::none)
         : _parseableQueryShape(parseableQueryShape.getOwned()),
-          _collectionType(collectionType),
+          _collectionType(collectionType ? boost::make_optional(*collectionType) : boost::none),
           _queryShapeHash(queryShapeHash.value_or(query_shape::hash(parseableQueryShape))) {
         if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
             _clientMetaData = boost::make_optional(metadata->getDocument());
@@ -171,8 +171,9 @@ protected:
         if (_clientMetaData) {
             bob.append("client", *_clientMetaData);
         }
-
-        bob.append("collectionType"_sd, _collectionType);
+        if (_collectionType) {
+            bob.append("collectionType", *_collectionType);
+        }
     }
 
     /**
@@ -185,7 +186,9 @@ protected:
     virtual int64_t doGetSize() const = 0;
 
     BSONObj _parseableQueryShape;
-    StringData _collectionType;
+    // This value is not known when run a query is run on mongos over an unsharded collection, so it
+    // is not set through that code path.
+    boost::optional<StringData> _collectionType;
     query_shape::QueryShapeHash _queryShapeHash;
 
     // Preserve this value in the query shape.
@@ -199,6 +202,5 @@ protected:
     boost::optional<BSONObj> _readPreference = boost::none;
 };
 
-StringData classifyCollectionType(OperationContext* opCtx, const NamespaceString& nss);
 }  // namespace query_stats
 }  // namespace mongo

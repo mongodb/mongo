@@ -43,10 +43,9 @@ class FindKeyGenerator final : public KeyGenerator {
 public:
     FindKeyGenerator(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const ParsedFindCommand& request,
-                     BSONObj parseableQueryShape)
-        : KeyGenerator(expCtx->opCtx,
-                       parseableQueryShape,
-                       classifyCollectionType(expCtx->opCtx, expCtx->ns)),
+                     BSONObj parseableQueryShape,
+                     boost::optional<StringData> collectionType = boost::none)
+        : KeyGenerator(expCtx->opCtx, parseableQueryShape, collectionType),
           _readConcern(
               request.findCommandRequest->getReadConcern().has_value()
                   ? boost::optional<BSONObj>(request.findCommandRequest->getReadConcern()->copy())

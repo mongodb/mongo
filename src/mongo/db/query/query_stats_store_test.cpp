@@ -54,6 +54,7 @@ std::size_t hash(const BSONObj& obj) {
 
 class QueryStatsStoreTest : public ServiceContextTest {
 public:
+    boost::optional<StringData> collectionType = boost::make_optional("collection"_sd);
     BSONObj makeQueryStatsKeyFindRequest(const FindCommandRequest& fcr,
                                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                          bool applyHmac) {
@@ -61,7 +62,7 @@ public:
         auto parsedFind = uassertStatusOK(parsed_find_command::parse(expCtx, std::move(fcrCopy)));
         auto queryShape = query_shape::extractQueryShape(
             *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
-        FindKeyGenerator findKeyGenerator(expCtx, *parsedFind, queryShape);
+        FindKeyGenerator findKeyGenerator(expCtx, *parsedFind, queryShape, collectionType);
         return findKeyGenerator.generate(
             expCtx->opCtx,
             applyHmac
@@ -75,8 +76,12 @@ public:
         const boost::intrusive_ptr<ExpressionContext>& expCtx,
         bool applyHmac = false,
         LiteralSerializationPolicy literalPolicy = LiteralSerializationPolicy::kUnchanged) {
-        AggregateKeyGenerator aggKeyGenerator(
-            acr, pipeline, expCtx, pipeline.getInvolvedCollections(), acr.getNamespace());
+        AggregateKeyGenerator aggKeyGenerator(acr,
+                                              pipeline,
+                                              expCtx,
+                                              pipeline.getInvolvedCollections(),
+                                              acr.getNamespace(),
+                                              collectionType);
 
         SerializationOptions opts(literalPolicy);
         if (applyHmac) {
@@ -694,8 +699,8 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
         uassertStatusOK(parsed_find_command::parse(opCtx.get(), std::move(fcr)));
     auto queryShape = query_shape::extractQueryShape(
         *parsedFind, SerializationOptions::kRepresentativeQueryShapeSerializeOptions, expCtx);
-    QueryStatsEntry testMetrics{
-        std::make_unique<query_stats::FindKeyGenerator>(expCtx, *parsedFind, queryShape)};
+    QueryStatsEntry testMetrics{std::make_unique<query_stats::FindKeyGenerator>(
+        expCtx, *parsedFind, queryShape, collectionType)};
 
     auto hmacApplied =
         testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithm::kNone, std::string{});

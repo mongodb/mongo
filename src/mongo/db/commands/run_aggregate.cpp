@@ -1076,7 +1076,12 @@ Status runAggregate(OperationContext* opCtx,
                     // Inside this callback we know we have already checked that query stats are
                     // enabled and know that this request has not been rate limited.
                     return std::make_unique<query_stats::AggregateKeyGenerator>(
-                        request, *pipeline, expCtx, pipelineInvolvedNamespaces, origNss);
+                        request,
+                        *pipeline,
+                        expCtx,
+                        pipelineInvolvedNamespaces,
+                        origNss,
+                        ctx->getCollectionType());
                 });
             } catch (const DBException& ex) {
                 if (ex.code() == 6347902) {
@@ -1129,12 +1134,16 @@ Status runAggregate(OperationContext* opCtx,
 
         // Register query stats with the pre-optimized pipeline. Exclude queries against collections
         // with encrypted fields. We still collect query stats on collection-less aggregations.
-        // TODO SERVER-75912 make sure query shape is unresolved for queries on views
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
             query_stats::registerRequest(expCtx, nss, [&]() {
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
-                    request, *pipeline, expCtx, pipelineInvolvedNamespaces, nss);
+                    request,
+                    *pipeline,
+                    expCtx,
+                    pipelineInvolvedNamespaces,
+                    nss,
+                    ctx ? boost::make_optional(ctx->getCollectionType()) : boost::none);
             });
         }
 

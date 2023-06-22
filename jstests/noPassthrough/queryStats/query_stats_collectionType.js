@@ -38,6 +38,10 @@ function runTest(conn) {
     coll.insert({v: 3, time: ISODate("2021-05-18T02:00:00.000Z")});
     coll.find({v: 6}).toArray();
     coll.aggregate().toArray();
+    // QueryStats should still be collected for queries run on nonexistent collections.
+    assert.commandWorked(testDB.runCommand({find: jsTestName() + "_nonExistent", filter: {v: 6}}));
+    assert.commandWorked(
+        testDB.runCommand({aggregate: jsTestName() + "_nonExistent", pipeline: [], cursor: {}}));
 
     // Verify that we have two telemetry entries for the collection type. This assumes we have
     // executed one find and one agg query for the given collection type.
@@ -57,8 +61,10 @@ function runTest(conn) {
     verifyTelemetryForCollectionType("collection");
     verifyTelemetryForCollectionType("view");
     verifyTelemetryForCollectionType("timeseries");
+    verifyTelemetryForCollectionType("nonExistent");
 
-    // Verify that, for views, we capture the original query before it's rewritten.
+    // Verify that, for views, we capture the original query before it's rewritten. The view would
+    // include a $gt predicate on 'v'.
     const findOnViewShape =
         getTelemetry(conn, {"key.collectionType": "view", "key.queryShape.command": "find"})[0]
             .key.queryShape;

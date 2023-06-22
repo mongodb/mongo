@@ -48,12 +48,13 @@ public:
                           const Pipeline& pipeline,
                           const boost::intrusive_ptr<ExpressionContext>& expCtx,
                           stdx::unordered_set<NamespaceString> involvedNamespaces,
-                          const NamespaceString& origNss)
+                          const NamespaceString& origNss,
+                          boost::optional<StringData> collectionType = boost::none)
         : KeyGenerator(
               expCtx->opCtx,
               // TODO: SERVER-76330 Store representative agg query shape in telemetry store.
               BSONObj(),
-              classifyCollectionType(expCtx->opCtx, origNss)),
+              collectionType),
           _request(std::move(request)),
           _involvedNamespaces(std::move(involvedNamespaces)),
           _origNss(origNss),
