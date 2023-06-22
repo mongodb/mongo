@@ -51,6 +51,16 @@ BSONObj makeNewDocumentForWrite(std::shared_ptr<timeseries::bucket_catalog::Writ
                                 const BSONObj& metadata);
 
 /**
+ * Returns a new document, compressed, with which to initialize a new bucket containing only the
+ * given 'batch'. If compression fails for any reason, an uncompressed document will be returned.
+ */
+BSONObj makeNewCompressedDocumentForWrite(
+    std::shared_ptr<timeseries::bucket_catalog::WriteBatch> batch,
+    const BSONObj& metadata,
+    const NamespaceString& nss,
+    StringData timeField);
+
+/**
  * Returns the document for writing a new bucket with 'measurements'. Calculates the min and max
  * fields while building the document.
  *

@@ -292,6 +292,29 @@ BSONObj makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batc
         batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
 }
 
+BSONObj makeNewCompressedDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
+                                          const BSONObj& metadata,
+                                          const NamespaceString& nss,
+                                          StringData timeField) {
+    // Builds the data field of a bucket document.
+    StringDataMap<BSONObjBuilder> dataBuilders;
+    processTimeseriesMeasurements(
+        {batch->measurements.begin(), batch->measurements.end()}, metadata, dataBuilders);
+
+    BSONObj uncompressedDoc = makeNewDocument(
+        batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
+
+    const bool validateCompression = gValidateTimeseriesCompression.load();
+    auto compressed =
+        timeseries::compressBucket(uncompressedDoc, timeField, nss, validateCompression);
+    if (compressed.compressedBucket) {
+        return *compressed.compressedBucket;
+    }
+
+    // Return the uncompressed document if compression has failed.
+    return uncompressedDoc;
+}
+
 BSONObj makeNewDocumentForWrite(
     const OID& bucketId,
     const std::vector<BSONObj>& measurements,
