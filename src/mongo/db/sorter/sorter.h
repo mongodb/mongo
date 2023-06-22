@@ -29,8 +29,6 @@
 
 #pragma once
 
-#include <MurmurHash3.h>
-
 #include <boost/filesystem/path.hpp>
 #include <deque>
 #include <fstream>

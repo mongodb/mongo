@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
+#include <gperftools/malloc_hook.h>
 #include <memory>
 
 #include "mongo/base/init.h"
@@ -37,11 +36,9 @@
 #include "mongo/config.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
-
-#include <MurmurHash3.h>
-#include <gperftools/malloc_hook.h>
 
 #if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
 #include <dlfcn.h>
@@ -344,11 +341,11 @@ private:
         }
 
         Hash hash() {
-            Hash hash;
             MONGO_STATIC_ASSERT_MSG(sizeof(frames) == sizeof(FrameInfo) * kMaxFramesPerStack,
                                     "frames array is not dense");
-            MurmurHash3_x86_32(frames.data(), numFrames * sizeof(FrameInfo), 0, &hash);
-            return hash;
+            ConstDataRange dataRange{reinterpret_cast<const char*>(frames.data()),
+                                     numFrames * sizeof(FrameInfo)};
+            return murmur3<sizeof(Hash)>(dataRange, 0 /*seed*/);
         }
     };
 
@@ -388,9 +385,8 @@ private:
         }
 
         Hash hash() {
-            Hash hash = 0;
-            MurmurHash3_x86_32(&objPtr, sizeof(objPtr), 0, &hash);
-            return hash;
+            ConstDataRange dataRange{reinterpret_cast<const char*>(&objPtr), sizeof(objPtr)};
+            return murmur3<sizeof(Hash)>(dataRange, 0 /*seed*/);
         }
     };
 

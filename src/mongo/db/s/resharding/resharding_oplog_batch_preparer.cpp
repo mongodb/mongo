@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
-
-#include <MurmurHash3.h>
 
 #include "mongo/bson/bsonelement_comparator.h"
 #include "mongo/db/ops/write_ops_retryability.h"
@@ -41,6 +37,7 @@
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -280,8 +277,9 @@ void ReshardingOplogBatchPreparer::_appendCrudOpToWriterVector(const OplogEntry*
 
     const size_t idHash = elementHasher.hash(op->getIdElement());
 
-    uint32_t hash = 0;
-    MurmurHash3_x86_32(&idHash, sizeof(idHash), hash, &hash);
+    // View 'idHash' as an array of 8 bytes.
+    ConstDataRange dataRange{reinterpret_cast<const char*>(&idHash), sizeof(idHash)};
+    uint32_t hash = murmur3<sizeof(uint32_t)>(dataRange, 0 /*seed*/);
 
     _appendOpToWriterVector(hash, op, writerVectors);
 }

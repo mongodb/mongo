@@ -65,6 +65,7 @@
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -77,10 +78,8 @@ namespace {
  * Calculates and returns a new murmur hash value based on the prior murmur hash and a new piece
  * of data.
  */
-uint32_t addDataToChecksum(const void* startOfData, size_t sizeOfData, uint32_t checksum) {
-    unsigned newChecksum;
-    MurmurHash3_x86_32(startOfData, sizeOfData, checksum, &newChecksum);
-    return newChecksum;
+uint32_t addDataToChecksum(const char* startOfData, size_t sizeOfData, uint32_t checksum) {
+    return murmur3<sizeof(uint32_t)>(ConstDataRange{startOfData, sizeOfData}, checksum);
 }
 
 void checkNoExternalSortOnMongos(const SortOptions& opts) {

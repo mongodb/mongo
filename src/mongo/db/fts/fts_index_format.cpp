@@ -29,8 +29,6 @@
 
 #include "mongo/platform/basic.h"
 
-#include <MurmurHash3.h>
-
 #include "mongo/base/init.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/fts/fts_index_format.h"
@@ -38,6 +36,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -53,24 +52,18 @@ namespace {
 BSONObj nullObj;
 BSONElement nullElt;
 
-// New in textIndexVersion 2.
-// If the term is longer than 32 characters, it may
-// result in the generated key being too large
-// for the index. In that case, we generate a 64-character key
-// from the concatenation of the first 32 characters
-// and the hex string of the murmur3 hash value of the entire
-// term value.
+// New in textIndexVersion 2. If the term is longer than 32 characters, it may result in the
+// generated key being too large for the index. In that case, we generate a 64-character key from
+// the concatenation of the first 32 characters and the hex string of the murmur3 hash value of the
+// entire term value.
 const size_t termKeyPrefixLengthV2 = 32U;
 // 128-bit hash value expressed in hex = 32 characters
 const size_t termKeySuffixLengthV2 = 32U;
 const size_t termKeyLengthV2 = termKeyPrefixLengthV2 + termKeySuffixLengthV2;
 
-// TextIndexVersion 3.
-// If the term is longer than 256 characters, it may
-// result in the generated key being too large
-// for the index. In that case, we generate a 256-character key
-// from the concatenation of the first 224 characters
-// and the hex string of the md5 hash value of the entire
+// TextIndexVersion 3. If the term is longer than 256 characters, it may result in the generated key
+// being too large for the index. In that case, we generate a 256-character key from the
+// concatenation of the first 224 characters and the hex string of the md5 hash value of the entire
 // term value.
 const size_t termKeyPrefixLengthV3 = 224U;
 // 128-bit hash value expressed in hex = 32 characters
@@ -191,13 +184,10 @@ void FTSIndexFormat::_appendIndexKey(KeyStringBuilder& keyString,
         if (term.size() <= termKeyPrefixLengthV2) {
             keyString.appendString(term);
         } else {
-            union {
-                uint64_t hash[2];
-                char data[16];
-            } t;
+            std::array<char, 16> hash;
             uint32_t seed = 0;
-            MurmurHash3_x64_128(term.data(), term.size(), seed, t.hash);
-            string keySuffix = hexblob::encodeLower(t.data, sizeof(t.data));
+            murmur3(StringData{term}, seed, hash);
+            string keySuffix = hexblob::encodeLower(hash.data(), hash.size());
             invariant(termKeySuffixLengthV2 == keySuffix.size());
             keyString.appendString(term.substr(0, termKeyPrefixLengthV2) + keySuffix);
         }

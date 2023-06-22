@@ -28,7 +28,6 @@
  */
 
 
-#include <MurmurHash3.h>
 #include <algorithm>
 #include <array>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -70,6 +69,7 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -179,10 +179,8 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 }
 
 UUID fieldNameToUUID(StringData field) {
-    std::array<uint8_t, UUID::kNumBytes> buf;
-
-    MurmurHash3_x86_128(field.rawData(), field.size(), 123456, buf.data());
-
+    std::array<char, UUID::kNumBytes> buf;
+    murmur3(field, 123456 /*seed*/, buf);
     return UUID::fromCDR(buf);
 }
 

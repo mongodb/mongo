@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include <MurmurHash3.h>
 #include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
@@ -46,6 +45,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/assert_util_core.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
@@ -331,9 +331,7 @@ private:
     }
 
     static uint64_t hashStringData(StringData str) {
-        char hash[16];
-        MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
-        return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
+        return murmur3<sizeof(uint64_t)>(str, 0 /*seed*/);
     }
 };
 

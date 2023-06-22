@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-#include <MurmurHash3.h>
 #include <algorithm>
 #include <array>
 #include <cstddef>
@@ -85,6 +84,7 @@
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/murmur3.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
@@ -176,9 +176,8 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 }
 
 UUID fieldNameToUUID(StringData field) {
-    std::array<uint8_t, UUID::kNumBytes> buf;
-
-    MurmurHash3_x86_128(field.rawData(), field.size(), 123456, buf.data());
+    std::array<char, UUID::kNumBytes> buf;
+    murmur3(field, 123456 /*seed*/, buf);
     return UUID::fromCDR(buf);
 }
 
