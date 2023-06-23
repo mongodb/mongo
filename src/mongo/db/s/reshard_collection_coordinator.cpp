@@ -175,9 +175,13 @@ ExecutorFuture<void> ReshardCollectionCoordinator::_runImpl(
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject forceRedistribution parameter",
                     !_doc.getForceRedistribution().has_value());
+                uassert(ErrorCodes::InvalidOptions,
+                        "Resharding improvements is not enabled, reject reshardingUUID parameter",
+                        !_doc.getReshardingUUID().has_value());
             }
             configsvrReshardCollection.setShardDistribution(_doc.getShardDistribution());
             configsvrReshardCollection.setForceRedistribution(_doc.getForceRedistribution());
+            configsvrReshardCollection.setReshardingUUID(_doc.getReshardingUUID());
 
             const auto configShard = Grid::get(opCtx)->shardRegistry()->getConfigShard();
 
