@@ -87,7 +87,7 @@ std::vector<AsyncRequestsSender::Response> sendAuthenticatedCommandWithOsiToShar
     const OperationSessionInfo& osi,
     WriteConcernOptions wc = WriteConcernOptions()) {
     async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(opts->genericArgs, wc);
-    // TODO SERVER-77461 Add back async_rpc::AsyncRPCCommandHelpers::appendOSI
+    async_rpc::AsyncRPCCommandHelpers::appendOSI(opts->genericArgs, osi);
     return sharding_ddl_util::sendAuthenticatedCommandToShards(opCtx, opts, shardIds);
 }
 
