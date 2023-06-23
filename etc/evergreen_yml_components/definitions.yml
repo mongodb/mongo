@@ -3166,6 +3166,7 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
+      separate_debug: off
 
 - name: compile_visibility_test
   tags: []
