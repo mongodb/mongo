@@ -114,7 +114,8 @@ struct BatchedDeletesSSS : ServerStatusSection {
 } batchedDeletesSSS;
 
 // Wrapper for write_stage_common::ensureStillMatches() which also updates the 'refetchesDueToYield'
-// serverStatus metric.
+// serverStatus metric. As with ensureStillMatches, if false is returned, the WoringSetMember
+// referenced by 'id' is no longer valid, and must not be used except for freeing the WSM.
 bool ensureStillMatchesAndUpdateStats(const CollectionPtr& collection,
                                       OperationContext* opCtx,
                                       WorkingSet* ws,
@@ -340,24 +341,37 @@ long long BatchedDeleteStage::_commitBatch(WorkingSetID* out,
         }
 
         auto workingSetMemberID = _stagedDeletesBuffer.at(*bufferOffset);
-
-        // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
-        // Different documents may have different snapshots.
-        bool docStillMatches = ensureStillMatchesAndUpdateStats(
-            collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
-
         WorkingSetMember* member = _ws->get(workingSetMemberID);
 
         // Determine whether the document being deleted is owned by this shard, and the action
         // to undertake if it isn't.
-        bool writeToOrphan = false;
-        auto action = _preWriteFilter.computeActionAndLogSpecialCases(
-            member->doc.value(), "batched delete"_sd, collection()->ns());
-        if (!docStillMatches || action == write_stage_common::PreWriteFilter::Action::kSkip) {
+        using write_stage_common::PreWriteFilter;
+        // Warning: on Action::kSkip, the WSM's underlaying document is no longer valid.
+        const PreWriteFilter::Action action = [&]() {
+            // The PlanExecutor YieldPolicy may change snapshots between calls to 'doWork()'.
+            // Different documents may have different snapshots.
+            const bool docStillMatches = ensureStillMatchesAndUpdateStats(
+                collection(), opCtx(), _ws, workingSetMemberID, _params->canonicalQuery);
+
+            // Warning: if docStillMatches is false, the WSM's underlaying Document/BSONObj is
+            // no longer valid.
+            if (!docStillMatches) {
+                return PreWriteFilter::Action::kSkip;
+            }
+            // Determine whether the document being deleted is owned by this shard, and the
+            // action to undertake if it isn't.
+            return _preWriteFilter.computeActionAndLogSpecialCases(
+                member->doc.value(), "batched delete"_sd, collection()->ns());
+        }();
+
+        // Skip the document, as it either no longer exists, or has been filtered by the
+        // PreWriteFilter.
+        if (PreWriteFilter::Action::kSkip == action) {
             recordsToSkip->insert(workingSetMemberID);
             continue;
         }
-        writeToOrphan = action == write_stage_common::PreWriteFilter::Action::kWriteAsFromMigrate;
+
+        bool writeToOrphan = action == PreWriteFilter::Action::kWriteAsFromMigrate;
 
         auto retryableWrite = write_stage_common::isRetryableWrite(opCtx());
         Snapshotted<Document> memberDoc = member->doc;

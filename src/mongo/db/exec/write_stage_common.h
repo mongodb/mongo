@@ -170,7 +170,8 @@ private:
 /**
  * Returns true if the document referred to by 'id' still exists and matches the query predicate
  * given by 'cq'. Returns true if the document still exists and 'cq' is null. Returns false
- * otherwise.
+ * otherwise, in which case the WorkingSetMember referred to by 'id' will no longer contain a valid
+ * document, and the only operation that should be performed on the WSM is to free it.
  *
  * May throw a WriteConflictException if there was a conflict while searching to see if the document
  * still exists.
