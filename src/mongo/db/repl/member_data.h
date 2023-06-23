@@ -129,11 +129,6 @@ public:
     bool up() const {
         return _health > 0;
     }
-    // Was this member up for the last hearbeeat
-    // (or we haven't received the first heartbeat yet)
-    bool maybeUp() const {
-        return _health != 0;
-    }
 
     OpTime getLastAppliedOpTime() const {
         return _lastAppliedOpTime;
