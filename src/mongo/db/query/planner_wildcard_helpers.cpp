@@ -794,32 +794,17 @@ bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& 
             std::vector<Interval>{IndexBoundsBuilder::allValues()};
         idxNode->bounds.fields[index.wildcardFieldPos].intervals =
             std::vector<Interval>{IndexBoundsBuilder::allValues()};
-        idxNode->bounds.fields[index.wildcardFieldPos].name = "$_path";
         idxNode->bounds.fields[index.wildcardFieldPos - 1].name = "$_path";
-        idxNode->iets[index.wildcardFieldPos - 1] =
-            interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
-                idxNode->bounds.fields[index.wildcardFieldPos - 1]);
-        idxNode->iets[index.wildcardFieldPos] =
-            interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
-                idxNode->bounds.fields[index.wildcardFieldPos]);
+        if (!idxNode->iets.empty()) {
+            idxNode->iets[index.wildcardFieldPos - 1] =
+                interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                    idxNode->bounds.fields[index.wildcardFieldPos - 1]);
+            idxNode->iets[index.wildcardFieldPos] =
+                interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                    idxNode->bounds.fields[index.wildcardFieldPos]);
+        }
         index.multikeyPaths[index.wildcardFieldPos] = MultikeyComponents();
         idxNode->shouldDedup = true;
-
-        // Replace the old index key pattern with the generic pattern.
-        BSONObjBuilder newPattern;
-        size_t idx = 0;
-        for (auto elem : index.keyPattern) {
-            if (idx == index.wildcardFieldPos) {
-                newPattern.appendAs(elem, "$_path");
-                if (elem.number() < 0) {
-                    idxNode->bounds.fields[index.wildcardFieldPos].reverse();
-                }
-            } else {
-                newPattern.append(elem);
-            }
-            idx++;
-        }
-        index.keyPattern = newPattern.obj();
     };
 
     // Expand the index bounds of certain compound wildcard indexes in order to avoid missing any

@@ -991,12 +991,17 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
                 "The bounds did not have as many fields as the key pattern.",
                 static_cast<size_t>(index.keyPattern.nFields()) == bounds.fields.size());
 
-        // No sorts are provided if the bounds for '$_path' consist of multiple intervals. This can
-        // happen for existence queries. For example, {a: {$exists: true}} results in bounds
-        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a nested
-        // object are in bounds.
-        if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u) {
-            return {};
+        // TODO SERVER-68303: Merge this check with the same check below for CWI.
+        //
+        // No sorts are provided if this wildcard index has one single field and the bounds for
+        // '$_path' consist of multiple intervals. This can happen for existence queries. For
+        // example, {a: {$exists: true}} results in bounds
+        // [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents where "a" is a
+        // nested object are in bounds.
+        if (bounds.fields.size() == 2u) {
+            if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u) {
+                return {};
+            }
         }
 
         BSONObjBuilder sortPatternStripped;
@@ -1005,13 +1010,21 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
         // (Ignore FCV check): This is intentional because we want clusters which have wildcard
         // indexes still be able to use the feature even if the FCV is downgraded.
         if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe()) {
-            bool hasPathField = false;
             for (auto elem : sortPatternProvidedByIndex) {
                 if (elem.fieldNameStringData() == "$_path"_sd) {
-                    if (hasPathField) {
+                    tassert(7767200,
+                            "The bounds cannot be empty.",
+                            bounds.fields[index.wildcardFieldPos - 1].intervals.size() > 0u);
+                    // No sorts on the following fields should be provided if it's full scan on the
+                    // '$_path' field or the bounds for '$_path' consist of multiple intervals. This
+                    // can happen for existence queries. For example, {a: {$exists: true}} results
+                    // in bounds [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents
+                    // where "a" is a nested object are in bounds.
+                    if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u ||
+                        bounds.fields[index.wildcardFieldPos - 1].intervals[0] ==
+                            IndexBoundsBuilder::allValues()) {
                         break;
                     }
-                    hasPathField = true;
                 } else {
                     sortPatternStripped.append(elem);
                 }

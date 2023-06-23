@@ -105,16 +105,16 @@ assert.eq(idxUsedCnt, 2, winningPlan);
 // Test that two different CWI can be used to answer a $or query.
 const collTwoCWI = db[jsTestName() + "_wild_2"];
 const docs = [
-    {num: 1, sub: {num: 1, str: 'aa'}},
-    {num: 2, sub: {num: 2, str: 'bb'}},
-    {num: 3, sub: {num: 3, str: 'cc'}},
+    {num: 1, sub: {num: 1, str: 'aa'}, str: '1'},
+    {num: 2, sub: {num: 2, str: 'bb'}, str: '2'},
+    {num: 3, sub: {num: 3, str: 'cc'}, str: '3'},
 ];
 collTwoCWI.drop();
 assert.commandWorked(collTwoCWI.insertMany(docs));
 assert.commandWorked(collTwoCWI.createIndexes([{num: 1, "sub.$**": 1}, {"sub.$**": 1, num: 1}]));
 
-explain =
-    assert.commandWorked(collTwoCWI.find({$or: [{num: {$gte: 1}}, {'sub.str': 'aa'}]}).explain());
+explain = assert.commandWorked(
+    collTwoCWI.find({$or: [{num: {$gte: 1}}, {'sub.str': 'aa'}]}).explain("executionStats"));
 winningPlan = getWinningPlan(explain.queryPlanner);
 planStages = getPlanStages(winningPlan, 'IXSCAN');
 
@@ -140,6 +140,51 @@ for (const stage of planStages) {
         // The CWI used to answer a $or query should be expanded to include all paths and all keys
         // for the wildcard field.
         assert.eq(stage.indexBounds["$_path"], ["[MinKey, MaxKey]"], stage);
+    }
+}
+assert.eq(idxUsedCnt, 2, winningPlan);
+
+collTwoCWI.dropIndexes();
+assert.commandWorked(collTwoCWI.createIndexes([{num: 1, "sub.$**": 1}, {str: 1, "sub.$**": 1}]));
+
+// Test a filter with nested $and under a $or.
+explain = assert.commandWorked(
+    collTwoCWI
+        .find({$or: [{$and: [{num: 1}, {"sub.num": {$gt: 4}}]}, {str: '1', "sub.num": {$lt: 10}}]})
+        .explain("executionStats"));
+winningPlan = getWinningPlan(explain.queryPlanner);
+planStages = getPlanStages(winningPlan, 'IXSCAN');
+
+idxUsedCnt = 0;
+for (const stage of planStages) {
+    assert(stage.hasOwnProperty('indexName'), stage);
+    if (stage.indexName === "num_1_sub.$**_1") {
+        idxUsedCnt++;
+
+        // If the IndexScan stage has a filter on field 'sub.num', then this CWI's key pattern
+        // cannot be overwritten.
+        if (stage.hasOwnProperty("filter") && stage["filter"].hasOwnProperty("sub.num")) {
+            const expectedKeyPattern = {"num": 1, "$_path": 1, "sub.num": 1};
+            assert.eq(stage.keyPattern, expectedKeyPattern, stage);
+        } else {
+            const expectedKeyPattern = {"num": 1, "$_path": 1};
+            assert.eq(stage.keyPattern, expectedKeyPattern, stage);
+            assert.eq(stage.indexBounds["$_path"], ["[MinKey, MaxKey]"], stage);
+        }
+    }
+    if (stage.indexName === "str_1_sub.$**_1") {
+        idxUsedCnt++;
+
+        // If the IndexScan stage has a filter on field 'sub.num', then this CWI's key pattern
+        // cannot be overwritten.
+        if (stage.hasOwnProperty("filter") && stage["filter"].hasOwnProperty("sub.num")) {
+            const expectedKeyPattern = {"num": 1, "$_path": 1, "sub.num": 1};
+            assert.eq(stage.keyPattern, expectedKeyPattern, stage);
+        } else {
+            const expectedKeyPattern = {"str": 1, "$_path": 1};
+            assert.eq(stage.keyPattern, expectedKeyPattern, stage);
+            assert.eq(stage.indexBounds["$_path"], ["[MinKey, MaxKey]"], stage);
+        }
     }
 }
 assert.eq(idxUsedCnt, 2, winningPlan);
