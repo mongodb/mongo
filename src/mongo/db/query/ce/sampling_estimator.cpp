@@ -39,6 +39,7 @@
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -273,7 +274,9 @@ private:
                           ids,
                           _phaseManager.getMetadata(),
                           planAndProps._map,
-                          ScanOrder::Random};
+                          internalCascadesOptimizerSamplingCEScanStartOfColl.load()
+                              ? ScanOrder::Forward
+                              : ScanOrder::Random};
         auto sbePlan = g.optimize(planAndProps._node, slotMap, ridSlot);
         tassert(6624261, "Unexpected rid slot", !ridSlot);
 

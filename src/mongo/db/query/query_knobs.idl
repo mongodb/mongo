@@ -872,6 +872,14 @@ server_parameters:
     default: false
     test_only: true
 
+  internalCascadesOptimizerSamplingCEScanStartOfColl:
+    description: "Forces sampling CE to select sample by scanning from the start of the collection."
+    set_at: [ startup, runtime ]
+    cpp_varname: "internalCascadesOptimizerSamplingCEScanStartOfColl"
+    cpp_vartype: AtomicWord<bool>
+    default: false
+    test_only: true
+
   internalQueryFrameworkControl:
     description: "Knob to control the optimizer/execution engine to use."
     set_at: [ startup, runtime ]
