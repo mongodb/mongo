@@ -819,12 +819,12 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
                                              const NamespaceStringOrUUID& nsOrUUID,
                                              boost::optional<Timestamp> readTimestamp) const {
     // Don't need to open the collection if it was already previously instantiated.
-    if (nsOrUUID.nss()) {
-        if (OpenedCollections::get(opCtx).lookupByNamespace(*nsOrUUID.nss())) {
+    if (nsOrUUID.isNamespaceString()) {
+        if (OpenedCollections::get(opCtx).lookupByNamespace(nsOrUUID.nss())) {
             return false;
         }
     } else {
-        if (OpenedCollections::get(opCtx).lookupByUUID(*nsOrUUID.uuid())) {
+        if (OpenedCollections::get(opCtx).lookupByUUID(nsOrUUID.uuid())) {
             return false;
         }
     }
@@ -833,10 +833,10 @@ bool CollectionCatalog::_needsOpenCollection(OperationContext* opCtx,
         auto coll = lookupCollectionByNamespaceOrUUID(opCtx, nsOrUUID);
         return !coll || *readTimestamp < coll->getMinimumValidSnapshot();
     } else {
-        if (nsOrUUID.nss()) {
-            return _pendingCommitNamespaces.find(*nsOrUUID.nss());
+        if (nsOrUUID.isNamespaceString()) {
+            return _pendingCommitNamespaces.find(nsOrUUID.nss());
         } else {
-            return _pendingCommitUUIDs.find(*nsOrUUID.uuid());
+            return _pendingCommitUUIDs.find(nsOrUUID.uuid());
         }
     }
 }
@@ -863,22 +863,23 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // compare the collection instance in _pendingCommitNamespaces and the collection instance in
     // the in-memory catalog with the durable catalog entry to determine which instance to return.
     const auto& pendingCollection = [&]() -> std::shared_ptr<Collection> {
-        if (const auto& nss = nssOrUUID.nss()) {
-            const std::shared_ptr<Collection>* pending = _pendingCommitNamespaces.find(*nss);
+        if (nssOrUUID.isNamespaceString()) {
+            const std::shared_ptr<Collection>* pending =
+                _pendingCommitNamespaces.find(nssOrUUID.nss());
             invariant(pending);
             return *pending;
         }
 
-        const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(*nssOrUUID.uuid());
+        const std::shared_ptr<Collection>* pending = _pendingCommitUUIDs.find(nssOrUUID.uuid());
         invariant(pending);
         return *pending;
     }();
 
     auto latestCollection = [&]() -> std::shared_ptr<const Collection> {
-        if (const auto& nss = nssOrUUID.nss()) {
-            return _getCollectionByNamespace(opCtx, *nss);
+        if (nssOrUUID.isNamespaceString()) {
+            return _getCollectionByNamespace(opCtx, nssOrUUID.nss());
         }
-        return _getCollectionByUUID(opCtx, *nssOrUUID.uuid());
+        return _getCollectionByUUID(opCtx, nssOrUUID.uuid());
     }();
 
     // At least one of latest and pending should be a valid pointer.
@@ -897,15 +898,15 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
 
     const NamespaceString& nss = [&]() {
-        if (auto nss = nssOrUUID.nss()) {
-            return *nss;
+        if (nssOrUUID.isNamespaceString()) {
+            return nssOrUUID.nss();
         }
         return latestCollection ? latestCollection->ns() : pendingCollection->ns();
     }();
 
     const UUID uuid = [&]() {
-        if (auto uuid = nssOrUUID.uuid()) {
-            return *uuid;
+        if (nssOrUUID.isUUID()) {
+            return nssOrUUID.uuid();
         }
 
         // If pendingCollection is nullptr, the collection is being dropped, so latestCollection
@@ -921,7 +922,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
         // that got dropped. If that rename has committed we need to put the correct collection
         // under open collection for this namespace. We can detect this case by comparing the
         // catalogId with what is pending for this namespace.
-        if (nssOrUUID.uuid()) {
+        if (nssOrUUID.isUUID()) {
             const std::shared_ptr<Collection>& pending = *_pendingCommitNamespaces.find(nss);
             if (pending && pending->getCatalogId() != catalogId) {
                 openedCollections.store(nullptr, boost::none, uuid);
@@ -936,7 +937,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // When trying to open the latest collection by namespace and the catalog entry has a different
     // namespace in our snapshot, then there is a rename operation concurrent with this call.
     NamespaceString nsInDurableCatalog = catalogEntry->metadata->nss;
-    if (nssOrUUID.nss() && nss != nsInDurableCatalog) {
+    if (nssOrUUID.isNamespaceString() && nss != nsInDurableCatalog) {
         // There are two types of rename depending on the dropTarget flag.
         if (pendingCollection && latestCollection &&
             pendingCollection->getCatalogId() != latestCollection->getCatalogId()) {
@@ -980,7 +981,7 @@ const Collection* CollectionCatalog::_openCollectionAtLatestByNamespaceOrUUID(
     // entries under uncommitted catalog changes for two namespaces (rename 'from' and 'to') so we
     // can make sure lookups by UUID is supported and will return a Collection with its namespace in
     // sync with the storage snapshot.
-    if (nssOrUUID.uuid() && latestCollection && pendingCollection &&
+    if (nssOrUUID.isUUID() && latestCollection && pendingCollection &&
         latestCollection->ns() != pendingCollection->ns()) {
         if (latestCollection->ns() == nsInDurableCatalog) {
             // If this is a rename with dropTarget=true and we're looking up with the 'from' UUID
@@ -1060,7 +1061,20 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
     // Try to find a catalog entry matching 'readTimestamp'.
     auto catalogEntry = _fetchPITCatalogEntry(opCtx, nssOrUUID, readTimestamp);
     if (!catalogEntry) {
-        openedCollections.store(nullptr, nssOrUUID.nss(), nssOrUUID.uuid());
+        openedCollections.store(
+            nullptr,
+            [nssOrUUID]() -> boost::optional<NamespaceString> {
+                if (nssOrUUID.isNamespaceString()) {
+                    return nssOrUUID.nss();
+                }
+                return boost::none;
+            }(),
+            [nssOrUUID]() -> boost::optional<UUID> {
+                if (nssOrUUID.isUUID()) {
+                    return nssOrUUID.uuid();
+                }
+                return boost::none;
+            }());
         return nullptr;
     }
 
@@ -1090,7 +1104,20 @@ const Collection* CollectionCatalog::_openCollectionAtPointInTimeByNamespaceOrUU
         return newCollection.get();
     }
 
-    openedCollections.store(nullptr, nssOrUUID.nss(), nssOrUUID.uuid());
+    openedCollections.store(
+        nullptr,
+        [nssOrUUID]() -> boost::optional<NamespaceString> {
+            if (nssOrUUID.isNamespaceString()) {
+                return nssOrUUID.nss();
+            }
+            return boost::none;
+        }(),
+        [nssOrUUID]() -> boost::optional<UUID> {
+            if (nssOrUUID.isUUID()) {
+                return nssOrUUID.uuid();
+            }
+            return boost::none;
+        }());
     return nullptr;
 }
 
@@ -1098,21 +1125,21 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
     OperationContext* opCtx,
     const NamespaceStringOrUUID& nssOrUUID,
     boost::optional<Timestamp> readTimestamp) const {
-    auto [catalogId, result] = nssOrUUID.nss()
-        ? _catalogIdTracker.lookup(*nssOrUUID.nss(), readTimestamp)
-        : _catalogIdTracker.lookup(*nssOrUUID.uuid(), readTimestamp);
+    auto [catalogId, result] = nssOrUUID.isNamespaceString()
+        ? _catalogIdTracker.lookup(nssOrUUID.nss(), readTimestamp)
+        : _catalogIdTracker.lookup(nssOrUUID.uuid(), readTimestamp);
     if (result == HistoricalCatalogIdTracker::LookupResult::Existence::kNotExists) {
         return boost::none;
     }
 
     auto writeCatalogIdAfterScan = [&](const boost::optional<DurableCatalogEntry>& catalogEntry) {
         if (!catalogEntry) {
-            if (const boost::optional<NamespaceString>& ns = nssOrUUID.nss()) {
-                if (!_catalogIdTracker.canRecordNonExisting(*ns)) {
+            if (nssOrUUID.isNamespaceString()) {
+                if (!_catalogIdTracker.canRecordNonExisting(nssOrUUID.nss())) {
                     return;
                 }
             } else {
-                if (!_catalogIdTracker.canRecordNonExisting(*nssOrUUID.uuid())) {
+                if (!_catalogIdTracker.canRecordNonExisting(nssOrUUID.uuid())) {
                     return;
                 }
             }
@@ -1126,11 +1153,10 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
                     *catalogEntry->metadata->options.uuid,
                     catalogEntry->catalogId,
                     *readTimestamp);
-            } else if (const boost::optional<NamespaceString>& ns = nssOrUUID.nss()) {
-                catalog._catalogIdTracker.recordNonExistingAtTime(*ns, *readTimestamp);
+            } else if (nssOrUUID.isNamespaceString()) {
+                catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.nss(), *readTimestamp);
             } else {
-                catalog._catalogIdTracker.recordNonExistingAtTime(*nssOrUUID.uuid(),
-                                                                  *readTimestamp);
+                catalog._catalogIdTracker.recordNonExistingAtTime(nssOrUUID.uuid(), *readTimestamp);
             }
         });
     };
@@ -1142,22 +1168,22 @@ boost::optional<DurableCatalogEntry> CollectionCatalog::_fetchPITCatalogEntry(
 
         // Scan durable catalog when we don't have accurate catalogId mapping for this timestamp.
         gCollectionCatalogSection.numScansDueToMissingMapping.fetchAndAdd(1);
-        auto catalogEntry = nssOrUUID.nss()
-            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nssOrUUID.nss())
-            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *nssOrUUID.uuid());
+        auto catalogEntry = nssOrUUID.isNamespaceString()
+            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss())
+            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
 
     auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
-    if (const auto& nss = nssOrUUID.nss();
-        !catalogEntry || (nss && nss != catalogEntry->metadata->nss)) {
+    if (!catalogEntry ||
+        (nssOrUUID.isNamespaceString() && nssOrUUID.nss() != catalogEntry->metadata->nss)) {
         invariant(readTimestamp);
         // If no entry is found or the entry contains a different namespace, the mapping might be
         // incorrect since it is incomplete after startup; scans durable catalog to confirm.
-        auto catalogEntry = nss
-            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nss)
-            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *nssOrUUID.uuid());
+        auto catalogEntry = nssOrUUID.isNamespaceString()
+            ? DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss())
+            : DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
         writeCatalogIdAfterScan(catalogEntry);
         return catalogEntry;
     }
@@ -1466,9 +1492,11 @@ const Collection* CollectionCatalog::lookupCollectionByUUID(OperationContext* op
 
 const Collection* CollectionCatalog::lookupCollectionByNamespaceOrUUID(
     OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) const {
-    if (boost::optional<UUID> uuid = nssOrUUID.uuid())
-        return lookupCollectionByUUID(opCtx, *uuid);
-    return lookupCollectionByNamespace(opCtx, *nssOrUUID.nss());
+    if (nssOrUUID.isUUID()) {
+        return lookupCollectionByUUID(opCtx, nssOrUUID.uuid());
+    }
+
+    return lookupCollectionByNamespace(opCtx, nssOrUUID.nss());
 }
 
 std::shared_ptr<Collection> CollectionCatalog::_lookupCollectionByUUID(UUID uuid) const {
@@ -1740,15 +1768,15 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupViewWithoutValida
 
 NamespaceString CollectionCatalog::resolveNamespaceStringOrUUID(
     OperationContext* opCtx, NamespaceStringOrUUID nsOrUUID) const {
-    if (auto nss = nsOrUUID.nss()) {
+    if (nsOrUUID.isNamespaceString()) {
         uassert(ErrorCodes::InvalidNamespace,
-                str::stream() << "Namespace " << (*nss).toStringForErrorMsg()
+                str::stream() << "Namespace " << nsOrUUID.toStringForErrorMsg()
                               << " is not a valid collection name",
-                nss->isValid());
-        return std::move(*nss);
+                nsOrUUID.nss().isValid());
+        return nsOrUUID.nss();
     }
 
-    auto resolvedNss = lookupNSSByUUID(opCtx, *nsOrUUID.uuid());
+    auto resolvedNss = lookupNSSByUUID(opCtx, nsOrUUID.uuid());
 
     uassert(ErrorCodes::NamespaceNotFound,
             str::stream() << "Unable to resolve " << nsOrUUID.toStringForErrorMsg(),

@@ -100,7 +100,7 @@ public:
         return _sourceNss;
     }
     UUID getSourceUuid() const {
-        return *_sourceDbAndUuid.uuid();
+        return _sourceDbAndUuid.uuid();
     }
 
     /**
@@ -163,7 +163,7 @@ private:
 
     std::string describeForFuzzer(BaseClonerStage* stage) const final {
         return _sourceNss.db() + " db: { " + stage->getName() + ": UUID(\"" +
-            _sourceDbAndUuid.uuid()->toString() + "\") coll: " + _sourceNss.coll() + " }";
+            _sourceDbAndUuid.uuid().toString() + "\") coll: " + _sourceNss.coll() + " }";
     }
 
     /**

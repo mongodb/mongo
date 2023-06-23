@@ -293,9 +293,8 @@ public:
                             CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
         };
         auto const nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, cmdObj);
-        auto optNss = nssOrUUID.nss();
-        if (optNss) {
-            initializeTracker(*optNss);
+        if (nssOrUUID.isNamespaceString()) {
+            initializeTracker(nssOrUUID.nss());
         }
         const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
             opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);

@@ -170,7 +170,7 @@ TEST_F(ParseNsOrUUID, ParseValidColl) {
                     << "coll");
     auto parsedNss = CommandHelpers::parseNsOrUUID(
         DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmd);
-    ASSERT_EQ(*parsedNss.nss(), NamespaceString::createNamespaceString_forTest("test.coll"));
+    ASSERT_EQ(parsedNss.nss(), NamespaceString::createNamespaceString_forTest("test.coll"));
 }
 
 TEST_F(ParseNsOrUUID, ParseValidUUID) {
@@ -178,7 +178,7 @@ TEST_F(ParseNsOrUUID, ParseValidUUID) {
     auto cmd = BSON("query" << uuid);
     auto parsedNsOrUUID = CommandHelpers::parseNsOrUUID(
         DatabaseName::createDatabaseName_forTest(boost::none, "test"), cmd);
-    ASSERT_EQUALS(uuid, *parsedNsOrUUID.uuid());
+    ASSERT_EQUALS(uuid, parsedNsOrUUID.uuid());
 }
 
 /**

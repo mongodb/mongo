@@ -320,7 +320,7 @@ parse(OperationContext* opCtx,
       MatchExpressionParser::AllowedFeatureSet allowedFeatures,
       const ProjectionPolicies& projectionPolicies) {
     // Make the expCtx.
-    invariant(findCommand->getNamespaceOrUUID().nss());
+    invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
     auto expCtx = make_intrusive<ExpressionContext>(
         opCtx, *findCommand, resolveCollator(opCtx, findCommand), true /* mayDbProfile */);
     auto swResult = parseWithValidatedCollator(

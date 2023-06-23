@@ -2656,7 +2656,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2717,7 +2717,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2741,7 +2741,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -4074,7 +4074,7 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
 
     auto testStruct = BasicNamespaceConstGetterCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
     // Verify that both const and non-const getters are generated.
     assert_same_types<

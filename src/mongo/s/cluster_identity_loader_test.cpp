@@ -83,7 +83,7 @@ public:
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->getNamespaceOrUUID().nss()->ns(), "config.version");
+            ASSERT_EQ(query->getNamespaceOrUUID().nss().ns(), "config.version");
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
             ASSERT_FALSE(query->getLimit().has_value());
 

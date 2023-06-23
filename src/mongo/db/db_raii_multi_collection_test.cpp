@@ -257,8 +257,8 @@ TEST_F(AutoGetCollectionMultiTest, LockedSecondaryNamespaceNotFound) {
     invariant(locker->isCollectionLockedForMode(_primaryNss, MODE_IS));
 
     for (const auto& secondaryNss : _secondaryNssOrUUIDVec) {
-        invariant(locker->isDbLockedForMode(secondaryNss.nss()->dbName(), MODE_IS));
-        invariant(locker->isCollectionLockedForMode(*secondaryNss.nss(), MODE_IS));
+        invariant(locker->isDbLockedForMode(secondaryNss.nss().dbName(), MODE_IS));
+        invariant(locker->isCollectionLockedForMode(secondaryNss.nss(), MODE_IS));
     }
 
     const auto& coll = autoGet.getCollection();

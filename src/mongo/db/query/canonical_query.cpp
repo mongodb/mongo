@@ -306,13 +306,9 @@ Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
 std::string CanonicalQuery::toString(bool forErrMsg) const {
     str::stream ss;
     if (forErrMsg) {
-        ss << "ns="
-           << _findCommand->getNamespaceOrUUID()
-                  .nss()
-                  .value_or(NamespaceString())
-                  .toStringForErrorMsg();
+        ss << "ns=" << _findCommand->getNamespaceOrUUID().toStringForErrorMsg();
     } else {
-        ss << "ns=" << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
+        ss << "ns=" << toStringForLogging(_findCommand->getNamespaceOrUUID());
     }
 
     if (_findCommand->getBatchSize()) {
@@ -340,13 +336,9 @@ std::string CanonicalQuery::toString(bool forErrMsg) const {
 std::string CanonicalQuery::toStringShort(bool forErrMsg) const {
     str::stream ss;
     if (forErrMsg) {
-        ss << "ns: "
-           << _findCommand->getNamespaceOrUUID()
-                  .nss()
-                  .value_or(NamespaceString())
-                  .toStringForErrorMsg();
+        ss << "ns: " << _findCommand->getNamespaceOrUUID().toStringForErrorMsg();
     } else {
-        ss << "ns: " << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
+        ss << "ns: " << toStringForLogging(_findCommand->getNamespaceOrUUID());
     }
 
     ss << " query: " << _findCommand->getFilter().toString()

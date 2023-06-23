@@ -472,6 +472,7 @@ public:
     SerializationContext serializationCtxt;
 
     // If known, the UUID of the execution namespace for this aggregation command.
+    // TODO(SERVER-78226): Replace `ns` and `uuid` with a type which can express "nss and uuid".
     boost::optional<UUID> uuid;
 
     std::string tempDir;  // Defaults to empty to prevent external sorting in mongos.

@@ -519,7 +519,7 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(
     const NamespaceStringOrUUID& nss) {
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
 
-    if (nss.uuid()) {
+    if (nss.isUUID()) {
         return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                 ActionType::useUUID);
     }

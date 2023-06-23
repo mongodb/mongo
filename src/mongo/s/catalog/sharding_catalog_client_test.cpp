@@ -104,8 +104,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionExisting) {
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
             // Ensure the query is correct
-            ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                      CollectionType::ConfigNS);
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
             ASSERT_BSONOBJ_EQ(
                 query->getFilter(),
                 BSON(CollectionType::kNssFieldName << expectedColl.getNss().ns_forTest()));
@@ -179,8 +178,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabaseExisting) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  NamespaceString::kConfigDatabasesNamespace);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
                           BSON(DatabaseType::kNameFieldName << expectedDb.getName()));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
@@ -311,8 +309,7 @@ TEST_F(ShardingCatalogClientTest, GetAllShardsValid) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  NamespaceString::kConfigsvrShardsNamespace);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigsvrShardsNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().has_value());
@@ -415,8 +412,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForNSWithSortAndLimit) {
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                      ChunkType::ConfigNS);
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
             ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
             ASSERT_BSONOBJ_EQ(query->getSort(), BSON(ChunkType::lastmod() << -1));
             ASSERT_EQ(query->getLimit().value(), 1);
@@ -481,8 +477,7 @@ TEST_F(ShardingCatalogClientTest, GetChunksForUUIDNoSortNoLimit) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  ChunkType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), ChunkType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), chunksQuery);
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
         ASSERT_FALSE(query->getLimit().has_value());
@@ -802,8 +797,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsNoDb) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
 
@@ -860,8 +854,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsValidResultsWithDb) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -903,8 +896,7 @@ TEST_F(ShardingCatalogClientTest, GetCollectionsInvalidCollectionType) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  CollectionType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), CollectionType::ConfigNS);
         {
             BSONObjBuilder b;
             b.appendRegex(CollectionType::kNssFieldName, "^test\\.");
@@ -942,8 +934,7 @@ TEST_F(ShardingCatalogClientTest, GetDatabasesForShardValid) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  NamespaceString::kConfigDatabasesNamespace);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigDatabasesNamespace);
         ASSERT_BSONOBJ_EQ(query->getFilter(),
                           BSON(DatabaseType::kPrimaryFieldName << dbt1.getPrimary()));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSONObj());
@@ -1013,8 +1004,7 @@ TEST_F(ShardingCatalogClientTest, GetTagsForCollection) {
         auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
         auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-        ASSERT_EQ(query->getNamespaceOrUUID().nss().value_or(NamespaceString()),
-                  TagsType::ConfigNS);
+        ASSERT_EQ(query->getNamespaceOrUUID().nss(), TagsType::ConfigNS);
         ASSERT_BSONOBJ_EQ(query->getFilter(), BSON(TagsType::ns("TestDB.TestColl")));
         ASSERT_BSONOBJ_EQ(query->getSort(), BSON(TagsType::min() << 1));
 
@@ -1238,8 +1228,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeys) {
             fromjson("{purpose: 'none',"
                      "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
 
-        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace,
-                  query->getNamespaceOrUUID().nss().value_or(NamespaceString()));
+        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace, query->getNamespaceOrUUID().nss());
         ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().has_value());
@@ -1292,8 +1281,7 @@ TEST_F(ShardingCatalogClientTest, GetNewKeysWithEmptyCollection) {
             fromjson("{purpose: 'none',"
                      "expiresAt: {$gt: {$timestamp: {t: 1234, i: 5678}}}}"));
 
-        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace,
-                  query->getNamespaceOrUUID().nss().value_or(NamespaceString()));
+        ASSERT_EQ(NamespaceString::kKeysCollectionNamespace, query->getNamespaceOrUUID().nss());
         ASSERT_BSONOBJ_EQ(expectedQuery, query->getFilter());
         ASSERT_BSONOBJ_EQ(BSON("expiresAt" << 1), query->getSort());
         ASSERT_FALSE(query->getLimit().has_value());

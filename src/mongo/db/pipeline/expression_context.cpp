@@ -63,22 +63,29 @@ ExpressionContext::ExpressionContext(OperationContext* opCtx,
     //
     // As we change the code to make the find and agg systems more tightly coupled, it would make
     // sense to start initializing these fields for find operations as well.
-    : ExpressionContext(opCtx,
-                        verbosity,
-                        false,  // fromMongos
-                        false,  // needsMerge
-                        findCmd.getAllowDiskUse().value_or(allowDiskUseDefault),
-                        false,  // bypassDocumentValidation
-                        false,  // isMapReduceCommand
-                        findCmd.getNamespaceOrUUID().nss().value_or(NamespaceString{}),
-                        findCmd.getLegacyRuntimeConstants(),
-                        std::move(collator),
-                        nullptr,  // mongoProcessInterface
-                        {},       // resolvedNamespaces
-                        findCmd.getNamespaceOrUUID().uuid(),
-                        findCmd.getLet(),
-                        mayDbProfile,
-                        findCmd.getSerializationContext()) {}
+    : ExpressionContext(
+          opCtx,
+          verbosity,
+          false,  // fromMongos
+          false,  // needsMerge
+          findCmd.getAllowDiskUse().value_or(allowDiskUseDefault),
+          false,  // bypassDocumentValidation
+          false,  // isMapReduceCommand
+          findCmd.getNamespaceOrUUID().isNamespaceString() ? findCmd.getNamespaceOrUUID().nss()
+                                                           : NamespaceString{},
+          findCmd.getLegacyRuntimeConstants(),
+          std::move(collator),
+          nullptr,  // mongoProcessInterface
+          {},       // resolvedNamespaces
+          [findCmd]() -> boost::optional<UUID> {
+              if (findCmd.getNamespaceOrUUID().isUUID()) {
+                  return findCmd.getNamespaceOrUUID().uuid();
+              }
+              return boost::none;
+          }(),
+          findCmd.getLet(),
+          mayDbProfile,
+          findCmd.getSerializationContext()) {}
 
 ExpressionContext::ExpressionContext(OperationContext* opCtx,
                                      const AggregateCommandRequest& request,

@@ -501,9 +501,9 @@ CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
     // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
-    PlacementConcern placementConcern = nssOrUUID.nss()
+    PlacementConcern placementConcern = nssOrUUID.isNamespaceString()
         ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()),
-                           oss.getShardVersion(*nssOrUUID.nss())}
+                           oss.getShardVersion(nssOrUUID.nss())}
         : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
     return CollectionOrViewAcquisitionRequest(
@@ -533,9 +533,9 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
     // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
-    PlacementConcern placementConcern = nssOrUUID.nss()
+    PlacementConcern placementConcern = nssOrUUID.isNamespaceString()
         ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()),
-                           oss.getShardVersion(*nssOrUUID.nss())}
+                           oss.getShardVersion(nssOrUUID.nss())}
         : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
@@ -688,7 +688,7 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
         try {
             nss = catalog->resolveNamespaceStringOrUUID(_opCtx, nsOrUUID);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.uuid());
+            invariant(nsOrUUID.isUUID());
 
             const auto readSource = _opCtx->recoveryUnit()->getTimestampReadSource();
             if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||

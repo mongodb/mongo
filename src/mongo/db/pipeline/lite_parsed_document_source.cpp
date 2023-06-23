@@ -122,9 +122,10 @@ void LiteParsedDocumentSourceNestedPipelines::getForeignExecutionNamespaces(
     for (auto&& pipeline : _pipelines) {
         auto nssVector = pipeline.getForeignExecutionNamespaces();
         for (const auto& nssOrUUID : nssVector) {
-            auto nss = nssOrUUID.nss();
-            tassert(6458500, "nss expected to contain a NamespaceString", nss != boost::none);
-            nssSet.insert(*nss);
+            tassert(6458500,
+                    "nss expected to contain a NamespaceString",
+                    nssOrUUID.isNamespaceString());
+            nssSet.insert(nssOrUUID.nss());
         }
     }
 }

@@ -209,11 +209,11 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
     // Serialize the namespace as part of the query shape.
     {
         auto ns = findCmd.getNamespaceOrUUID();
-        if (ns.nss()) {
-            bob.append("cmdNs", extractNamespaceShape(ns.nss().value(), opts));
+        if (ns.isNamespaceString()) {
+            bob.append("cmdNs", extractNamespaceShape(ns.nss(), opts));
         } else {
             BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
-            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
+            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid().toString()));
             cmdNs.append("db", opts.serializeIdentifier(ns.dbname()));
             cmdNs.done();
         }

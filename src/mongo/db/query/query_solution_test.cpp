@@ -112,11 +112,9 @@ void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& se
                                     const std::vector<NamespaceStringOrUUID>& expectedNssVector) {
     ASSERT_EQ(secondaryNssVector.size(), expectedNssVector.size());
     for (size_t i = 0; i < secondaryNssVector.size(); ++i) {
-        auto secondary = secondaryNssVector[i].nss();
-        auto expected = expectedNssVector[i].nss();
-        ASSERT(secondary != boost::none);
-        ASSERT(expected != boost::none);
-        ASSERT_EQ(*secondary, *expected);
+        ASSERT(secondaryNssVector[i].isNamespaceString());
+        ASSERT(expectedNssVector[i].isNamespaceString());
+        ASSERT_EQ(secondaryNssVector[i].nss(), expectedNssVector[i].nss());
     }
 }
 
