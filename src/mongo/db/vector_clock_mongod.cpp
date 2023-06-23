@@ -298,6 +298,12 @@ VectorClock::VectorTime VectorClockMongoD::recoverDirect(OperationContext* opCtx
     _advanceTime(
         {newDurableTime.clusterTime(), newDurableTime.configTime(), newDurableTime.topologyTime()});
 
+    LOGV2_DEBUG(1,
+                6011000,
+                "Recovered persisted vector clock",
+                "configTime"_attr = newDurableTime.configTime(),
+                "topologyTime"_attr = newDurableTime.topologyTime());
+
     return newDurableTime;
 }
 
@@ -448,10 +454,8 @@ void VectorClockMongoD::_tickTo(Component component, LogicalTime newTime) {
         return;
     }
 
-    if (component == Component::ConfigTime) {
-        // The ConfigTime is allowed to be tickTo on the ConfigServer and on the shard only when
-        // called from ShardingStateRecovery
-        // TODO SERVER-60110 re-add clusterRole == configServer condition like for TopologyTime
+    if (component == Component::ConfigTime &&
+        serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
         _advanceComponentTimeTo(component, std::move(newTime));
         return;
     }

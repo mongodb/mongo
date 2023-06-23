@@ -86,7 +86,6 @@
 #include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_local.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_util.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
@@ -980,16 +979,6 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
     if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
         if (ShardingState::get(opCtx)->enabled()) {
             VectorClockMutable::get(opCtx)->recoverDirect(opCtx);
-            Status status = ShardingStateRecovery_DEPRECATED::recover(opCtx);
-
-            // If the node is shutting down or it lost quorum just as it was becoming primary, don't
-            // run the sharding onStepUp machinery. The onStepDown counterpart to these methods is
-            // already idempotent, so the machinery will remain in the stepped down state.
-            if (ErrorCodes::isShutdownError(status.code()) ||
-                ErrorCodes::isNotPrimaryError(status.code())) {
-                return;
-            }
-            fassert(40107, status);
 
             CatalogCacheLoader::get(_service).onStepUp();
 
@@ -1003,9 +992,9 @@ void ReplicationCoordinatorExternalStateImpl::_shardingOnTransitionToPrimaryHook
             ShardingInitializationMongoD::get(opCtx)->updateShardIdentityConfigString(
                 opCtx, configsvrConnStr);
 
-            // Note, these must be done after the configOpTime is recovered via
-            // ShardingStateRecovery::recover above, because they may trigger filtering metadata
-            // refreshes which should use the recovered configOpTime.
+            // Note, these must be done after the configTime is recovered via
+            // VectorClockMutable::recoverDirect above, because they may trigger filtering metadata
+            // refreshes which should use the recovered configTime.
             migrationutil::resumeMigrationCoordinationsOnStepUp(opCtx);
             migrationutil::resumeMigrationRecipientsOnStepUp(opCtx);
 

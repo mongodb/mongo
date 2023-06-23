@@ -233,6 +233,24 @@ void dropDistLockCollections(OperationContext* opCtx) {
     }
 }
 
+// TODO SERVER-78330 remove this.
+void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    const auto commandResponse = client.runCommand([&] {
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kServerConfigurationNamespace);
+        deleteOp.setDeletes(
+            {[&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON("_id"
+                                << "minOpTimeRecovery"));
+                entry.setMulti(false);
+                return entry;
+            }()});
+        return deleteOp.serialize({});
+    }());
+    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
+}
+
 void uassertStatusOKIgnoreNSNotFound(Status status) {
     if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
         return;
@@ -702,6 +720,13 @@ private:
             _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
         }
+
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            // Delete any possible leftover ShardingStateRecovery document.
+            // TODO SERVER-78330 remove this.
+            deleteShardingStateRecoveryDoc(opCtx);
+        }
+
         _removeRecordPreImagesCollectionOption(opCtx);
     }
 

@@ -139,29 +139,6 @@ const newShardName =
 
 {
     //
-    // ShardingStateRecovery doesn't block step up.
-    //
-
-    assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {skey: 0}, to: configShardName}));
-
-    const hangMigrationFp = configureFailPoint(st.configRS.getPrimary(), "moveChunkHangAtStep5");
-    const moveChunkThread = new Thread(function(mongosHost, ns, newShardName) {
-        const mongos = new Mongo(mongosHost);
-        assert.commandWorked(
-            mongos.adminCommand({moveChunk: ns, find: {skey: 0}, to: newShardName}));
-    }, st.s.host, ns, newShardName);
-    moveChunkThread.start();
-    hangMigrationFp.wait();
-
-    // Stepping up shouldn't hang because of ShardingStateRecovery.
-    st.configRS.stepUp(st.configRS.getSecondary());
-
-    hangMigrationFp.off();
-    moveChunkThread.join();
-}
-
-{
-    //
     // Collections on the config server support changeStreamPreAndPostImages when the config server
     // is acting as a shard.
     //

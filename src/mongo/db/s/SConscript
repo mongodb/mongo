@@ -213,7 +213,6 @@ env.Library(
         'sharding_initialization_mongod.cpp',
         'sharding_recovery_service.cpp',
         'sharding_runtime_d_params.idl',
-        'sharding_state_recovery.cpp',
         'split_chunk.cpp',
         'split_vector.cpp',
         'start_chunk_clone_request.cpp',

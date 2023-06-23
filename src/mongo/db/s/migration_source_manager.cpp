@@ -45,7 +45,6 @@
 #include "mongo/db/s/sharding_logging.h"
 #include "mongo/db/s/sharding_runtime_d_params_gen.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/type_shard_collection.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
@@ -400,16 +399,13 @@ void MigrationSourceManager::enterCriticalSection() {
     if (!metadata.getChunkManager()->getVersion(_args.getToShard()).isSet()) {
         migrationutil::notifyChangeStreamsOnRecipientFirstChunk(
             _opCtx, nss(), _args.getFromShard(), _args.getToShard(), _collectionUUID);
-    }
 
-    // Mark the shard as running critical operation, which requires recovery on crash.
-    //
-    // NOTE: The 'migrateChunkToNewShard' oplog message written by the above call to
-    // 'notifyChangeStreamsOnRecipientFirstChunk' depends on this majority write to carry its local
-    // write to majority committed.
-    // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
-    uassertStatusOKWithContext(ShardingStateRecovery_DEPRECATED::startMetadataOp(_opCtx),
-                               "Start metadata op");
+        // Wait for the above 'migrateChunkToNewShard' oplog message to be majority acknowledged.
+        WriteConcernResult ignoreResult;
+        auto latestOpTime = repl::ReplClientInfo::forClient(_opCtx->getClient()).getLastOp();
+        uassertStatusOK(waitForWriteConcern(
+            _opCtx, latestOpTime, WriteConcerns::kMajorityWriteConcernNoTimeout, &ignoreResult));
+    }
 
     LOGV2_DEBUG_OPTIONS(4817402,
                         2,
@@ -761,24 +757,15 @@ void MigrationSourceManager::_cleanup(bool completeMigration) noexcept {
             if (_state >= kCriticalSection && _state <= kCommittingOnConfig) {
                 _stats.totalCriticalSectionTimeMillis.addAndFetch(_cloneAndCommitTimer.millis());
 
-                // NOTE: The order of the operations below is important and the comments explain the
-                // reasoning behind it.
-                //
                 // Wait for the updates to the cache of the routing table to be fully written to
-                // disk before clearing the 'minOpTime recovery' document. This way, we ensure that
-                // all nodes from a shard, which donated a chunk will always be at the placement
-                // version of the last migration it performed.
+                // disk. This way, we ensure that all nodes from a shard which donated a chunk will
+                // always be at the placement version of the last migration it performed.
                 //
                 // If the metadata is not persisted before clearing the 'inMigration' flag below, it
                 // is possible that the persisted metadata is rolled back after step down, but the
                 // write which cleared the 'inMigration' flag is not, a secondary node will report
                 // itself at an older placement version.
                 CatalogCacheLoader::get(newOpCtx).waitForCollectionFlush(newOpCtx, nss());
-
-                // Clear the 'minOpTime recovery' document so that the next time a node from this
-                // shard becomes a primary, it won't have to recover the config server optime.
-                // TODO (SERVER-60110): Remove once 7.0 becomes last LTS.
-                ShardingStateRecovery_DEPRECATED::endMetadataOp(newOpCtx);
             }
             if (completeMigration) {
                 // This can be called on an exception path after the OperationContext has been

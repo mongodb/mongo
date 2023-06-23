@@ -160,7 +160,6 @@
 #include "mongo/db/s/shard_server_op_observer.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_initialization_mongod.h"
-#include "mongo/db/s/sharding_state_recovery.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
@@ -768,15 +767,6 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
         }
 
         startFreeMonitoring(serviceContext);
-
-        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            // Note: For replica sets, ShardingStateRecovery happens on transition to primary.
-            if (!replCoord->isReplEnabled()) {
-                if (ShardingState::get(startupOpCtx.get())->enabled()) {
-                    uassertStatusOK(ShardingStateRecovery_DEPRECATED::recover(startupOpCtx.get()));
-                }
-            }
-        }
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             initializeGlobalShardingStateForConfigServerIfNeeded(startupOpCtx.get());
