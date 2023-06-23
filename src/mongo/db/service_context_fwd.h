@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2022-present MongoDB, Inc.
+ *    Copyright (C) 2018-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,32 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
+#pragma once
 
 namespace mongo {
-namespace {
 
-class TransactionResourcesNonMongoDClientObserver : public ServiceContext::ClientObserver {
-public:
-    TransactionResourcesNonMongoDClientObserver() = default;
-    ~TransactionResourcesNonMongoDClientObserver() = default;
+class ServiceContext;
 
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) final {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-ServiceContext::ConstructorActionRegisterer transactionResourcesConstructor{
-    "TransactionResourcesConstructor", [](ServiceContext* service) {
-        service->registerClientObserver(
-            std::make_unique<TransactionResourcesNonMongoDClientObserver>());
-    }};
-
-}  // namespace
 }  // namespace mongo

@@ -160,19 +160,20 @@ class ScopedCollectionOrViewAcquisition;
 
 class ScopedCollectionAcquisition {
 public:
-    ScopedCollectionAcquisition(OperationContext* opCtx,
-                                shard_role_details::AcquiredCollection& acquiredCollection);
+    ScopedCollectionAcquisition(const mongo::ScopedCollectionAcquisition&) = delete;
 
-    ScopedCollectionAcquisition(ScopedCollectionAcquisition&& other)
-        : _txnResources(other._txnResources), _acquiredCollection(other._acquiredCollection) {
-        other._txnResources = nullptr;
+    ScopedCollectionAcquisition(mongo::ScopedCollectionAcquisition&& other)
+        : _opCtx(other._opCtx), _acquiredCollection(other._acquiredCollection) {
+        other._opCtx = nullptr;
     }
+
+    ~ScopedCollectionAcquisition();
 
     explicit ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other);
 
-    ScopedCollectionAcquisition(const ScopedCollectionAcquisition&) = delete;
-
-    ~ScopedCollectionAcquisition();
+    ScopedCollectionAcquisition(OperationContext* opCtx,
+                                shard_role_details::AcquiredCollection& acquiredCollection)
+        : _opCtx(opCtx), _acquiredCollection(acquiredCollection) {}
 
     const NamespaceString& nss() const {
         return _acquiredCollection.prerequisites.nss;
@@ -195,6 +196,7 @@ public:
     // stack
 
     // Sharding catalog services
+
     const ScopedCollectionDescription& getShardingDescription() const;
     const boost::optional<ScopedCollectionFilter>& getShardingFilter() const;
 
@@ -204,25 +206,28 @@ public:
 private:
     friend class ScopedLocalCatalogWriteFence;
 
+    OperationContext* _opCtx;
+
     // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
-    // lifetime of these resources is tied to the lifetime of this ScopedCollectionAcquisition.
-    shard_role_details::TransactionResources* _txnResources;
+    // lifetime of these resources is tied to the lifetime of this
+    // ScopedCollectionOrViewAcquisition.
     shard_role_details::AcquiredCollection& _acquiredCollection;
 };
 
 class ScopedViewAcquisition {
 public:
-    ScopedViewAcquisition(OperationContext* opCtx,
-                          const shard_role_details::AcquiredView& acquiredView);
+    ScopedViewAcquisition(const mongo::ScopedViewAcquisition&) = delete;
 
-    ScopedViewAcquisition(ScopedViewAcquisition&& other)
-        : _txnResources(other._txnResources), _acquiredView(other._acquiredView) {
-        other._txnResources = nullptr;
+    ScopedViewAcquisition(mongo::ScopedViewAcquisition&& other)
+        : _opCtx(other._opCtx), _acquiredView(other._acquiredView) {
+        other._opCtx = nullptr;
     }
 
-    ScopedViewAcquisition(const ScopedViewAcquisition&) = delete;
-
     ~ScopedViewAcquisition();
+
+    ScopedViewAcquisition(OperationContext* opCtx,
+                          const shard_role_details::AcquiredView& acquiredView)
+        : _opCtx(opCtx), _acquiredView(acquiredView) {}
 
     const NamespaceString& nss() const {
         return _acquiredView.prerequisites.nss;
@@ -235,9 +240,11 @@ public:
     }
 
 private:
+    OperationContext* _opCtx;
+
     // Points to the acquired resources that live on the TransactionResources opCtx decoration. The
-    // lifetime of these resources is tied to the lifetime of this ScopedViewAcquisition.
-    shard_role_details::TransactionResources* _txnResources;
+    // lifetime of these resources is tied to the lifetime of this
+    // ScopedCollectionOrViewAcquisition.
     const shard_role_details::AcquiredView& _acquiredView;
 };
 
@@ -248,14 +255,6 @@ public:
 
     ScopedCollectionOrViewAcquisition(ScopedViewAcquisition&& view)
         : _collectionOrViewAcquisition(std::move(view)) {}
-
-    const NamespaceString& nss() const {
-        if (isCollection()) {
-            return getCollection().nss();
-        } else {
-            return getView().nss();
-        }
-    }
 
     bool isCollection() const {
         return std::holds_alternative<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
@@ -283,9 +282,17 @@ public:
         return std::get<ScopedViewAcquisition>(_collectionOrViewAcquisition);
     }
 
-private:
+    const NamespaceString& nss() const {
+        if (isCollection()) {
+            return getCollection().nss();
+        } else {
+            return getView().nss();
+        }
+    }
+
     friend class ScopedCollectionAcquisition;
 
+private:
     std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition, std::monostate>
         _collectionOrViewAcquisition;
 };
@@ -351,11 +358,10 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
 class ScopedLocalCatalogWriteFence {
 public:
     ScopedLocalCatalogWriteFence(OperationContext* opCtx, ScopedCollectionAcquisition* acquisition);
+    ~ScopedLocalCatalogWriteFence();
 
     ScopedLocalCatalogWriteFence(ScopedLocalCatalogWriteFence&) = delete;
     ScopedLocalCatalogWriteFence(ScopedLocalCatalogWriteFence&&) = delete;
-
-    ~ScopedLocalCatalogWriteFence();
 
 private:
     static void _updateAcquiredLocalCollection(
@@ -370,13 +376,16 @@ private:
  * `yieldTransactionResources`. Must never be destroyed without having been restored and the
  * transaction resources properly committed/aborted, or disposed of.
  */
-struct YieldedTransactionResources {
-    YieldedTransactionResources(
-        std::unique_ptr<shard_role_details::TransactionResources> yieldedResources);
+class YieldedTransactionResources {
+public:
+    ~YieldedTransactionResources();
+
+    YieldedTransactionResources() = default;
 
     YieldedTransactionResources(YieldedTransactionResources&&) = default;
 
-    ~YieldedTransactionResources();
+    YieldedTransactionResources(
+        std::unique_ptr<shard_role_details::TransactionResources>&& yieldedResources);
 
     /**
      * Releases the yielded TransactionResources.
@@ -387,20 +396,13 @@ struct YieldedTransactionResources {
 };
 
 /**
- * This method puts the TransactionResources associated with the current OpCtx into the yielded
- * state and then detaches them from the OpCtx, moving their ownership to the returned object.
- *
- * The returned object must either be properly restored by a later call to
- * `restoreTransactionResourcesToOperationContext` or it must be `.dispose()`d of before
- * destruction.
- *
- * It is not always allowed to yield the transaction resources and it is the caller's responsibility
- * to verify a yield can be performed by calling Locker::canSaveLockState().
+ * Yields the TransactionResources from the opCtx. It's the callers responsibility to verify a yield
+ * can be performed by calling Locker::canSaveLockState().
  */
 YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx);
 
-void restoreTransactionResourcesToOperationContext(
-    OperationContext* opCtx, YieldedTransactionResources yieldedResourcesHolder);
+void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
+                                                   YieldedTransactionResources&& yieldedResources);
 
 /**
  * TODO SERVER-77405 remove, make internal only.
@@ -424,6 +426,7 @@ private:
     OperationContext* _opCtx{nullptr};
     boost::optional<bool> _originalSettings;
 };
+
 
 namespace shard_role_details {
 class SnapshotAttempt {

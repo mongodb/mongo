@@ -29,8 +29,6 @@
 
 #include "mongo/db/transaction_resources.h"
 
-#include "mongo/db/concurrency/locker_impl.h"
-
 namespace mongo {
 
 const PlacementConcern AcquisitionPrerequisites::kPretendUnsharded =
@@ -38,9 +36,6 @@ const PlacementConcern AcquisitionPrerequisites::kPretendUnsharded =
 
 namespace shard_role_details {
 namespace {
-
-auto getTransactionResources = OperationContext::declareDecoration<
-    std::unique_ptr<shard_role_details::TransactionResources>>();
 
 /**
  * This method ensures that two read concerns are equivalent for the purposes of acquiring a
@@ -68,25 +63,6 @@ TransactionResources::~TransactionResources() {
     invariant(!yieldedRecoveryUnit);
     invariant(acquiredCollections.empty());
     invariant(acquiredViews.empty());
-}
-
-TransactionResources& TransactionResources::get(OperationContext* opCtx) {
-    auto& transactionResources = getTransactionResources(opCtx);
-    return *transactionResources;
-}
-
-std::unique_ptr<TransactionResources> TransactionResources::detachFromOpCtx(
-    OperationContext* opCtx) {
-    auto& transactionResources = getTransactionResources(opCtx);
-    invariant(transactionResources);
-    return std::move(transactionResources);
-}
-
-void TransactionResources::attachToOpCtx(
-    OperationContext* opCtx, std::unique_ptr<TransactionResources> newTransactionResources) {
-    auto& transactionResources = getTransactionResources(opCtx);
-    invariant(!transactionResources);
-    transactionResources = std::move(newTransactionResources);
 }
 
 AcquiredCollection& TransactionResources::addAcquiredCollection(

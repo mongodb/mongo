@@ -29,6 +29,7 @@
 
 #include "mongo/db/shard_role.h"
 
+#include "storage/snapshot_helper.h"
 #include <boost/utility/in_place_factory.hpp>
 #include <map>
 
@@ -41,22 +42,30 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/storage/capped_snapshots.h"
-#include "mongo/db/storage/snapshot_helper.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
 namespace mongo {
-
-using TransactionResources = shard_role_details::TransactionResources;
-
 namespace {
 
 // TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
 // If set to false, secondary reads should wait behind the PBW lock.
 const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
     OperationContext::declareDecoration<boost::optional<bool>>();
+
+auto getTransactionResources = OperationContext::declareDecoration<
+    std::unique_ptr<shard_role_details::TransactionResources>>();
+
+shard_role_details::TransactionResources& getOrMakeTransactionResources(OperationContext* opCtx) {
+    auto& optTransactionResources = getTransactionResources(opCtx);
+    if (!optTransactionResources) {
+        optTransactionResources = std::make_unique<shard_role_details::TransactionResources>();
+    }
+
+    return *optTransactionResources;
+}
 
 struct ResolvedNamespaceOrViewAcquisitionRequest {
     // Populated in the first phase of collection(s) acquisition.
@@ -297,7 +306,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
                     acquisitionRequest.second.collLock);
 
         auto& prerequisites = acquisitionRequest.second.prerequisites;
-        auto& txnResources = TransactionResources::get(opCtx);
+        auto& txnResources = getOrMakeTransactionResources(opCtx);
         auto snapshotedServices = acquireServicesSnapshot(opCtx, catalog, prerequisites);
         const bool isCollection =
             std::holds_alternative<CollectionPtr>(snapshotedServices.collectionPtrOrView);
@@ -339,12 +348,13 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
             acquisitions.emplace_back(std::move(scopedAcquisition));
         } else {
             // It's a view.
-            auto& acquiredView = TransactionResources::get(opCtx).addAcquiredView(
-                {prerequisites,
-                 std::move(acquisitionRequest.second.dbLock),
-                 std::move(acquisitionRequest.second.collLock),
-                 std::move(std::get<std::shared_ptr<const ViewDefinition>>(
-                     snapshotedServices.collectionPtrOrView))});
+            const shard_role_details::AcquiredView& acquiredView =
+                getOrMakeTransactionResources(opCtx).addAcquiredView(
+                    {prerequisites,
+                     std::move(acquisitionRequest.second.dbLock),
+                     std::move(acquisitionRequest.second.collLock),
+                     std::move(std::get<std::shared_ptr<const ViewDefinition>>(
+                         snapshotedServices.collectionPtrOrView))});
 
             ScopedViewAcquisition scopedAcquisition(opCtx, acquiredView);
             acquisitions.emplace_back(std::move(scopedAcquisition));
@@ -541,36 +551,14 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
 }
 
-ScopedCollectionAcquisition::ScopedCollectionAcquisition(
-    OperationContext* opCtx, shard_role_details::AcquiredCollection& acquiredCollection)
-    : _txnResources(&TransactionResources::get(opCtx)), _acquiredCollection(acquiredCollection) {}
-
 ScopedCollectionAcquisition::ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other)
-    : _txnResources(
-          (invariant(other.isCollection()),
-           get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._txnResources)),
+    : _opCtx((invariant(other.isCollection()),
+              get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._opCtx)),
       _acquiredCollection(get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)
                               ._acquiredCollection) {
-    get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._txnResources = nullptr;
+    get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._opCtx = nullptr;
     other._collectionOrViewAcquisition = std::monostate();
-}
-
-ScopedCollectionAcquisition::~ScopedCollectionAcquisition() {
-    if (!_txnResources)
-        return;
-
-    auto& transactionResources = *_txnResources;
-
-    transactionResources.acquiredCollections.remove_if(
-        [this](const shard_role_details::AcquiredCollection& txnResourceAcquiredColl) {
-            return &txnResourceAcquiredColl == &_acquiredCollection;
-        });
-
-    if (transactionResources.acquiredCollections.empty() &&
-        transactionResources.acquiredViews.empty()) {
-        transactionResources.releaseAllResourcesOnCommitOrAbort();
-    }
-}
+};
 
 UUID ScopedCollectionAcquisition::uuid() const {
     invariant(exists(),
@@ -604,24 +592,35 @@ const CollectionPtr& ScopedCollectionAcquisition::getCollectionPtr() const {
     return _acquiredCollection.collectionPtr;
 }
 
-ScopedViewAcquisition::ScopedViewAcquisition(OperationContext* opCtx,
-                                             const shard_role_details::AcquiredView& acquiredView)
-    : _txnResources(&TransactionResources::get(opCtx)), _acquiredView(acquiredView) {}
+ScopedCollectionAcquisition::~ScopedCollectionAcquisition() {
+    if (_opCtx) {
+        const auto& transactionResources = getTransactionResources(_opCtx);
+        if (transactionResources) {
+            transactionResources->acquiredCollections.remove_if(
+                [this](const shard_role_details::AcquiredCollection& txnResourceAcquiredColl) {
+                    return &txnResourceAcquiredColl == &(this->_acquiredCollection);
+                });
+            if (transactionResources->acquiredCollections.empty() &&
+                transactionResources->acquiredViews.empty()) {
+                transactionResources->releaseAllResourcesOnCommitOrAbort();
+            }
+        }
+    }
+}
 
 ScopedViewAcquisition::~ScopedViewAcquisition() {
-    if (!_txnResources)
-        return;
-
-    auto& transactionResources = *_txnResources;
-
-    transactionResources.acquiredViews.remove_if(
-        [this](const shard_role_details::AcquiredView& txnResourceAcquiredView) {
-            return &txnResourceAcquiredView == &_acquiredView;
-        });
-
-    if (transactionResources.acquiredCollections.empty() &&
-        transactionResources.acquiredViews.empty()) {
-        transactionResources.releaseAllResourcesOnCommitOrAbort();
+    if (_opCtx) {
+        const auto& transactionResources = getTransactionResources(_opCtx);
+        if (transactionResources) {
+            transactionResources->acquiredViews.remove_if(
+                [this](const shard_role_details::AcquiredView& txnResourceAcquiredView) {
+                    return &txnResourceAcquiredView == &(this->_acquiredView);
+                });
+            if (transactionResources->acquiredCollections.empty() &&
+                transactionResources->acquiredViews.empty()) {
+                transactionResources->releaseAllResourcesOnCommitOrAbort();
+            }
+        }
     }
 }
 
@@ -669,8 +668,8 @@ ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
     invariant(acquisition.size() == 1);
     return std::move(acquisition.front());
 }
-
 namespace shard_role_details {
+
 void SnapshotAttempt::snapshotInitialState() {
     // The read source used can change depending on replication state, so we must fetch the repl
     // state beforehand, to compare with afterwards.
@@ -712,21 +711,19 @@ void SnapshotAttempt::openStorageSnapshot() {
     // It is safe to establish the capped snapshot here, on the Collection object in the latest
     // version of the catalog, even if establishConsistentCollection is eventually called to
     // construct a Collection object from the durable catalog because the only way that can be
-    // required for a collection that uses capped snapshots (i.e. a collection that is
-    // unreplicated and capped) is:
-    //  * The present read operation is reading without a timestamp (since unreplicated
-    //  collections
+    // required for a collection that uses capped snapshots (i.e. a collection that is unreplicated
+    // and capped) is:
+    //  * The present read operation is reading without a timestamp (since unreplicated collections
     //    don't support timestamped reads), and
-    //  * When opening the storage snapshot (and thus when establishing the capped snapshot),
-    //  there
-    //    was a DDL operation pending on the namespace or UUID requested for this read (because
-    //    this is the only time we need to construct a Collection object from the durable
-    //    catalog for an untimestamped read).
+    //  * When opening the storage snapshot (and thus when establishing the capped snapshot), there
+    //    was a DDL operation pending on the namespace or UUID requested for this read (because this
+    //    is the only time we need to construct a Collection object from the durable catalog for an
+    //    untimestamped read).
     //
     // Because DDL operations require a collection X lock, there cannot have been any ongoing
-    // concurrent writes to the collection while establishing the capped snapshot. This means
-    // that if there was a capped snapshot, it should not have contained any uncommitted writes,
-    // and so the _lowestUncommittedRecord must be null.
+    // concurrent writes to the collection while establishing the capped snapshot. This means that
+    // if there was a capped snapshot, it should not have contained any uncommitted writes, and so
+    // the _lowestUncommittedRecord must be null.
     for (auto& nssOrUUID : _acquisitionRequests) {
         establishCappedSnapshotIfNeeded(_opCtx, *_catalogBeforeSnapshot, nssOrUUID);
     }
@@ -965,7 +962,7 @@ ScopedCollectionAcquisition acquireCollectionForLocalCatalogOnlyWithPotentialDat
     OperationContext* opCtx, const NamespaceString& nss, LockMode mode) {
     invariant(!OperationShardingState::isComingFromRouter(opCtx));
 
-    auto& txnResources = TransactionResources::get(opCtx);
+    auto& txnResources = getOrMakeTransactionResources(opCtx);
     txnResources.assertNoAcquiredCollections();
 
     auto dbLock = std::make_shared<Lock::DBLock>(
@@ -1045,27 +1042,31 @@ void ScopedLocalCatalogWriteFence::_updateAcquiredLocalCollection(
     }
 }
 
-YieldedTransactionResources::YieldedTransactionResources(
-    std::unique_ptr<TransactionResources> yieldedResources)
-    : _yieldedResources(std::move(yieldedResources)) {}
-
-void YieldedTransactionResources::dispose() {
-    if (!_yieldedResources)
-        return;
-
-    _yieldedResources->releaseAllResourcesOnCommitOrAbort();
-    _yieldedResources.reset();
-}
-
 YieldedTransactionResources::~YieldedTransactionResources() {
     invariant(!_yieldedResources);
 }
 
-YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx) {
-    auto& transactionResources = TransactionResources::get(opCtx);
-    invariant(!transactionResources.yielded);
+YieldedTransactionResources::YieldedTransactionResources(
+    std::unique_ptr<shard_role_details::TransactionResources>&& yieldedResources)
+    : _yieldedResources(std::move(yieldedResources)) {}
 
-    for (auto& acquisition : transactionResources.acquiredCollections) {
+void YieldedTransactionResources::dispose() {
+    if (_yieldedResources) {
+        _yieldedResources->releaseAllResourcesOnCommitOrAbort();
+        _yieldedResources.reset();
+    }
+}
+
+YieldedTransactionResources yieldTransactionResourcesFromOperationContext(OperationContext* opCtx) {
+    auto& transactionResources = getTransactionResources(opCtx);
+    if (!transactionResources) {
+        return YieldedTransactionResources();
+    }
+
+    invariant(!transactionResources->yielded);
+
+
+    for (auto& acquisition : transactionResources->acquiredCollections) {
         // Yielding kLocalCatalogOnlyWithPotentialDataLoss acquisitions is not allowed.
         invariant(
             !stdx::holds_alternative<AcquisitionPrerequisites::PlacementConcernPlaceholder>(
@@ -1077,44 +1078,46 @@ YieldedTransactionResources yieldTransactionResourcesFromOperationContext(Operat
     // Yielding view acquisitions is not supported.
     tassert(7300502,
             "Yielding view acquisitions is forbidden",
-            transactionResources.acquiredViews.empty());
+            transactionResources->acquiredViews.empty());
 
-    invariant(!transactionResources.yieldedLocker);
+    invariant(!transactionResources->yieldedLocker);
     Locker::LockSnapshot lockSnapshot;
     opCtx->lockState()->saveLockStateAndUnlock(&lockSnapshot);
 
-    transactionResources.yieldedLocker.emplace(std::move(lockSnapshot));
-    transactionResources.yielded = true;
+    transactionResources->yieldedLocker.emplace(std::move(lockSnapshot));
+    transactionResources->yielded = true;
 
-    return YieldedTransactionResources(TransactionResources::detachFromOpCtx(opCtx));
+    return YieldedTransactionResources(std::move(transactionResources));
 }
 
-void restoreTransactionResourcesToOperationContext(
-    OperationContext* opCtx, YieldedTransactionResources yieldedResourcesHolder) {
-    if (!yieldedResourcesHolder._yieldedResources) {
+void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
+                                                   YieldedTransactionResources&& yieldedResources) {
+    if (!yieldedResources._yieldedResources) {
         // Nothing to restore.
         return;
     }
 
-    TransactionResources::attachToOpCtx(opCtx, std::move(yieldedResourcesHolder._yieldedResources));
-    auto& transactionResources = TransactionResources::get(opCtx);
-
     // On failure to restore, release the yielded resources.
-    ScopeGuard scopeGuard([&] { transactionResources.releaseAllResourcesOnCommitOrAbort(); });
+    ScopeGuard scopeGuard([&] {
+        yieldedResources._yieldedResources->releaseAllResourcesOnCommitOrAbort();
+        yieldedResources._yieldedResources.reset();
+    });
 
-    auto restoreFn = [&] {
+    auto restoreFn = [&]() {
         // Reacquire locks.
-        if (transactionResources.yieldedLocker) {
-            opCtx->lockState()->restoreLockState(opCtx, *transactionResources.yieldedLocker);
-            transactionResources.yieldedLocker.reset();
+        if (yieldedResources._yieldedResources->yieldedLocker) {
+            opCtx->lockState()->restoreLockState(
+                opCtx, *yieldedResources._yieldedResources->yieldedLocker);
+            yieldedResources._yieldedResources->yieldedLocker.reset();
         }
 
         // Reestablish a consistent catalog snapshot (multi document transactions don't yield).
-        auto requests = toNamespaceStringOrUUIDs(transactionResources.acquiredCollections);
+        auto requests =
+            toNamespaceStringOrUUIDs(yieldedResources._yieldedResources->acquiredCollections);
         auto catalog = getConsistentCatalogAndSnapshot(opCtx, requests);
 
         // Reacquire service snapshots. Will throw if placement concern can no longer be met.
-        for (auto& acquiredCollection : transactionResources.acquiredCollections) {
+        for (auto& acquiredCollection : yieldedResources._yieldedResources->acquiredCollections) {
             const auto& prerequisites = acquiredCollection.prerequisites;
 
             auto uassertCollectionAppearedAfterRestore = [&] {
@@ -1173,8 +1176,8 @@ void restoreTransactionResourcesToOperationContext(
                 acquiredCollection.ownershipFilter =
                     std::move(reacquiredServicesSnapshot.ownershipFilter);
             }
-
-            // TODO: This will be removed when we no longer snapshot sharding state on CollectionPtr
+            // TODO: This will be removed when we no longer snapshot sharding state on
+            // CollectionPtr.
             invariant(acquiredCollection.collectionDescription);
             if (acquiredCollection.collectionDescription->isSharded()) {
                 acquiredCollection.collectionPtr.setShardKeyPattern(
@@ -1196,10 +1199,10 @@ void restoreTransactionResourcesToOperationContext(
                     // the point we had left. We do this to prevent large multi-writes from
                     // repeatedly failing due to StaleConfig and exhausting the mongos retry
                     // attempts. Yield the locks.
-                    transactionResources.yieldedLocker.emplace();
+                    yieldedResources._yieldedResources->yieldedLocker.emplace();
                     opCtx->recoveryUnit()->abandonSnapshot();
                     opCtx->lockState()->saveLockStateAndUnlock(
-                        transactionResources.yieldedLocker.get_ptr());
+                        yieldedResources._yieldedResources->yieldedLocker.get_ptr());
                     // Wait for the critical section to finish.
                     OperationShardingState::waitForCriticalSectionToComplete(
                         opCtx, *ex->getCriticalSectionSignal())
@@ -1212,12 +1215,12 @@ void restoreTransactionResourcesToOperationContext(
         }
     }();
 
-    transactionResources.yielded = false;
-
+    // Restore TransactionsResource on opCtx.
+    yieldedResources._yieldedResources->yielded = false;
+    getTransactionResources(opCtx) = std::move(yieldedResources)._yieldedResources;
     if (!opCtx->inMultiDocumentTransaction()) {
         CollectionCatalog::stash(opCtx, catalog);
     }
-
     scopeGuard.dismiss();
 }
 
