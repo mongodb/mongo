@@ -51,4 +51,5 @@ const assertIndexCorruption = (executionStats) => {
         executionStats.forEach(stats => assertIndexCorruption(stats));
     }
 };
+assertIndexCorruption(explain.executionStats);
 })();
