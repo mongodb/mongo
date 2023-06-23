@@ -28,16 +28,22 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/scatter_gather_runner.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <functional>
+#include <mutex>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
+#include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 

@@ -27,23 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/ftdc_test.h"
-
-#include <boost/filesystem.hpp>
+#include <algorithm>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <iostream>
 #include <memory>
+#include <tuple>
 
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/init.h"
-#include "mongo/bson/bson_validate.h"
-#include "mongo/db/client.h"
+#include <boost/filesystem/path.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/ftdc/ftdc_test.h"
+#include "mongo/db/ftdc/util.h"
 #include "mongo/db/service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo {

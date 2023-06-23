@@ -27,20 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/collation/collator_factory_icu.h"
-
 #include <memory>
-
+#include <string>
 #include <unicode/coll.h>
 #include <unicode/errorcode.h>
 #include <unicode/ucol.h>
 #include <unicode/uvernum.h>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <unicode/locid.h>
+#include <unicode/uloc.h>
+#include <unicode/utypes.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/query/collation/collation_spec.h"
+#include "mongo/db/query/collation/collator_factory_icu.h"
 #include "mongo/db/query/collation/collator_interface_icu.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

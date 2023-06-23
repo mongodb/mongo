@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 
 namespace mongo {

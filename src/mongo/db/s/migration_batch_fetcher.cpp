@@ -28,6 +28,32 @@
  */
 
 #include "mongo/db/s/migration_batch_fetcher.h"
+
+#include <functional>
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/s/migration_batch_mock_inserter.h"
+#include "mongo/db/s/sharding_runtime_d_params_gen.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

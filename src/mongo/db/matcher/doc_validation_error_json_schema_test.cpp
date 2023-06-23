@@ -27,9 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstring>
+#include <sys/types.h>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/doc_validation_error_test.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

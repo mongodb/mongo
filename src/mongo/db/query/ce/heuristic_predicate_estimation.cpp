@@ -29,8 +29,20 @@
 
 #include "mongo/db/query/ce/heuristic_predicate_estimation.h"
 
+#include <boost/optional.hpp>
+#include <cmath>
+#include <initializer_list>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/bound_utils.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/ce_math.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::ce {
 

@@ -30,9 +30,13 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/file_manager.h"
@@ -40,6 +44,7 @@
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 

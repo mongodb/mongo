@@ -29,15 +29,33 @@
 
 #pragma once
 
+#include <boost/container_hash/extensions.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_info.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/container_size_helper.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace sbe {

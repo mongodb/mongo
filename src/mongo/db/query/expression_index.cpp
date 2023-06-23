@@ -30,18 +30,30 @@
 
 #include "mongo/db/query/expression_index.h"
 
-#include <iostream>
+#include <algorithm>
+#include <memory>
 #include <s2cellid.h>
 #include <s2region.h>
 #include <s2regioncoverer.h>
+#include <set>
+#include <string>
 #include <unordered_set>
+#include <utility>
 
-#include "mongo/db/geo/geoconstants.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/r2_region_coverer.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/index/expression_params.h"
 #include "mongo/db/query/expression_index_knobs_gen.h"
+#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

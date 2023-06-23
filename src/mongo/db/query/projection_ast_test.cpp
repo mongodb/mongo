@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <map>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <functional>
+#include <limits>
 #include <string>
-#include <vector>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/query_planner_test_fixture.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/serialization_options.h"
-#include "mongo/unittest/inline_auto_update.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace {
 

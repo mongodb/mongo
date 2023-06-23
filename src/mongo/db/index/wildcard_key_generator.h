@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 

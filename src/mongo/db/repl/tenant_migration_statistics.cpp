@@ -29,6 +29,10 @@
 
 #include "mongo/db/repl/tenant_migration_statistics.h"
 
+#include <utility>
+
+#include "mongo/util/decorable.h"
+
 namespace mongo {
 
 // static

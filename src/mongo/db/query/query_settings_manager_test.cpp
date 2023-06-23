@@ -28,28 +28,43 @@
  */
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <iterator>
+#include <memory>
+#include <variant>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_hint.h"
 #include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/query/query_shape.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/serialization_context.h"
 
 namespace mongo::query_settings {
 namespace {

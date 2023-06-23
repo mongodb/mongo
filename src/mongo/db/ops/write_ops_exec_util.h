@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo::write_ops_exec {
 

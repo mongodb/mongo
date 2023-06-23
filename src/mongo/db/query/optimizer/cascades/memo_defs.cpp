@@ -29,6 +29,12 @@
 
 #include "mongo/db/query/optimizer/cascades/memo_defs.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/utils/abt_hash.h"
 
 

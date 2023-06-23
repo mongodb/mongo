@@ -30,12 +30,16 @@
 #pragma once
 
 #include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/initial_syncer_interface.h"
 #include "mongo/db/repl/replication_process.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/string_map.h"
 

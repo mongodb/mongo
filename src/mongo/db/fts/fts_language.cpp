@@ -31,17 +31,16 @@
 
 #include <algorithm>
 #include <fmt/format.h>
+#include <functional>
 #include <map>
 #include <memory>
 #include <string>
 #include <type_traits>
-#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
-#include "mongo/db/fts/fts_basic_phrase_matcher.h"
 #include "mongo/db/fts/fts_basic_tokenizer.h"
-#include "mongo/db/fts/fts_unicode_phrase_matcher.h"
+#include "mongo/db/fts/fts_tokenizer.h"
 #include "mongo/db/fts/fts_unicode_tokenizer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"

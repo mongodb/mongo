@@ -29,8 +29,18 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/type_index_catalog.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

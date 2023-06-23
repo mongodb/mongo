@@ -29,6 +29,14 @@
 
 #include "mongo/db/query/interval.h"
 
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+
 namespace mongo {
 
 using std::string;

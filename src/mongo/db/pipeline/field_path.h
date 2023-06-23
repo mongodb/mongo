@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <compare>
+#include <cstddef>
 #include <limits>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/exec/document_value/document_internal.h"

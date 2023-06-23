@@ -30,12 +30,17 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <mutex>
 #include <queue>
 #include <vector>
 
 #include "mongo/db/free_mon/free_mon_message.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/time_support.h"
 

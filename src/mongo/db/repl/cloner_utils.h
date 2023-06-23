@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 namespace repl {

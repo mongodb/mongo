@@ -30,18 +30,28 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <string>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/data_view.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/query/query_shape.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/trusted_hasher.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 /**

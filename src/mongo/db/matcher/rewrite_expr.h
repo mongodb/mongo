@@ -29,13 +29,19 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
 
 namespace mongo {
 

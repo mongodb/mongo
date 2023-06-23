@@ -29,19 +29,28 @@
 
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
 
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/query/collation/collation_index_key.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/internal_plans.h"
-#include "mongo/db/s/shard_key_index_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
-#include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
-#include "mongo/s/grid.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

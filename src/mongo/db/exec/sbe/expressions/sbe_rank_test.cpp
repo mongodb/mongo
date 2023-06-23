@@ -27,8 +27,20 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <tuple>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/expression_test_base.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
 using SBERankTest = EExpressionTestFixture;

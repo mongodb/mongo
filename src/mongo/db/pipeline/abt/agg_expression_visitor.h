@@ -31,7 +31,9 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 

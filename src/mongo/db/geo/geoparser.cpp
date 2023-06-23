@@ -30,15 +30,34 @@
 
 #include "mongo/db/geo/geoparser.h"
 
+#include <cstddef>
+#include <s1angle.h>
+#include <s1interval.h>
+#include <s2.h>
+#include <s2cap.h>
+#include <s2cell.h>
+#include <s2cellid.h>
+#include <s2latlng.h>
+#include <s2loop.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+#include <util/math/vector3-inl.h>
+#include <util/math/vector3.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <cmath>
 #include <memory>
-#include <s2polygonbuilder.h>
+#include <ostream>
 #include <string>
 #include <vector>
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 

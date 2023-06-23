@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/tenant_migration_decoration.h"
 

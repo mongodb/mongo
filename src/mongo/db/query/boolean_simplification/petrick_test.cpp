@@ -29,8 +29,10 @@
 
 #include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/boolean_simplification/petrick.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::boolean_simplification {
 /**

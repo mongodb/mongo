@@ -29,30 +29,56 @@
 
 #pragma once
 
-#include "mongo/db/repl/replication_coordinator_fwd.h"
-
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_data.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_heartbeat_response.h"
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator_fwd.h"
 #include "mongo/db/repl/split_horizon.h"
 #include "mongo/db/repl/split_prepare_session_manager.h"
 #include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_init.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
+
 class CommitQuorumOptions;
 class IndexDescriptor;
 class NamespaceString;
@@ -75,13 +101,17 @@ class ReplSetMetadata;
 namespace repl {
 
 class BackgroundSync;
+
 class HelloResponse;
 class OpTime;
 class OpTimeAndWallTime;
+
 class ReadConcernArgs;
 class ReplSetConfig;
+
 class ReplSetHeartbeatArgsV1;
 class ReplSetHeartbeatResponse;
+
 class ReplSetRequestVotesArgs;
 class ReplSetRequestVotesResponse;
 class UpdatePositionArgs;

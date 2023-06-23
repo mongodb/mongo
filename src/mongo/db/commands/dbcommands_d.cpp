@@ -28,13 +28,12 @@
  */
 
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstring>
 #include <memory>
 #include <string>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -81,7 +80,6 @@
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/namespace_string_util.h"

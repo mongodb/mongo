@@ -29,8 +29,22 @@
 
 #include "mongo/db/index/wildcard_validation.h"
 
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index_names.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

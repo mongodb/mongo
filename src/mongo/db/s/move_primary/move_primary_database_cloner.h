@@ -29,13 +29,27 @@
 
 #pragma once
 
+#include <cstddef>
+#include <list>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/s/move_primary/move_primary_base_cloner.h"
 #include "mongo/db/s/move_primary/move_primary_collection_cloner.h"
 #include "mongo/db/s/move_primary/move_primary_shared_data.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

@@ -28,8 +28,17 @@
  */
 
 #include "mongo/db/index/column_store_sorter.h"
+
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstdint>
+
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 TEST(ColumnStoreSorter, SortTest) {

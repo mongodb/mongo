@@ -29,10 +29,24 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 

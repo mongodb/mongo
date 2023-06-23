@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
 
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
 ShardingDataTransformMetricsObserver::ShardingDataTransformMetricsObserver(

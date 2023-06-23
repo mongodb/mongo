@@ -28,9 +28,15 @@
  */
 
 #include "mongo/db/matcher/path.h"
-#include "mongo/db/jsobj.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/matcher/path_internal.h"
-#include "mongo/platform/basic.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

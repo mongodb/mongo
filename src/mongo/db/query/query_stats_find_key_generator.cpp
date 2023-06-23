@@ -29,15 +29,23 @@
 
 #include "mongo/db/query/query_stats_find_key_generator.h"
 
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::query_stats {
 

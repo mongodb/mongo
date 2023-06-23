@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/ftdc_system_stats.h"
-
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <sys/resource.h>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
@@ -41,6 +39,7 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_system_stats.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/processinfo.h"

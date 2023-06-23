@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
 #include <random>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 namespace {

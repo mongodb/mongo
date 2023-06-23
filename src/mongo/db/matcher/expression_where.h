@@ -29,8 +29,19 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/js_function.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_where_base.h"
+#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/matcher/matchable.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

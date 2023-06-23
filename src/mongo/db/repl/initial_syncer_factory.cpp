@@ -29,6 +29,18 @@
 
 #include "mongo/db/repl/initial_syncer_factory.h"
 
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 namespace repl {
 

@@ -29,22 +29,42 @@
 
 #include "mongo/db/query/ce/histogram_estimator.h"
 
-#include "mongo/db/pipeline/abt/utils.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <map>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/bound_utils.h"
 #include "mongo/db/query/ce/heuristic_predicate_estimation.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/sel_tree_utils.h"
-
 #include "mongo/db/query/cqf_command_utils.h"
-
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/utils/abt_hash.h"
-#include "mongo/db/query/optimizer/utils/ce_math.h"
-#include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
-
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/stats/value_utils.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

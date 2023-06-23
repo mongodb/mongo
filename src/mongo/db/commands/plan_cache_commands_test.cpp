@@ -40,7 +40,6 @@
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

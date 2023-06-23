@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_parsing_validators.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -30,29 +30,62 @@
 
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
 
-#include <boost/filesystem.hpp>
+#include <algorithm>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
 #include <fmt/format.h>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/uncommitted_catalog_updates.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/import_options.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/cursor_server_params_gen.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/multitenancy.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/repl/oplog_applier.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 

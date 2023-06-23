@@ -27,9 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace repl {

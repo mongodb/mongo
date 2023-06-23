@@ -27,17 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <utility>
 
-#include "mongo/db/clientcursor.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/repl/cloner_test_fixture.h"
-#include "mongo/db/repl/replication_consistency_markers_impl.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/db/storage/storage_engine_mock.h"
 #include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {

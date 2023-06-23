@@ -29,9 +29,15 @@
 
 #pragma once
 
+#include <cstddef>
+#include <deque>
+#include <memory>
+#include <vector>
+
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/memory_usage_tracker.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/temporary_record_store.h"
 
 namespace mongo {

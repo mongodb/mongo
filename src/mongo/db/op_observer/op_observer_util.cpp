@@ -29,9 +29,17 @@
 
 #include "mongo/db/op_observer/op_observer_util.h"
 
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

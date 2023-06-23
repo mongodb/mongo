@@ -29,33 +29,41 @@
 
 #include "mongo/db/query/query_stats.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <climits>
+#include <list>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats_util.h"
 #include "mongo/db/query/rate_limiting.h"
 #include "mongo/db/query/serialization_options.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/memory_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/system_clock_source.h"
-#include <optional>
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

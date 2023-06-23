@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
 
-#include "mongo/db/ftdc/decompressor.h"
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/ftdc/compressor.h"
+#include "mongo/db/ftdc/decompressor.h"
 #include "mongo/db/ftdc/util.h"
 #include "mongo/db/ftdc/varint.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/rpc/object_check.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 
 namespace mongo {
 

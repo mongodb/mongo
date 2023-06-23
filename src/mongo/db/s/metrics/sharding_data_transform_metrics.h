@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include "mongo/base/string_data.h"
 
 namespace mongo {

@@ -29,6 +29,15 @@
 
 #include "mongo/db/repl/split_prepare_session_manager.h"
 
+#include <mutex>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo {
 namespace repl {
 

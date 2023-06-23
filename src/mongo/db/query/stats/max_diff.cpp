@@ -31,21 +31,22 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstddef>
 #include <fmt/format.h>
-#include <iostream>
 #include <limits>
 #include <map>
-#include <ostream>
 #include <queue>
+#include <set>
+#include <utility>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/exec/sbe/values/bson.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::stats {
 namespace {

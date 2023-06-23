@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/stats_gen.h"
 

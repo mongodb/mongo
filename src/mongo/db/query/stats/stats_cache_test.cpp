@@ -27,17 +27,28 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <list>
 #include <string>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/db/client.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/stats_cache.h"
 #include "mongo/db/query/stats/stats_cache_loader_mock.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/barrier.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
 #include "mongo/util/read_through_cache.h"
-#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

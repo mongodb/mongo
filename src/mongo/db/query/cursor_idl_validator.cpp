@@ -29,6 +29,14 @@
 
 #include "mongo/db/query/cursor_idl_validator.h"
 
+#include <boost/optional.hpp>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
 /**

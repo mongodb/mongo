@@ -28,8 +28,23 @@
  */
 
 #include "mongo/db/pipeline/accumulator_percentile.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+#include <type_traits>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/accumulator_percentile_gen.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

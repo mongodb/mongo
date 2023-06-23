@@ -29,28 +29,51 @@
 
 
 #include "mongo/db/pipeline/pipeline.h"
-#include "mongo/logv2/log.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
+#include <bitset>
+#include <exception>
+#include <iterator>
+#include <ostream>
+#include <string>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/exact_cast.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/accumulator.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/change_stream_helpers.h"
 #include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/pipeline/search_helper.h"
+#include "mongo/db/pipeline/stage_constraints.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/str.h"
 

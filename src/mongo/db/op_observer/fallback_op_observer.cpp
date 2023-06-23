@@ -29,17 +29,36 @@
 
 #include "mongo/db/op_observer/fallback_op_observer.h"
 
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/op_observer/batched_write_context.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/session/session_killer.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/views/util.h"
 #include "mongo/db/views/view_catalog_helpers.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 
 namespace mongo {

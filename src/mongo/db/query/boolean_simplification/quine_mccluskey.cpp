@@ -29,9 +29,17 @@
 
 #include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
 
+#include <absl/container/node_hash_set.h>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <cstddef>
-#include <iostream>
+#include <cstdint>
 #include <iterator>
+#include <memory>
+
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo::boolean_simplification {
 namespace {

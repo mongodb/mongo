@@ -31,6 +31,7 @@
 
 #include <cstring>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/str.h"
 

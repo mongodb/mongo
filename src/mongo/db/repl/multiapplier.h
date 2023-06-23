@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <functional>
 #include <iosfwd>
 #include <memory>
@@ -40,11 +41,14 @@
 #include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 namespace repl {

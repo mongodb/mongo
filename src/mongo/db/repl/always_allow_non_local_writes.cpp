@@ -27,9 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/db/repl/always_allow_non_local_writes.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace repl {

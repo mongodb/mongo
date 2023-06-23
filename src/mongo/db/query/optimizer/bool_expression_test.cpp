@@ -29,13 +29,22 @@
 
 #include "mongo/db/query/optimizer/bool_expression.h"
 
+#include <absl/container/flat_hash_map.h>
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <cmath>
 
-#include "mongo/db/query/optimizer/explain.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/utils/bool_expression_printer.h"
 #include "mongo/db/query/optimizer/utils/unit_test_abt_literals.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/inline_auto_update.h"
 
 namespace mongo::optimizer {
 namespace {

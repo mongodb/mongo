@@ -30,23 +30,56 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <ostream>
 #include <set>
 #include <vector>
 
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/index/expression_params.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/match_expression_dependencies.h"
-#include "mongo/db/query/planner_ixselect.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/projection.h"
-#include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

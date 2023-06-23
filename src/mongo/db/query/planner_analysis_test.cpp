@@ -29,13 +29,27 @@
 
 #include "mongo/db/query/planner_analysis.h"
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <s2cellid.h>
 #include <set>
+#include <vector>
 
-#include "mongo/db/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 using namespace mongo;
 

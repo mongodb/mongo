@@ -29,14 +29,15 @@
 
 #include "mongo/db/index/btree_access_method.h"
 
+#include <utility>
 #include <vector>
 
-#include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/expression_keys_private.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/keypattern.h"
+#include "mongo/db/index/index_descriptor.h"
 
 namespace mongo {
 

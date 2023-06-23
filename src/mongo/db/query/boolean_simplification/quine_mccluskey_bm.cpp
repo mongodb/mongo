@@ -28,8 +28,12 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <memory>
+#include <vector>
 
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
+#include "mongo/db/query/boolean_simplification/petrick.h"
 #include "mongo/db/query/boolean_simplification/quine_mccluskey.h"
 
 namespace mongo::boolean_simplification {

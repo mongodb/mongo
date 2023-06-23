@@ -30,9 +30,38 @@
 
 #include "mongo/db/geo/geometry_container.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <s1angle.h>
+#include <s2.h>
+#include <s2cap.h>
+#include <s2cell.h>
+#include <s2cellid.h>
+#include <s2latlng.h>
+#include <s2latlngrect.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+#include <s2region.h>
+#include <s2regionunion.h>
+#include <util/math/vector3-inl.h>
+#include <util/math/vector3.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <set>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/geo/big_polygon.h"
 #include "mongo/db/geo/geoconstants.h"
 #include "mongo/db/geo/geoparser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 

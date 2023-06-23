@@ -30,14 +30,19 @@
 #pragma once
 
 #include <boost/filesystem/path.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
 #include <vector>
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/ftdc/compressor.h"
+#include "mongo/db/ftdc/config.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

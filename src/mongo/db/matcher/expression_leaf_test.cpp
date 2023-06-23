@@ -29,21 +29,24 @@
 
 /** Unit tests for MatchMatchExpression operator implementations in match_operators.{h,cpp}. */
 
+#include <cmath>
+// IWYU pragma: no_include "ext/type_traits.h"
 #include <memory>
 
-#include "mongo/unittest/unittest.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_leaf.h"
-#include "mongo/db/matcher/expression_parser.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -29,8 +29,25 @@
 
 #pragma once
 
+#include <algorithm>
+#include <map>
+#include <string>
+#include <variant>
+#include <vector>
+
+#include <absl/container/flat_hash_map.h>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_set_tag.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

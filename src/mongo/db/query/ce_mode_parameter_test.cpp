@@ -29,7 +29,11 @@
 
 #include "mongo/db/query/ce_mode_parameter.h"
 
-#include "mongo/unittest/unittest.h"
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::ce {
 

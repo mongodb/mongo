@@ -29,9 +29,15 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <utility>
+#include <vector>
+
 #include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/session/logical_session_id.h"
-#include <vector>
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 namespace repl {

@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <iostream>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
 
-#include "mongo/db/pipeline/percentile_algo_tdigest.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/percentile_algo.h"
+#include "mongo/db/pipeline/percentile_algo_tdigest.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

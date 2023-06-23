@@ -30,22 +30,41 @@
 
 #include "mongo/db/index/columns_access_method.h"
 
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <set>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
-#include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/curop.h"
 #include "mongo/db/index/bulk_builder_common.h"
 #include "mongo/db/index/column_cell.h"
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/column_store_sorter.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_gen.h"
 #include "mongo/db/storage/execution_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/progress_meter.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

@@ -28,16 +28,19 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
-#include <boost/filesystem.hpp>
+#include <cstddef>
 #include <iostream>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bson_validate.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
@@ -46,10 +49,13 @@
 #include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/ftdc/file_writer.h"
 #include "mongo/db/ftdc/ftdc_test.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

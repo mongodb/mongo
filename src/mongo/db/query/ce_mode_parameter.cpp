@@ -28,7 +28,10 @@
  */
 
 #include "mongo/db/query/ce_mode_parameter.h"
-#include "mongo/db/query/query_knobs_gen.h"
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 
 namespace mongo::optimizer::ce {
 Status validateCEMode(const std::string& value, const boost::optional<TenantId>&) {

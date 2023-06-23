@@ -39,6 +39,7 @@
 #include <vector>
 
 #include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/util/murmur3.h"
 

@@ -31,8 +31,11 @@
 
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

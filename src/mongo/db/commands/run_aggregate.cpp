@@ -113,6 +113,7 @@
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/query/query_stats.h"
 #include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/query/query_stats_key_generator.h"

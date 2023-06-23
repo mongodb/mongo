@@ -29,6 +29,18 @@
 
 #include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
 
+#include <boost/move/utility_core.hpp>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/expression_context.h"
+
 namespace mongo {
 
 Value WindowFunctionExecDerivative::getNext() {

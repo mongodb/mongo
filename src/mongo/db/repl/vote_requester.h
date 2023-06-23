@@ -29,16 +29,22 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <memory>
 #include <vector>
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/scatter_gather_algorithm.h"
 #include "mongo/db/repl/scatter_gather_runner.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

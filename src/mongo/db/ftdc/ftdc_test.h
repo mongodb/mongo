@@ -28,8 +28,10 @@
  */
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/jsobj.h"
 

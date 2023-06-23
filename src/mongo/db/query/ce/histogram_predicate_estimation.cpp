@@ -29,13 +29,20 @@
 
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 
-#include "mongo/db/exec/sbe/abt/abt_lower.h"
-#include "mongo/db/pipeline/abt/utils.h"
+#include <algorithm>
+#include <cmath>
+#include <cstddef>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/bound_utils.h"
-#include "mongo/db/query/optimizer/syntax/expr.h"
-#include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::ce {
 namespace value = sbe::value;

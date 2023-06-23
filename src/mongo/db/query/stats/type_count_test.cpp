@@ -27,8 +27,13 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/array_histogram.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::stats {
 

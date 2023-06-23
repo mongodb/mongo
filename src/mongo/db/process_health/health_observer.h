@@ -28,10 +28,18 @@
  */
 #pragma once
 
+#include <memory>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/process_health/fault_facet.h"
 #include "mongo/db/process_health/fault_manager_config.h"
+#include "mongo/db/process_health/health_check_status.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace process_health {

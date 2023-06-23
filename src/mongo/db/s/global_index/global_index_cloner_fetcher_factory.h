@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/global_index/global_index_cloner_fetcher.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace global_index {

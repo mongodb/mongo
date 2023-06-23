@@ -29,7 +29,16 @@
 
 #include "mongo/db/query/ce/sel_tree_utils.h"
 
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::ce {
 

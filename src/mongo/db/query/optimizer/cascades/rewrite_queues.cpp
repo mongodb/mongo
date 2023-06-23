@@ -28,6 +28,9 @@
  */
 
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
+
+#include <absl/container/node_hash_map.h>
+
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/defs.h"
 

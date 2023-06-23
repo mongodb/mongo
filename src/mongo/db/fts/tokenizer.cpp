@@ -30,7 +30,7 @@
 #include <string>
 
 #include "mongo/db/fts/tokenizer.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

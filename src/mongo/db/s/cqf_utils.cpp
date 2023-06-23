@@ -27,10 +27,17 @@
  *    it in the license file.
  */
 
+#include <string>
+
+#include <s2cellid.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/pipeline/abt/document_source_visitor.h"
 #include "mongo/db/pipeline/visitors/document_source_visitor_registry_mongod.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::optimizer {
 

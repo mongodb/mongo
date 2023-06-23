@@ -33,6 +33,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/numeric/conversion/converter_policies.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cmath>
@@ -43,7 +44,7 @@
 #include <type_traits>
 #include <typeinfo>
 
-#include <boost/preprocessor/control/iif.hpp>
+#include <absl/strings/string_view.h>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"

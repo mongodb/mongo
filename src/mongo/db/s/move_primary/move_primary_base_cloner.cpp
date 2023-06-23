@@ -29,8 +29,8 @@
 
 #include "mongo/db/s/move_primary/move_primary_base_cloner.h"
 
-#include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kMovePrimary
 

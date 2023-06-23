@@ -31,7 +31,9 @@
 
 #include <functional>
 #include <list>
+#include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"

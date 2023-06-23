@@ -29,15 +29,15 @@
 
 /** Unit tests for MatchExpression operator implementations in match_operators.{h,cpp}. */
 
-#include "mongo/unittest/unittest.h"
-
 #include <memory>
 
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 
 namespace mongo {

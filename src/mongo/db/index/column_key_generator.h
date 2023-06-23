@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 #include <iosfwd>
+#include <memory>
 #include <queue>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/column_store.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/string_map.h"

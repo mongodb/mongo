@@ -28,9 +28,23 @@
  */
 
 #include "mongo/db/s/move_primary/move_primary_metrics.h"
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <string>
+#include <utility>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/move_primary/move_primary_metrics_field_name_provider.h"
+#include "mongo/db/s/move_primary/move_primary_state_machine_gen.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 

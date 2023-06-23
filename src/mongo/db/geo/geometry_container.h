@@ -29,10 +29,21 @@
 
 #pragma once
 
+#include <memory>
+#include <s2.h>
+#include <s2cell.h>
+#include <s2cellid.h>
+#include <s2polygon.h>
+#include <s2polyline.h>
+#include <s2region.h>
 #include <s2regionunion.h>
 #include <string>
+#include <vector>
 
 #include "mongo/base/clonable_ptr.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/geo/shapes.h"
 

@@ -29,13 +29,21 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
 #include <map>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/util/assert_util.h"
 

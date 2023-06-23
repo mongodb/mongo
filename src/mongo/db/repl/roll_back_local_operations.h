@@ -30,6 +30,7 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -39,6 +40,7 @@
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

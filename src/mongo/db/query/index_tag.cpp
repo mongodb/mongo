@@ -29,13 +29,18 @@
 
 #include "mongo/db/query/index_tag.h"
 
-#include "mongo/db/matcher/expression_array.h"
-#include "mongo/db/matcher/expression_tree.h"
-#include "mongo/db/query/indexability.h"
-#include "mongo/stdx/unordered_map.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <limits>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

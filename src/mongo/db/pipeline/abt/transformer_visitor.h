@@ -29,13 +29,20 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <string>
+
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
 #include "mongo/db/pipeline/abt/algebrizer_context.h"
 #include "mongo/db/pipeline/abt/field_map_builder.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/transformer_interface.h"
 #include "mongo/db/pipeline/visitors/transformer_interface_visitor.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/projection.h"
 
 namespace mongo::optimizer {
 

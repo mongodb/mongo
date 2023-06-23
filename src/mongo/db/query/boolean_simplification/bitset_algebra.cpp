@@ -29,6 +29,14 @@
 
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
 
+#include <absl/container/node_hash_set.h>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <ostream>
+#include <utility>
+
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/stream_utils.h"

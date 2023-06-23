@@ -28,7 +28,24 @@
  */
 
 #include "mongo/db/query/stats/array_histogram.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <functional>
+#include <ostream>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/stats/value_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::stats {
 namespace {

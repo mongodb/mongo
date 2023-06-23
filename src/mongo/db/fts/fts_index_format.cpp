@@ -27,13 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <array>
+#include <boost/container/vector.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/fts/fts_index_format.h"
 #include "mongo/db/fts/fts_spec.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/murmur3.h"

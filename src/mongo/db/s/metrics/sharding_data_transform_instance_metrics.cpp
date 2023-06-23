@@ -28,8 +28,19 @@
  */
 
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <fmt/format.h>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 

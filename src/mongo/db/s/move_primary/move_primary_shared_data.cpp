@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/move_primary/move_primary_shared_data.h"
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 void MovePrimarySharedData::setLastVisibleOpTime(WithLock, repl::OpTime opTime) {
     _lastVisibleOpTime = opTime;

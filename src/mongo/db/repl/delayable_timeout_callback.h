@@ -28,10 +28,16 @@
  */
 #pragma once
 
+#include <cstdint>
+#include <functional>
 #include <string>
+#include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

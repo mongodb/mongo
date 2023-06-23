@@ -31,6 +31,8 @@
  * This file contains tests for mongo/db/commands/index_filter_commands.h
  */
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
 #include <cstddef>
 #include <fmt/format.h>
 #include <functional>
@@ -38,9 +40,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/none.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -70,8 +69,6 @@
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source.h"
-#include "mongo/util/hex.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

@@ -29,8 +29,20 @@
 
 #pragma once
 
+#include <deque>
+#include <limits>
+#include <memory>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function.h"
 #include "mongo/db/pipeline/window_function/window_function_sum.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

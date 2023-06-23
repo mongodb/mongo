@@ -34,6 +34,7 @@
 #include <absl/container/inlined_vector.h>
 #include <memory>
 #include <string_view>
+#include <type_traits>
 #include <utility>
 #include <vector>
 

@@ -29,15 +29,25 @@
 
 #pragma once
 
+#include <absl/container/node_hash_set.h>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

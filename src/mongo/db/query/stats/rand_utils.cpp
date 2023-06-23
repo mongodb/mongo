@@ -29,12 +29,21 @@
 
 #include "mongo/db/query/stats/rand_utils.h"
 
+#include <absl/container/flat_hash_map.h>
 #include <algorithm>
-#include <cstddef>
+#include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <iterator>
 #include <string>
+#include <tuple>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::stats {

@@ -30,21 +30,33 @@
 
 #include "mongo/db/query/index_bounds_builder.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <s2cellid.h>
+#include <s2region.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <cmath>
 #include <limits>
-#include <s2.h>
-#include <s2cell.h>
-#include <s2regioncoverer.h>
+#include <memory>
+#include <set>
+#include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/db/geo/geoconstants.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/index/s2_common.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
+#include "mongo/db/matcher/expression_type.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/query/analyze_regex.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
@@ -53,8 +65,15 @@
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

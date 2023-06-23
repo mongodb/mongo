@@ -29,7 +29,11 @@
 
 #include "mongo/db/query/util/memory_util.h"
 
-#include "mongo/unittest/unittest.h"
+#include <cstdlib>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::memory_util {
 

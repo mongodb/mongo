@@ -29,7 +29,17 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"

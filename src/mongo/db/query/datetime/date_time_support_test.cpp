@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <limits>
-#include <sstream>
+#include <boost/move/utility_core.hpp>
 #include <timelib.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <initializer_list>
+#include <limits>
 
 #include "mongo/db/query/datetime/date_time_support.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

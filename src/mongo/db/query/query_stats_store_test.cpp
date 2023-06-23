@@ -27,18 +27,48 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/db/catalog/rename_collection.h"
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/hash/hash.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats.h"
 #include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/query/query_stats_find_key_generator.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/serialization_options.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/inline_auto_update.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo::query_stats {
 /**

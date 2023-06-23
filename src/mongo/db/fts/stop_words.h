@@ -30,9 +30,13 @@
 
 #pragma once
 
+#include <cstddef>
 #include <set>
 #include <string>
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/util/string_map.h"
 

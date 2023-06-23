@@ -27,18 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/ftdc/collector.h"
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
-#include "mongo/db/ftdc/util.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

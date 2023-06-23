@@ -59,7 +59,6 @@
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::cst_match_translation {

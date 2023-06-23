@@ -28,25 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/free_mon/free_mon_processor.h"
-
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cmath>
+#include <cstdlib>
 #include <functional>
-#include <numeric>
+#include <ratio>
 #include <snappy.h>
 #include <tuple>
 #include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/free_mon/free_mon_processor.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <set>
+#include <utility>
 
-#include "mongo/db/free_mon/free_mon_op_observer.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
+#include "mongo/db/free_mon/free_mon_op_observer.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

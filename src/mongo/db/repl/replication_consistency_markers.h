@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 
 class BSONObj;
+
 class OperationContext;
 class Timestamp;
 

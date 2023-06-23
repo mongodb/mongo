@@ -27,9 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/window_function/window_function_exec_removable_range.h"
+#include "mongo/util/assert_util.h"
 
 using boost::optional;
 using std::pair;

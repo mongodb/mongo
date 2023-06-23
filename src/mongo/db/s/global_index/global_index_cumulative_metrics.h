@@ -29,6 +29,21 @@
 
 #pragma once
 
+#include <boost/preprocessor/arithmetic/limits/dec_256.hpp>
+#include <boost/preprocessor/control/expr_iif.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/preprocessor/detail/limits/auto_rec_256.hpp"
+#include <boost/preprocessor/logical/limits/bool_256.hpp>
+// IWYU pragma: no_include "boost/preprocessor/repetition/detail/limits/for_256.hpp"
+#include <boost/preprocessor/repetition/for.hpp>
+#include <boost/preprocessor/seq/limits/elem_256.hpp>
+#include <boost/preprocessor/seq/limits/size_256.hpp>
+#include <boost/preprocessor/tuple/elem.hpp>
+#include <boost/preprocessor/tuple/limits/to_seq_64.hpp>
+#include <boost/preprocessor/tuple/to_seq.hpp>
+#include <boost/preprocessor/variadic/limits/elem_64.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/s/global_index/global_index_cloner_gen.h"
 #include "mongo/db/s/global_index/global_index_coordinator_state_enum_placeholder.h"
 #include "mongo/db/s/global_index/global_index_cumulative_metrics_field_name_provider.h"

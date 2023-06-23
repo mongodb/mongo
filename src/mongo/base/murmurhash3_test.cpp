@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include <array>
 #include <cstdint>
 #include <string>
 #include <utility>

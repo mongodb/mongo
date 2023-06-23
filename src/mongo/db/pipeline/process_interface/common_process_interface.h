@@ -29,11 +29,31 @@
 
 #pragma once
 
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
 #include <vector>
 
+#include <boost/exception/exception.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <mutex>
+#include <utility>
 
-#include "mongo/db/repl/replication_coordinator_mock.h"
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/sync_source_resolver.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/session/internal_session_pool.h"
 #include "mongo/db/storage/snapshot_manager.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future_impl.h"
 
 namespace mongo {
 namespace repl {

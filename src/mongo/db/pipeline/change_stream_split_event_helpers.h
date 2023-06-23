@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <queue>
+#include <utility>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {

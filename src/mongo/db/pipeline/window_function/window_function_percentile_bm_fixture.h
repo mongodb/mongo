@@ -28,6 +28,7 @@
  */
 #pragma once
 #include <benchmark/benchmark.h>
+#include <vector>
 
 #include "mongo/db/pipeline/window_function/window_function_percentile.h"
 #include "mongo/platform/basic.h"

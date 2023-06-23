@@ -29,13 +29,24 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <queue>
 #include <tuple>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
 #include "mongo/util/queue.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

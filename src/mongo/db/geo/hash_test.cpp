@@ -32,16 +32,20 @@
  */
 
 #include <algorithm>  // For max()
-#include <bitset>
 #include <cmath>
-#include <iomanip>
-#include <sstream>
+#include <cstddef>
+#include <iostream>
 #include <string>
 
+#include <s2cellid.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/shapes.h"
 #include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

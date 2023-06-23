@@ -31,9 +31,30 @@
  * This file contains tests for mongo/db/exec/spool.cpp
  */
 
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <variant>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/mock_stage.h"
 #include "mongo/db/exec/spool.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/util/assert_util.h"
 
 using namespace mongo;
 

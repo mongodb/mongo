@@ -29,14 +29,27 @@
 
 #include "mongo/db/query/query_settings_manager.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <map>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_cluster_parameter_gen.h"
 #include "mongo/db/query/query_settings_gen.h"
 #include "mongo/db/service_context.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo::query_settings {
 

@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/duration.h"
 

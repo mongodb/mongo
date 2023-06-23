@@ -27,13 +27,25 @@
  *    it in the license file.
  */
 
+#include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/random/normal_distribution.hpp>
+#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <random>
+#include <s2cellid.h>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/pipeline/expression_bm_fixture.h"
-
-#include "mongo/db/json.h"
-#include "mongo/db/matcher/expression_geo.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

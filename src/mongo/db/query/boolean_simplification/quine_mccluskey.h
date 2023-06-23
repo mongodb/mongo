@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <utility>
+#include <vector>
+
 #include "mongo/db/query/boolean_simplification/bitset_algebra.h"
 #include "mongo/db/query/boolean_simplification/petrick.h"
 #include "mongo/stdx/unordered_set.h"

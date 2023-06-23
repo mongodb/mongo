@@ -29,20 +29,35 @@
 
 #pragma once
 
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <compare>
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
 #include <set>
 #include <string>
+#include <utility>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/container_size_helper.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
 class CollatorInterface;
 class MatchExpression;
+
 class IndexPathProjection;
 using WildcardProjection = IndexPathProjection;
 

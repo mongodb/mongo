@@ -29,6 +29,12 @@
 
 #include "mongo/db/op_observer/op_observer.h"
 
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo {
 namespace {
 const auto getOpObserverTimes = OperationContext::declareDecoration<OpObserver::Times>();

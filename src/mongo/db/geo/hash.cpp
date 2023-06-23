@@ -28,14 +28,32 @@
  */
 
 #include "mongo/db/geo/hash.h"
-#include "mongo/config.h"
-#include "mongo/db/field_parser.h"
-#include "mongo/db/geo/shapes.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/util/str.h"
 
 #include <algorithm>  // for max()
+#include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <iostream>
+#include <limits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <s2cellid.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/field_parser.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/platform/endian.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -28,8 +28,13 @@
  */
 #pragma once
 
+#include "mongo/db/process_health/fault_manager_config.h"
+#include "mongo/db/process_health/health_check_status.h"
 #include "mongo/db/process_health/health_observer_base.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 namespace process_health {
