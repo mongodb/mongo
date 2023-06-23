@@ -5,7 +5,7 @@
 (function() {
 "use strict";
 
-load("jstests/libs/query_stats_utils.js");  // For getTelemetry.
+load("jstests/libs/query_stats_utils.js");  // For getQueryStats.
 
 // Turn on the collecting of telemetry metrics.
 let options = {
@@ -27,7 +27,7 @@ assert.commandWorked(bulk.execute());
 
 {
     coll.find({foo: {$regex: "/^ABC/i"}}).itcount();
-    let queryStats = getTelemetry(testDB);
+    let queryStats = getQueryStats(testDB);
     assert.eq(1, queryStats.length, queryStats);
     assert.eq({"foo": {"$regex": "?string"}}, queryStats[0].key.queryShape.filter);
 }

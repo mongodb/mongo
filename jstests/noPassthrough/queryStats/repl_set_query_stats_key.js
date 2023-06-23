@@ -53,8 +53,7 @@ let commandObj = {
 };
 const replSetConn = new Mongo(replTest.getURL());
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
-let telemetry = getTelemetryReplSet(replSetConn, collName);
-// We're not concerned with this field here.
+let telemetry = getQueryStats(replSetConn, {collName: collName});
 delete telemetry[0].key["collectionType"];
 confirmCommandFieldsPresent(telemetry[0].key, commandObj);
 // check that readConcern afterClusterTime is normalized.
@@ -66,7 +65,7 @@ commandObj["readConcern"] = {
 };
 delete commandObj["$readPreference"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
-telemetry = getTelemetryReplSet(replSetConn, collName);
+telemetry = getQueryStats(replSetConn, {collName});
 // We're not concerned with this field here.
 delete telemetry[0].key["collectionType"];
 confirmCommandFieldsPresent(telemetry[0].key, commandObj);
@@ -80,7 +79,7 @@ delete commandObj["apiDeprecationErrors"];
 delete commandObj["apiVersion"];
 delete commandObj["apiStrict"];
 assert.commandWorked(replSetConn.getDB(dbName).runCommand(commandObj));
-telemetry = getTelemetryReplSet(replSetConn, collName);
+telemetry = getQueryStats(replSetConn, {collName: collName});
 assert.eq(telemetry[1].key["readConcern"], {level: "local"});
 // We're not concerned with this field here.
 delete telemetry[1].key["collectionType"];

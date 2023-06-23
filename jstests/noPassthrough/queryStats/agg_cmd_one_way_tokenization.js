@@ -38,7 +38,7 @@ function runTest(conn) {
             ])
             .toArray();
 
-        const stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
+        const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
         assert.eq(1, stats.length);
         const key = stats[0].key;
@@ -68,7 +68,7 @@ function runTest(conn) {
     // pipeline to make sure there are separate query stats entries per separate query shape.
     {
         db.test.aggregate([{$match: {a: {$regex: "foo(.*)"}, b: {$gt: 0}}}]).toArray();
-        const stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
+        const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
         assert.eq(2, stats.length);
         const key = stats[0].key;
@@ -86,7 +86,6 @@ function runTest(conn) {
                   key.queryShape.pipeline,
                   key.queryShape.pipeline);
     }
-
     // Checks proper tokenization on a pipeline that involves a let variable and a $lookup stage
     // that has its own subpipeline and references another namespace.
     {
@@ -116,7 +115,7 @@ function runTest(conn) {
         {
             $match: {$expr: {$eq: ["$role", "$$USER_ROLES.role"]}}
         }], {let: {max_price: 3.00}}).toArray();
-        const stats = getQueryStatsAggCmd(admin, /*transformIdentifiers*/ true);
+        const stats = getQueryStatsAggCmd(admin, {transformIdentifiers: true});
 
         assert.eq(3, stats.length);
         const key = stats[0].key;

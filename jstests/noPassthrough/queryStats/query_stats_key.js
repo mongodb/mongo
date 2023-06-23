@@ -128,7 +128,7 @@ let commandObj = {
 };
 
 assert.commandWorked(testDB.runCommand(commandObj));
-let telemetry = getTelemetry(conn);
+let telemetry = getQueryStats(conn);
 assert.eq(1, telemetry.length);
 confirmAllFieldsPresent(telemetry);
 

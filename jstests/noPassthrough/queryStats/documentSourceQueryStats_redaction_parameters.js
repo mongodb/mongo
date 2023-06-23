@@ -9,11 +9,11 @@ load("jstests/libs/query_stats_utils.js");
 (function() {
 "use strict";
 
-// Assert the expected telemetry key with no hmac.
-function assertTelemetryKeyWithoutHmac(telemetryKey) {
-    assert.eq(telemetryKey.filter, {"foo": {"$lte": "?number"}});
-    assert.eq(telemetryKey.sort, {"bar": -1});
-    assert.eq(telemetryKey.limit, "?number");
+// Assert the expected queryStats key with no hmac.
+function assertQueryStatsKeyWithoutHmac(queryStatsKey) {
+    assert.eq(queryStatsKey.filter, {"foo": {"$lte": "?number"}});
+    assert.eq(queryStatsKey.sort, {"bar": -1});
+    assert.eq(queryStatsKey.limit, "?number");
 }
 
 function runTest(conn) {
@@ -24,24 +24,25 @@ function runTest(conn) {
     coll.insert({foo: 1});
     coll.find({foo: {$lte: 2}}).sort({bar: -1}).limit(2).toArray();
     // Default is no hmac.
-    assertTelemetryKeyWithoutHmac(getQueryStatsFindCmd(conn)[0].key.queryShape);
+    let ret = getQueryStatsFindCmd(conn)[0].key.queryShape;
+    assertQueryStatsKeyWithoutHmac(getQueryStatsFindCmd(conn)[0].key.queryShape);
 
     // Turning on hmac should apply hmac to all field names on all entries, even previously cached
     // ones.
-    const telemetryKey = getQueryStatsFindCmd(conn, /*transformIdentifiers*/ true)[0]["key"];
-    assert.eq(telemetryKey.queryShape.filter,
+    const queryStatsKey = getQueryStatsFindCmd(conn, {transformIdentifiers: true})[0]["key"];
+    assert.eq(queryStatsKey.queryShape.filter,
               {"fNWkKfogMv6MJ77LpBcuPrO7Nq+R+7TqtD+Lgu3Umc4=": {"$lte": "?number"}});
-    assert.eq(telemetryKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
-    assert.eq(telemetryKey.queryShape.limit, "?number");
+    assert.eq(queryStatsKey.queryShape.sort, {"CDDQIXZmDehLKmQcRxtdOQjMqoNqfI2nGt2r4CgJ52o=": -1});
+    assert.eq(queryStatsKey.queryShape.limit, "?number");
 
     // Turning hmac back off should preserve field names on all entries, even previously cached
     // ones.
-    const telemetry = getTelemetry(conn)[1]["key"];
-    assertTelemetryKeyWithoutHmac(telemetry.queryShape);
+    const queryStats = getQueryStats(conn)[1]["key"];
+    assertQueryStatsKeyWithoutHmac(queryStats.queryShape);
 
     // Explicitly set transformIdentifiers to false.
-    assertTelemetryKeyWithoutHmac(
-        getQueryStatsFindCmd(conn, /*transformIdentifiers*/ false)[0]["key"].queryShape);
+    assertQueryStatsKeyWithoutHmac(
+        getQueryStatsFindCmd(conn, {transformIdentifiers: false})[0]["key"].queryShape);
 
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];

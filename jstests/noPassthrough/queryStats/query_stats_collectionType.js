@@ -46,9 +46,11 @@ function runTest(conn) {
     // Verify that we have two telemetry entries for the collection type. This assumes we have
     // executed one find and one agg query for the given collection type.
     function verifyTelemetryForCollectionType(collectionType) {
-        const telemetry = getTelemetry(conn, {
-            "key.collectionType": collectionType,
-            "key.queryShape.cmdNs.coll": jsTestName() + "_" + collectionType
+        const telemetry = getQueryStats(conn, {
+            extraMatch: {
+                "key.collectionType": collectionType,
+                "key.queryShape.cmdNs.coll": jsTestName() + "_" + collectionType
+            }
         });
         // We should see one entry for find() and one for aggregate()
         // for each collection type. The queries account for the fact
@@ -66,12 +68,15 @@ function runTest(conn) {
     // Verify that, for views, we capture the original query before it's rewritten. The view would
     // include a $gt predicate on 'v'.
     const findOnViewShape =
-        getTelemetry(conn, {"key.collectionType": "view", "key.queryShape.command": "find"})[0]
+        getQueryStats(
+            conn, {extraMatch: {"key.collectionType": "view", "key.queryShape.command": "find"}})[0]
             .key.queryShape;
     assert.eq(findOnViewShape.filter, {"v": {"$eq": "?number"}});
 
     const aggOnViewShape =
-        getTelemetry(conn, {"key.collectionType": "view", "key.queryShape.command": "aggregate"})[0]
+        getQueryStats(
+            conn,
+            {extraMatch: {"key.collectionType": "view", "key.queryShape.command": "aggregate"}})[0]
             .key.queryShape;
     assert.eq(aggOnViewShape.pipeline, [{"$match": {"v": {"$lt": "?number"}}}]);
 }

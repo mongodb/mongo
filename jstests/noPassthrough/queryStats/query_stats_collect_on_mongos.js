@@ -107,7 +107,7 @@ const assertExpectedResults = (results,
 
     // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
-    let queryStats = getTelemetry(db);
+    let queryStats = getQueryStats(db);
     assert.eq(0, queryStats.length, queryStats);
 
     // Run a getMore to exhaust the cursor, then ensure query stats results have been written
@@ -177,7 +177,7 @@ const assertExpectedResults = (results,
 
     // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
-    let queryStats = getTelemetry(db);
+    let queryStats = getQueryStats(db);
     assert.eq(0, queryStats.length, queryStats);
 
     // Run a getMore to exhaust the cursor, then ensure query stats results have been written
@@ -250,8 +250,7 @@ const assertExpectedResults = (results,
 
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
-
-    const queryStats = getTelemetry(db);
+    const queryStats = getQueryStats(db);
     assert.eq(1, queryStats.length);
     assertExpectedResults(queryStats[0],
                           queryStatsKey,
@@ -294,8 +293,7 @@ const assertExpectedResults = (results,
 
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
-
-    const queryStats = getTelemetry(db);
+    const queryStats = getQueryStats(db);
     assert.eq(1, queryStats.length);
     assertExpectedResults(queryStats[0],
                           queryStatsKey,
