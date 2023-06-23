@@ -52,7 +52,7 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nss),
+        : nss(std::move(nss)),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -69,8 +69,8 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nss),
-          uuid(uuid),
+        : nss(std::move(nss)),
+          uuid(std::move(uuid)),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -86,9 +86,19 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nssOrUUID.nss()),
+        : nss([nssOrUUID]() -> boost::optional<NamespaceString> {
+              if (nssOrUUID.isNamespaceString()) {
+                  return nssOrUUID.nss();
+              }
+              return boost::none;
+          }()),
           dbname(nssOrUUID.dbName()),
-          uuid(nssOrUUID.uuid()),
+          uuid([nssOrUUID]() -> boost::optional<UUID> {
+              if (nssOrUUID.isUUID()) {
+                  return nssOrUUID.uuid();
+              }
+              return boost::none;
+          }()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -104,8 +114,8 @@ struct CollectionOrViewAcquisitionRequest {
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
 
+    // TODO(SERVER-78226): Replace the following with a type which can express "nss and uuid".
     boost::optional<NamespaceString> nss;
-
     boost::optional<DatabaseName> dbname;
     boost::optional<UUID> uuid;
 

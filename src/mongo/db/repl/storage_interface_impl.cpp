@@ -337,8 +337,7 @@ Status insertDocumentsSingleBatch(OperationContext* opCtx,
     boost::optional<AutoGetOplog> autoOplog;
     const CollectionPtr* collection;
 
-    auto nss = nsOrUUID.nss();
-    if (nss && nss->isOplog()) {
+    if (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isOplog()) {
         // Simplify locking rules for oplog collection.
         autoOplog.emplace(opCtx, OplogAccessMode::kWrite);
         collection = &autoOplog->getCollection();

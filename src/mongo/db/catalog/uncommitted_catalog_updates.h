@@ -312,6 +312,7 @@ public:
 private:
     struct Entry {
         std::shared_ptr<const Collection> collection;
+        // TODO(SERVER-78226): Replace `nss` and `uuid` with a type which can express "nss and uuid"
         boost::optional<NamespaceString> nss;
         boost::optional<UUID> uuid;
     };

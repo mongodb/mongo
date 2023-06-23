@@ -3030,15 +3030,14 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
 
 namespace {
 bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
-    if (auto ns = nsOrUUID.nss()) {
-        return ns->isSystemDotProfile();
-    } else {
-        auto uuid = nsOrUUID.uuid();
-        invariant(uuid, nsOrUUID.toString());
-        if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid)) {
-            return ns->isSystemDotProfile();
-        }
+    if (nsOrUUID.isNamespaceString()) {
+        return nsOrUUID.nss().isSystemDotProfile();
     }
+
+    if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, nsOrUUID.uuid())) {
+        return ns->isSystemDotProfile();
+    }
+
     return false;
 }
 }  // namespace
@@ -3077,14 +3076,12 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
         return true;
     }
 
-    if (auto ns = nsOrUUID.nss()) {
-        if (!ns->isOplog()) {
+    if (nsOrUUID.isNamespaceString()) {
+        if (!nsOrUUID.nss().isOplog()) {
             return true;
         }
     } else if (const auto& oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
-        auto uuid = nsOrUUID.uuid();
-        invariant(uuid, nsOrUUID.toString());
-        if (oplogCollection->uuid() != *uuid) {
+        if (oplogCollection->uuid() != nsOrUUID.uuid()) {
             return true;
         }
     }

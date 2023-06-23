@@ -211,16 +211,15 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     {
         BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
         auto ns = findCommand.getNamespaceOrUUID();
-        if (ns.nss()) {
-            auto nss = ns.nss().value();
+        if (ns.isNamespaceString()) {
+            auto nss = ns.nss();
             if (nss.tenantId()) {
-                cmdNs.append("tenantId",
-                             opts.serializeIdentifier(nss.tenantId().value().toString()));
+                cmdNs.append("tenantId", opts.serializeIdentifier(nss.tenantId()->toString()));
             }
             cmdNs.append("db", opts.serializeIdentifier(nss.db()));
             cmdNs.append("coll", opts.serializeIdentifier(nss.coll()));
         } else {
-            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
+            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid().toString()));
         }
         cmdNs.done();
     }
@@ -229,11 +228,11 @@ StatusWith<BSONObj> makeTelemetryKey(const FindCommandRequest& findCommand,
     {
         auto nssOrUUID = findCommand.getNamespaceOrUUID();
         std::string toSerialize;
-        if (nssOrUUID.uuid()) {
+        if (nssOrUUID.isUUID()) {
             toSerialize = opts.serializeIdentifier(nssOrUUID.toString());
         } else {
             // Database is set at the command level, only serialize the collection here.
-            toSerialize = opts.serializeIdentifier(nssOrUUID.nss()->coll());
+            toSerialize = opts.serializeIdentifier(nssOrUUID.nss().coll());
         }
         bob.append(FindCommandRequest::kCommandName, toSerialize);
     }
@@ -610,14 +609,17 @@ StatusWith<BSONObj> TelemetryMetrics::redactKey(const BSONObj& key,
     }
 
     if (cmdObj.hasField(FindCommandRequest::kCommandName)) {
-        tassert(7198600, "Find command must have a namespace string.", this->nss.nss().has_value());
+        tassert(
+            7198600, "Find command must have a namespace string.", this->nss.isNamespaceString());
         auto findCommand =
-            query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss().value(), false);
+            query_request_helper::makeFromFindCommand(cmdObj, this->nss.nss(), false);
 
         SerializationOptions options(sha256StringDataHasher, replacementForLiteralArgs);
-        auto nss = findCommand->getNamespaceOrUUID().nss();
-        uassert(7349400, "Namespace must be defined", nss.has_value());
-        auto expCtx = make_intrusive<ExpressionContext>(opCtx, nullptr, nss.value());
+        uassert(7349400,
+                "Namespace must be defined",
+                findCommand->getNamespaceOrUUID().isNamespaceString());
+        auto expCtx = make_intrusive<ExpressionContext>(
+            opCtx, nullptr, findCommand->getNamespaceOrUUID().nss());
         expCtx->variables.setDefaultRuntimeConstants(opCtx);
         expCtx->maxFeatureCompatibilityVersion = boost::none;  // Ensure all features are allowed.
         expCtx->stopExpressionCounters();

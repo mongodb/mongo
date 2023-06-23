@@ -209,8 +209,7 @@ int runQueryWithReadCommands(DBClientBase* conn,
                              Milliseconds delayBeforeGetMore,
                              BSONObj readPrefObj,
                              BSONObj* objOut) {
-    const auto dbName =
-        findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).dbName();
+    const auto dbName = findCommand->getNamespaceOrUUID().dbName();
 
     BSONObj findCommandResult;
     BSONObj findCommandObj = findCommand->toBSON(readPrefObj);
@@ -243,9 +242,10 @@ int runQueryWithReadCommands(DBClientBase* conn,
     while (cursorResponse.getCursorId() != 0) {
         sleepFor(delayBeforeGetMore);
 
+        invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
         GetMoreCommandRequest getMoreRequest(
             cursorResponse.getCursorId(),
-            findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).coll().toString());
+            findCommand->getNamespaceOrUUID().nss().coll().toString());
         getMoreRequest.setBatchSize(findCommand->getBatchSize());
         BSONObj getMoreCommandResult;
         uassert(ErrorCodes::CommandFailed,

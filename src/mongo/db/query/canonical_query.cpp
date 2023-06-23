@@ -91,10 +91,10 @@ StatusWith<std::unique_ptr<CanonicalQuery>> CanonicalQuery::canonicalize(
     // Make MatchExpression.
     boost::intrusive_ptr<ExpressionContext> newExpCtx;
     if (!expCtx.get()) {
-        invariant(findCommand->getNamespaceOrUUID().nss());
+        invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
         newExpCtx = make_intrusive<ExpressionContext>(opCtx,
                                                       std::move(collator),
-                                                      *findCommand->getNamespaceOrUUID().nss(),
+                                                      findCommand->getNamespaceOrUUID().nss(),
                                                       findCommand->getLegacyRuntimeConstants(),
                                                       findCommand->getLet());
     } else {
@@ -474,7 +474,7 @@ Status CanonicalQuery::isValidNormalized(const MatchExpression* root) {
 
 std::string CanonicalQuery::toString() const {
     str::stream ss;
-    ss << "ns=" << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns();
+    ss << "ns=" << _findCommand->getNamespaceOrUUID().toString();
 
     if (_findCommand->getBatchSize()) {
         ss << " batchSize=" << *_findCommand->getBatchSize();
@@ -500,7 +500,7 @@ std::string CanonicalQuery::toString() const {
 
 std::string CanonicalQuery::toStringShort() const {
     str::stream ss;
-    ss << "ns: " << _findCommand->getNamespaceOrUUID().nss().value_or(NamespaceString()).ns()
+    ss << "ns: " << _findCommand->getNamespaceOrUUID().toString()
        << " query: " << _findCommand->getFilter().toString()
        << " sort: " << _findCommand->getSort().toString()
        << " projection: " << _findCommand->getProjection().toString();

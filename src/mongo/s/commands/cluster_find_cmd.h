@@ -151,11 +151,11 @@ public:
                 Timer timer;
                 const auto cri =
                     uassertStatusOK(Grid::get(opCtx)->catalogCache()->getCollectionRoutingInfo(
-                        opCtx, *findCommand->getNamespaceOrUUID().nss()));
+                        opCtx, findCommand->getNamespaceOrUUID().nss()));
                 shardResponses = scatterGatherVersionedTargetByRoutingTable(
                     opCtx,
-                    findCommand->getNamespaceOrUUID().nss()->db(),
-                    *findCommand->getNamespaceOrUUID().nss(),
+                    findCommand->getNamespaceOrUUID().nss().db(),
+                    findCommand->getNamespaceOrUUID().nss(),
                     cri,
                     explainCmd,
                     ReadPreferenceSetting::get(opCtx),
@@ -301,11 +301,11 @@ public:
                     !findCommand->getLegacyRuntimeConstants());
 
             if (shouldDoFLERewrite(findCommand)) {
-                invariant(findCommand->getNamespaceOrUUID().nss());
+                invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
 
                 if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLEFindS(
-                        opCtx, findCommand->getNamespaceOrUUID().nss().get(), findCommand.get());
+                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
                     _didDoFLERewrite = true;
                 }
 

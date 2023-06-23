@@ -832,8 +832,8 @@ MigrationDestinationManager::IndexesAndIdIndex MigrationDestinationManager::getC
     // Do not hold any locks while issuing remote calls.
     invariant(!opCtx->lockState()->isLocked());
 
-    auto cmd = nssOrUUID.nss() ? BSON("listIndexes" << nssOrUUID.nss()->coll())
-                               : BSON("listIndexes" << *nssOrUUID.uuid());
+    auto cmd = nssOrUUID.isNamespaceString() ? BSON("listIndexes" << nssOrUUID.nss().coll())
+                                             : BSON("listIndexes" << nssOrUUID.uuid());
     if (cri) {
         cmd = appendShardVersion(cmd, cri->getShardVersion(fromShardId));
     }
@@ -877,9 +877,9 @@ MigrationDestinationManager::getCollectionOptions(OperationContext* opCtx,
 
     BSONObj fromOptions;
 
-    auto cmd = nssOrUUID.nss()
-        ? BSON("listCollections" << 1 << "filter" << BSON("name" << nssOrUUID.nss()->coll()))
-        : BSON("listCollections" << 1 << "filter" << BSON("info.uuid" << *nssOrUUID.uuid()));
+    auto cmd = nssOrUUID.isNamespaceString()
+        ? BSON("listCollections" << 1 << "filter" << BSON("name" << nssOrUUID.nss().coll()))
+        : BSON("listCollections" << 1 << "filter" << BSON("info.uuid" << nssOrUUID.uuid()));
     if (cm) {
         cmd = appendDbVersionIfPresent(cmd, cm->dbVersion());
     }

@@ -1567,7 +1567,7 @@ TEST_F(QueryRequestTest, ParseFromUUID) {
     FindCommandRequest findCommand(nssOrUUID);
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.testns");
     findCommand.setNss(nss);
-    ASSERT_EQ(nss, *findCommand.getNamespaceOrUUID().nss());
+    ASSERT_EQ(nss, findCommand.getNamespaceOrUUID().nss());
 }
 
 }  // namespace

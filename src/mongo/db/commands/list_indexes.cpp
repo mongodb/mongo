@@ -119,14 +119,14 @@ IndexSpecsWithNamespaceString getIndexSpecsWithNamespaceString(OperationContext*
 
     // Since time-series collections don't have UUIDs, we skip the time-series lookup
     // if the target collection is specified as a UUID.
-    if (const auto& origNss = origNssOrUUID.nss()) {
+    if (origNssOrUUID.isNamespaceString()) {
         auto isCommandOnTimeseriesBucketNamespace =
             cmd.getIsTimeseriesNamespace() && *cmd.getIsTimeseriesNamespace();
         if (auto timeseriesOptions = timeseries::getTimeseriesOptions(
-                opCtx, *origNss, !isCommandOnTimeseriesBucketNamespace)) {
+                opCtx, origNssOrUUID.nss(), !isCommandOnTimeseriesBucketNamespace)) {
             auto bucketsNss = isCommandOnTimeseriesBucketNamespace
-                ? *origNss
-                : origNss->makeTimeseriesBucketsNamespace();
+                ? origNssOrUUID.nss()
+                : origNssOrUUID.nss().makeTimeseriesBucketsNamespace();
             AutoGetCollectionForReadCommandMaybeLockFree autoColl(opCtx, bucketsNss);
 
             const CollectionPtr& coll = autoColl.getCollection();
@@ -230,13 +230,12 @@ public:
         }
 
         NamespaceString ns() const final {
-            auto nss = request().getNamespaceOrUUID();
-            if (nss.uuid()) {
+            auto nssOrUUID = request().getNamespaceOrUUID();
+            if (nssOrUUID.isUUID()) {
                 // UUID requires opCtx to resolve, settle on just the dbname.
                 return NamespaceString(request().getDbName());
             }
-            invariant(nss.nss());
-            return nss.nss().value();
+            return nssOrUUID.nss();
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const final {

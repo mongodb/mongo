@@ -90,8 +90,13 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     findCommand->setSort(sortObj.getOwned());
     findCommand->setProjection(projObj.getOwned());
     findCommand->setCollation(collationObj.getOwned());
-    const ExtensionsCallbackReal extensionsCallback(
-        opCtx, findCommand->getNamespaceOrUUID().nss().get_ptr());
+
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namespace",
+            findCommand->getNamespaceOrUUID().isNamespaceString());
+    const ExtensionsCallbackReal extensionsCallback(opCtx,
+                                                    &findCommand->getNamespaceOrUUID().nss());
+
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,

@@ -80,7 +80,7 @@ protected:
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             auto findCommand = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(findCommand->getNamespaceOrUUID().nss()->ns(), "config.settings");
+            ASSERT_EQ(findCommand->getNamespaceOrUUID().nss().ns(), "config.settings");
             ASSERT_BSONOBJ_EQ(findCommand->getFilter(), BSON("_id" << key));
 
             checkReadConcern(request.cmdObj,

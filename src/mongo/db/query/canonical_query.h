@@ -120,8 +120,8 @@ public:
     static Status isValidNormalized(const MatchExpression* root);
 
     NamespaceString nss() const {
-        invariant(_findCommand->getNamespaceOrUUID().nss());
-        return *_findCommand->getNamespaceOrUUID().nss();
+        invariant(_findCommand->getNamespaceOrUUID().isNamespaceString());
+        return _findCommand->getNamespaceOrUUID().nss();
     }
     StringData ns() const {
         return nss().ns();

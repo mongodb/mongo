@@ -118,7 +118,9 @@ boost::intrusive_ptr<ExpressionContext> makeExpressionContext(
         findCommand.getAllowDiskUse().value_or(allowDiskUseByDefault.load()),
         false,  // bypassDocumentValidation
         false,  // isMapReduceCommand
-        findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()),
+        findCommand.getNamespaceOrUUID().isNamespaceString()
+            ? findCommand.getNamespaceOrUUID().nss()
+            : NamespaceString{},
         findCommand.getLegacyRuntimeConstants(),
         std::move(collator),
         nullptr,  // mongoProcessInterface
@@ -396,7 +398,7 @@ public:
                     !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
                       !findCommand->getAllowSpeculativeMajorityRead()));
 
-            const bool isFindByUUID = findCommand->getNamespaceOrUUID().uuid().has_value();
+            const bool isFindByUUID = findCommand->getNamespaceOrUUID().isUUID();
             uassert(ErrorCodes::InvalidOptions,
                     "When using the find command by UUID, the collectionUUID parameter cannot also "
                     "be specified",
@@ -499,7 +501,7 @@ public:
             const auto& collection = ctx->getCollection();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << *findCommand->getNamespaceOrUUID().uuid()
+                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid()
                                   << " specified in query request not found",
                     collection || !isFindByUUID);
 
@@ -789,11 +791,11 @@ public:
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {
-                invariant(findCommand->getNamespaceOrUUID().nss());
+                invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
 
                 if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLEFindD(
-                        opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
+                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
                 }
                 // Set the telemetryStoreKey to none so telemetry isn't collected when we've done a
                 // FLE rewrite.

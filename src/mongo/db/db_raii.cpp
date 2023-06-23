@@ -691,9 +691,9 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
               return boost::none;
           }()),
       _autoDb(AutoGetDb::createForAutoGetCollection(
-          opCtx, nsOrUUID, getLockModeForQuery(opCtx, nsOrUUID.nss()), options)) {
+          opCtx, nsOrUUID, getLockModeForQuery(opCtx, nsOrUUID), options)) {
 
-    const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID.nss());
+    const auto modeColl = getLockModeForQuery(opCtx, nsOrUUID);
     const auto viewMode = options._viewMode;
     const auto deadline = options._deadline;
     const auto& secondaryNssOrUUIDs = options._secondaryNssOrUUIDs;
@@ -702,7 +702,10 @@ AutoGetCollectionForReadPITCatalog::AutoGetCollectionForReadPITCatalog(
     // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
     // deadlocks across threads.
     if (secondaryNssOrUUIDs.empty()) {
-        uassertStatusOK(nsOrUUID.isNssValid());
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("Namespace {} is not a valid collection name", nsOrUUID.toString()),
+                nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
+
         _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
     } else {
         catalog_helper::acquireCollectionLocksInResourceIdOrder(
@@ -1086,7 +1089,7 @@ ConsistentCatalogAndSnapshot getConsistentCatalogAndSnapshot(
         try {
             nss = catalogBeforeSnapshot->resolveNamespaceStringOrUUID(opCtx, nsOrUUID);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.uuid());
+            invariant(nsOrUUID.isUUID());
 
             const auto readSource = opCtx->recoveryUnit()->getTimestampReadSource();
             if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
@@ -1652,14 +1655,14 @@ OldClientContext::~OldClientContext() {
                 currentOp->getReadWriteType());
 }
 
-LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss) {
+LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID) {
     invariant(opCtx);
 
     // Use IX locks for multi-statement transactions; otherwise, use IS locks.
     if (opCtx->inMultiDocumentTransaction()) {
         uassert(51071,
                 "Cannot query system.views within a transaction",
-                !nss || !nss->isSystemDotViews());
+                !nssOrUUID.isNamespaceString() || !nssOrUUID.nss().isSystemDotViews());
         return MODE_IX;
     }
     return MODE_IS;

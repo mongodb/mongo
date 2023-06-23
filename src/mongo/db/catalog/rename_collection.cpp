@@ -629,7 +629,7 @@ Status renameCollectionAcrossDatabases(OperationContext* opCtx,
             WriteUnitOfWork wunit(opCtx);
             auto fromMigrate = false;
             try {
-                CollectionWriter tmpCollWriter(opCtx, *tmpCollUUID.uuid());
+                CollectionWriter tmpCollWriter(opCtx, tmpCollUUID.uuid());
                 IndexBuildsCoordinator::get(opCtx)->createIndexesOnEmptyCollection(
                     opCtx, tmpCollWriter, indexesToCopy, fromMigrate);
             } catch (DBException& ex) {

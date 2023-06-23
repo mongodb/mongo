@@ -300,10 +300,10 @@ StatusWith<BSONObj> asAggregationCommand(const FindCommandRequest& findCommand) 
     }
 
     // Now that we've successfully validated this QR, begin building the aggregation command.
-    aggregationBuilder.append("aggregate",
-                              findCommand.getNamespaceOrUUID().nss()
-                                  ? findCommand.getNamespaceOrUUID().nss()->coll()
-                                  : "");
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namspace",
+            findCommand.getNamespaceOrUUID().isNamespaceString());
+    aggregationBuilder.append("aggregate", findCommand.getNamespaceOrUUID().nss().coll());
 
     // Construct an aggregation pipeline that finds the equivalent documents to this query request.
     BSONArrayBuilder pipelineBuilder(aggregationBuilder.subarrayStart("pipeline"));

@@ -175,8 +175,10 @@ StatusWith<BSONObj> ParsedDistinct::asAggregationCommand() const {
 
     invariant(_query);
     const FindCommandRequest& findCommand = _query->getFindCommandRequest();
-    aggregationBuilder.append(
-        "aggregate", findCommand.getNamespaceOrUUID().nss().value_or(NamespaceString()).coll());
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namespace",
+            findCommand.getNamespaceOrUUID().isNamespaceString());
+    aggregationBuilder.append("aggregate", findCommand.getNamespaceOrUUID().nss().coll());
 
     // Build a pipeline that accomplishes the distinct request. The building code constructs a
     // pipeline that looks like this, assuming the distinct is on the key "a.b.c"

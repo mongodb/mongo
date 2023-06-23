@@ -183,7 +183,7 @@ public:
         /**
          * Returns false, if the evaluation needs to be aborted.
          */
-        bool _validateNamespace(OperationContext* opCtx, const NamespaceStringOrUUID& coll) {
+        bool _validateNamespace(OperationContext* opCtx, const NamespaceString& coll) {
             bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
             auto apiVersion = APIParameters::get(opCtx).getAPIVersion().value_or("");
 
@@ -204,7 +204,7 @@ public:
             }
             const auto status = collection->checkValidatorAPIVersionCompatability(opCtx);
             if (!status.isOK()) {
-                ErrorReplyElement error(coll.nss()->ns().toString(),
+                ErrorReplyElement error(coll.ns().toString(),
                                         ErrorCodes::APIStrictError,
                                         ErrorCodes::errorString(ErrorCodes::APIStrictError),
                                         status.reason());
@@ -227,7 +227,7 @@ public:
                 const IndexDescriptor* desc = ii->next()->descriptor();
                 if (apiStrict && apiVersion == "1" &&
                     !index_key_validate::isIndexAllowedInAPIVersion1(*desc)) {
-                    ErrorReplyElement error(coll.nss()->ns().toString(),
+                    ErrorReplyElement error(coll.ns().toString(),
                                             ErrorCodes::APIStrictError,
                                             ErrorCodes::errorString(ErrorCodes::APIStrictError),
                                             str::stream()

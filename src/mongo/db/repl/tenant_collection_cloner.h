@@ -84,7 +84,7 @@ public:
         return _sourceNss;
     }
     UUID getSourceUuid() const {
-        return *_sourceDbAndUuid.uuid();
+        return _sourceDbAndUuid.uuid();
     }
     const std::string& getTenantId() const {
         return _tenantId;

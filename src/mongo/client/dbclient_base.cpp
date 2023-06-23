@@ -302,11 +302,11 @@ BSONObj DBClientBase::_countCmd(const NamespaceStringOrUUID nsOrUuid,
                                 int skip,
                                 boost::optional<BSONObj> readConcernObj) {
     BSONObjBuilder b;
-    if (nsOrUuid.uuid()) {
-        const auto uuid = *nsOrUuid.uuid();
+    if (nsOrUuid.isUUID()) {
+        const auto uuid = nsOrUuid.uuid();
         uuid.appendToBuilder(&b, "count");
     } else {
-        b.append("count", (*nsOrUuid.nss()).coll());
+        b.append("count", nsOrUuid.nss().coll());
     }
     b.append("query", query);
     if (limit)
@@ -750,11 +750,11 @@ namespace {
  */
 BSONObj makeListIndexesCommand(const NamespaceStringOrUUID& nsOrUuid, bool includeBuildUUIDs) {
     BSONObjBuilder bob;
-    if (nsOrUuid.nss()) {
-        bob.append("listIndexes", (*nsOrUuid.nss()).coll());
+    if (nsOrUuid.isNamespaceString()) {
+        bob.append("listIndexes", nsOrUuid.nss().coll());
         bob.append("cursor", BSONObj());
     } else {
-        const auto uuid = (*nsOrUuid.uuid());
+        const auto& uuid = nsOrUuid.uuid();
         uuid.appendToBuilder(&bob, "listIndexes");
         bob.append("cursor", BSONObj());
     }
@@ -795,8 +795,8 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
         if (id != 0) {
             const auto cursorNs =
                 NamespaceStringUtil::deserialize(dbName.tenantId(), cursorObj["ns"].String());
-            if (nsOrUuid.nss()) {
-                invariant((*nsOrUuid.nss()) == cursorNs);
+            if (nsOrUuid.isNamespaceString()) {
+                invariant(nsOrUuid.nss() == cursorNs);
             }
             unique_ptr<DBClientCursor> cursor = getMore(cursorNs, id);
             while (cursor->more()) {
@@ -814,7 +814,7 @@ std::list<BSONObj> DBClientBase::_getIndexSpecs(const NamespaceStringOrUUID& nsO
 
     // "NamespaceNotFound" is an error for UUID but returns an empty list for NamespaceString; this
     // matches the behavior for other commands such as 'find' and 'count'.
-    if (nsOrUuid.nss() && status.code() == ErrorCodes::NamespaceNotFound) {
+    if (nsOrUuid.isNamespaceString() && status.code() == ErrorCodes::NamespaceNotFound) {
         return specs;
     }
     uassertStatusOK(status.withContext(str::stream() << "listIndexes failed: " << res));

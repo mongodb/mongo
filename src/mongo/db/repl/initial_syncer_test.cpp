@@ -2987,7 +2987,7 @@ TEST_F(
             const NamespaceStringOrUUID& nsOrUUID,
             const TimestampedBSONObj& doc,
             long long term) {
-            insertDocumentNss = *nsOrUUID.nss();
+            insertDocumentNss = nsOrUUID.nss();
             insertDocumentDoc = doc;
             insertDocumentTerm = term;
             return Status(ErrorCodes::OperationFailed, "failed to insert oplog entry");
@@ -3056,7 +3056,7 @@ TEST_F(
             const NamespaceStringOrUUID& nsOrUUID,
             const TimestampedBSONObj& doc,
             long long term) {
-            insertDocumentNss = *nsOrUUID.nss();
+            insertDocumentNss = nsOrUUID.nss();
             insertDocumentDoc = doc;
             insertDocumentTerm = term;
             initialSyncer->shutdown().transitional_ignore();

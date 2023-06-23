@@ -214,7 +214,7 @@ mongo::BSONArray MockRemoteDBServer::findImpl(InstanceID id,
     scoped_spinlock sLock(_lock);
     _queryCount++;
 
-    auto ns = nsOrUuid.uuid() ? _uuidToNs[*nsOrUuid.uuid()] : nsOrUuid.nss()->ns().toString();
+    auto ns = nsOrUuid.isUUID() ? _uuidToNs[nsOrUuid.uuid()] : nsOrUuid.nss().ns().toString();
     const vector<BSONObj>& coll = _dataMgr[ns];
     BSONArrayBuilder result;
     for (vector<BSONObj>::const_iterator iter = coll.begin(); iter != coll.end(); ++iter) {

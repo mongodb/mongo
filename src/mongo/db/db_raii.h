@@ -801,7 +801,7 @@ private:
  * lock otherwise. MODE_IX acquisition will allow a read to participate in two-phase locking.
  * Throws an exception if 'system.views' is being queried within a transaction.
  */
-LockMode getLockModeForQuery(OperationContext* opCtx, const boost::optional<NamespaceString>& nss);
+LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUID& nssOrUUID);
 
 /**
  * When in scope, enforces prepare conflicts in the storage engine. Reads and writes in this scope

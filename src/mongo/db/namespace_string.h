@@ -958,19 +958,21 @@ public:
         : _nssOrUUID(
               UUIDWithDbName{DatabaseName{std::move(tenantId), std::move(db)}, std::move(uuid)}) {}
 
-    boost::optional<NamespaceString> nss() const {
-        if (!stdx::holds_alternative<NamespaceString>(_nssOrUUID)) {
-            return boost::none;
-        }
+    bool isNamespaceString() const {
+        return stdx::holds_alternative<NamespaceString>(_nssOrUUID);
+    }
 
+    const NamespaceString& nss() const {
+        invariant(stdx::holds_alternative<NamespaceString>(_nssOrUUID));
         return get<NamespaceString>(_nssOrUUID);
     }
 
-    boost::optional<UUID> uuid() const {
-        if (!stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID)) {
-            return boost::none;
-        }
+    bool isUUID() const {
+        return stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID);
+    }
 
+    const UUID& uuid() const {
+        invariant(stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID));
         return get<1>(get<UUIDWithDbName>(_nssOrUUID));
     }
 
@@ -993,12 +995,6 @@ public:
 
         return get<0>(get<UUIDWithDbName>(_nssOrUUID));
     }
-
-    /**
-     * Returns OK if either the nss is not set or is a valid nss. Otherwise returns an
-     * InvalidNamespace error.
-     */
-    Status isNssValid() const;
 
     std::string toString() const;
 

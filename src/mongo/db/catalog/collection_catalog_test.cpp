@@ -1329,22 +1329,22 @@ private:
             ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, coll->uuid()), coll);
         } else {
             ASSERT(!coll);
-            if (auto nss = nssOrUUID.nss()) {
+            if (nssOrUUID.isNamespaceString()) {
                 auto catalogEntry =
-                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nss);
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss());
                 ASSERT(!catalogEntry);
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, *nss), coll);
-            } else if (auto uuid = nssOrUUID.uuid()) {
+                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, nssOrUUID.nss()), coll);
+            } else {
                 auto catalogEntry =
-                    DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *uuid);
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
                 ASSERT(!catalogEntry);
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, *uuid), coll);
+                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, nssOrUUID.uuid()), coll);
             }
         }
 

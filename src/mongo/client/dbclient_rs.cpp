@@ -501,9 +501,9 @@ void DBClientReplicaSet::remove(const NamespaceString& nss,
 std::unique_ptr<DBClientCursor> DBClientReplicaSet::find(FindCommandRequest findRequest,
                                                          const ReadPreferenceSetting& readPref,
                                                          ExhaustMode exhaustMode) {
-    invariant(findRequest.getNamespaceOrUUID().nss());
-    auto ns = findRequest.getNamespaceOrUUID().nss()->ns().toString();
-    if (_isSecondaryQuery(ns, findRequest.toBSON(BSONObj{}), readPref)) {
+    invariant(findRequest.getNamespaceOrUUID().isNamespaceString());
+    if (_isSecondaryQuery(
+            findRequest.getNamespaceOrUUID().nss().ns(), findRequest.toBSON(BSONObj{}), readPref)) {
         LOGV2_DEBUG(5951202,
                     3,
                     "dbclient_rs query using secondary or tagged node selection",

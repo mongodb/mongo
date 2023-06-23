@@ -279,18 +279,17 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
         std::vector<NamespaceStringOrUUID> systemViewsNamespacesFromSecondCatalogRead;
         listDurableCatalog(
             opCtx, getShardName(opCtx), &docs, &systemViewsNamespacesFromSecondCatalogRead);
-        if (!std::equal(
-                systemViewsNamespaces.cbegin(),
-                systemViewsNamespaces.cend(),
-                systemViewsNamespacesFromSecondCatalogRead.cbegin(),
-                [](const auto& lhs, const auto& rhs) { return *lhs.nss() == *rhs.nss(); })) {
+        if (!std::equal(systemViewsNamespaces.cbegin(),
+                        systemViewsNamespaces.cend(),
+                        systemViewsNamespacesFromSecondCatalogRead.cbegin(),
+                        [](const auto& lhs, const auto& rhs) { return lhs.nss() == rhs.nss(); })) {
             continue;
         }
 
         for (const auto& svns : systemViewsNamespaces) {
             // Hold reference to the catalog for collection lookup without locks to be safe.
             auto catalog = CollectionCatalog::get(opCtx);
-            auto collection = catalog->lookupCollectionByNamespace(opCtx, *svns.nss());
+            auto collection = catalog->lookupCollectionByNamespace(opCtx, svns.nss());
             if (!collection) {
                 continue;
             }
@@ -299,7 +298,7 @@ std::deque<BSONObj> CommonMongodProcessInterface::listCatalog(OperationContext* 
             while (auto record = cursor->next()) {
                 BSONObj obj = record->data.releaseToBson();
 
-                NamespaceString ns(NamespaceStringUtil::deserialize((*svns.nss()).tenantId(),
+                NamespaceString ns(NamespaceStringUtil::deserialize(svns.nss().tenantId(),
                                                                     obj.getStringField("_id")));
                 NamespaceString viewOnNs(NamespaceStringUtil::parseNamespaceFromDoc(
                     ns.dbName(), obj.getStringField("viewOn")));

@@ -462,25 +462,12 @@ bool NamespaceString::isReplicated() const {
     return true;
 }
 
-Status NamespaceStringOrUUID::isNssValid() const {
-    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
-        // _nss is set and not valid.
-        if (!nss->isValid()) {
-            return {ErrorCodes::InvalidNamespace,
-                    fmt::format("Namespace {} is not a valid collection name",
-                                nss->toStringForErrorMsg())};
-        }
-    }
-
-    return Status::OK();
-}
-
 std::string NamespaceStringOrUUID::toString() const {
-    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
-        return nss->toString();
+    if (isNamespaceString()) {
+        return nss().toString();
     }
 
-    return get<1>(get<UUIDWithDbName>(_nssOrUUID)).toString();
+    return uuid().toString();
 }
 
 void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldName) const {

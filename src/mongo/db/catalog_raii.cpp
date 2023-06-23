@@ -62,11 +62,11 @@ void verifyDbAndCollection(OperationContext* opCtx,
                            const Collection* coll,
                            Database* db,
                            bool verifyWriteEligible) {
-    invariant(!nsOrUUID.uuid() || coll,
+    invariant(!nsOrUUID.isUUID() || coll,
               str::stream() << "Collection for " << resolvedNss.ns()
                             << " disappeared after successfully resolving " << nsOrUUID.toString());
 
-    invariant(!nsOrUUID.uuid() || db,
+    invariant(!nsOrUUID.isUUID() || db,
               str::stream() << "Database for " << resolvedNss.ns()
                             << " disappeared after successfully resolving " << nsOrUUID.toString());
 
@@ -152,20 +152,15 @@ AutoGetDb::AutoGetDb(OperationContext* opCtx,
 }
 
 bool AutoGetDb::canSkipRSTLLock(const NamespaceStringOrUUID& nsOrUUID) {
-    const auto& maybeNss = nsOrUUID.nss();
-
-    if (maybeNss) {
-        const auto& nss = *maybeNss;
-        return repl::canCollectionSkipRSTLLockAcquisition(nss);
+    if (nsOrUUID.isNamespaceString()) {
+        return repl::canCollectionSkipRSTLLockAcquisition(nsOrUUID.nss());
     }
     return false;
 }
 
 bool AutoGetDb::canSkipFlowControlTicket(const NamespaceStringOrUUID& nsOrUUID) {
-    const auto& maybeNss = nsOrUUID.nss();
-
-    if (maybeNss) {
-        const auto& nss = *maybeNss;
+    if (nsOrUUID.isNamespaceString()) {
+        const auto& nss = nsOrUUID.nss();
         bool notReplicated = !nss.isReplicated();
         // TODO: Improve comment
         //
@@ -229,8 +224,8 @@ CollectionNamespaceOrUUIDLock::CollectionNamespaceOrUUIDLock(OperationContext* o
                                                              LockMode mode,
                                                              Date_t deadline)
     : _lock([opCtx, &nsOrUUID, mode, deadline] {
-          if (auto ns = nsOrUUID.nss()) {
-              return Lock::CollectionLock{opCtx, *ns, mode, deadline};
+          if (nsOrUUID.isNamespaceString()) {
+              return Lock::CollectionLock{opCtx, nsOrUUID.nss(), mode, deadline};
           }
 
           auto resolveNs = [opCtx, &nsOrUUID] {
@@ -293,7 +288,10 @@ AutoGetCollection::AutoGetCollection(OperationContext* opCtx,
     // there are many, however, the locks must be taken in _ascending_ ResourceId order to avoid
     // deadlocks across threads.
     if (secondaryNssOrUUIDs.empty()) {
-        uassertStatusOK(nsOrUUID.isNssValid());
+        uassert(ErrorCodes::InvalidNamespace,
+                fmt::format("Namespace {} is not a valid collection name", nsOrUUID.toString()),
+                nsOrUUID.isUUID() || (nsOrUUID.isNamespaceString() && nsOrUUID.nss().isValid()));
+
         _collLocks.emplace_back(opCtx, nsOrUUID, modeColl, deadline);
     } else {
         catalog_helper::acquireCollectionLocksInResourceIdOrder(
