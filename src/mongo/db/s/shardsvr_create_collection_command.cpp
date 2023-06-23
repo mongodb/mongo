@@ -146,6 +146,13 @@ public:
                 auto nssToForward = ns();
                 auto requestToForward = request().getCreateCollectionRequest();
                 auto coordinatorType = DDLCoordinatorTypeEnum::kCreateCollection;
+                // Validates and sets missing time-series options fields automatically.
+                if (requestToForward.getTimeseries()) {
+                    auto timeseriesOptions = *requestToForward.getTimeseries();
+                    uassertStatusOK(
+                        timeseries::validateAndSetBucketingParameters(timeseriesOptions));
+                    requestToForward.setTimeseries(std::move(timeseriesOptions));
+                }
                 if (!feature_flags::gCreateCollectionCoordinatorV3.isEnabled(
                         serverGlobalParams.featureCompatibility)) {
                     translateToTimeseriesCollection(opCtx, &nssToForward, &requestToForward);
