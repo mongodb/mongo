@@ -110,9 +110,9 @@ TEST_F(OperationCPUTimerTest, TestReset) {
     auto elapsedAfterStop = timer->getElapsed();
     // Due to inconsistencies between the CPU time-based clock used in the timer and the
     // clock used in busyWait, the elapsed CPU time is sometimes observed as being less than the
-    // time spent busy waiting. To account for that, only assert that at least 1ms of CPU time has
-    // elapsed even though the thread was supposed to have busy-waited for 2ms.
-    ASSERT_GTE(elapsedAfterStop, Milliseconds(1));
+    // time spent busy waiting. To account for that, only assert that any amount of CPU
+    // time has elapsed, even though the thread was supposed to have busy-waited for 2ms.
+    ASSERT_GT(elapsedAfterStop, Nanoseconds(0));
 
     timer->start();
     auto elapsedAfterReset = timer->getElapsed();
