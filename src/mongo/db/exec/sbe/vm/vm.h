@@ -800,6 +800,11 @@ enum class Builtin : uint8_t {
     aggMinN,
     aggMinNMerge,
     aggMinNFinalize,
+    aggRank,
+    aggRankColl,
+    aggDenseRank,
+    aggDenseRankColl,
+    aggRankFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -924,6 +929,17 @@ enum AggStdDevValueElems {
     // This is actually not an index but represents the number of elements stored
     kSizeOfArray
 };
+
+/**
+ * This enum defines indices into an 'Array' that store state for rank expressions.
+ *
+ * The array contains three elements:
+ * - The element at index `kLastValue` is the last value.
+ * - The element at index `kLastRank` is the rank of the last value.
+ * - The element at index `kSameRankCount` is how many values are of the same rank as the last
+ * value.
+ */
+enum AggRankElems { kLastValue, kLastRank, kSameRankCount, kRankArraySize };
 
 /**
  * This enum defines indices into an 'Array' that returns the result of accumulators that track the
@@ -1731,6 +1747,11 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNMerge(ArityType arity);
     template <bool less>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRank(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRankColl(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDenseRank(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDenseRankColl(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRankFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 
