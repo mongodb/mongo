@@ -261,11 +261,7 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
         }));
         const metrics = res.keyCharacteristics;
 
-        const listCollectionRes =
-            assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-        const isClusteredColl =
-            listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
-
+        const isClusteredColl = AnalyzeShardKeyUtil.isClusterCollection(conn, dbName, collName);
         const expectedType = isClusteredColl ? "unknown" : testCase.expected;
         assert.eq(metrics.monotonicity.type, expectedType, res);
 
