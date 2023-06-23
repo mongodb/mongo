@@ -102,6 +102,8 @@ ShardSplitDonorDocument parseAndValidateDonorDocument(const BSONObj& doc) {
                                 doc.toString()),
                     !donorStateDoc.getAbortReason());
             break;
+        case ShardSplitDonorStateEnum::kRecipientCaughtUp:
+            break;
         case ShardSplitDonorStateEnum::kCommitted:
             uassert(ErrorCodes::BadValue,
                     fmt::format(errmsg,
@@ -362,6 +364,8 @@ void ShardSplitDonorOpObserver::onUpdate(OperationContext* opCtx,
 
     auto donorStateDoc = parseAndValidateDonorDocument(args.updateArgs->updatedDoc);
     switch (donorStateDoc.getState()) {
+        case ShardSplitDonorStateEnum::kRecipientCaughtUp:
+            break;
         case ShardSplitDonorStateEnum::kBlocking:
             onTransitionToBlocking(opCtx, donorStateDoc);
             break;

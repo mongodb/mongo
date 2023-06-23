@@ -182,6 +182,9 @@ std::ostream& operator<<(std::ostream& builder, mongo::ShardSplitDonorStateEnum 
         case mongo::ShardSplitDonorStateEnum::kBlocking:
             builder << "kBlocking";
             break;
+        case mongo::ShardSplitDonorStateEnum::kRecipientCaughtUp:
+            builder << "kRecipientCaughtUp";
+            break;
         case mongo::ShardSplitDonorStateEnum::kCommitted:
             builder << "kCommitted";
             break;

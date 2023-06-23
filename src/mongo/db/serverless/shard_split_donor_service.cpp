@@ -65,6 +65,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(abortShardSplitBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterRecipientCaughtUp);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitGarbageCollectionTimeout);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
@@ -345,6 +346,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 return _waitForRecipientToReachBlockOpTime(executor, abortToken);
             })
             .then([this, executor, abortToken, criticalSectionWithoutCatchupTimer] {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                pauseShardSplitAfterRecipientCaughtUp.pauseWhileSet(opCtx.get());
                 criticalSectionWithoutCatchupTimer->reset();
                 return _applySplitConfigToDonor(executor, abortToken);
             })
@@ -533,7 +536,7 @@ ConnectionString ShardSplitDonorService::DonorStateMachine::_setupAcceptanceMoni
 
     // Always start the replica set monitor if we haven't reached a decision yet
     _splitAcceptancePromise.setWith([&]() {
-        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking ||
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kRecipientCaughtUp ||
             MONGO_unlikely(skipShardSplitWaitForSplitAcceptance.shouldFail())) {
             return Future<HostAndPort>::makeReady(StatusWith<HostAndPort>(HostAndPort{}));
         }
@@ -661,7 +664,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
     checkForTokenInterrupt(abortToken);
 
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking ||
+    if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kRecipientCaughtUp ||
         _hasInstalledSplitConfig(lg)) {
         return ExecutorFuture(**executor);
     }
@@ -686,11 +689,27 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
     LOGV2(
         6177201, "Waiting for recipient nodes to reach block timestamp.", "id"_attr = _migrationId);
 
-    return ExecutorFuture(**executor).then([this, blockOpTime, writeConcern]() {
-        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
-        uassertStatusOK(replCoord->awaitReplication(opCtx.get(), blockOpTime, writeConcern).status);
-    });
+    return ExecutorFuture(**executor)
+        .then([this, blockOpTime, writeConcern]() {
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+            uassertStatusOK(
+                replCoord->awaitReplication(opCtx.get(), blockOpTime, writeConcern).status);
+        })
+        .then([this, executor, abortToken]() {
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                LOGV2(8423389,
+                      "Entering 'recipient caught up' state.",
+                      "id"_attr = _stateDoc.getId());
+            }
+
+            return _updateStateDocument(
+                       executor, abortToken, ShardSplitDonorStateEnum::kRecipientCaughtUp)
+                .then([this, self = shared_from_this(), executor, abortToken](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
+                });
+        });
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfigToDonor(
@@ -791,7 +810,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForSplitAcceptanceAndEnterCommit
     checkForTokenInterrupt(abortToken);
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kRecipientCaughtUp) {
             return ExecutorFuture(**executor);
         }
     }
@@ -927,6 +946,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                        switch (nextState) {
                            case ShardSplitDonorStateEnum::kUninitialized:
                            case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+                           case ShardSplitDonorStateEnum::kRecipientCaughtUp:
                                break;
                            case ShardSplitDonorStateEnum::kBlocking:
                                _stateDoc.setBlockOpTime(oplogSlot);

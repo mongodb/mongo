@@ -42,6 +42,7 @@ enums:
             kUninitialized: "uninitialized"
             kAbortingIndexBuilds: "aborting index builds"
             kBlocking: "blocking"
+            kRecipientCaughtUp: "recipient caught up"
             kCommitted: "committed"
             kAborted: "aborted"
 

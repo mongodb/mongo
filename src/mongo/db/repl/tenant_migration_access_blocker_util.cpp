@@ -603,6 +603,7 @@ void recoverTenantMigrationAccessBlockers(OperationContext* opCtx) {
                 case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
                     break;
                 case ShardSplitDonorStateEnum::kBlocking:
+                case ShardSplitDonorStateEnum::kRecipientCaughtUp:
                     invariant(doc.getBlockOpTime());
                     mtab->startBlockingWrites();
                     mtab->startBlockingReadsAfter(doc.getBlockOpTime()->getTimestamp());
