@@ -60,7 +60,7 @@ function runTest(readPreference) {
 
     // Run the analyzeShardKey command and verify that the metrics are as expected.
     const res0 = assert.commandWorked(st.s1.adminCommand(analyzeShardKeyCmdObj));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0.keyCharacteristics, expectedMetrics);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, expectedMetrics);
 
     // Make shard1 the primary shard instead by running the movePrimary command against mongos0.
     assert.commandWorked(st.s0.adminCommand({movePrimary: dbName, to: st.shard1.name}));
@@ -71,7 +71,7 @@ function runTest(readPreference) {
     // run on shard0 instead of on shard1. As a result, the command would fail with a
     // NamespaceNotFound error.
     const res1 = assert.commandWorked(st.s1.adminCommand(analyzeShardKeyCmdObj));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1.keyCharacteristics, expectedMetrics);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, expectedMetrics);
 
     // Shard the collection and make it have two chunks:
     // shard0: [MinKey, 0]
@@ -88,7 +88,7 @@ function runTest(readPreference) {
     // only on shard1 instead of on both shard0 and shard1. As a result, the metrics would be
     // incorrect.
     const res2 = assert.commandWorked(st.s1.adminCommand(analyzeShardKeyCmdObj));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2.keyCharacteristics, expectedMetrics);
+    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, expectedMetrics);
 }
 
 runTest({mode: "primary"});

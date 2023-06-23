@@ -218,8 +218,11 @@ function analyzeShardKey(ns, shardKey, indexKey) {
     assert.commandWorked(res);
     jsTest.log(`Finished analyzing the shard key: ${tojsononeline(res)}`);
 
-    if (res.hasOwnProperty("keyCharacteristics")) {
-        AnalyzeShardKeyUtil.validateKeyCharacteristicsMetrics(res.keyCharacteristics);
+    // The response should only contain the "numDocs" field if it also contains the fields about the
+    // characteristics of the shard key (e.g. "numDistinctValues" and "mostCommonValues") since the
+    // number of documents is just a supporting metric for those metrics.
+    if (res.hasOwnProperty("numDocs")) {
+        AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res);
     } else {
         AnalyzeShardKeyUtil.assertNotContainKeyCharacteristicsMetrics(res);
     }

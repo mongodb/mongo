@@ -49,7 +49,7 @@ const res0 = assert.commandWorked(st.s.adminCommand({
     // this test.
     readWriteDistribution: false
 }));
-assert.eq(res0.keyCharacteristics.monotonicity.type, expectedType, res0);
+assert.eq(res0.monotonicity.type, expectedType, res0);
 
 // Make the collection have the following chunks:
 // shard0: [MinKey, -1000] (10000 documents)
@@ -67,7 +67,7 @@ const res1 = assert.commandWorked(st.s.adminCommand({
     // this test.
     readWriteDistribution: false
 }));
-assert.eq(res1.keyCharacteristics.monotonicity.type, expectedType, res1);
+assert.eq(res1.monotonicity.type, expectedType, res1);
 
 st.stop();
 })();

@@ -24,8 +24,8 @@ function testUnshardedCollection(conn) {
         // this test.
         readWriteDistribution: false
     }));
-    assert.lt(res.keyCharacteristics.avgDocSizeBytes, 1000, res);
-    assert.gt(res.keyCharacteristics.avgDocSizeBytes, 1000 / 2, res);
+    assert.lt(res.avgDocSizeBytes, 1000, res);
+    assert.gt(res.avgDocSizeBytes, 1000 / 2, res);
 
     assert(coll.drop());
 }
@@ -67,8 +67,8 @@ function testShardedCollection(st) {
         // this test.
         readWriteDistribution: false
     });
-    assert.lt(res.keyCharacteristics.avgDocSizeBytes, 1000, res);
-    assert.gt(res.keyCharacteristics.avgDocSizeBytes, 3000 / 5, res);
+    assert.lt(res.avgDocSizeBytes, 1000, res);
+    assert.gt(res.avgDocSizeBytes, 3000 / 5, res);
 
     assert(coll.drop());
 }

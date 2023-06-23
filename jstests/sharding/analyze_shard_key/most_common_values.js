@@ -237,15 +237,13 @@ function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
         setMongodServerParameters({st, rst, params: sufficientAccumulatorBytesLimitParams});
         let res = conn.adminCommand(cmdObj);
         assert.commandWorked(res);
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics,
-                                                            expectedMetrics);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, expectedMetrics);
 
         setMongodServerParameters({st, rst, params: insufficientAccumulatorBytesLimitParams});
         res = conn.adminCommand(cmdObj);
         if (isUnique || isHashed) {
             assert.commandWorked(res);
-            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics,
-                                                                expectedMetrics);
+            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, expectedMetrics);
         } else {
             // The aggregation pipeline that the analyzeShardKey command uses to calculate the
             // cardinality and frequency metrics when the supporting index is not unique contains

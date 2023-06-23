@@ -164,12 +164,12 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     function validateKeyCharacteristicsMetrics(metrics) {
-        assert.gt(metrics.numDocsTotal, 0, metrics);
+        assert.gt(metrics.numDocs, 0, metrics);
         assert.gt(metrics.numDistinctValues, 0, metrics);
         assert.gt(metrics.mostCommonValues.length, 0, metrics);
         assert.gt(metrics.avgDocSizeBytes, 0, metrics);
 
-        assert.gte(metrics.numDocsTotal, metrics.numDistinctValues, metrics);
+        assert.gte(metrics.numDocs, metrics.numDistinctValues, metrics);
         assert.gte(metrics.numDistinctValues, metrics.mostCommonValues.length, metrics);
 
         let totalFrequency = 0;
@@ -182,7 +182,7 @@ var AnalyzeShardKeyUtil = (function() {
             totalFrequency += frequency;
             prevFrequency = frequency;
         }
-        assert.gte(metrics.numDocsTotal, totalFrequency, metrics);
+        assert.gte(metrics.numDocs, totalFrequency, metrics);
 
         if (metrics.monotonicity.type == "unknown") {
             assert(!metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"), metrics);
@@ -194,14 +194,17 @@ var AnalyzeShardKeyUtil = (function() {
         }
     }
 
-    function assertNotContainKeyCharacteristicsMetrics(res) {
-        assert(!res.hasOwnProperty("keyCharacteristics"), res);
+    function assertNotContainKeyCharacteristicsMetrics(metrics) {
+        assert(!metrics.hasOwnProperty("numDocs"), metrics);
+        assert(!metrics.hasOwnProperty("isUnique"), metrics);
+        assert(!metrics.hasOwnProperty("numDistinctValues"), metrics);
+        assert(!metrics.hasOwnProperty("mostCommonValues"), metrics);
+        assert(!metrics.hasOwnProperty("monotonicity"), metrics);
+        assert(!metrics.hasOwnProperty("avgDocSizeBytes"), metrics);
     }
 
-    function assertContainKeyCharacteristicsMetrics(res) {
-        assert(res.hasOwnProperty("keyCharacteristics"), res);
-        const metrics = res.keyCharacteristics;
-        assert(metrics.hasOwnProperty("numDocsTotal"), metrics);
+    function assertContainKeyCharacteristicsMetrics(metrics) {
+        assert(metrics.hasOwnProperty("numDocs"), metrics);
         assert(metrics.hasOwnProperty("isUnique"), metrics);
         assert(metrics.hasOwnProperty("numDistinctValues"), metrics);
         assert(metrics.hasOwnProperty("mostCommonValues"), metrics);
@@ -211,7 +214,9 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     function assertKeyCharacteristicsMetrics(actual, expected) {
-        assert.eq(actual.numDocsTotal, expected.numDocs, {actual, expected});
+        assertContainKeyCharacteristicsMetrics(actual);
+
+        assert.eq(actual.numDocs, expected.numDocs, {actual, expected});
         assert.eq(actual.isUnique, expected.isUnique, {actual, expected});
         assert.eq(actual.numDistinctValues, expected.numDistinctValues, {actual, expected});
 
@@ -311,16 +316,16 @@ var AnalyzeShardKeyUtil = (function() {
         }
     }
 
-    function assertNotContainReadWriteDistributionMetrics(res) {
-        assert(!res.hasOwnProperty("readDistribution"));
-        assert(!res.hasOwnProperty("writeDistribution"));
+    function assertNotContainReadWriteDistributionMetrics(metrics) {
+        assert(!metrics.hasOwnProperty("readDistribution"));
+        assert(!metrics.hasOwnProperty("writeDistribution"));
     }
 
-    function assertContainReadWriteDistributionMetrics(res) {
-        assert(res.hasOwnProperty("readDistribution"));
-        assert(res.hasOwnProperty("writeDistribution"));
-        validateReadDistributionMetrics(res.readDistribution);
-        validateWriteDistributionMetrics(res.writeDistribution);
+    function assertContainReadWriteDistributionMetrics(metrics) {
+        assert(metrics.hasOwnProperty("readDistribution"));
+        assert(metrics.hasOwnProperty("writeDistribution"));
+        validateReadDistributionMetrics(metrics.readDistribution);
+        validateWriteDistributionMetrics(metrics.writeDistribution);
     }
 
     function validateSampledQueryDocument(doc) {
@@ -354,7 +359,6 @@ var AnalyzeShardKeyUtil = (function() {
         assertNotContainKeyCharacteristicsMetrics,
         assertContainKeyCharacteristicsMetrics,
         assertKeyCharacteristicsMetrics,
-        validateKeyCharacteristicsMetrics,
         assertNotContainReadWriteDistributionMetrics,
         assertContainReadWriteDistributionMetrics,
         validateSampledQueryDocument
