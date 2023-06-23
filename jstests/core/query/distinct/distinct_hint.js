@@ -2,7 +2,8 @@
  * This test ensures that hint on the distinct command works.
  *
  * @tags: [
- *  assumes_unsharded_collection
+ *  assumes_unsharded_collection,
+ *  requires_fcv_71,
  * ]
  */
 
