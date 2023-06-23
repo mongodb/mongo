@@ -110,6 +110,16 @@ var AnalyzeShardKeyUtil = (function() {
     }
 
     /**
+     * Returns true if the collection is a clustered collection. Assumes that the collection
+     * exists.
+     */
+    function isClusterCollection(conn, dbName, collName) {
+        const listCollectionRes = assert.commandWorked(
+            conn.getDB(dbName).runCommand({listCollections: 1, filter: {name: collName}}));
+        return listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
+    }
+
+    /**
      * Enables profiling of the given database on all the given mongods.
      */
     function enableProfiler(mongodConns, dbName) {
@@ -346,6 +356,7 @@ var AnalyzeShardKeyUtil = (function() {
         getRandInteger,
         getRandomElement,
         getRandomFieldName,
+        isClusterCollection,
         enableProfiler,
         disableProfiler,
         calculatePercentage,
