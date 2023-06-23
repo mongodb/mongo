@@ -29,6 +29,7 @@
 
 #include "mongo/db/ops/write_ops.h"
 
+#include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
@@ -64,6 +65,9 @@ static constexpr int kBoolSize = 1;
 // 'BinDataType', 4 bytes for serializing the integer size of the UUID, and finally, 16 bytes
 // for the UUID itself.
 static const int kUUIDSize = 21;
+
+// This constant accounts for the size of a 32-bit integer.
+static const int kIntSize = 4;
 
 template <class T>
 void checkOpCountForCommand(const T& op, size_t numOps) {
@@ -103,15 +107,15 @@ int getWriteCommandRequestBaseSize(const WriteCommandRequestBase& base) {
 
     if (auto stmtId = base.getStmtId(); stmtId) {
         estSize += write_ops::WriteCommandRequestBase::kStmtIdFieldName.size() +
-            sizeof(std::int32_t) + kPerElementOverhead;
+            write_ops::kStmtIdSize + kPerElementOverhead;
     }
 
     if (auto stmtIds = base.getStmtIds(); stmtIds) {
         estSize += write_ops::WriteCommandRequestBase::kStmtIdsFieldName.size();
         estSize += static_cast<int>(BSONObj::kMinBSONLength);
         estSize +=
-            ((sizeof(std::int32_t) + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes) *
-             stmtIds->size());
+            (write_ops::kStmtIdSize + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes) *
+            stmtIds->size();
         estSize += kPerElementOverhead;
     }
 
@@ -234,6 +238,18 @@ int estimateRuntimeConstantsSize(const mongo::LegacyRuntimeConstants& constants)
     return size;
 }
 
+int getArrayFiltersFieldSize(const std::vector<mongo::BSONObj>& arrayFilters,
+                             const StringData arrayFiltersFieldName) {
+    auto size = BSONObj::kMinBSONLength + arrayFiltersFieldName.size() + kPerElementOverhead;
+    for (auto&& filter : arrayFilters) {
+        // For each filter, we not only need to account for the size of the filter itself,
+        // but also for the per array element overhead.
+        size += filter.objsize();
+        size += write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+    return size;
+}
+
 int getUpdateSizeEstimate(const BSONObj& q,
                           const write_ops::UpdateModification& u,
                           const boost::optional<mongo::BSONObj>& c,
@@ -272,17 +288,8 @@ int getUpdateSizeEstimate(const BSONObj& q,
 
     // Add the size of the 'arrayFilters' field, if present.
     if (arrayFilters) {
-        estSize += ([&]() {
-            auto size = BSONObj::kMinBSONLength + UpdateOpEntry::kArrayFiltersFieldName.size() +
-                kPerElementOverhead;
-            for (auto&& filter : *arrayFilters) {
-                // For each filter, we not only need to account for the size of the filter itself,
-                // but also for the per array element overhead.
-                size += filter.objsize();
-                size += write_ops::kWriteCommandBSONArrayPerElementOverheadBytes;
-            }
-            return size;
-        })();
+        estSize +=
+            getArrayFiltersFieldSize(arrayFilters.get(), UpdateOpEntry::kArrayFiltersFieldName);
     }
 
     // Add the size of the 'hint' field, if present.
@@ -304,13 +311,90 @@ int getUpdateSizeEstimate(const BSONObj& q,
     return estSize;
 }
 
+// TODO SERVER-77871: Ensure sampleId size is accounted for in this method.
+// TODO SERVER-72983: If we need to add a allowShardKeyUpdatesWithoutFullShardKeyInQuery field,
+// ensure the size is accounted for in this method.
+int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
+                                   const write_ops::UpdateModification& updateMods,
+                                   const boost::optional<mongo::BSONObj>& constants,
+                                   const bool includeUpsertSupplied,
+                                   const boost::optional<mongo::BSONObj>& collation,
+                                   const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+                                   const BSONObj& hint,
+                                   const boost::optional<mongo::BSONObj>& sort,
+                                   const boost::optional<StringData> returnValue,
+                                   const boost::optional<mongo::BSONObj>& returnFields) {
+    int estSize = static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Adds the size of the 'update' field which contains the index of the corresponding namespace.
+    estSize += BulkWriteUpdateOp::kUpdateFieldName.size() + kIntSize + kPerElementOverhead;
+
+    // Add the sizes of the 'multi' and 'upsert' fields.
+    estSize += BulkWriteUpdateOp::kUpsertFieldName.size() + kBoolSize + kPerElementOverhead;
+    estSize += BulkWriteUpdateOp::kMultiFieldName.size() + kBoolSize + kPerElementOverhead;
+
+    // Add the size of 'upsertSupplied' field if present.
+    if (includeUpsertSupplied) {
+        estSize +=
+            BulkWriteUpdateOp::kUpsertSuppliedFieldName.size() + kBoolSize + kPerElementOverhead;
+    }
+
+    // Add the sizes of the 'filter' and 'updateMods' fields.
+    estSize += (BulkWriteUpdateOp::kFilterFieldName.size() + filter.objsize() +
+                kPerElementOverhead + BulkWriteUpdateOp::kUpdateModsFieldName.size() +
+                updateMods.objsize() + kPerElementOverhead);
+
+    // Add the size of the 'constants' field, if present.
+    if (constants) {
+        estSize += (BulkWriteUpdateOp::kConstantsFieldName.size() + constants->objsize() +
+                    kPerElementOverhead);
+    }
+
+    // Add the size of the 'collation' field, if present.
+    if (collation) {
+        estSize += (BulkWriteUpdateOp::kCollationFieldName.size() + collation->objsize() +
+                    kPerElementOverhead);
+    }
+
+    // Add the size of the 'arrayFilters' field, if present.
+    if (arrayFilters) {
+        estSize +=
+            getArrayFiltersFieldSize(arrayFilters.get(), BulkWriteUpdateOp::kArrayFiltersFieldName);
+    }
+
+    // Add the size of the 'hint' field, if present.
+    if (!hint.isEmpty()) {
+        estSize += BulkWriteUpdateOp::kHintFieldName.size() + hint.objsize() + kPerElementOverhead;
+    }
+
+    // Add the size of the 'sort' field, if present.
+    if (sort) {
+        estSize +=
+            (BulkWriteUpdateOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead);
+    }
+
+    // Add the size of the 'return' field, if present.
+    if (returnValue) {
+        estSize += (BulkWriteUpdateOp::kReturnFieldName.size() +
+                    // A string is stored with a leading int32 containing its length and a null byte
+                    // as terminator.
+                    (kIntSize + returnValue->size() + 1) + kPerElementOverhead);
+    }
+
+    // Add the size of the 'returnFields' field, if present.
+    if (returnFields) {
+        estSize += (BulkWriteUpdateOp::kReturnFieldsFieldName.size() + returnFields->objsize() +
+                    kPerElementOverhead);
+    }
+
+    return estSize;
+}
+
 int getDeleteSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const mongo::BSONObj& hint,
                           const boost::optional<UUID>& sampleId) {
     using DeleteOpEntry = write_ops::DeleteOpEntry;
-
-    static const int kIntSize = 4;
     int estSize = static_cast<int>(BSONObj::kMinBSONLength);
 
     // Add the size of the 'q' field.
@@ -334,6 +418,69 @@ int getDeleteSizeEstimate(const BSONObj& q,
     if (sampleId) {
         estSize += DeleteOpEntry::kSampleIdFieldName.size() + kUUIDSize + kPerElementOverhead;
     }
+
+    return estSize;
+}
+
+// TODO SERVER-77871: Ensure sampleId size is accounted for in this method.
+int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
+                                   const boost::optional<mongo::BSONObj>& collation,
+                                   const mongo::BSONObj& hint,
+                                   const boost::optional<mongo::BSONObj>& sort,
+                                   bool includeReturn,
+                                   const boost::optional<mongo::BSONObj>& returnFields) {
+    int estSize = static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Adds the size of the 'delete' field which contains the index of the corresponding namespace.
+    estSize += BulkWriteDeleteOp::kDeleteCommandFieldName.size() + kIntSize + kPerElementOverhead;
+
+    // Add the size of the 'filter' field.
+    estSize += BulkWriteDeleteOp::kFilterFieldName.size() + filter.objsize() + kPerElementOverhead;
+
+    // Add the size of the 'multi' field.
+    estSize += BulkWriteDeleteOp::kMultiFieldName.size() + kBoolSize + kPerElementOverhead;
+
+    // Add the size of the 'collation' field, if present.
+    if (collation) {
+        estSize += BulkWriteDeleteOp::kCollationFieldName.size() + collation->objsize() +
+            kPerElementOverhead;
+    }
+
+    // Add the size of the 'hint' field, if present.
+    if (!hint.isEmpty()) {
+        estSize +=
+            (BulkWriteDeleteOp::kHintFieldName.size() + hint.objsize() + kPerElementOverhead);
+    }
+
+    // Add the size of the 'sort' field, if present.
+    if (sort) {
+        estSize +=
+            (BulkWriteDeleteOp::kSortFieldName.size() + sort->objsize() + kPerElementOverhead);
+    }
+
+    // Add the size of the 'return' field, if present.
+    if (includeReturn) {
+        estSize += (BulkWriteDeleteOp::kReturnFieldName.size() + kBoolSize + kPerElementOverhead);
+    }
+
+    // Add the size of the 'returnFields' field, if present.
+    if (returnFields) {
+        estSize += (BulkWriteDeleteOp::kReturnFieldsFieldName.size() + returnFields->objsize() +
+                    kPerElementOverhead);
+    }
+
+    return estSize;
+}
+
+int getBulkWriteInsertSizeEstimate(const mongo::BSONObj& document) {
+    int estSize = static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Adds the size of the 'insert' field which contains the index of the corresponding namespace.
+    estSize += BulkWriteInsertOp::kInsertFieldName.size() + kIntSize + kPerElementOverhead;
+
+    // Add the size of the 'document' field.
+    estSize +=
+        BulkWriteInsertOp::kDocumentFieldName.size() + document.objsize() + kPerElementOverhead;
 
     return estSize;
 }

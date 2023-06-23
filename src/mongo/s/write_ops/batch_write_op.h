@@ -278,6 +278,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                                 bool recordTargetErrors,
                                 GetTargeterFn getTargeterFn,
                                 GetWriteSizeFn getWriteSizeFn,
+                                int baseCommandSizeBytes,
                                 TargetedBatchMap& batchMap);
 
 /**

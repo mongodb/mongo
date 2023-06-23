@@ -248,7 +248,12 @@ class TargetedWriteBatch {
     TargetedWriteBatch& operator=(const TargetedWriteBatch&) = delete;
 
 public:
-    TargetedWriteBatch(const ShardId& shardId) : _shardId(shardId) {}
+    /**
+     * baseCommandSizeBytes specifies an estimate of the size of the corresponding batch request
+     * command prior to adding any write ops to it.
+     */
+    TargetedWriteBatch(const ShardId& shardId, const int baseCommandSizeBytes)
+        : _shardId(shardId), _estimatedSizeBytes(baseCommandSizeBytes) {}
 
     const ShardId& getShardId() const {
         return _shardId;
@@ -279,9 +284,9 @@ private:
     // TargetedWrite*s are owned by the TargetedWriteBatch
     std::vector<std::unique_ptr<TargetedWrite>> _writes;
 
-    // Conservatively estimated size of the batch, for ensuring it doesn't grow past the maximum
-    // BSON size
-    int _estimatedSizeBytes{0};
+    // Conservatively estimated size of the batch command, for ensuring it doesn't grow past the
+    // maximum BSON size.
+    int _estimatedSizeBytes;
 };
 
 }  // namespace mongo

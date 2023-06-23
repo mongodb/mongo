@@ -192,12 +192,17 @@ int getEncryptionInformationSize(const BatchedCommandRequest& req) {
 
 }  // namespace
 
+// 'baseCommandSizeBytes' specifies the base size of a batch command request prior to adding any
+// individual operations to it. This function will ensure that 'baseCommandSizeBytes' plus the
+// result of calling 'getWriteSizeFn' on each write added to a batch will not result in a command
+// over BSONObjMaxUserSize.
 StatusWith<bool> targetWriteOps(OperationContext* opCtx,
                                 std::vector<WriteOp>& writeOps,
                                 bool ordered,
                                 bool recordTargetErrors,
                                 GetTargeterFn getTargeterFn,
                                 GetWriteSizeFn getWriteSizeFn,
+                                int baseCommandSizeBytes,
                                 TargetedBatchMap& batchMap) {
     //
     // Targeting of unordered batches is fairly simple - each remaining write op is targeted,
@@ -388,7 +393,7 @@ StatusWith<bool> targetWriteOps(OperationContext* opCtx,
             const auto& shardId = write->endpoint.shardName;
             TargetedBatchMap::iterator batchIt = batchMap.find(shardId);
             if (batchIt == batchMap.end()) {
-                auto newBatch = std::make_unique<TargetedWriteBatch>(shardId);
+                auto newBatch = std::make_unique<TargetedWriteBatch>(shardId, baseCommandSizeBytes);
                 batchIt = batchMap.emplace(shardId, std::move(newBatch)).first;
             }
 
@@ -458,12 +463,12 @@ StatusWith<bool> BatchWriteOp::targetBatch(const NSTargeter& targeter,
             // corresponding to the statements that got routed to each individual shard, so they
             // need to be accounted in the potential request size so it does not exceed the max BSON
             // size.
-            //
-            // The constant 4 is chosen as the size of the BSON representation of the stmtId.
-            const int writeSizeBytes = writeOp.getWriteItem().getWriteSizeBytes() +
+            const int writeSizeBytes = writeOp.getWriteItem().getSizeForBatchWriteBytes() +
                 getEncryptionInformationSize(_clientRequest) +
                 write_ops::kWriteCommandBSONArrayPerElementOverheadBytes +
-                (_batchTxnNum ? write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 4 : 0);
+                (_batchTxnNum ? write_ops::kStmtIdSize +
+                         write_ops::kWriteCommandBSONArrayPerElementOverheadBytes
+                              : 0);
 
             // For unordered writes, the router must return an entry for each failed write. This
             // constant is a pessimistic attempt to ensure that if a request to a shard hits
@@ -477,6 +482,8 @@ StatusWith<bool> BatchWriteOp::targetBatch(const NSTargeter& targeter,
                 ordered ? 0 : write_ops::kWriteCommandBSONArrayPerElementOverheadBytes + 272;
             return std::max(writeSizeBytes, errorResponsePotentialSizeBytes);
         },
+        // TODO SERVER-77653: Account for the size of top-level command fields here.
+        0 /* baseCommandSizeBytes */,
         *targetedBatches);
 
     if (!targetStatus.isOK()) {
