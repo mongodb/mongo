@@ -15,7 +15,7 @@ if __name__ == "__main__" and __package__ is None:
 
 from buildscripts.linter import git  # pylint: disable=wrong-import-position
 from buildscripts.linter import parallel  # pylint: disable=wrong-import-position
-from buildscripts.linter import simplecpplint  # pylint: disable=wrong-import-position
+from buildscripts.linter import mongolint  # pylint: disable=wrong-import-position
 
 FILES_RE = re.compile('\\.(h|cpp)$')
 
@@ -32,7 +32,7 @@ def is_interesting_file(file_name: str) -> bool:
 
 def _lint_files(file_names: List[str]) -> None:
     """Lint a list of files with clang-format."""
-    run_lint1 = lambda param1: simplecpplint.lint_file(param1) == 0
+    run_lint1 = lambda param1: mongolint.lint_file(param1) == 0
     if not parallel.parallel_process([os.path.abspath(f) for f in file_names], run_lint1):
         print("ERROR: Code Style does not match coding style")
         sys.exit(1)

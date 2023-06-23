@@ -29,12 +29,12 @@ assertion codes are distinct. You can see the usage by running the following com
 
 Ex: `buildscripts/errorcodes.py`
 
-### `quickcpplint.py`
-The `buildscripts/quickcpplint.py` script runs a simple MongoDB C++ linter. You can see the usage 
-by running the following command: `buildscripts/quickcpplint.py --help`. You can take a look at 
-`buildscripts/linter/simplecpplint.py` to better understand the rules for this linter.
+### `quickmongolint.py`
+The `buildscripts/quickmongolint.py` script runs a simple MongoDB C++ linter. You can see the usage 
+by running the following command: `buildscripts/quickmongolint.py --help`. You can take a look at 
+`buildscripts/linter/mongolint.py` to better understand the rules for this linter.
 
-Ex: `buildscripts/quickcpplint.py lint`
+Ex: `buildscripts/quickmongolint.py lint`
 
 ## Javascript Linters
 The `buildscripts/eslint.py` wrapper script runs the `eslint` javascript linter. You can see the 
@@ -87,11 +87,11 @@ Here are some examples:
 
 | SCons Target | Linter(s) | Example |
 | --- | --- | --- |
-| `lint` | `clang-format` `errorcodes.py` `quickcpplint.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint` |
+| `lint` | `clang-format` `errorcodes.py` `quickmongolint.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint` |
 | `lint-fast` | `clang-format` `errorcodes.py` `eslint` `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint-fast` |
 | `lint-clang-format` | `clang-format` | `buildscripts/scons.py lint-clang-format` |
 | `lint-errorcodes` | `errorcodes.py` | `buildscripts/scons.py lint-errorcodes` |
-| `lint-lint.py` | `quickcpplint.py` | `buildscripts/scons.py lint-lint.py` |
+| `lint-lint.py` | `quickmongolint.py` | `buildscripts/scons.py lint-lint.py` |
 | `lint-eslint` | `eslint` | `buildscripts/scons.py lint-eslint` |
 | `lint-pylinters` | `pylint` `mypy` `pydocstyle` `yapf` | `buildscripts/scons.py lint-pylinters` |
 | `lint-sconslinters` | `yapf` | `buildscripts/scons.py lint-sconslinters` |

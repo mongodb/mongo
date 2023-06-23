@@ -6219,7 +6219,7 @@ sconslinters = env.Command(
 
 lint_py = env.Command(
     target="#lint-lint.py",
-    source=["buildscripts/quickcpplint.py"],
+    source=["buildscripts/quickmongolint.py"],
     action="$PYTHON ${SOURCES[0]} lint",
 )
 
