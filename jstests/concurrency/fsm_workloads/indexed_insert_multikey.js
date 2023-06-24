@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_multikey.js
  *
@@ -7,10 +5,10 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is an array of numbers.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.indexedField = 'indexed_insert_multikey';
     // Remove the shard key, since it cannot be a multikey index
     delete $config.data.shardKey;

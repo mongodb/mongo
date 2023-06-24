@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * distinct_noindex.js
  *
@@ -7,7 +5,7 @@
  * The field contains non-unique values.
  * Each thread operates on the same collection.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {
         randRange: function randRange(low, high) {
             assertAlways.gt(high, low);

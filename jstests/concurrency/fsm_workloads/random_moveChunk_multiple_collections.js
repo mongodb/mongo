@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform continuous moveChunk on multiple collections/databases.
  *
@@ -9,8 +7,8 @@
  *  does_not_support_add_remove_shards,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 
 const dbNames = ['db0', 'db1', 'db2'];
 const collNames = ['collA', 'collB', 'collC'];
@@ -44,7 +42,7 @@ const runWithManualRetriesIfInStepdownSuite = (fn) => {
     }
 };
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = dbNames.length * collNames.length;
     $config.iterations = 64;
 

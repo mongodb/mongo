@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * map_reduce_interrupt.js
  *
@@ -13,10 +11,12 @@
  *   uses_curop_agg_stage
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                      // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/map_reduce_replace_nonexistent.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'map_reduce_interrupt';
 
     $config.states.killOp = function killOp(db, collName) {

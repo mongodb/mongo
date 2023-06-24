@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Concurrently performs DDL commands and verifies guarantees are not broken.
  *
@@ -31,7 +29,7 @@ function getRandomShard(connCache) {
     return shards[Random.randInt(shards.length)];
 }
 
-var $config = (function() {
+export const $config = (function() {
     let states = {
         create: function(db, collName, connCache) {
             db = getRandomDb(db);

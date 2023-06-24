@@ -1,4 +1,3 @@
-'use strict';
 /**
  * This test runs many concurrent aggregations using $out, writing to the same time-series
  * collection. While this is happening, other threads may be creating or dropping indexes, changing
@@ -17,9 +16,10 @@
  *   featureFlagAggOutTimeseries
  * ]
  */
-load('jstests/concurrency/fsm_workloads/agg_out.js');  // for $super state functions
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/agg_out.js';
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
     const numDocs = 100;

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Extends sharded_base_partitioned.js.
  *
@@ -12,11 +10,13 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
-load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
 load("jstests/sharding/libs/find_chunks_util.js");
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.iterations = 8;
     $config.threadCount = 5;
 

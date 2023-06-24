@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * drop_index_during_lookup.js
  *
  * Sets up a situation where index join strategy will be chosen for $lookup while while running
  * concurrent dropIndexes against the index chosen for the foreign side.
  */
-var $config = (function() {
+export const $config = (function() {
     let data = {
         collName: 'localColl',
         foreignCollName: 'foreignColl',

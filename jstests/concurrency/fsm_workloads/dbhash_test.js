@@ -12,9 +12,9 @@
 
 load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
 
-const dbPrefix = jsTestName() + '_db_';
+export const dbPrefix = jsTestName() + '_db_';
 
-var $config = (function() {
+export const $config = (function() {
     let states = {
         init: function(db, collName) {
             jsTestLog("init tid: " + this.tid);

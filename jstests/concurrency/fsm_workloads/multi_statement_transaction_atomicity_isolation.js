@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * multi_statement_transaction_atomicity_isolation.js
  *
@@ -52,7 +50,7 @@ load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 // For arrayEq.
 load("jstests/aggregation/extras/utils.js");
 
-var $config = (function() {
+export const $config = (function() {
     function checkTransactionCommitOrder(documents) {
         const graph = new Graph();
 

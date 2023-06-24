@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_simple.js
  *
@@ -12,7 +10,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     var states = {
         set: function set(db, collName) {
             this.setOrUnset(db, collName, true, this.numDocs);

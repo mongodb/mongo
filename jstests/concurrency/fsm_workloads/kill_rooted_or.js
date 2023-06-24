@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * kill_rooted_or.js
  *
@@ -10,7 +8,8 @@
  * This workload was designed to reproduce SERVER-24761.
  */
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
-var $config = (function() {
+
+export const $config = (function() {
     // Use the workload name as the collection name, since the workload name is assumed to be
     // unique. Note that we choose our own collection name instead of using the collection provided
     // by the concurrency framework, because this workload drops its collection.

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_where.js
  *
@@ -8,7 +6,7 @@
  * data.insertedDocuments is used as a counter by all of those workloads for their own checks.
  */
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         documentsToInsert: 100,
         insertedDocuments: 0,

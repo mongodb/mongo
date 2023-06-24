@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * update_check_index.js
  *
  * Ensures that concurrent multi updates cannot produce duplicate index entries. Regression test
  * for SERVER-17132.
  */
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         function multiUpdate(db, collName) {
             // Set 'c' to some random value.

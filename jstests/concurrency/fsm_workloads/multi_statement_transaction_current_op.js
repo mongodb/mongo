@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs update, findAndModify, delete, find, and getMore in a transaction with all threads using the
  * same session.
@@ -13,11 +11,12 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands.js');  // for
-                                                                                        // $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_all_commands.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.verifyMongosSessionsWithTxns = function verifyMongosSessionsWithTxns(sessions) {
         const acceptableReadConcernLevels = ['snapshot', 'local'];
         sessions.forEach((session) => {

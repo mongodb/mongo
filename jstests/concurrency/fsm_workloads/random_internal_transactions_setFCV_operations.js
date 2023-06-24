@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs updates that will change a document's shard key across chunks while simultaneously
  * changing the FCV.
@@ -13,14 +11,16 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/random_moveChunk_update_shard_key.js";
 // Transactions that run concurrently with a setFCV may get interrupted due to setFCV issuing for a
 // killSession any open sessions during an FCV change. We want to have to retryability support for
 // such scenarios.
 load('jstests/libs/override_methods/retry_on_killed_session.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Sessions of open transactions can be killed and throw "Interrupted" if we run it concurrently
     // with a setFCV command, so we want to be able to catch those as acceptable killSession errors.
     $config.data.retryOnKilledSession = true;

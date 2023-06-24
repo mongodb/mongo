@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs refineCollectionShardKey and CRUD operations concurrently.
  *
@@ -8,7 +6,7 @@
 
 load('jstests/libs/parallelTester.js');
 
-var $config = (function() {
+export const $config = (function() {
     // The organization of documents in every collection is as follows:
     //
     // (i)   Reserved for find:   {tid: tid, a:  0, b:  0} -->> {tid: tid, a: 24, b: 24}

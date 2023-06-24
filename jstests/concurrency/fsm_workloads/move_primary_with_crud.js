@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Randomly performs a series of CRUD and movePrimary operations on unsharded collections, checking
  * for data consistency as a consequence of these operations.
@@ -12,7 +10,7 @@
 
 load('jstests/libs/feature_flag_util.js');
 
-const $config = (function() {
+export const $config = (function() {
     const kCollNamePrefix = 'unsharded_coll_';
     const kInitialCollSize = 100;
     const kBatchSizeForDocsLookup = kInitialCollSize * 2;

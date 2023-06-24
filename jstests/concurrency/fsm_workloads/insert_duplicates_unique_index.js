@@ -11,7 +11,7 @@
 
 "use strict";
 
-var $config = (function() {
+export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
             return "insert_duplicates_unique_index_" + collName;

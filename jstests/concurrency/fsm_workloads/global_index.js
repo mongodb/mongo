@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform global index CRUD operations, with create and drop commands.
  *
@@ -9,7 +7,7 @@
  *     requires_replication
  * ]
  */
-var $config = (function() {
+export const $config = (function() {
     const data = {
         uuidArr: ["47b5c083-8d60-4920-90e2-ba3ff668c371", "8acc9ba2-2d8f-4b01-b835-8f1818c1df1c"],
         range: 5

@@ -8,8 +8,6 @@
  *   requires_fcv_51,
  * ]
  */
-'use strict';
-
 const dbPrefix = 'fsm_db_for_sharded_timeseries_collection_';
 const dbCount = 2;
 const collPrefix = 'sharded_timeseries_collection_';
@@ -27,7 +25,7 @@ function getRandomTimeseriesView(db) {
     return getRandomDb(db)[collPrefix + Random.randInt(collCount)];
 }
 
-var $config = (function() {
+export const $config = (function() {
     const setup = function(db, collName, cluster) {
         // Enable sharding for the test databases.
         for (var i = 0; i < dbCount; i++) {

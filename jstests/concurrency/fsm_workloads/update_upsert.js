@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * update_upsert_multi.js
  *
  * Tests updates that specify upsert=true.
  */
 
-var $config = (function() {
+export const $config = (function() {
     let states = {
         update: function update(db, collName) {
             const docId = Random.randInt(5) * 4;

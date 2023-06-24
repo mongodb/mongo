@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Shards a collection by 'skey' and creates one chunk per thread, filling each chunk with
  * documents, and assigning each document to a random thread. Meant to be extended by workloads that
@@ -10,10 +8,12 @@
  *  assumes_balancer_off,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/sharded_base_partitioned.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/sharded_base_partitioned.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 1;
     $config.iterations = 1;
 

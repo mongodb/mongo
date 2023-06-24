@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * remove_single_document.js
  *
@@ -7,7 +5,7 @@
  *
  * @tags: [assumes_balancer_off]
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         remove: function remove(db, collName) {
             // try removing a random document

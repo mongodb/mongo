@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * kill_aggregation.js
  *
@@ -10,10 +8,10 @@
  * This workload was designed to reproduce SERVER-25039.
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkload
-load('jstests/concurrency/fsm_workloads/kill_rooted_or.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/kill_rooted_or.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as the collection name, since the workload name is assumed to be
     // unique. Note that we choose our own collection name instead of using the collection provided
     // by the concurrency framework, because this workload drops its collection.

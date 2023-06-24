@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests killing time-series inserts.
  *
@@ -14,7 +12,7 @@
  * ]
  */
 
-var $config = (function() {
+export const $config = (function() {
     const timeFieldName = 'time';
     const metaFieldName = 'tag';
 

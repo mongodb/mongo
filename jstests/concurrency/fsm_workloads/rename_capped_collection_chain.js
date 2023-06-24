@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * rename_capped_collection_chain.js
  *
@@ -10,7 +8,7 @@
  * @tags: [requires_capped]
  */
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the collection name,
         // since the workload name is assumed to be unique.

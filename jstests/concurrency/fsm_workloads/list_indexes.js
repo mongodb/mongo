@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * list_indexes.js
  *
  * Checks that the listIndexes command can tolerate concurrent modifications to the
  * index catalog.
  */
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         // Picks a random index to drop and recreate.
         function modifyIndices(db, collName) {

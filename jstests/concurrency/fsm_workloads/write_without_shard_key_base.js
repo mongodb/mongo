@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster.
  *
@@ -10,14 +8,13 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 // This workload does not make use of random moveChunks, but other workloads that extend this base
 // workload may.
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');  // for $config
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 50;
     $config.startState = "init";  // Inherited from random_moveChunk_base.js.

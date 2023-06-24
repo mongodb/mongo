@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Creates several bank accounts. On each iteration, each thread:
  *  - chooses two accounts and amount of money being transfer
@@ -11,7 +9,7 @@
 // For withTxnAndAutoRetry.
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 
-var $config = (function() {
+export const $config = (function() {
     function computeTotalOfAllBalances(documents) {
         return documents.reduce((total, account) => total + account.balance, 0);
     }

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * remove_and_bulk_insert.js
  *
@@ -9,7 +7,7 @@
  * This workload was designed to reproduce SERVER-20512, where a record in an evicted page was
  * accessed after a WriteConflictException occurred in Collection::deleteDocument().
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         insert: function insert(db, collName) {
             var bulk = db[collName].initializeUnorderedBulkOp();

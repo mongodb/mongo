@@ -1,16 +1,15 @@
-'use strict';
-
 /**
  *  Performs repeated reads of the documents in the collection to test snapshot isolation.
  *
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js');
-// for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.numReads = 5;
 
     $config.states.repeatedRead = function repeatedRead(db, collName) {

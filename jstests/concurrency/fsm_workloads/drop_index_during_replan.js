@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * drop_index_during_replan.js
  *
@@ -8,7 +6,7 @@
  * time, other threads may be dropping {b: 1}. This tests that the replanning process is robust to
  * index drops.
  */
-var $config = (function() {
+export const $config = (function() {
     let data = {
         collName: 'drop_index_during_replan',
         indexSpecs: [

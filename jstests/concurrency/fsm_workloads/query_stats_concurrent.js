@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * query_stats_concurrent.js
  *
@@ -11,7 +9,7 @@
  * ]
  *
  */
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
         }

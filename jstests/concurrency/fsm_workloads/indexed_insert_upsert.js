@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_upsert.js
  *
@@ -10,10 +8,10 @@
  * Instead of inserting via coll.insert(), this workload inserts using an
  * upsert.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.indexedField = 'indexed_insert_upsert';
     $config.data.shardKey = {};
     $config.data.shardKey[$config.data.indexedField] = 1;

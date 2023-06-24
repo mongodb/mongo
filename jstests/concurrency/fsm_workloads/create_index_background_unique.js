@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_index_background_unique.js
  *
@@ -15,7 +13,8 @@
  * ]
  */
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
-var $config = (function() {
+
+export const $config = (function() {
     var data = {
         prefix: "create_index_background_unique_",
         numDocsToLoad: 5000,

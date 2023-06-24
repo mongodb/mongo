@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Provides an init state that partitions the data space into chunks evenly across threads.
  *
@@ -27,7 +25,7 @@
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
 load("jstests/sharding/libs/find_chunks_util.js");
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         partitionSize: 1,
         // We use a non-hashed shard key of { _id: 1 } so that documents reside on their expected

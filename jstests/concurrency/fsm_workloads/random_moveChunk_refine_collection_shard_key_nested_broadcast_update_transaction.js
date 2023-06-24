@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Same as the base workload, but refines to a nested shard key.
  *
@@ -15,11 +13,13 @@
  *   uses_transactions,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load(
-    'jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_update_transaction.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from
+    "jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key_broadcast_update_transaction.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.newShardKey = {a: 1, "b.c": 1};
     $config.data.newShardKeyFields = ["a", "b.c"];
     return $config;

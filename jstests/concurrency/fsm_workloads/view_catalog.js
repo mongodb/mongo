@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * view_catalog.js
  *
@@ -7,7 +5,7 @@
  * built on a shared underlying collection.
  */
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the view name, since the workload name is assumed
         // to be unique.

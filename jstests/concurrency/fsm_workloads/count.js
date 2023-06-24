@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * count.js
  *
@@ -13,7 +11,7 @@
  */
 load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         randRange: function randRange(low, high) {
             // return random number in range [low, high]

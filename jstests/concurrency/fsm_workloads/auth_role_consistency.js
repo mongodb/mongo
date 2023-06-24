@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * auth_role_consistency.js
  *
@@ -8,7 +6,7 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropRoles
 
-var $config = (function() {
+export const $config = (function() {
     const kRoleNamePrefix = 'auth_role_consistency';
 
     const states = (function() {

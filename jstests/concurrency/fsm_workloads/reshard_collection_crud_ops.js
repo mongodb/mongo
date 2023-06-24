@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * Runs reshardCollection and CRUD operations concurrently.
  *
  * @tags: [requires_sharding]
  */
 
-var $config = (function() {
+export const $config = (function() {
     const shardKeys = [
         {a: 1},
         {b: 1},

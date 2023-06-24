@@ -11,7 +11,7 @@
 
 "use strict";
 
-var $config = (function() {
+export const $config = (function() {
     function setup(db, collName) {
         for (let i = 0; i < 200; ++i) {
             assertAlways.commandWorked(

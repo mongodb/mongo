@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests that the analyzeShardKey command returns correct metrics.
  *
@@ -13,7 +11,8 @@
  *  incompatible_with_concurrency_simultaneous,
  * ]
  */
-load("jstests/concurrency/fsm_libs/extend_workload.js");
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // for isMongos
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/retryable_writes_util.js");
@@ -23,22 +22,18 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 const aggregateInterruptErrors =
     [ErrorCodes.CursorNotFound, ErrorCodes.CursorKilled, ErrorCodes.QueryPlanKilled];
 
-if ($config === undefined) {
-    // There is no workload to extend. Define a noop base workload to make the 'extendWorkload' call
-    // below still work.
-    $config = {
-        threadCount: 1,
-        iterations: 1,
-        startState: "init",
-        data: {},
-        states: {init: function(db, collName) {}},
-        transitions: {init: {init: 1}},
-        setup: function(db, collName) {},
-        teardown: function(db, collName) {},
-    };
-}
+const kBaseConfig = {
+    threadCount: 1,
+    iterations: 1,
+    startState: "init",
+    data: {},
+    states: {init: function(db, collName) {}},
+    transitions: {init: {init: 1}},
+    setup: function(db, collName) {},
+    teardown: function(db, collName) {},
+};
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 500;
 

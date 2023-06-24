@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests running operations with 'collectionUUID' parameter while the collection is being renamed
  * concurrently, and makes sure that all operations will succeed eventually when using the correct
@@ -133,7 +131,7 @@ const verifyFailingWithCollectionUUIDMismatch = function(
     assert.eq(res.actualCollection, actualCollection);
 };
 
-const testCommand = function(
+export const testCommand = function(
     db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors = []) {
     verifyFailingWithCollectionUUIDMismatch(
         db, cmdName, cmdObj, data.sameDbCollUUID, sameDbCollName, namespace, data);
@@ -152,7 +150,7 @@ const testCommand = function(
     runCommandInLoop(db, namespace, cmdName, cmdObj, data, expectedNonRetryableErrors);
 };
 
-var $config = (function() {
+export const $config = (function() {
     const data = {};
 
     const states = (function() {

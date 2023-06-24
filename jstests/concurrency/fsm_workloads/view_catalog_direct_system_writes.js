@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * view_catalog_direct_system_writes.js
  *
@@ -7,10 +5,10 @@
  * does so via direct writes to system.views instead of using the collMod or drop commands. Each
  * worker operates on their own view, built on a shared underlying collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');    // for extendWorkload
-load('jstests/concurrency/fsm_workloads/view_catalog.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/view_catalog.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.create = function create(db, collName) {
         this.counter++;
         let pipeline = [{$match: {_id: this.counter}}];

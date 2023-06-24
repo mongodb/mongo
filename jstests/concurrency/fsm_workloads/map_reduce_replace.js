@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * map_reduce_replace.js
  *
@@ -15,10 +13,10 @@
  *   does_not_support_causal_consistency
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
-load('jstests/concurrency/fsm_workloads/map_reduce_inline.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/map_reduce_inline.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as a prefix for the collection name,
     // since the workload name is assumed to be unique.
     var prefix = 'map_reduce_replace';

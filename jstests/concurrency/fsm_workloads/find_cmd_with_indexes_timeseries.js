@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * This test verifies that neither index creation nor find cmd operation on a time-series collection
  * leads to incorrect data results.
@@ -17,7 +15,7 @@
  * ]
  */
 
-var $config = (function() {
+export const $config = (function() {
     // Hardcode time-series collection information so that the threads can all obtain it and run on
     // the same fields and indexes.
     const timeFieldName = "tm";

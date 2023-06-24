@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs updateOne, deleteOne, and findAndModify without shard key against a sharded cluster while
  * the collection reshards concurrently.
@@ -11,11 +9,13 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/write_without_shard_key_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/write_without_shard_key_base.js";
 load("jstests/libs/feature_flag_util.js");
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.startState = "init";
 
     // reshardingMinimumOperationDurationMillis is set to 30 seconds when there are stepdowns.

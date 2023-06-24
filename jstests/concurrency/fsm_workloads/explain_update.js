@@ -1,15 +1,13 @@
-'use strict';
-
 /**
  * explain_update.js
  *
  * Runs explain() and update() on a collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js');              // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states = Object.extend({
         explainBasicUpdate: function explainBasicUpdate(db, collName) {
             var res =

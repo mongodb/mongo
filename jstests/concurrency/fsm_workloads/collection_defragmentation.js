@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * collection_defragmentation.js
  *
@@ -51,7 +49,7 @@ function getAllChunks(configDB, ns, keyPattern) {
     return chunkArray;
 }
 
-var $config = (function() {
+export const $config = (function() {
     var states = {
         init: function init(db, collName, connCache) {
             // Initialize defragmentation

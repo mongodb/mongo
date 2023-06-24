@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * invalidated_cursors.js
  *
@@ -13,7 +11,7 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
-var $config = (function() {
+export const $config = (function() {
     let data = {
         chooseRandomlyFrom: function chooseRandomlyFrom(arr) {
             if (!Array.isArray(arr)) {

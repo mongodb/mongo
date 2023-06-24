@@ -1,10 +1,8 @@
-'use strict';
-
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_example.js');               // for $config
+import {$config as $baseConfig} from 'jstests/concurrency/fsm_example.js';
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 
 // extendWorkload takes a $config object and a callback, and returns an extended $config object.
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // In the callback, $super is the base workload definition we're
     // extending,
     // and $config is the extended workload definition we're creating.

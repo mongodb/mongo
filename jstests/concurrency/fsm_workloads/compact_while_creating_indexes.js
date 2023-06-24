@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * WiredTiger allows online compaction of its collections so it does not require an exclusive lock.
  * This workload is meant to test the behavior of the locking changes done in SERVER-16413. To
@@ -11,7 +9,7 @@
 
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
             insertDocuments.call(this, db, collName);

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * count_odd.js
  *
@@ -10,7 +8,7 @@
  * ]
  *
  */
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
         }

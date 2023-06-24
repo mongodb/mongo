@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_and_bulk_insert.js
  *
@@ -10,7 +8,7 @@
  * we attempted to make a copy of a record after a WriteConflictException occurred in
  * Collection::updateDocument().
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         insert: function insert(db, collName) {
             var bulk = db[collName].initializeUnorderedBulkOp();

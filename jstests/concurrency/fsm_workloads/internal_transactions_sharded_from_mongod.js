@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs insert, update, delete and findAndModify commands against a sharded collection inside
  * single-shard and cross-shard internal transactions started on a shard using all the available
@@ -12,11 +10,13 @@
  *  antithesis_incompatible
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/internal_transactions_sharded.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/internal_transactions_sharded.js";
 load('jstests/libs/fixture_helpers.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.expectDirtyDocs = {
         // The client is either not using a session or is using a session without retryable writes
         // enabled. Therefore, when a write is interrupted due to stepdown/kill/terminate, they

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * view_catalog_cycle_with_drop.js
  *
@@ -7,7 +5,7 @@
  * underlying collection.
  */
 
-var $config = (function() {
+export const $config = (function() {
     // Use the workload name as a prefix for the view names, since the workload name is assumed
     // to be unique.
     const prefix = 'view_catalog_cycle_with_drop_';

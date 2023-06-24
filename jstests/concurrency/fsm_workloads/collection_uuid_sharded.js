@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests running sharding operations with 'collectionUUID' parameter while the sharded collection is
  * being renamed concurrenlty.
@@ -11,10 +9,13 @@
  *   requires_sharding,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');       // for extendWorkload
-load('jstests/concurrency/fsm_workloads/collection_uuid.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig,
+    testCommand
+} from "jstests/concurrency/fsm_workloads/collection_uuid.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     const origStates = Object.keys($config.states);
     $config.states = Object.extend({
         shardingCommands: function shardingCommands(db, collName) {

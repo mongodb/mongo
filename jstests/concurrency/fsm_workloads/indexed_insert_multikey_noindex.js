@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * indexed_insert_multikey_noindex.js
  *
  * Executes the indexed_insert_multikey.js workload after dropping its index.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_multikey.js');   // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_multikey.js";
 load('jstests/concurrency/fsm_workload_modifiers/indexed_noindex.js');  // for indexedNoindex
 
-var $config = extendWorkload($config, indexedNoindex);
+export const $config = extendWorkload($baseConfig, indexedNoindex);

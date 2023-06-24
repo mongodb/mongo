@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_capped_collection.js
  *
@@ -9,7 +7,7 @@
  * @tags: [requires_capped]
  */
 
-var $config = (function() {
+export const $config = (function() {
     // Returns a document of the form { _id: ObjectId(...), field: '...' }
     // with specified BSON size.
     function makeDocWithSize(targetSize) {

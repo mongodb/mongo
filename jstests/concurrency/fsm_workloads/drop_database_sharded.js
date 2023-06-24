@@ -5,8 +5,6 @@
  *   requires_sharding,
  * ]
  */
-'use strict';
-
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
 const collPrefix = 'sharded_coll_';
@@ -47,7 +45,7 @@ function getDropDbStateResults(db) {
     return {ok: countOK, notOK: countNotOK};
 }
 
-var $config = (function() {
+export const $config = (function() {
     var states = (function() {
         function init(db, collName) {
         }

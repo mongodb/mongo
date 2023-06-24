@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * compact.js
  *
@@ -17,7 +15,7 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isEphemeral
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         nDocumentsToInsert: 1000,
         nIndexes: 3 + 1,   // The number of indexes created in createIndexes + 1 for { _id: 1 }

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * reindex_background.js
  *
@@ -11,10 +9,10 @@
  * @tags: [SERVER-40561, creates_background_indexes]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/reindex.js');     // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/reindex.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'reindex_background';
 
     $config.states.createIndexes = function createIndexes(db, collName) {

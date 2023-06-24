@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Build indexes with different abort causes.
  * - Indexing error.
@@ -22,7 +20,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/noPassthrough/libs/index_build.js");
 
-var $config = (function() {
+export const $config = (function() {
     const data = {
         prefix: "index_build_abort_",
         nCollections: 3,

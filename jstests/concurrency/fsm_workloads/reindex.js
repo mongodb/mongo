@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * reindex.js
  *
@@ -10,7 +8,7 @@
  */
 load("jstests/concurrency/fsm_workload_helpers/assert_handle_fail_in_transaction.js");
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         nIndexes: 4 + 1,  // 4 created and 1 for _id.
         nDocumentsToInsert: 1000,
