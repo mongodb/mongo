@@ -268,6 +268,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAfterSteadyTransition);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep7);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
@@ -1248,6 +1249,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
     {
         // 6. Wait for commit
         _setState(STEADY);
+        migrateThreadHangAfterSteadyTransition.pauseWhileSet();
 
         bool transferAfterCommit = false;
         while (getState() == STEADY || getState() == COMMIT_START) {
@@ -1275,7 +1277,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx) {
 
             auto mods = res.response;
 
-            if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods, &lastOpApplied)) {
+            if (mods["size"].number() > 0) {
+                (void)_applyMigrateOp(opCtx, mods, &lastOpApplied);
                 continue;
             }
 
