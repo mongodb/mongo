@@ -353,10 +353,11 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
     WT_UPDATE *newest_hs, *non_aborted_upd, *oldest_upd, *prev_upd, *ref_upd, *tombstone, *upd;
     WT_TIME_WINDOW tw;
     wt_off_t hs_size;
+    wt_timestamp_t ts;
     uint64_t insert_cnt, max_hs_size, modify_cnt;
     uint32_t i;
     int nentries;
-    bool enable_reverse_modify, error_on_ooo_ts, hs_inserted, squashed;
+    bool enable_reverse_modify, error_on_ooo_ts, hs_inserted, reinsert, squashed;
 
     error_on_ooo_ts = F_ISSET(r, WT_REC_CHECKPOINT_RUNNING);
     r->cache_write_hs = false;
@@ -423,6 +424,16 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
          */
         enable_reverse_modify =
           (WT_STREQ(btree->value_format, "S") || WT_STREQ(btree->value_format, "u"));
+
+        /*
+         * If there exists an on page tombstone without a timestamp or less than the on page update,
+         * consider it as a no timestamp update to clear the timestamps of all the updates that are
+         * inserted into the history store.
+         */
+        if (list->onpage_tombstone != NULL &&
+          (list->onpage_tombstone->start_ts == WT_TS_NONE ||
+            list->onpage_tombstone->start_ts < list->onpage_upd->start_ts))
+            min_ts_upd = list->onpage_tombstone;
 
         /*
          * The algorithm assumes the oldest update on the update chain in memory is either a full
@@ -555,15 +566,23 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
          * history store.
          */
         if (oldest_upd->type == WT_UPDATE_TOMBSTONE) {
-            if (out_of_order_ts_upd != NULL && out_of_order_ts_upd->start_ts < oldest_upd->start_ts)
+            if (out_of_order_ts_upd != NULL &&
+              out_of_order_ts_upd->start_ts < oldest_upd->start_ts) {
                 fix_ts_upd = out_of_order_ts_upd;
-            else
+                ts = fix_ts_upd->start_ts + 1;
+                reinsert = true;
+            } else {
                 fix_ts_upd = oldest_upd;
+                ts = fix_ts_upd->start_ts;
+                reinsert = false;
+            }
+
+            WT_STAT_CONN_DATA_INCR(session, cache_hs_key_truncate);
 
             if (!F_ISSET(fix_ts_upd, WT_UPDATE_FIXED_HS)) {
                 /* Delete and reinsert any update of the key with a higher timestamp. */
-                WT_ERR(__wt_hs_delete_key_from_ts(session, hs_cursor, btree->id, key,
-                  fix_ts_upd->start_ts + 1, true, false, error_on_ooo_ts));
+                WT_ERR(__wt_hs_delete_key_from_ts(
+                  session, hs_cursor, btree->id, key, ts, reinsert, error_on_ooo_ts));
                 F_SET(fix_ts_upd, WT_UPDATE_FIXED_HS);
             }
         }
@@ -760,15 +779,18 @@ __wt_hs_insert_updates(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_MULTI *mult
         }
 
         /*
-         * In the case that the onpage value is an out of order timestamp update and the update
-         * older than it is a tombstone, it remains in the stack.
+         * In the case that the onpage value/tombstone is an out of order timestamp update/tombstone
+         * it remains in the stack. Validate it is time window against on page value/tombstone.
          */
         WT_ASSERT(session, out_of_order_ts_updates.size <= 1);
 #ifdef HAVE_DIAGNOSTIC
         if (out_of_order_ts_updates.size == 1) {
             __wt_update_vector_peek(&out_of_order_ts_updates, &upd);
             WT_ASSERT(session,
-              upd->txnid == list->onpage_upd->txnid && upd->start_ts == list->onpage_upd->start_ts);
+              (upd->txnid == list->onpage_upd->txnid &&
+                upd->start_ts == list->onpage_upd->start_ts) ||
+                (upd->txnid == list->onpage_tombstone->txnid &&
+                  upd->start_ts == list->onpage_tombstone->start_ts));
         }
 #endif
     }
@@ -809,7 +831,7 @@ err:
  */
 int
 __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint32_t btree_id,
-  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool ooo_tombstone, bool error_on_ooo_ts)
+  const WT_ITEM *key, wt_timestamp_t ts, bool reinsert, bool error_on_ooo_ts)
 {
     WT_DECL_RET;
     WT_ITEM hs_key;
@@ -817,12 +839,6 @@ __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint3
     uint64_t hs_counter;
     uint32_t hs_btree_id;
     bool hs_read_all_flag;
-
-    /*
-     * If we delete all the updates of the key from the history store, we should not reinsert any
-     * update except when an out-of-order tombstone is not globally visible yet.
-     */
-    WT_ASSERT(session, ooo_tombstone || ts > WT_TS_NONE || !reinsert);
 
     hs_read_all_flag = F_ISSET(hs_cursor, WT_CURSTD_HS_READ_ALL);
 
@@ -842,8 +858,8 @@ __wt_hs_delete_key_from_ts(WT_SESSION_IMPL *session, WT_CURSOR *hs_cursor, uint3
         ++hs_counter;
     }
 
-    WT_ERR(__hs_delete_reinsert_from_pos(session, hs_cursor, btree_id, key, ts, reinsert,
-      ooo_tombstone, error_on_ooo_ts, &hs_counter, NULL));
+    WT_ERR(__hs_delete_reinsert_from_pos(
+      session, hs_cursor, btree_id, key, ts, reinsert, true, error_on_ooo_ts, &hs_counter, NULL));
 
 done:
 err:
