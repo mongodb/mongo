@@ -959,7 +959,7 @@ config_transaction(void)
             testutil_die(EINVAL, "prepare requires transaction timestamps");
     }
 
-    /* Transaction timestamps are incompatible with implicit transactions. */
+    /* Transaction timestamps are incompatible with implicit transactions and logging. */
     if (g.c_txn_timestamps && config_is_perm("transaction.timestamps")) {
         if (g.c_txn_implicit && config_is_perm("transaction.implicit"))
             testutil_die(
@@ -968,6 +968,8 @@ config_transaction(void)
         /* FIXME-WT-6431: temporarily disable salvage with timestamps. */
         if (g.c_salvage && config_is_perm("ops.salvage"))
             testutil_die(EINVAL, "transaction.timestamps is incompatible with salvage");
+        if (g.c_logging && config_is_perm("logging"))
+            testutil_die(EINVAL, "transaction.timestamps is incompatible with logging");
     }
 
     /*
@@ -987,11 +989,15 @@ config_transaction(void)
     if (g.c_txn_timestamps) {
         if (!config_is_perm("transaction.implicit"))
             config_single("transaction.implicit=0", false);
+        if (!config_is_perm("logging"))
+            config_single("logging=off", false);
         if (!config_is_perm("ops.salvage"))
             config_single("ops.salvage=off", false);
     }
-    if (g.c_logging)
+    if (g.c_logging) {
         config_single("ops.prepare=off", false);
+        config_single("transaction.timestamps=off", false);
+    }
     if (g.c_txn_implicit)
         config_single("transaction.timestamps=off", false);
     if (g.c_salvage)
