@@ -104,7 +104,7 @@ void FindKeyGenerator::appendCommandSpecificComponents(BSONObjBuilder& bob,
                 subObj.append(levelElem);
             }
             opts.appendLiteral(&subObj, "afterClusterTime", optObj.get()["afterClusterTime"]);
-            subObj.done();
+            subObj.doneFast();
         } else {
             bob.append(FindCommandRequest::kReadConcernFieldName, optObj.get());
         }

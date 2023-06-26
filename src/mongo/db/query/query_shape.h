@@ -87,7 +87,9 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const NamespaceString& nss);
 
 NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt);
-BSONObj extractNamespaceShape(NamespaceString nss, const SerializationOptions& opts);
+void appendNamespaceShape(BSONObjBuilder& bob,
+                          const NamespaceString& nss,
+                          const SerializationOptions& opts);
 
 QueryShapeHash hash(const BSONObj& queryShape);
 }  // namespace mongo::query_shape

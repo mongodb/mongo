@@ -75,7 +75,7 @@ void AggregateKeyGenerator::appendCommandSpecificComponents(
         opts.appendLiteral(&cursorInfo,
                            SimpleCursorOptions::kBatchSizeFieldName,
                            static_cast<long long>(param.get()));
-        cursorInfo.done();
+        cursorInfo.doneFast();
     }
 
     // maxTimeMS
@@ -95,9 +95,11 @@ void AggregateKeyGenerator::appendCommandSpecificComponents(
     if (!_involvedNamespaces.empty()) {
         BSONArrayBuilder otherNss = bob.subarrayStart(kOtherNssFieldName);
         for (const auto& nss : _involvedNamespaces) {
-            otherNss.append(query_shape::extractNamespaceShape(nss, opts));
+            BSONObjBuilder otherNsEntryBob = otherNss.subobjStart();
+            query_shape::appendNamespaceShape(otherNsEntryBob, nss, opts);
+            otherNsEntryBob.doneFast();
         }
-        otherNss.done();
+        otherNss.doneFast();
     }
 }
 

@@ -202,7 +202,7 @@ BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool pre
  */
 BSONObj extractLetSpecShape(BSONObj letSpec,
                             const SerializationOptions& opts,
-                            boost::intrusive_ptr<ExpressionContext> expCtx) {
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     BSONObjBuilder bob;
     for (BSONElement elem : letSpec) {
@@ -214,14 +214,22 @@ BSONObj extractLetSpecShape(BSONObj letSpec,
     return bob.obj();
 }
 
-BSONObj extractNamespaceShape(NamespaceString nss, const SerializationOptions& opts) {
-    BSONObjBuilder bob;
+void appendCmdNs(BSONObjBuilder& bob,
+                 const NamespaceString& nss,
+                 const SerializationOptions& opts) {
+    BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
+    appendNamespaceShape(nsObj, nss, opts);
+    nsObj.doneFast();
+}
+
+void appendNamespaceShape(BSONObjBuilder& bob,
+                          const NamespaceString& nss,
+                          const SerializationOptions& opts) {
     if (nss.tenantId()) {
         bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
     }
     bob.append("db", opts.serializeIdentifier(nss.db()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
-    return bob.obj();
 }
 
 BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
@@ -233,12 +241,12 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
     {
         auto ns = findCmd.getNamespaceOrUUID();
         if (ns.isNamespaceString()) {
-            bob.append("cmdNs", extractNamespaceShape(ns.nss(), opts));
+            appendCmdNs(bob, ns.nss(), opts);
         } else {
             BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
             cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid().toString()));
             cmdNs.append("db", opts.serializeIdentifier(ns.dbname()));
-            cmdNs.done();
+            cmdNs.doneFast();
         }
     }
 
@@ -302,7 +310,7 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
     BSONObjBuilder bob;
 
     // namespace
-    bob.append("cmdNs", extractNamespaceShape(nss, opts));
+    appendCmdNs(bob, nss, opts);
     bob.append("command", "aggregate");
 
     // pipeline
