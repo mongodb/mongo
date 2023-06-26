@@ -428,7 +428,6 @@ env.Library(
         'query_shape.idl',
         'query_stats_find_key_generator.cpp',
         'query_stats_aggregate_key_generator.cpp',
-        'query_stats_key_generator.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',

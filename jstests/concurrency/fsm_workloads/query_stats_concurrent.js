@@ -38,12 +38,7 @@ var $config = (function() {
                 db[collName].aggregate([{$match: query}]).itcount();
             }
             const evictedAfter = db.serverStatus().metrics.queryStats.numEvicted;
-            // TODO SERVER-77262 until we guarantee tracking non-existent collections it is
-            // conceivable that some concurrent actor in a concurrent fsm suite would drop the
-            // collection and prevent the above aggregates from registering query stats. Until we
-            // track non-existent collections, we'll use assertWhenOwnColl() so that this assertion
-            // only asserts when we know we have exclusive access to the collection.
-            assertWhenOwnColl.gt(evictedAfter, 0);
+            assertAlways.gt(evictedAfter, 0);
         }
 
         // Runs queryStats with transformation.
