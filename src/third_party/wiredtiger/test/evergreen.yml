@@ -2909,35 +2909,6 @@ tasks:
           #run for 2 hours ( 2 * 60 = 120 minutes), use default config
           format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120
 
-  # Replace this test with format-stress-sanitizer-test after BUILD-10248 fix.
-  - name: format-stress-sanitizer-ppc-test
-    tags: ["stress-test-ppc-1"]
-    # Set 2.5 hours timeout (60 * 60 * 2.5)
-    exec_timeout_secs: 9000
-    commands:
-      - func: "get project"
-      - func: "compile wiredtiger"
-        vars:
-          # CC is set to the system default "clang" binary here as a workaround. Change it back
-          # to mongodbtoolchain "clang" binary after BUILD-10248 fix.
-          configure_env_vars:
-            CCAS=/opt/mongodbtoolchain/v3/bin/gcc CC=/usr/bin/clang
-            CXX=/opt/mongodbtoolchain/v3/bin/clang++ PATH=/opt/mongodbtoolchain/v3/bin:$PATH
-            CFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
-            -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
-            CXXFLAGS="-ggdb -fPIC -fsanitize=address -fno-omit-frame-pointer
-            -I/opt/mongodbtoolchain/v3/lib/gcc/ppc64le-mongodb-linux/8.2.0/include"
-          posix_configure_flags: --enable-diagnostic --with-builtins=lz4,snappy,zlib
-      - func: "format test script"
-        vars:
-          test_env_vars:
-            ASAN_OPTIONS="detect_leaks=1:abort_on_error=1:disable_coredump=0"
-            ASAN_SYMBOLIZER_PATH=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer
-          # Run for 2 hours ( 2 * 60 = 120 minutes), use default config
-          # Always disable mmap for PPC due to issues on variant setup.
-          # See https://bugzilla.redhat.com/show_bug.cgi?id=1686261#c10 for the potential cause.
-          format_test_script_args: -e "SEGFAULT_SIGNALS=all" -b "catchsegv ./t" -t 120 -- -C "mmap=false,mmap_all=false"
-
   - <<: *format-stress-test
     name: format-stress-test-1
     tags: ["stress-test-1"]
