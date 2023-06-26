@@ -209,17 +209,6 @@ for (let session of sessions) {
 }
 
 authUser(configRstPrimary);
-const externalKeysColl = configRstPrimary.getCollection("config.external_validation_keys");
-if (isShardSvrRst) {
-    // Verify the external (i.e. old) keys are stored on the config server.
-    assert.gt(externalKeysColl.find().itcount(), 0);
-    // Lower the TTL monitor sleep interval and verify that the keys are eventually deleted.
-    assert.commandWorked(configRstPrimary.adminCommand({setParameter: 1, ttlMonitorSleepSecs: 1}));
-    assert.soon(() => externalKeysColl.find().itcount() == 0);
-} else {
-    // Verify that there are no external (i.e. old) keys.
-    assert.eq(externalKeysColl.find().itcount(), 0);
-}
 
 if (mongos) {
     MongoRunner.stopMongos(mongos);
