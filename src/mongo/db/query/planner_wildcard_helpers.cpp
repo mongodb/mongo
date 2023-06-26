@@ -822,12 +822,17 @@ bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& 
         idxNode->bounds.fields[index.wildcardFieldPos].intervals =
             std::vector<Interval>{IndexBoundsBuilder::allValues()};
         idxNode->bounds.fields[index.wildcardFieldPos - 1].name = "$_path";
-        idxNode->iets[index.wildcardFieldPos - 1] =
-            interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
-                idxNode->bounds.fields[index.wildcardFieldPos - 1]);
-        idxNode->iets[index.wildcardFieldPos] =
-            interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
-                idxNode->bounds.fields[index.wildcardFieldPos]);
+        if (!idxNode->iets.empty()) {
+            tassert(7842600,
+                    "The size of iets must be the same as in the index bounds",
+                    idxNode->iets.size() == idxNode->bounds.fields.size());
+            idxNode->iets[index.wildcardFieldPos - 1] =
+                interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                    idxNode->bounds.fields[index.wildcardFieldPos - 1]);
+            idxNode->iets[index.wildcardFieldPos] =
+                interval_evaluation_tree::IET::make<interval_evaluation_tree::ConstNode>(
+                    idxNode->bounds.fields[index.wildcardFieldPos]);
+        }
         index.multikeyPaths[index.wildcardFieldPos] = MultikeyComponents();
         idxNode->shouldDedup = true;
     };
