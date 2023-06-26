@@ -2470,6 +2470,12 @@ TEST(IDLEnum, ExtraDataEnum) {
     ASSERT_BSONOBJ_EQ(s2Data, s2Expected);
 }
 
+TEST(IDLEnum, NonContiguousIntEnum) {
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::one), 1);
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::five), 5);
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::ten), 10);
+}
+
 OpMsgRequest makeOMR(BSONObj obj) {
     OpMsgRequest request;
     request.body = obj;

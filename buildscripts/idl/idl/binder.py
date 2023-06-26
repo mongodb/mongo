@@ -1280,15 +1280,6 @@ def _validate_enum_int(ctxt, idl_enum):
                                               str(value_error))
             return
 
-    # Check the values are continuous so they can be static_cast.
-    min_value = min(int_values_set)
-    max_value = max(int_values_set)
-
-    valid_int = set(range(min_value, max_value + 1))
-
-    if valid_int != int_values_set:
-        ctxt.add_enum_non_continuous_range_error(idl_enum, idl_enum.name)
-
 
 def _bind_enum(ctxt, idl_enum):
     # type: (errors.ParserContext, syntax.Enum) -> ast.Enum
