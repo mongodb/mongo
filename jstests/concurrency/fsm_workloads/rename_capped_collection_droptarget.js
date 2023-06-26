@@ -45,12 +45,20 @@ var $config = (function() {
             // Clear out the "from" collection and insert 'fromCollCount' documents
             var fromCollCount = 7;
             assertWhenOwnDB(db[this.fromCollName].drop());
-            assertAlways.commandWorked(db.createCollection(this.fromCollName, options));
+            // NamespaceNotFound is an acceptable error since it's possible for the collection to
+            // have been dropped before the call to listCollections (issued during the
+            // createCollection command).
+            assertAlways.commandWorkedOrFailedWithCode(
+                db.createCollection(this.fromCollName, options), ErrorCodes.NamespaceNotFound);
             assertWhenOwnDB(db[this.fromCollName].isCapped());
             insert(db, this.fromCollName, fromCollCount);
 
             var toCollCount = 4;
-            assertAlways.commandWorked(db.createCollection(this.toCollName, options));
+            // NamespaceNotFound is an acceptable error since it's possible for the collection to
+            // have been dropped before the call to listCollections (issued during the
+            // createCollection command).
+            assertAlways.commandWorkedOrFailedWithCode(
+                db.createCollection(this.toCollName, options), ErrorCodes.NamespaceNotFound);
             insert(db, this.toCollName, toCollCount);
 
             // Verify that 'fromCollCount' documents exist in the "to" collection
