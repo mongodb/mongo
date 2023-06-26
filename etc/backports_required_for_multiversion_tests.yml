@@ -394,6 +394,8 @@ last-continuous:
     ticket: SERVER-78050
   - test_file: jstests/sharding/cluster_time_across_add_shard.js
     ticket: SERVER-60466
+  - test_file: jstests/sharding/transfer_mods_large_batches.js
+    ticket: SERVER-78414
   suites: null
 last-lts:
   all:
@@ -875,4 +877,6 @@ last-lts:
     ticket: SERVER-77386
   - test_file: jstests/sharding/cluster_time_across_add_shard.js
     ticket: SERVER-60466
+  - test_file: jstests/sharding/transfer_mods_large_batches.js
+    ticket: SERVER-78414
   suites: null
