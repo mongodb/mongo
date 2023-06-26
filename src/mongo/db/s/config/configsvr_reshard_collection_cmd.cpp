@@ -33,6 +33,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
@@ -73,10 +74,19 @@ public:
                     serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer));
             CommandHelpers::uassertCommandRunWithMajority(Request::kCommandName,
                                                           opCtx->getWriteConcern());
+            const NamespaceString& nss = ns();
+
+            {
+                repl::ReplicationStateTransitionLockGuard rstl(opCtx, MODE_IX);
+                auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
+                uassert(ErrorCodes::InterruptedDueToReplStateChange,
+                        "node is not primary",
+                        replCoord->canAcceptWritesForDatabase(opCtx, nss.dbName()));
+                opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
+            }
+
             repl::ReadConcernArgs::get(opCtx) =
                 repl::ReadConcernArgs(repl::ReadConcernLevel::kLocalReadConcern);
-
-            const NamespaceString& nss = ns();
 
             const auto catalogClient = ShardingCatalogManager::get(opCtx)->localCatalogClient();
             try {
@@ -204,7 +214,6 @@ public:
                     coordinatorDoc.setShardDistribution(request().getShardDistribution());
                     coordinatorDoc.setForceRedistribution(request().getForceRedistribution());
 
-                    opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
                     auto instance = getOrCreateReshardingCoordinator(opCtx, coordinatorDoc);
                     instance->getCoordinatorDocWrittenFuture().get(opCtx);
                     return instance;
