@@ -774,3 +774,9 @@ feature_flags:
         default: true
         version: 6.3
         shouldBeFCVGated: true
+
+    featureFlagSecondaryIndexChecksInDbCheck:
+        description: When enabled, dbCheck runs document and secondary index consistency checks in addition to replica set data consistency checks.
+        cpp_varname: feature_flags::gSecondaryIndexChecksInDbCheck
+        default: false
+        shouldBeFCVGated: true
