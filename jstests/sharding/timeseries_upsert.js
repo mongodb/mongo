@@ -66,7 +66,7 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, inTxn = false}) 
             return assert.commandWorked(testDB.runCommand(updateCommand));
         }
 
-        // TODO SERVER-76432 Run this as a retryable write instead of inside a transaction.
+        // TODO SERVER-78364 Run this as a retryable write instead of inside a transaction.
         const session = coll.getDB().getMongo().startSession();
         const sessionDb = session.getDatabase(coll.getDB().getName());
         session.startTransaction();

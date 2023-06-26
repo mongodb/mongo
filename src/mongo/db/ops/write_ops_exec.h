@@ -184,6 +184,18 @@ Status performAtomicTimeseriesWrites(OperationContext* opCtx,
                                      const std::vector<write_ops::UpdateCommandRequest>& updateOps);
 
 /**
+ * Runs a time-series update command in a transaction and collects the write result from each
+ * statement.
+ *
+ * Assumes the update command is a retryable write and targeted on the time-series view namespace.
+ */
+void runTimeseriesRetryableUpdates(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const write_ops::UpdateCommandRequest& wholeOp,
+                                   std::shared_ptr<executor::TaskExecutor> executor,
+                                   write_ops_exec::WriteResult* reply);
+
+/**
  * Populate 'opDebug' with stats describing the execution of an update operation. Illegal to call
  * with a null OpDebug pointer.
  */

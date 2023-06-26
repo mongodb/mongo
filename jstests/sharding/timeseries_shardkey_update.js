@@ -63,7 +63,7 @@ setUpShardedCluster();
     const coll = prepareShardedCollection(
         {collName: getCallerName(1), initialDocList: docs, includeMeta: true});
 
-    // TODO SERVER-76432 Run this as a retryable write instead of inside a transaction.
+    // TODO SERVER-78364 Run this as a retryable write instead of inside a transaction.
     // Update one command in a transaction can modify the shard key.
     const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());

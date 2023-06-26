@@ -77,6 +77,7 @@
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_options.h"
@@ -94,6 +95,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/decorable.h"
@@ -464,7 +466,6 @@ public:
 
             doTransactionValidationForWrites(opCtx, ns());
             write_ops::UpdateCommandReply updateReply;
-            OperationSource source = OperationSource::kStandard;
             if (request().getEncryptionInformation().has_value()) {
                 // Flag set here and in fle_crud.cpp since this only executes on a mongod.
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
@@ -473,9 +474,10 @@ public:
                 }
             }
 
-            if (auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request()); isTimeseries) {
-                source = OperationSource::kTimeseriesUpdate;
-            }
+            auto [isTimeseries, _] = timeseries::isTimeseries(opCtx, request());
+            OperationSource source =
+                isTimeseries ? OperationSource::kTimeseriesUpdate : OperationSource::kStandard;
+            auto ns = request().getNamespace();
 
             long long nModified = 0;
 
@@ -483,7 +485,20 @@ public:
             // 'postProcessHandler' and should not be accessed afterwards.
             std::vector<write_ops::Upserted> upsertedInfoVec;
 
-            auto reply = write_ops_exec::performUpdates(opCtx, request(), source);
+            write_ops_exec::WriteResult reply;
+            // For retryable updates on time-series collections, we needs to run them in
+            // transactions to ensure the multiple writes are replicated atomically.
+            if (isTimeseries && !ns.isTimeseriesBucketsCollection() && opCtx->isRetryableWrite() &&
+                !opCtx->inMultiDocumentTransaction()) {
+                auto executor = serverGlobalParams.clusterRole.has(ClusterRole::None)
+                    ? ReplicaSetNodeProcessInterface::getReplicaSetNodeExecutor(
+                          opCtx->getServiceContext())
+                    : Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
+                write_ops_exec::runTimeseriesRetryableUpdates(
+                    opCtx, ns, request(), executor, &reply);
+            } else {
+                reply = write_ops_exec::performUpdates(opCtx, request(), source);
+            }
 
             // Handler to process each 'SingleWriteResult'.
             auto singleWriteHandler = [&](const SingleWriteResult& opResult, int index) {

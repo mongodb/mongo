@@ -215,14 +215,18 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpsert) {
     ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSON("_id" << 2));
 }
 
-TEST_F(WriteOpsRetryability, ShouldFailIfParsingDeleteOplogForUpdate) {
+TEST_F(WriteOpsRetryability, ParsingDeleteOplogForUpdate) {
     auto deleteOplog =
         makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),                     // optime
                        repl::OpTypeEnum::kDelete,                              // op type
                        NamespaceString::createNamespaceString_forTest("a.b"),  // namespace
                        BSON("_id" << 2));                                      // o
 
-    ASSERT_THROWS(parseOplogEntryForUpdate(deleteOplog), AssertionException);
+    auto res = parseOplogEntryForUpdate(deleteOplog);
+
+    ASSERT_EQ(res.getN(), 1);
+    ASSERT_EQ(res.getNModified(), 1);
+    ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
 }
 
 TEST_F(WriteOpsRetryability, PerformInsertsSuccess) {

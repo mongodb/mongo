@@ -639,7 +639,6 @@ void performAtomicWrites(
 
     // Groups all operations in one or several chained oplog entries to ensure the writes are
     // replicated atomically.
-    // TODO(SERVER-76432): Handle the updateOne case for retryable writes.
     auto groupOplogEntries = !opCtx->getTxnNumber() && !insertOps.empty() && modificationOp;
     WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 

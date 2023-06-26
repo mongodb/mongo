@@ -141,7 +141,9 @@
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
+#include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/path_support.h"
@@ -1394,11 +1396,78 @@ static SingleWriteResult performSingleUpdateOpWithDupKeyRetry(
     MONGO_UNREACHABLE;
 }
 
+void runTimeseriesRetryableUpdates(OperationContext* opCtx,
+                                   const NamespaceString& ns,
+                                   const write_ops::UpdateCommandRequest& wholeOp,
+                                   std::shared_ptr<executor::TaskExecutor> executor,
+                                   write_ops_exec::WriteResult* reply) {
+    ON_BLOCK_EXIT([&] {
+        // Increments the counter if the command contains retries.
+        if (!reply->retriedStmtIds.empty()) {
+            RetryableWritesStats::get(opCtx)->incrementRetriedCommandsCount();
+        }
+    });
+    size_t nextOpIndex = 0;
+    for (auto&& singleOp : wholeOp.getUpdates()) {
+        write_ops::UpdateCommandRequest singleUpdateOp(wholeOp.getNamespace(), {singleOp});
+        auto commandBase = singleUpdateOp.getWriteCommandRequestBase();
+        commandBase.setOrdered(wholeOp.getOrdered());
+        commandBase.setBypassDocumentValidation(wholeOp.getBypassDocumentValidation());
+        const auto stmtId = write_ops::getStmtIdForWriteAt(wholeOp, nextOpIndex++);
+
+        auto inlineExecutor = std::make_shared<executor::InlineExecutor>();
+        txn_api::SyncTransactionWithRetries txn(
+            opCtx, executor, TransactionParticipantResourceYielder::make("update"), inlineExecutor);
+
+        auto swResult = txn.runNoThrow(
+            opCtx,
+            [&singleUpdateOp, stmtId, &reply](const txn_api::TransactionClient& txnClient,
+                                              ExecutorPtr txnExec) {
+                auto updateResponse = txnClient.runCRUDOpSync(singleUpdateOp, {stmtId});
+                // Propagates the write results from executing the statement to the current
+                // command's results.
+                SingleWriteResult singleReply;
+                singleReply.setN(updateResponse.getN());
+                singleReply.setNModified(updateResponse.getNModified());
+                if (updateResponse.isUpsertDetailsSet()) {
+                    invariant(updateResponse.sizeUpsertDetails() == 1);
+                    singleReply.setUpsertedId(
+                        updateResponse.getUpsertDetailsAt(0)->getUpsertedID());
+                }
+                if (updateResponse.areRetriedStmtIdsSet()) {
+                    invariant(updateResponse.getRetriedStmtIds().size() == 1);
+                    reply->retriedStmtIds.push_back(updateResponse.getRetriedStmtIds()[0]);
+                }
+                reply->results.push_back(singleReply);
+                return SemiFuture<void>::makeReady();
+            });
+        try {
+            // Rethrows the error from the command or the internal transaction api to
+            // handle them accordingly..
+            uassertStatusOK(swResult);
+            uassertStatusOK(swResult.getValue().getEffectiveStatus());
+        } catch (const DBException& ex) {
+            reply->canContinue = handleError(opCtx,
+                                             ex,
+                                             ns,
+                                             wholeOp.getOrdered(),
+                                             singleOp.getMulti(),
+                                             singleOp.getSampleId(),
+                                             reply);
+            if (!reply->canContinue) {
+                break;
+            }
+        }
+    }
+}
+
 WriteResult performUpdates(OperationContext* opCtx,
                            const write_ops::UpdateCommandRequest& wholeOp,
                            OperationSource source) {
     auto ns = wholeOp.getNamespace();
+    NamespaceString originalNs;
     if (source == OperationSource::kTimeseriesUpdate && !ns.isTimeseriesBucketsCollection()) {
+        originalNs = ns;
         ns = ns.makeTimeseriesBucketsNamespace();
     }
 
@@ -1442,13 +1511,17 @@ WriteResult performUpdates(OperationContext* opCtx,
                         "Cannot perform a multi update inside of a multi-document transaction on a "
                         "time-series collection: {}",
                         ns.toStringForErrorMsg()),
-                    !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti());
+                    !opCtx->inMultiDocumentTransaction() || !singleOp.getMulti() ||
+                        opCtx->isRetryableWrite());
         }
         const auto currentOpIndex = nextOpIndex++;
         const auto stmtId = getStmtIdForWriteOp(opCtx, wholeOp, currentOpIndex);
         if (opCtx->isRetryableWrite()) {
             if (auto entry = txnParticipant.checkStatementExecuted(opCtx, stmtId)) {
-                containsRetry = true;
+                // For user time-series updates, handles the metrics of the command at the caller
+                // since each statement will run as a command through the internal transaction API.
+                containsRetry = source != OperationSource::kTimeseriesUpdate ||
+                    originalNs.isTimeseriesBucketsCollection();
                 RetryableWritesStats::get(opCtx)->incrementRetriedStatementsCount();
                 out.results.emplace_back(parseOplogEntryForUpdate(*entry));
                 out.retriedStmtIds.push_back(stmtId);

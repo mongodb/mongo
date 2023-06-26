@@ -280,7 +280,10 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
         BSONObjBuilder upserted;
         upserted.append(entry.getObject()["_id"]);
         res.setUpsertedId(upserted.obj());
-    } else if (entry.getOpType() == repl::OpTypeEnum::kUpdate) {
+    } else if (entry.getOpType() == repl::OpTypeEnum::kUpdate ||
+               entry.getOpType() == repl::OpTypeEnum::kDelete) {
+        // Time-series updates could generate an oplog of type "kDelete". It also implies one
+        // user-level measurement is modified.
         res.setN(1);
         res.setNModified(1);
     } else if (entry.getOpType() == repl::OpTypeEnum::kNoop) {

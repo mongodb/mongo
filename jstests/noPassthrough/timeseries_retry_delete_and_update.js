@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_replication,
  *   requires_timeseries,
- *   requires_fcv_70,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 (function() {
@@ -42,14 +42,15 @@ let retriedStatementsCount = 0;
  * returns the command object given the collection to run it on, and a validate function that
  * validates the result after the command has been applied to the collection.
  */
-const runTest = function(initialDocs, cmdBuilderFn, validateFn) {
+const runTest = function(
+    initialDocs, cmdBuilderFn, validateFn, expectError = false, statementRetried = 1) {
     const session = primary.startSession({retryWrites: true});
     const testDB = session.getDatabase(jsTestName());
 
-    const coll = testDB.getCollection('timeseres_retry_delete_and_update_' + collCount++);
+    const coll = testDB.getCollection('timeseries_retry_delete_and_update_' + collCount++);
     coll.drop();
-    assert.commandWorked(
-        testDB.createCollection(coll.getName(), {timeseries: {timeField: timeFieldName}}));
+    assert.commandWorked(testDB.createCollection(
+        coll.getName(), {timeseries: {timeField: timeFieldName, metaField: metaFieldName}}));
 
     assert.commandWorked(testDB.runCommand({
         insert: coll.getName(),
@@ -59,13 +60,18 @@ const runTest = function(initialDocs, cmdBuilderFn, validateFn) {
     }));
 
     // For retryable writes, the server uses 'txnNumber' as the key to look up previously executed
-    // operations in the sesssion.
+    // operations in the session.
     let cmdObj = cmdBuilderFn(coll);
     cmdObj["lsid"] = session.getSessionId();
     cmdObj["txnNumber"] = NumberLong(1);
 
-    assert.commandWorked(testDB.runCommand(cmdObj), 'Failed to write bucket on first write');
-    assert.commandWorked(testDB.runCommand(cmdObj), 'Failed to write bucket on retry write');
+    if (expectError) {
+        assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.InvalidOptions);
+        assert.commandFailedWithCode(testDB.runCommand(cmdObj), ErrorCodes.InvalidOptions);
+    } else {
+        assert.commandWorked(testDB.runCommand(cmdObj), 'Failed to write bucket on first write');
+        assert.commandWorked(testDB.runCommand(cmdObj), 'Failed to write bucket on retry write');
+    }
 
     validateFn(coll);
 
@@ -73,7 +79,8 @@ const runTest = function(initialDocs, cmdBuilderFn, validateFn) {
     assert.eq(++retriedCommandsCount,
               transactionsServerStatus.retriedCommandsCount,
               'Incorrect statistic in db.serverStatus(): ' + tojson(transactionsServerStatus));
-    assert.eq(++retriedStatementsCount,
+    retriedStatementsCount += statementRetried;
+    assert.eq(retriedStatementsCount,
               transactionsServerStatus.retriedStatementsCount,
               'Incorrect statistic in db.serverStatus(): ' + tojson(transactionsServerStatus));
 
@@ -106,7 +113,19 @@ function deleteValidateFn(coll) {
 })();
 
 function updateCmdBuilderFn(coll) {
-    return {update: coll.getName(), updates: [{q: {}, u: {$inc: {updated: 1}}, multi: false}]};
+    return {
+        update: coll.getName(),
+        updates: [
+            {q: {}, u: {$inc: {updated: 1}}, multi: false},
+            {q: {}, u: {$inc: {updated: 1}}, multi: true},
+            {q: {}, u: {$inc: {anotherUpdated: 1}}, multi: false},
+        ],
+    };
+}
+function updateCmdUnorderedBuilderFn(coll) {
+    let updateCmd = updateCmdBuilderFn(coll);
+    updateCmd["ordered"] = false;
+    return updateCmd;
 }
 function updateValidateFn(coll) {
     assert.eq(coll.countDocuments({updated: {$exists: true}}),
@@ -115,13 +134,32 @@ function updateValidateFn(coll) {
     assert.eq(coll.countDocuments({updated: 1}), 1, "Expected document to be updated only once.");
 }
 
-// TODO SERVER-73726 Enable update tests.
-// (function testPartialBucketUpdate() {
-//     runTest(allDocumentsSameBucket, updateCmdBuilderFn, updateValidateFn);
-// })();
-// (function testFullBucketUpdate() {
-//     runTest(allDocumentsDifferentBuckets, updateCmdBuilderFn, updateValidateFn);
-// })();
+(function testPartialBucketUpdate() {
+    runTest(allDocumentsSameBucket,
+            updateCmdBuilderFn,
+            updateValidateFn,
+            /*expectError=*/ true);
+})();
+(function testFullBucketUpdate() {
+    runTest(allDocumentsDifferentBuckets,
+            updateCmdBuilderFn,
+            updateValidateFn,
+            /*expectError=*/ true);
+})();
+(function testPartialBucketUpdate() {
+    runTest(allDocumentsSameBucket,
+            updateCmdUnorderedBuilderFn,
+            updateValidateFn,
+            /*expectError=*/ true,
+            /*statementRetried=*/ 2);
+})();
+(function testFullBucketUpdate() {
+    runTest(allDocumentsDifferentBuckets,
+            updateCmdUnorderedBuilderFn,
+            updateValidateFn,
+            /*expectError=*/ true,
+            /*statementRetried=*/ 2);
+})();
 
 rst.stopSet();
 })();
