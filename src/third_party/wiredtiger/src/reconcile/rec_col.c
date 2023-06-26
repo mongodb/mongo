@@ -808,32 +808,22 @@ record_loop:
                 case WT_UPDATE_STANDARD:
                     data = upd->data;
                     size = upd->size;
-                    /*
-                     * When an out-of-order or mixed-mode tombstone is getting written to disk,
-                     * remove any historical versions that are greater in the history store for this
-                     * key.
-                     */
-                    if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
-                        WT_ERR(__wt_rec_hs_clear_on_tombstone(
-                          session, r, twp->durable_stop_ts, src_recno, NULL, true));
-
                     break;
                 case WT_UPDATE_TOMBSTONE:
-                    /*
-                     * When an out-of-order or mixed-mode tombstone is getting written to disk,
-                     * remove any historical versions that are greater in the history store for this
-                     * key.
-                     */
-                    if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
-                        WT_ERR(__wt_rec_hs_clear_on_tombstone(
-                          session, r, twp->durable_stop_ts, src_recno, NULL, false));
-
                     deleted = true;
                     twp = &clear_tw;
                     break;
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, twp->durable_stop_ts,
+                      src_recno, NULL, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
 compare:
@@ -983,6 +973,14 @@ compare:
                 default:
                     WT_ERR(__wt_illegal_value(session, upd->type));
                 }
+
+                /*
+                 * When a tombstone without a timestamp is written to disk, remove any historical
+                 * versions that are greater in the history store for this key.
+                 */
+                if (upd_select.ooo_tombstone && r->hs_clear_on_tombstone)
+                    WT_ERR(__wt_rec_hs_clear_on_tombstone(session, r, upd_select.tw.durable_stop_ts,
+                      src_recno, NULL, upd->type == WT_UPDATE_TOMBSTONE ? false : true));
             }
 
             /*
