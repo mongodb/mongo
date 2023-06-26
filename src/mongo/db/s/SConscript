@@ -5,45 +5,6 @@ Import("env")
 env = env.Clone()
 
 env.Library(
-    target='move_primary_shared_data',
-    source=[
-        'move_primary/move_primary_shared_data.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/repl/repl_sync_shared_data',
-    ],
-)
-
-env.Library(
-    target='move_primary_cloners',
-    source=[
-        'move_primary/move_primary_base_cloner.cpp',
-        'move_primary/move_primary_collection_cloner.cpp',
-        'move_primary/move_primary_database_cloner.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/repl/base_cloner',
-        '$BUILD_DIR/mongo/db/repl/cloner_utils',
-        '$BUILD_DIR/mongo/db/repl/task_runner',
-        'move_primary_shared_data',
-    ],
-    LIBDEPS_PRIVATE=[
-        '$BUILD_DIR/mongo/base',
-        '$BUILD_DIR/mongo/db/catalog/collection_catalog',
-        '$BUILD_DIR/mongo/db/catalog/document_validation',
-        '$BUILD_DIR/mongo/db/commands/list_collections_filter',
-        '$BUILD_DIR/mongo/db/dbdirectclient',
-        '$BUILD_DIR/mongo/db/ops/write_ops_exec',
-        '$BUILD_DIR/mongo/db/repl/oplog',
-        '$BUILD_DIR/mongo/db/repl/repl_server_parameters',
-        '$BUILD_DIR/mongo/db/shard_role_api',
-        '$BUILD_DIR/mongo/rpc/metadata',
-        '$BUILD_DIR/mongo/util/progress_meter',
-    ],
-)
-
-env.Library(
     target='balancer_stats_registry',
     source=[
         'balancer_stats_registry.cpp',
@@ -141,16 +102,6 @@ env.Library(
         'migration_source_manager.cpp',
         'migration_util.cpp',
         'move_primary_source_manager.cpp',
-        'move_primary/move_primary_common_metadata.idl',
-        'move_primary/move_primary_cumulative_metrics.cpp',
-        'move_primary/move_primary_donor_service.cpp',
-        'move_primary/move_primary_metrics.cpp',
-        'move_primary/move_primary_metrics_field_name_provider.cpp',
-        'move_primary/move_primary_oplog_applier_progress.idl',
-        'move_primary/move_primary_recipient_cmds.idl',
-        'move_primary/move_primary_recipient_service.cpp',
-        'move_primary/move_primary_server_parameters.idl',
-        'move_primary/move_primary_state_machine.idl',
         'move_timing_helper.cpp',
         'namespace_metadata_change_notifications.cpp',
         'op_observer_sharding_impl.cpp',
@@ -275,7 +226,6 @@ env.Library(
         '$BUILD_DIR/mongo/s/common_s',
         '$BUILD_DIR/mongo/util/future_util',
         'balancer_stats_registry',
-        'move_primary_cloners',
         'query_analysis_writer',
         'sharding_catalog',
         'sharding_logging',
@@ -514,7 +464,6 @@ env.Library(
         'move_primary_coordinator_document.idl',
         'move_primary_coordinator.cpp',
         'move_primary_coordinator_no_resilient.cpp',
-        'move_primary/move_primary_recipient_cmds.cpp',
         'refine_collection_shard_key_coordinator_document.idl',
         'refine_collection_shard_key_coordinator.cpp',
         'refresh_query_analyzer_configuration_cmd.cpp',
@@ -822,7 +771,6 @@ env.CppUnitTest(
         '$BUILD_DIR/mongo/s/analyze_shard_key_util',
         '$BUILD_DIR/mongo/s/catalog/sharding_catalog_client_mock',
         '$BUILD_DIR/mongo/s/sharding_router_test_fixture',
-        'move_primary_cloners',
         'query_analysis_writer',
         'shard_server_test_fixture',
         'sharding_catalog',

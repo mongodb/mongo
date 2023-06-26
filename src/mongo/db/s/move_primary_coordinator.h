@@ -29,7 +29,6 @@
 
 #pragma once
 
-#include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/db/s/move_primary_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
 #include "mongo/s/client/shard.h"
@@ -60,27 +59,12 @@ private:
                                          const Status& status) noexcept override;
 
     ExecutorFuture<void> runMovePrimaryWorkflow(
-        std::shared_ptr<executor::ScopedTaskExecutor> executor,
-        const CancellationToken& token) noexcept;
-
-    bool onlineClonerPossiblyNeverCreated() const;
-    bool onlineClonerPossiblyCleanedUp() const;
-    bool onlineClonerAllowedToBeMissing() const;
-    void recoverOnlineCloner(OperationContext* opCtx);
-    void createOnlineCloner(OperationContext* opCtx);
+        std::shared_ptr<executor::ScopedTaskExecutor> executor) noexcept;
 
     /**
-     * Clone data to the recipient without using the online cloning machinery.
+     * Clone data to the recipient shard.
      */
-    void cloneDataLegacy(OperationContext* opCtx);
-
-    /**
-     * Clone data to the recipient using the online cloning machinery.
-     */
-    void cloneDataUntilReadyForCatchup(OperationContext* opCtx, const CancellationToken& token);
-
-    void informOnlineClonerOfBlockingWrites(OperationContext* opCtx);
-    void waitUntilOnlineClonerPrepared(const CancellationToken& token);
+    void cloneData(OperationContext* opCtx);
 
     /**
      * Logs in the `config.changelog` collection a specific event for `movePrimary` operations.
@@ -197,16 +181,8 @@ private:
      */
     void exitCriticalSectionOnRecipient(OperationContext* opCtx);
 
-    void cleanupOnlineCloner(OperationContext* opCtx, const CancellationToken& token);
-    void cleanupOnAbortWithoutOnlineCloner(OperationContext* opCtx,
-                                           std::shared_ptr<executor::ScopedTaskExecutor> executor);
-    void cleanupOnAbortWithOnlineCloner(OperationContext* opCtx,
-                                        const CancellationToken& token,
-                                        const Status& status);
-
     const DatabaseName _dbName;
     const BSONObj _csReason;
-    std::shared_ptr<MovePrimaryDonor> _onlineCloner;
 };
 
 }  // namespace mongo
