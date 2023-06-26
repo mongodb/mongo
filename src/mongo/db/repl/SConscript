@@ -1954,10 +1954,8 @@ env.CppUnitTest(
         'tenant_file_cloner_test.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/op_observer/op_observer',
-        'cloner_test_fixtures',
-        'initial_sync_cloners',
-        'tenant_migration_cloners',
+        '$BUILD_DIR/mongo/db/op_observer/op_observer', 'cloner_test_fixtures',
+        'initial_sync_cloners', 'tenant_migration_cloners'
     ],
 )
 

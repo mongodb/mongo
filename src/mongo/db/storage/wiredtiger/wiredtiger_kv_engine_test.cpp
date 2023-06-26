@@ -31,11 +31,13 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/path.hpp>
 
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/base/init.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/checkpointer.h"
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
@@ -125,6 +127,7 @@ protected:
         opCtx->setRecoveryUnit(
             std::unique_ptr<RecoveryUnit>(_helper.getEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
         return opCtx;
     }
 
@@ -201,7 +204,6 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = _makeOperationContext();
-    Lock::GlobalLock globalLk(opCtxPtr.get(), MODE_X);
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";

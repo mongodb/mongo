@@ -81,13 +81,13 @@ env.Benchmark(
         'd_concurrency_bm.cpp',
     ],
     LIBDEPS=[
-        '$BUILD_DIR/mongo/db/service_context_non_d',
+        '$BUILD_DIR/mongo/db/service_context',
         'lock_manager',
     ],
 )
 
 env.CppUnitTest(
-    target='lock_manager_test',
+    target='db_concurrency_test',
     source=[
         'd_concurrency_test.cpp',
         'fast_map_noalloc_test.cpp',
@@ -99,8 +99,7 @@ env.CppUnitTest(
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/auth/authmocks',
         '$BUILD_DIR/mongo/db/query/op_metrics',
-        '$BUILD_DIR/mongo/db/service_context_non_d',
-        '$BUILD_DIR/mongo/db/service_context_test_fixture',
+        '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
         '$BUILD_DIR/mongo/transport/transport_layer_common',
         '$BUILD_DIR/mongo/transport/transport_layer_mock',
         '$BUILD_DIR/mongo/util/progress_meter',

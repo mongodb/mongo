@@ -30,7 +30,7 @@
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
 #include "mongo/db/catalog/collection_impl.h"
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/operation_context.h"
@@ -127,6 +127,7 @@ protected:
         auto opCtx = makeOperationContext();
         opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
                                WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
         return opCtx;
     }
 
@@ -142,6 +143,8 @@ protected:
             auto opCtx = client->makeOperationContext();
             opCtx->setRecoveryUnit(std::unique_ptr<RecoveryUnit>(engine->newRecoveryUnit()),
                                    WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+            opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
+
             opCtxs.emplace_back(std::move(client), std::move(opCtx));
         }
 
@@ -182,7 +185,6 @@ TEST_F(KVEngineTestHarness, SimpleRS1) {
 
     {
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -231,7 +233,6 @@ TEST_F(KVEngineTestHarness, Restart1) {
 
         {
             auto opCtx = _makeOperationContext(engine);
-            Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
             ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
         }
     }
@@ -241,7 +242,6 @@ TEST_F(KVEngineTestHarness, Restart1) {
     {
         std::unique_ptr<RecordStore> rs;
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         rs = engine->getRecordStore(opCtx.get(),
                                     NamespaceString::createNamespaceString_forTest(ns),
                                     ns,
@@ -297,7 +297,6 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
 
     {
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         WriteUnitOfWork uow(opCtx.get());
         const RecordId recordId(6, 4);
         const KeyString::Value keyString =
@@ -310,7 +309,6 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
 
     {
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -340,7 +338,6 @@ TEST_F(KVEngineTestHarness, TemporaryRecordStoreSimple) {
 
     {
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(std::string("abc"), rs->dataFor(opCtx.get(), loc).data());
 
         std::vector<std::string> all = engine->getAllIdents(opCtx.get());
@@ -449,7 +446,6 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
     auto opCtxs = _makeOperationContexts(engine, 2);
 
     auto opCtx1 = opCtxs[0].second.get();
-    Lock::GlobalLock globalLk1(opCtx1, MODE_IX);
     WriteUnitOfWork uow1(opCtx1);
     StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
     RecordId rid = res.getValue();
@@ -460,7 +456,6 @@ TEST_F(KVEngineTestHarness, PinningOldestWithAnotherSession) {
                                                    Timestamp(15, 15));
 
     auto opCtx2 = opCtxs[1].second.get();
-    Lock::GlobalLock globalLk2(opCtx2, MODE_IX);
     WriteUnitOfWork uow2(opCtx2);
 
     ASSERT(rs->findRecord(opCtx1, rid, &rd));
@@ -610,7 +605,6 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
 
     // Start a read transaction.
     auto opCtx1 = opCtxs[0].second.get();
-    Lock::GlobalLock globalLk(opCtx1, MODE_IS);
 
     opCtx1->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                    kReadTimestamp);
@@ -620,7 +614,6 @@ TEST_F(KVEngineTestHarness, BasicTimestampSingle) {
     RecordId rid;
     {
         auto opCtx2 = opCtxs[1].second.get();
-        Lock::GlobalLock globalLk(opCtx2, MODE_IX);
         WriteUnitOfWork wuow(opCtx2);
         auto swRid = rs->insertRecord(opCtx2, "abc", 4, kInsertTimestamp);
         ASSERT_OK(swRid);
@@ -687,7 +680,6 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
     {
         // Initial insert of record.
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
         WriteUnitOfWork wuow(opCtx.get());
         auto swRid = rs->insertRecord(opCtx.get(), "abc", 4, t10);
         ASSERT_OK(swRid);
@@ -702,7 +694,6 @@ TEST_F(KVEngineTestHarness, BasicTimestampMultiple) {
 
     RecordData rd;
     auto opCtx = _makeOperationContext(engine);
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_S);
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t10);
     ASSERT(rs->findRecord(opCtx.get(), rid, &rd));
     ASSERT_EQUALS(std::string("abc"), rd.data());
@@ -747,7 +738,6 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
     auto opCtxs = _makeOperationContexts(engine, 2);
 
     auto opCtx1 = opCtxs[0].second.get();
-    Lock::GlobalLock globalLk1(opCtx1, MODE_IX);
     WriteUnitOfWork uow1(opCtx1);
     StatusWith<RecordId> res = rs->insertRecord(opCtx1, "abc", 4, Timestamp(10, 10));
     ASSERT_OK(res);
@@ -755,11 +745,10 @@ DEATH_TEST_REGEX_F(KVEngineTestHarness, SnapshotHidesVisibility, ".*item not fou
     uow1.commit();
 
     // Snapshot was taken before the insert and will not find the record even after the commit.
+    RecordData rd;
     auto opCtx2 = opCtxs[1].second.get();
-    Lock::GlobalLock globalLk2(opCtx2, MODE_IX);
     opCtx2->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided,
                                                    Timestamp(9, 9));
-    RecordData rd;
     ASSERT(!rs->findRecord(opCtx2, loc, &rd));
 
     // Trying to write in an outdated snapshot will cause item not found.
@@ -842,7 +831,6 @@ TEST_F(KVEngineTestHarness, SingleReadWithConflictWithOplog) {
     }
 
     auto opCtx = _makeOperationContext(engine);
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_S);
     opCtx->recoveryUnit()->setTimestampReadSource(RecoveryUnit::ReadSource::kProvided, t9);
     ASSERT(!collectionRs->findRecord(opCtx.get(), locCollection, &rd));
     ASSERT(!oplogRs->findRecord(opCtx.get(), locOplog, &rd));
@@ -888,7 +876,6 @@ TEST_F(KVEngineTestHarness, PinningOldestTimestampWithReadConflict) {
     }
 
     auto opCtx = _makeOperationContext(engine);
-    Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
     WriteUnitOfWork uow(opCtx.get());
     StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "abc", 4, Timestamp(10, 10));
     RecordId rid = res.getValue();
@@ -1023,7 +1010,6 @@ TEST_F(KVEngineTestHarness, RollingBackToLastStable) {
     {
         // Rollback to the last stable timestamp.
         auto opCtx = _makeOperationContext(engine);
-        Lock::GlobalLock globalLk(opCtx.get(), MODE_X);
         StatusWith<Timestamp> swTimestamp = engine->recoverToStableTimestamp(opCtx.get());
         ASSERT_EQ(swTimestamp.getValue(), Timestamp(1, 1));
 

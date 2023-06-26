@@ -27,8 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
+
+#include <memory>
+
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -48,7 +52,6 @@ TEST(SortedDataInterface, IsEmpty) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
@@ -65,7 +68,6 @@ TEST(SortedDataInterface, IsEmpty) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             sorted->unindex(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false);

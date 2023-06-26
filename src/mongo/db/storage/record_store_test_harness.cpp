@@ -30,8 +30,8 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/storage/record_store.h"
 
 namespace mongo {
 namespace {
@@ -76,13 +76,11 @@ TEST(RecordStoreTestHarness, Simple1) {
             uow.commit();
         }
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
     }
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc1).data());
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
 
@@ -135,7 +133,6 @@ TEST(RecordStoreTestHarness, Delete1) {
             uow.commit();
         }
 
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -186,7 +183,6 @@ TEST(RecordStoreTestHarness, Delete2) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
         ASSERT_EQUALS(2, rs->numRecords(opCtx.get()));
     }
@@ -228,7 +224,6 @@ TEST(RecordStoreTestHarness, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -245,7 +240,6 @@ TEST(RecordStoreTestHarness, Update1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, rs->numRecords(opCtx.get()));
         ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
     }
@@ -277,7 +271,6 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s1, rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -302,7 +295,6 @@ TEST(RecordStoreTestHarness, UpdateInPlace1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s2, rs->dataFor(opCtx.get(), loc).data());
     }
 }
@@ -334,7 +326,6 @@ TEST(RecordStoreTestHarness, Truncate1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(s, rs->dataFor(opCtx.get(), loc).data());
     }
 
@@ -421,7 +412,6 @@ TEST(RecordStoreTestHarness, ClusteredRecordStore) {
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     const int numRecords = 100;
     std::vector<Record> records;
@@ -539,7 +529,6 @@ TEST(RecordStoreTestHarness, ClusteredRecordStoreSeekNear) {
     invariant(rs->keyFormat() == KeyFormat::String);
 
     auto opCtx = harnessHelper->newOperationContext();
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     const int numRecords = 100;
     std::vector<Record> records;

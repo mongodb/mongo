@@ -26,58 +26,35 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#pragma once
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/record_store_test_harness.h"
-
-
-#include "mongo/db/storage/record_store.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/concurrency/locker_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo {
-namespace {
 
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-
-// Verify that a nonempty collection maybe takes up some space on disk.
-TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
-    const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
+class OperationContextNoop : public OperationContext {
+public:
+    /**
+     * These constructors are for use in legacy tests that do not need operation contexts that are
+     * properly connected to clients.
+     */
+    OperationContextNoop() : OperationContextNoop(nullptr, 0) {}
+    OperationContextNoop(RecoveryUnit* ru) : OperationContextNoop(nullptr, 0) {
+        setRecoveryUnit(std::unique_ptr<RecoveryUnit>(ru),
+                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
     }
 
-    int nToInsert = 10;
-    for (int i = 0; i < nToInsert; i++) {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        {
-            stringstream ss;
-            ss << "record " << i;
-            string data = ss.str();
-
-            WriteUnitOfWork uow(opCtx.get());
-            StatusWith<RecordId> res =
-                rs->insertRecord(opCtx.get(), data.c_str(), data.size() + 1, Timestamp());
-            ASSERT_OK(res.getStatus());
-            uow.commit();
-        }
+    /**
+     * This constructor is for use by ServiceContexts, and should not be called directly.
+     */
+    OperationContextNoop(Client* client, unsigned int opId) : OperationContext(client, opId) {
+        setRecoveryUnit(std::make_unique<RecoveryUnitNoop>(),
+                        WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
+        setLockState(std::make_unique<LockerNoop>());
     }
+};
 
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT_EQUALS(nToInsert, rs->numRecords(opCtx.get()));
-    }
-
-    {
-        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        ASSERT(rs->storageSize(opCtx.get(), nullptr) >= 0);
-    }
-}
-
-}  // namespace
 }  // namespace mongo

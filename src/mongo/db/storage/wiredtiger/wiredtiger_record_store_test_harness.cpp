@@ -28,7 +28,6 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
-
 #include "mongo/db/repl/replication_coordinator_mock.h"
 
 namespace mongo {
@@ -43,6 +42,7 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test"),
+      _lockerNoopClientObserverRegisterer(getServiceContext()),
       _engine(Client::getCurrent()->makeOperationContext().get(),
               kWiredTigerEngineName,
               _dbpath.path(),

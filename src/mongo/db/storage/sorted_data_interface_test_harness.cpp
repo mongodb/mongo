@@ -29,35 +29,26 @@
 
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
-#include "mongo/db/concurrency/d_concurrency.h"
+#include <algorithm>
+#include <memory>
+
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
-namespace mongo {
-namespace {
-
-std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()>
-    sortedDataInterfaceHarnessFactory;
-
-}  // namespace
-
-auto SortedDataInterfaceHarnessHelper::newSortedDataInterface(
+auto mongo::SortedDataInterfaceHarnessHelper::newSortedDataInterface(
     bool unique, bool partial, std::initializer_list<IndexKeyEntry> toInsert)
     -> std::unique_ptr<SortedDataInterface> {
     invariant(std::is_sorted(
         toInsert.begin(), toInsert.end(), IndexEntryComparison(Ordering::make(BSONObj()))));
 
     auto index = newSortedDataInterface(unique, partial);
-    auto client = serviceContext()->makeClient("insertToIndex");
-    auto opCtx = newOperationContext(client.get());
-    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
-    insertToIndex(opCtx.get(), index.get(), toInsert);
+    insertToIndex(this, index.get(), toInsert);
     return index;
 }
 
-void insertToIndex(OperationContext* opCtx,
-                   SortedDataInterface* index,
-                   std::initializer_list<IndexKeyEntry> toInsert) {
+void mongo::insertToIndex(OperationContext* opCtx,
+                          SortedDataInterface* index,
+                          std::initializer_list<IndexKeyEntry> toInsert) {
     WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toInsert) {
         ASSERT_OK(index->insert(opCtx, makeKeyString(index, entry.key, entry.loc), true));
@@ -65,9 +56,9 @@ void insertToIndex(OperationContext* opCtx,
     wuow.commit();
 }
 
-void removeFromIndex(OperationContext* opCtx,
-                     SortedDataInterface* index,
-                     std::initializer_list<IndexKeyEntry> toRemove) {
+void mongo::removeFromIndex(OperationContext* opCtx,
+                            SortedDataInterface* index,
+                            std::initializer_list<IndexKeyEntry> toRemove) {
     WriteUnitOfWork wuow(opCtx);
     for (auto&& entry : toRemove) {
         index->unindex(opCtx, makeKeyString(index, entry.key, entry.loc), true);
@@ -75,9 +66,9 @@ void removeFromIndex(OperationContext* opCtx,
     wuow.commit();
 }
 
-KeyString::Value makeKeyString(SortedDataInterface* sorted,
-                               BSONObj bsonKey,
-                               const boost::optional<RecordId>& rid) {
+mongo::KeyString::Value mongo::makeKeyString(SortedDataInterface* sorted,
+                                             BSONObj bsonKey,
+                                             const boost::optional<RecordId>& rid) {
     KeyString::Builder builder(sorted->getKeyStringVersion(), bsonKey, sorted->getOrdering());
     if (rid) {
         builder.appendRecordId(*rid);
@@ -85,10 +76,10 @@ KeyString::Value makeKeyString(SortedDataInterface* sorted,
     return builder.getValueCopy();
 }
 
-KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
-                                      BSONObj bsonKey,
-                                      bool isForward,
-                                      bool inclusive) {
+mongo::KeyString::Value mongo::makeKeyStringForSeek(SortedDataInterface* sorted,
+                                                    BSONObj bsonKey,
+                                                    bool isForward,
+                                                    bool inclusive) {
     BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
     KeyString::Builder builder(sorted->getKeyStringVersion(),
                                finalKey,
@@ -98,12 +89,19 @@ KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
     return builder.getValueCopy();
 }
 
+namespace mongo {
+namespace {
+std::function<std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>()>
+    sortedDataInterfaceHarnessFactory;
+}
+
 void registerSortedDataInterfaceHarnessHelperFactory(
-    std::function<std::unique_ptr<SortedDataInterfaceHarnessHelper>()> factory) {
+    std::function<std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper>()> factory) {
     sortedDataInterfaceHarnessFactory = std::move(factory);
 }
 
-auto newSortedDataInterfaceHarnessHelper() -> std::unique_ptr<SortedDataInterfaceHarnessHelper> {
+auto newSortedDataInterfaceHarnessHelper()
+    -> std::unique_ptr<mongo::SortedDataInterfaceHarnessHelper> {
     return sortedDataInterfaceHarnessFactory();
 }
 

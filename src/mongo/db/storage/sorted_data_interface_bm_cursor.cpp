@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
+
 #include <algorithm>
+#include <memory>
+
 #include <benchmark/benchmark.h>
 
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/logv2/log_debug.h"
 #include "mongo/unittest/unittest.h"
+
 
 namespace mongo {
 namespace {
@@ -53,7 +57,6 @@ struct Fixture {
           harness(newSortedDataInterfaceHarnessHelper()),
           sorted(harness->newSortedDataInterface(uniqueness == kUnique, /*partial*/ false)),
           opCtx(harness->newOperationContext()),
-          globalLock(opCtx.get(), MODE_X),
           cursor(sorted->newCursor(opCtx.get(), direction == kForward)),
           firstKey(makeKeyStringForSeek(sorted.get(),
                                         BSON("" << (direction == kForward ? 1 : nToInsert)),
@@ -77,7 +80,6 @@ struct Fixture {
     std::unique_ptr<SortedDataInterfaceHarnessHelper> harness;
     std::unique_ptr<SortedDataInterface> sorted;
     ServiceContext::UniqueOperationContext opCtx;
-    Lock::GlobalLock globalLock;
     std::unique_ptr<SortedDataInterface::Cursor> cursor;
     KeyString::Value firstKey;
     size_t itemsProcessed = 0;

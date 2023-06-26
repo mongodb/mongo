@@ -29,6 +29,7 @@
 
 #include <benchmark/benchmark.h>
 
+#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/logv2/log.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/unittest/barrier.h"
@@ -73,7 +74,10 @@ struct Notification {
 class ServiceExecutorSynchronousBm : public benchmark::Fixture {
 public:
     void firstSetup() {
-        setGlobalServiceContext(ServiceContext::make());
+        auto usc = ServiceContext::make();
+        sc = usc.get();
+        usc->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
+        setGlobalServiceContext(std::move(usc));
         (void)executor()->start();
     }
 

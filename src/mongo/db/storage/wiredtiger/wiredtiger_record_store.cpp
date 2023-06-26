@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
+
 #define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/platform/basic.h"
 
 #include <fmt/format.h>
+
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+
+#include <memory>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/static_assert.h"
@@ -41,6 +46,7 @@
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
@@ -819,7 +825,6 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 
 void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const RecordId& id) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
-
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
     if (_keyFormat == KeyFormat::Long) {
@@ -1158,6 +1163,7 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     OperationContext* opCtx) const {
     invariant(_isOplog);
     invariant(_keyFormat == KeyFormat::Long);
+    dassert(opCtx->lockState()->isReadLocked());
 
     // Using this function inside a UOW is not supported because the main reason to call it is to
     // synchronize to the last op before waiting for write concern, so it makes little sense to do

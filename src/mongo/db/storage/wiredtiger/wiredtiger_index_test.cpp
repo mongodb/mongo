@@ -27,6 +27,11 @@
  *    it in the license file.
  */
 
+#include "mongo/platform/basic.h"
+
+#include <memory>
+
+#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"

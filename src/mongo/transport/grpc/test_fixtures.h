@@ -39,7 +39,7 @@
 #include <grpcpp/security/credentials.h>
 #include <grpcpp/support/sync_stream.h>
 
-#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg.h"
@@ -124,7 +124,7 @@ private:
     std::shared_ptr<MockChannel> _channel;
 };
 
-class ServiceContextWithClockSourceMockTest : public ServiceContextTest {
+class ServiceContextWithClockSourceMockTest : public LockerNoopServiceContextTest {
 public:
     void setUp() override {
         _clkSource = std::make_shared<ClockSourceMock>();

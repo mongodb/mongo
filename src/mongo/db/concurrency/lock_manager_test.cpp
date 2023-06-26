@@ -116,10 +116,6 @@ DEATH_TEST_F(ResourceIdTest, CantCreateResourceMutexDirectly, "invariant") {
 // LockManager
 //
 
-TEST_F(LockManagerTest, IsModeCovered) {
-    ASSERT(isModeCovered(MODE_IS, MODE_IX));
-}
-
 TEST_F(LockManagerTest, Grant) {
     LockManager lockMgr;
     const ResourceId resId(

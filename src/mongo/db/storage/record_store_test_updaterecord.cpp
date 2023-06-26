@@ -27,24 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/platform/basic.h"
+
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
+using std::string;
+using std::stringstream;
+using std::unique_ptr;
+
 // Insert a record and try to update it.
 TEST(RecordStoreTestHarness, UpdateRecord) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         ASSERT_EQUALS(0, rs->numRecords(opCtx.get()));
     }
 
-    std::string data = "my record";
+    string data = "my record";
     RecordId loc;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -77,7 +85,6 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
             RecordData record = rs->dataFor(opCtx.get(), loc);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
@@ -89,7 +96,7 @@ TEST(RecordStoreTestHarness, UpdateRecord) {
 // Insert multiple records and try to update them.
 TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -101,9 +108,9 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            std::stringstream ss;
+            stringstream ss;
             ss << "record " << i;
-            std::string data = ss.str();
+            string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -122,9 +129,9 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            std::stringstream ss;
+            stringstream ss;
             ss << "update record-" << i;
-            std::string data = ss.str();
+            string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             Status res = rs->updateRecord(opCtx.get(), locs[i], data.c_str(), data.size() + 1);
@@ -136,11 +143,10 @@ TEST(RecordStoreTestHarness, UpdateMultipleRecords) {
 
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         {
-            std::stringstream ss;
+            stringstream ss;
             ss << "update record-" << i;
-            std::string data = ss.str();
+            string data = ss.str();
 
             RecordData record = rs->dataFor(opCtx.get(), locs[i]);
             ASSERT_EQUALS(data.size() + 1, static_cast<size_t>(record.size()));
