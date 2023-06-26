@@ -9,6 +9,7 @@
 "use strict";
 load('jstests/libs/chunk_manipulation_util.js');
 load("jstests/libs/fail_point_util.js");
+load('jstests/replsets/rslib.js');
 load('jstests/sharding/libs/create_sharded_collection_util.js');
 
 const dbName = "test";
@@ -54,7 +55,11 @@ function prepareTransactionAndTriggerFailover() {
         writeConcern: {w: "majority"},
     }));
 
-    st.rs0.stepUp(st.rs0.getSecondary());
+    let oldSecondary = st.rs0.getSecondary();
+
+    st.rs0.stepUp(oldSecondary);
+
+    awaitRSClientHosts(st.s, oldSecondary, {ok: true, ismaster: true});
 
     return result.prepareTimestamp;
 }
