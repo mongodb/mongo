@@ -157,6 +157,8 @@ all:
   ticket: SERVER-73229
 - test_file: jstests/sharding/move_chunk_deferred_lookup.js
   ticket: SERVER-78050
+- test_file: jstests/sharding/transfer_mods_large_batches.js
+  ticket: SERVER-78414
 suites:
   change_streams_multiversion: null
   concurrency_replication_multiversion: null
