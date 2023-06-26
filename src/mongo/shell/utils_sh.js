@@ -602,26 +602,8 @@ sh.addTagRange = function(ns, min, max, tag) {
                            {upsert: true, writeConcern: {w: 'majority', wtimeout: 60000}}));
 };
 
-sh.removeTagRange = function(ns, min, max, tag) {
-    var result = sh.removeRangeFromZone(ns, min, max);
-    if (result.code != ErrorCodes.CommandNotFound) {
-        return result;
-    }
-
-    var config = sh._getConfigDB();
-    // warn if the namespace does not exist, even dropped
-    if (config.collections.findOne({_id: ns}) == null) {
-        print("Warning: can't find the namespace: " + ns + " - collection likely never sharded");
-    }
-    // warn if the tag being removed is still in use
-    if (config.shards.findOne({tags: tag})) {
-        print("Warning: tag still in use by at least one shard");
-    }
-    // max and tag criteria not really needed, but including them avoids potentially unexpected
-    // behavior.
-    return assert.commandWorked(
-        config.tags.remove({_id: {ns: ns, min: min}, max: max, tag: tag},
-                           {writeConcern: {w: 'majority', wtimeout: 60000}}));
+sh.removeTagRange = function(ns, min, max) {
+    return sh._getConfigDB().adminCommand({updateZoneKeyRange: ns, min: min, max: max, zone: null});
 };
 
 sh.addShardToZone = function(shardName, zoneName) {
