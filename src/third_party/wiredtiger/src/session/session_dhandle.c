@@ -352,11 +352,11 @@ __wt_session_close_cache(WT_SESSION_IMPL *session)
 }
 
 /*
- * __session_dhandle_sweep --
+ * __wt_session_dhandle_sweep --
  *     Discard any session dhandles that are not open.
  */
-static void
-__session_dhandle_sweep(WT_SESSION_IMPL *session)
+void
+__wt_session_dhandle_sweep(WT_SESSION_IMPL *session)
 {
     WT_CONNECTION_IMPL *conn;
     WT_DATA_HANDLE *dhandle;
@@ -436,7 +436,7 @@ __session_get_dhandle(WT_SESSION_IMPL *session, const char *uri, const char *che
     }
 
     /* Sweep the handle list to remove any dead handles. */
-    __session_dhandle_sweep(session);
+    __wt_session_dhandle_sweep(session);
 
     /*
      * We didn't find a match in the session cache, search the shared handle list and cache the
