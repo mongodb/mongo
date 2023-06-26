@@ -70,11 +70,14 @@ const testColl = testDb.getCollection(kCollName);
 
     // Check that the resulting array of catalog entries contains our target databases and
     // namespaces.
-    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
+    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)),
+           tojson(resultArray));
 
     // Also check that the resulting array contains views specific to our target database.
-    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)));
-    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)));
+    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === targetViews)),
+           tojson(resultArray));
+    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === viewName)),
+           tojson(resultArray));
 
     // Get catalog when specifying our target collection, which should only return one result.
     result = testDb.runCommand({
@@ -87,13 +90,16 @@ const testColl = testDb.getCollection(kCollName);
 
     // Check that the resulting array of catalog entries contains our target database and
     // namespace.
-    assert(resultArray.length == 1);
-    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)));
+    assert.eq(resultArray.length, 1, tojson(resultArray));
+    assert(resultArray.some((entry) => (entry.db === targetDb) && (entry.name === kCollName)),
+           tojson(resultArray));
 
     // These collections should not be accessed with a different tenant.
     const collsWithDiffTenant = assert.commandWorked(
         testDb.runCommand({listCollections: 1, nameOnly: true, '$tenant': kOtherTenant}));
-    assert.eq(0, collsWithDiffTenant.cursor.firstBatch.length);
+    assert.eq(0,
+              collsWithDiffTenant.cursor.firstBatch.length,
+              tojson(collsWithDiffTenant.cursor.firstBatch));
 }
 
 // Test listDatabases command.
@@ -106,25 +112,25 @@ const testColl = testDb.getCollection(kCollName);
 
     const dbs = assert.commandWorked(
         adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kTenant}));
-    assert.eq(2, dbs.databases.length);
+    assert.eq(2, dbs.databases.length, tojson(dbs));
     // The 'admin' database is not expected because we do not create a tenant user in this test.
     const expectedDbs = featureFlagRequireTenantId
         ? [kDbName, kOtherDbName]
         : [kTenant + "_" + kDbName, kTenant + "_" + kOtherDbName];
-    assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)));
+    assert(arrayEq(expectedDbs, dbs.databases.map(db => db.name)), tojson(dbs));
 
     // These databases should not be accessed with a different tenant.
     const dbsWithDiffTenant = assert.commandWorked(
         adminDb.runCommand({listDatabases: 1, nameOnly: true, '$tenant': kOtherTenant}));
-    assert.eq(0, dbsWithDiffTenant.databases.length);
+    assert.eq(0, dbsWithDiffTenant.databases.length, tojson(dbsWithDiffTenant));
 
     const allDbs = assert.commandWorked(adminDb.runCommand({listDatabases: 1, nameOnly: true}));
     expectedDbs.push("admin");
     expectedDbs.push("config");
     expectedDbs.push("local");
 
-    assert.eq(5, allDbs.databases.length);
-    assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)));
+    assert.eq(5, allDbs.databases.length, tojson(allDbs));
+    assert(arrayEq(expectedDbs, allDbs.databases.map(db => db.name)), tojson(allDbs));
 }
 
 // Test insert, agg, find, getMore, and explain commands.
@@ -174,7 +180,7 @@ const testColl = testDb.getCollection(kCollName);
         '$tenant': kTenant
     }));
     assert.eq(1, aggRes.cursor.firstBatch.length, tojson(aggRes.cursor.firstBatch));
-    assert.eq(kTenantDocs[0], aggRes.cursor.firstBatch[0]);
+    assert.eq(kTenantDocs[0], aggRes.cursor.firstBatch[0], tojson(aggRes.cursor.firstBatch));
 
     const aggRes2 = assert.commandWorked(testDb.runCommand({
         aggregate: kCollName,
@@ -183,7 +189,7 @@ const testColl = testDb.getCollection(kCollName);
         '$tenant': kOtherTenant
     }));
     assert.eq(1, aggRes2.cursor.firstBatch.length, tojson(aggRes2.cursor.firstBatch));
-    assert.eq(kOtherTenantDocs[0], aggRes2.cursor.firstBatch[0]);
+    assert.eq(kOtherTenantDocs[0], aggRes2.cursor.firstBatch[0], tojson(aggRes2.cursor.firstBatch));
 
     // Test that explain works correctly.
     const kTenantExplainRes = assert.commandWorked(testDb.runCommand(
@@ -204,14 +210,14 @@ const testColl = testDb.getCollection(kCollName);
 
     const fad1 = assert.commandWorked(testDb.runCommand(
         {findAndModify: kCollName, query: {a: 1}, update: {$inc: {a: 10}}, '$tenant': kTenant}));
-    assert.eq({_id: 0, a: 1, b: 1}, fad1.value);
+    assert.eq({_id: 0, a: 1, b: 1}, fad1.value, tojson(fad1));
     const fad2 = assert.commandWorked(testDb.runCommand({
         findAndModify: kCollName,
         query: {a: 11},
         update: {$set: {a: 1, b: 1}},
         '$tenant': kTenant
     }));
-    assert.eq({_id: 0, a: 11, b: 1}, fad2.value);
+    assert.eq({_id: 0, a: 11, b: 1}, fad2.value, tojson(fad2));
     // This document should not be accessed with a different tenant.
     const fadOtherUser = assert.commandWorked(testDb.runCommand({
         findAndModify: kCollName,
@@ -219,7 +225,7 @@ const testColl = testDb.getCollection(kCollName);
         update: {$inc: {b: 10}},
         '$tenant': kOtherTenant
     }));
-    assert.eq(null, fadOtherUser.value);
+    assert.eq(null, fadOtherUser.value, tojson(fadOtherUser));
 }
 
 // Test count and distinct command.
@@ -230,18 +236,18 @@ const testColl = testDb.getCollection(kCollName);
     // Test count command.
     const resCount = assert.commandWorked(
         testDb.runCommand({count: kCollName, query: {c: 1}, '$tenant': kTenant}));
-    assert.eq(2, resCount.n);
+    assert.eq(2, resCount.n, tojson(resCount));
     const resCountOtherUser = assert.commandWorked(
         testDb.runCommand({count: kCollName, query: {c: 1}, '$tenant': kOtherTenant}));
-    assert.eq(0, resCountOtherUser.n);
+    assert.eq(0, resCountOtherUser.n, tojson(resCountOtherUser));
 
     // Test Distict command.
     const resDistinct = assert.commandWorked(
         testDb.runCommand({distinct: kCollName, key: 'd', query: {}, '$tenant': kTenant}));
-    assert.eq([1, 2], resDistinct.values.sort());
+    assert.eq([1, 2], resDistinct.values.sort(), tojson(resDistinct));
     const resDistinctOtherUser = assert.commandWorked(
         testDb.runCommand({distinct: kCollName, key: 'd', query: {}, '$tenant': kOtherTenant}));
-    assert.eq([], resDistinctOtherUser.values);
+    assert.eq([], resDistinctOtherUser.values, tojson(resDistinctOtherUser));
 }
 
 // Test renameCollection command.
@@ -258,7 +264,7 @@ const testColl = testDb.getCollection(kCollName);
         update: {$inc: {a: 10}},
         '$tenant': kTenant
     }));
-    assert.eq({_id: 0, a: 1, b: 1}, fad1.value);
+    assert.eq({_id: 0, a: 1, b: 1}, fad1.value, tojson(fad1));
 
     // This collection should not be accessed with a different tenant.
     assert.commandFailedWithCode(
@@ -357,17 +363,18 @@ const testColl = testDb.getCollection(kCollName);
         indexes: [{key: {a: 1}, name: "indexA"}, {key: {b: 1}, name: "indexB"}],
         '$tenant': kTenant
     }));
-    assert.eq(3, res.numIndexesAfter);
+    assert.eq(3, res.numIndexesAfter, tojson(res));
 
     res = assert.commandWorked(testDb.runCommand({listIndexes: kCollName, '$tenant': kTenant}));
-    assert.eq(3, res.cursor.firstBatch.length);
+    assert.eq(3, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
     assert(arrayEq(
-        [
-            {key: {"_id": 1}, name: "_id_"},
-            {key: {a: 1}, name: "indexA"},
-            {key: {b: 1}, name: "indexB"}
-        ],
-        getIndexesKeyAndName(res.cursor.firstBatch)));
+               [
+                   {key: {"_id": 1}, name: "_id_"},
+                   {key: {a: 1}, name: "indexA"},
+                   {key: {b: 1}, name: "indexB"}
+               ],
+               getIndexesKeyAndName(res.cursor.firstBatch)),
+           tojson(res.cursor.firstBatch));
 
     // These indexes should not be accessed with a different tenant.
     assert.commandFailedWithCode(
@@ -383,8 +390,9 @@ const testColl = testDb.getCollection(kCollName);
         {dropIndexes: kCollName, index: ["indexA", "indexB"], '$tenant': kTenant}));
 
     res = assert.commandWorked(testDb.runCommand({listIndexes: kCollName, '$tenant': kTenant}));
-    assert.eq(1, res.cursor.firstBatch.length);
-    assert(arrayEq([{key: {"_id": 1}, name: "_id_"}], getIndexesKeyAndName(res.cursor.firstBatch)));
+    assert.eq(1, res.cursor.firstBatch.length, tojson(res.cursor.firstBatch));
+    assert(arrayEq([{key: {"_id": 1}, name: "_id_"}], getIndexesKeyAndName(res.cursor.firstBatch)),
+           tojson(res.cursor.firstBatch));
 }
 
 // Test collMod
@@ -395,7 +403,7 @@ const testColl = testDb.getCollection(kCollName);
         indexes: [{key: {c: 1}, name: "indexC", expireAfterSeconds: 50}],
         '$tenant': kTenant
     }));
-    assert.eq(2, res.numIndexesAfter);
+    assert.eq(2, res.numIndexesAfter, tojson(res));
 
     // Modifying the index without the tenantId should not work.
     res = testDb.runCommand({
@@ -416,8 +424,8 @@ const testColl = testDb.getCollection(kCollName);
         "index": {"keyPattern": {c: 1}, expireAfterSeconds: 100},
         '$tenant': kTenant
     }));
-    assert.eq(50, res.expireAfterSeconds_old);
-    assert.eq(100, res.expireAfterSeconds_new);
+    assert.eq(50, res.expireAfterSeconds_old, tojson(res));
+    assert.eq(100, res.expireAfterSeconds_new, tojson(res));
 
     // Drop the index created
     assert.commandWorked(
@@ -441,15 +449,15 @@ const testColl = testDb.getCollection(kCollName);
     // Check applyOp inserted the document.
     const findRes = assert.commandWorked(
         testDb.runCommand({find: kCollName, filter: {_id: 5}, '$tenant': kTenant}));
-    assert.eq(1, findRes.cursor.firstBatch.length);
-    assert.eq(17, findRes.cursor.firstBatch[0].x);
+    assert.eq(1, findRes.cursor.firstBatch.length, tojson(findRes.cursor.firstBatch));
+    assert.eq(17, findRes.cursor.firstBatch[0].x, tojson(findRes.cursor.firstBatch));
 }
 
 // Test the validate command.
 {
     const validateRes =
         assert.commandWorked(testDb.runCommand({validate: kCollName, '$tenant': kTenant}));
-    assert(validateRes.valid);
+    assert(validateRes.valid, tojson(validateRes));
 }
 
 // Test dbCheck command.

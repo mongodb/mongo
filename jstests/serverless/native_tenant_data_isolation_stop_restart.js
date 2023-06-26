@@ -32,7 +32,7 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
     // Run findAndModify on the document.
     let fad = assert.commandWorked(testDb.runCommand(
         {findAndModify: "myColl0", query: {a: 1}, update: {$inc: {a: 10}}, '$tenant': kTenant}));
-    assert.eq({_id: 0, a: 1, b: 1}, fad.value);
+    assert.eq({_id: 0, a: 1, b: 1}, fad.value, tojson(fad));
 
     // Create a view on the collection.
     assert.commandWorked(testDb.runCommand(
@@ -62,7 +62,7 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
     // Assert we can still run findAndModify on the doc.
     fad = assert.commandWorked(testDb.runCommand(
         {findAndModify: "myColl0", query: {a: 11}, update: {$inc: {a: 10}}, '$tenant': kTenant}));
-    assert.eq({_id: 0, a: 11, b: 1}, fad.value);
+    assert.eq({_id: 0, a: 11, b: 1}, fad.value, tojson(fad));
 
     const findAndModPrefixed =
         primary.getDB(kTenant + '_myDb0')
@@ -73,11 +73,11 @@ const featureFlagRequireTenantId = FeatureFlagUtil.isEnabled(adminDb, "RequireTe
         // feature flag is not enabled. In this case, the server still accepts prefixed names,
         // and will parse the tenant from the db name.
         assert.commandWorked(findAndModPrefixed);
-        assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value);
+        assert.eq({_id: 0, a: 21, b: 1}, findAndModPrefixed.value, tojson(findAndModPrefixed));
     } else {
         // assert.commandFailed(findAndModPrefixed);
         // TODO SERVER-73113 Uncomment out the check above, and remove the check below.
-        assert.eq(null, findAndModPrefixed.value);
+        assert.eq(null, findAndModPrefixed.value, tojson(findAndModPrefixed));
     }
 }
 
