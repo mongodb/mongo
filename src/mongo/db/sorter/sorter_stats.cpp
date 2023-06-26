@@ -29,6 +29,8 @@
 
 #include "mongo/db/sorter/sorter_stats.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/util/assert_util_core.h"
 
 namespace mongo {

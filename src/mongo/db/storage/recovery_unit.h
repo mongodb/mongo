@@ -29,20 +29,28 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_stats.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
+
 class OperationContext;
 
 /**

@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <functional>
+#include <wiredtiger.h>
+
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

@@ -28,12 +28,10 @@
  */
 
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
-#include <memory>
 #include <set>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_operation_source.h"

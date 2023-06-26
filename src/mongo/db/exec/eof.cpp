@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <vector>
 
 #include "mongo/db/exec/eof.h"
-
-#include <memory>
-
-#include "mongo/db/exec/scoped_timer.h"
 
 namespace mongo {
 

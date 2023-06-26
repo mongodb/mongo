@@ -29,12 +29,17 @@
 
 #include "mongo/db/update/storage_validation.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/query/dbref.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/update/modifier_table.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -28,8 +28,6 @@
  */
 
 #include "mongo/db/matcher/matchable.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo {
 

@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <array>
 #include <csignal>
 #include <cstddef>
@@ -44,10 +42,20 @@
 #include <utility>
 #include <vector>
 
+/** `sigaltstack` was introduced in glibc-2.12 in 2010. */
+#if !defined(_WIN32)
+#define HAVE_SIGALTSTACK
+#endif
+
+#ifdef __linux__
+#include <ctime>
+#include <sys/syscall.h>
+#endif  //  __linux__
+
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
@@ -58,16 +66,10 @@
 #include "mongo/util/pcre.h"
 #include "mongo/util/stacktrace.h"
 
-/** `sigaltstack` was introduced in glibc-2.12 in 2010. */
-#if !defined(_WIN32)
-#define HAVE_SIGALTSTACK
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
 #endif
 
-#ifdef __linux__
-#include <ctime>
-#include <sys/syscall.h>
-#include <unistd.h>
-#endif  //  __linux__
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

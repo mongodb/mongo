@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/stage_builder_util.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/query/classic_stage_builder.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/plan_yield_policy_sbe.h"
 #include "mongo/db/query/sbe_stage_builder.h"
-#include "mongo/db/query/shard_filterer_factory_impl.h"
+#include "mongo/db/query/stage_builder_util.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::stage_builder {
 std::unique_ptr<PlanStage> buildClassicExecutableTree(OperationContext* opCtx,

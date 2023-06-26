@@ -28,13 +28,24 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/stats/top.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

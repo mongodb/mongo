@@ -27,16 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
-#include "mongo/db/storage/duplicate_key_error_info.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/overloaded_visitor.h"
-#include "mongo/util/text.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/text.h"                // IWYU pragma: keep
 
 namespace mongo {
 namespace {

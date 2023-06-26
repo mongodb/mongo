@@ -29,8 +29,21 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/record_id.h"
 
 namespace mongo::sbe::plan_ranker {
 

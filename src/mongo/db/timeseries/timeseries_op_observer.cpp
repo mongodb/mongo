@@ -29,14 +29,27 @@
 
 #include "mongo/db/timeseries/timeseries_op_observer.h"
 
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/timeseries_extended_range.h"
 #include "mongo/stdx/unordered_set.h"
-
-#include <vector>
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo {

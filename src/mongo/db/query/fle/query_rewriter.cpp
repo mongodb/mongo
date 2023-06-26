@@ -29,9 +29,23 @@
 
 #include "query_rewriter.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <functional>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_walker.h"
 #include "mongo/db/query/fle/range_validator.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::fle {
 

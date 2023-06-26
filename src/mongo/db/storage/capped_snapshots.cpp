@@ -28,6 +28,20 @@
  */
 
 #include "mongo/db/storage/capped_snapshots.h"
+
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+
 namespace mongo {
 
 auto getCappedSnapshots = RecoveryUnit::Snapshot::declareDecoration<CappedSnapshots>();

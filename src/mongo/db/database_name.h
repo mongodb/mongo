@@ -30,13 +30,28 @@
 #pragma once
 #include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <cstring>
+#include <fmt/format.h>
+#include <iosfwd>
+#include <mutex>
 #include <string>
+#include <utility>
 
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -97,6 +112,7 @@ public:
 
 #define DBNAME_CONSTANT(id, db) static const ConstantProxy id;
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 
     static constexpr size_t kMaxDatabaseNameLength = 63;
@@ -342,6 +358,7 @@ private:
 namespace dbname_detail::const_proxy_shared_states {
 #define DBNAME_CONSTANT(id, db) constexpr inline DatabaseName::ConstantProxy::SharedState id{db};
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 }  // namespace dbname_detail::const_proxy_shared_states
 
@@ -349,6 +366,7 @@ namespace dbname_detail::const_proxy_shared_states {
     constexpr inline DatabaseName::ConstantProxy DatabaseName::id{ \
         &dbname_detail::const_proxy_shared_states::id};
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 
 }  // namespace mongo

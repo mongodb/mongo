@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <set>
 #include <string>
 #include <vector>
@@ -40,6 +41,7 @@
 namespace mongo {
 
 class BSONObj;
+
 class OperationContext;
 
 /**

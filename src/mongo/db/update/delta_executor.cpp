@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/update/delta_executor.h"
-
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/object_replace_executor.h"
-#include "mongo/db/update/update_oplog_entry_serialization.h"
 
 namespace mongo {
 

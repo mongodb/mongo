@@ -27,20 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/filesystem.hpp>
-#include <fstream>
-#include <ostream>
-
-#include "mongo/db/storage/storage_engine_lock_file.h"
-#include "mongo/platform/process_id.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include <cstdint>
+#include <fstream>  // IWYU pragma: keep
+#include <utility>
 
 #ifndef _WIN32
 #include <sys/stat.h>
-#include <sys/types.h>
+#endif
+
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/storage/storage_engine_lock_file.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/temp_dir.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 

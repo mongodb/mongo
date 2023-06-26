@@ -30,6 +30,9 @@
 #pragma once
 
 #include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"

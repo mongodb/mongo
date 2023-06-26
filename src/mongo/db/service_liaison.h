@@ -30,7 +30,11 @@
 #pragma once
 
 #include <functional>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/util/periodic_runner.h"

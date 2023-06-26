@@ -29,12 +29,23 @@
 
 #include "mongo/db/exec/count_scan.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
+#include <vector>
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/exec/scoped_timer.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

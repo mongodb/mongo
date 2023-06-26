@@ -32,11 +32,9 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-#include <memory>
-#include <string>
-
 #include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"

@@ -31,6 +31,10 @@
 
 #include "api_parameters.h"
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/api_parameters_gen.h"
+#include "mongo/db/operation_context.h"
+
 namespace mongo {
 
 class BSONObj;

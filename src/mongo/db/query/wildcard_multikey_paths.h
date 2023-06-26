@@ -31,6 +31,7 @@
 
 #include <set>
 #include <string>
+#include <vector>
 
 #include "mongo/db/field_ref.h"
 #include "mongo/stdx/unordered_set.h"

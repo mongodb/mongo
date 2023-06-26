@@ -103,7 +103,6 @@
 #include <sys/ioctl.h>
 #include <sys/types.h>
 #include <termios.h>
-#include <unistd.h>
 
 #endif /* _WIN32 */
 
@@ -120,7 +119,12 @@
 #include <vector>
 
 #include "mongo/base/data_view.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/errno_util.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 using std::string;
 using std::vector;

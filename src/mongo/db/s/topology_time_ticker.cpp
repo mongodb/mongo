@@ -29,13 +29,24 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <iterator>
+#include <utility>
 
-#include "mongo/db/s/topology_time_ticker.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/topology_time_ticker.h"
 #include "mongo/db/vector_clock_mutable.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

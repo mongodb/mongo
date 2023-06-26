@@ -27,15 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/options_parser/startup_option_init.h"
-
 #include <iostream>
+#include <string>
+#include <vector>
 
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/wiredtiger/wiredtiger_global_options.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 namespace moe = mongo::optionenvironment;
 

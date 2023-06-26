@@ -28,10 +28,24 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+#include <limits>
 #include <memory>
+#include <ostream>
+#include <string>
+#include <type_traits>
+#include <vector>
+
+#include <wiredtiger.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/temp_dir.h"
 
 namespace mongo {
 namespace {

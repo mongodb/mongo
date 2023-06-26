@@ -28,16 +28,29 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/config/configsvr_coordinator_service.h"
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/configsvr_coordinator.h"
+#include "mongo/db/s/config/configsvr_coordinator_service.h"
 #include "mongo/db/s/config/set_cluster_parameter_coordinator.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

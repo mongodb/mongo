@@ -30,11 +30,40 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/update/update_driver.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 

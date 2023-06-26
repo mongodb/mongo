@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/s/query_analysis_op_observer_shardsvr.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_mongos.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

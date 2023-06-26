@@ -29,11 +29,21 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <memory>
+
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 /**
  * There is up to one 'config.system.preimages' collection per tenant. This pre-images

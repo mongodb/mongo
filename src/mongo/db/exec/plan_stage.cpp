@@ -28,12 +28,11 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/plan_stage.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/operation_context.h"
-#include "mongo/db/service_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

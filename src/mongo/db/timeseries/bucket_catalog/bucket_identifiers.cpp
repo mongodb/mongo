@@ -29,6 +29,8 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 
+#include <absl/hash/hash.h>
+
 namespace mongo::timeseries::bucket_catalog {
 
 BucketId::BucketId(const NamespaceString& n, const OID& o)

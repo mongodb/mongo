@@ -27,13 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/db/matcher/expression_visitor.h"
-#include "mongo/db/pipeline/expression.h"
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
-
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

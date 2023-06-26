@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/processinfo.h"
 
 namespace mongo {

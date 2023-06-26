@@ -27,25 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/filesystem/operations.hpp>
+#include <boost/program_options/value_semantic.hpp>
 #include <fcntl.h>
-#include <fstream>
+// IWYU pragma: no_include "boost/program_options/detail/parsers.hpp"
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+#include <cerrno>
+#include <cstring>
+#include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <string>
+#include <vector>
 
 #ifdef _WIN32
 #include <io.h>
 #endif
 
+#include <boost/program_options.hpp>  // IWYU pragma: keep
+
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
 #include "mongo/db/traffic_reader.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/text.h"
-
-#include <boost/filesystem.hpp>
-#include <boost/program_options.hpp>  // IWYU pragma: keep
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 using namespace mongo;
 

@@ -30,20 +30,36 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <mutex>
 #include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
 
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -186,6 +202,7 @@ public:
     // limitation).
 #define NSS_CONSTANT(id, db, coll) static const ConstantProxy id;
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
+
 #undef NSS_CONSTANT
 
     /**
@@ -1152,6 +1169,7 @@ namespace nss_detail::const_proxy_shared_states {
 #define NSS_CONSTANT(id, db, coll) \
     constexpr inline NamespaceString::ConstantProxy::SharedState id{db, coll};
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
+
 #undef NSS_CONSTANT
 }  // namespace nss_detail::const_proxy_shared_states
 
@@ -1159,6 +1177,7 @@ namespace nss_detail::const_proxy_shared_states {
     constexpr inline NamespaceString::ConstantProxy NamespaceString::id{ \
         &nss_detail::const_proxy_shared_states::id};
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
+
 #undef NSS_CONSTANT
 
 }  // namespace mongo

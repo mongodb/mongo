@@ -30,10 +30,8 @@
 #include "mongo/db/exec/limit.h"
 
 #include <memory>
-
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/util/str.h"
+#include <utility>
+#include <vector>
 
 namespace mongo {
 

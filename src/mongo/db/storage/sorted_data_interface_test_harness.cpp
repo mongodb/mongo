@@ -30,10 +30,18 @@
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/ordering.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util_core.h"
 
 auto mongo::SortedDataInterfaceHarnessHelper::newSortedDataInterface(
     bool unique, bool partial, std::initializer_list<IndexKeyEntry> toInsert)

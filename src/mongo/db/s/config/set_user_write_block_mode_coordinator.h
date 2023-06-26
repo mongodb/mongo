@@ -29,9 +29,21 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/s/config/configsvr_coordinator.h"
+#include "mongo/db/s/config/configsvr_coordinator_gen.h"
 #include "mongo/db/s/config/set_user_write_block_mode_coordinator_document_gen.h"
 #include "mongo/db/session/internal_session_pool.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

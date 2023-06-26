@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/cost_model/cost_model_on_update.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo::cost_model {
 

@@ -32,12 +32,15 @@
 #include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/write_concern_options.h"
 
 namespace mongo {
 class AddShard;
 class BSONObj;
 class OperationContext;
+
 class ShardId;
 
 // Contains a collection of utility functions relating to the addShard command

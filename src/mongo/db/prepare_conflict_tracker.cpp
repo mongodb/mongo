@@ -28,7 +28,14 @@
  */
 
 #include "mongo/db/prepare_conflict_tracker.h"
-#include "mongo/platform/basic.h"
+
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

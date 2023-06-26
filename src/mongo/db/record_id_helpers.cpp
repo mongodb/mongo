@@ -30,17 +30,26 @@
 
 #include "mongo/db/record_id_helpers.h"
 
+#include <cstdint>
 #include <limits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

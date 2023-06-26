@@ -29,16 +29,20 @@
 
 #include "mongo/db/server_options_base.h"
 
+#include <ostream>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base_gen.h"
 #include "mongo/db/server_options_general_gen.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace moe = mongo::optionenvironment;
 

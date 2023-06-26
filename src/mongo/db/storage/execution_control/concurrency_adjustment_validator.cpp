@@ -28,8 +28,13 @@
  */
 
 #include "mongo/db/storage/execution_control/concurrency_adjustment_validator.h"
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

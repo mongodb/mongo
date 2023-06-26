@@ -32,12 +32,10 @@
 #include <boost/container/flat_set.hpp>
 #include <boost/container/vector.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <initializer_list>
 #include <ostream>
 #include <string>
-#include <utility>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

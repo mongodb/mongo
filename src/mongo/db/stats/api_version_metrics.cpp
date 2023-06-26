@@ -28,7 +28,19 @@
  */
 
 #include "mongo/db/stats/api_version_metrics.h"
-#include "mongo/db/commands/server_status.h"
+
+#include <memory>
+#include <mutex>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

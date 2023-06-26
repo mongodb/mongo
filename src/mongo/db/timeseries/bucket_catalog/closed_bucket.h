@@ -29,10 +29,10 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <string>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"

@@ -29,7 +29,12 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 

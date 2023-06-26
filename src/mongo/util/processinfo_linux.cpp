@@ -28,21 +28,25 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "processinfo.h"
 
+#include <boost/filesystem.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <cstdio>
+#include <fmt/format.h>
 #include <fstream>
 #include <iostream>
+#include <string>
+
+#ifndef _WIN32
 #include <malloc.h>
 #include <sched.h>
-#include <string>
 #include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
-#include <unistd.h>
+#endif
 
 #ifdef __BIONIC__
 #include <android/api-level.h>
@@ -52,16 +56,16 @@
 #include <gnu/libc-version.h>
 #endif
 
-#include <boost/filesystem.hpp>
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <fmt/format.h>
-
 #include "mongo/base/parse_number.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/file.h"
 #include "mongo/util/pcre.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

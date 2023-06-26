@@ -30,10 +30,21 @@
 #pragma once
 
 #include <boost/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <functional>
 #include <memory>
+#include <utility>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/dependencies.h"
@@ -41,10 +52,16 @@
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
 #include "mongo/db/pipeline/document_source_sample.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/group_from_first_document_transformation.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 class Collection;
@@ -53,6 +70,7 @@ class DocumentSourceCursor;
 class DocumentSourceMatch;
 class DocumentSourceSort;
 class ExpressionContext;
+
 class SkipThenLimit;
 class OperationContext;
 class Pipeline;

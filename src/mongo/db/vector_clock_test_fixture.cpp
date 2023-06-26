@@ -27,23 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/vector_clock_test_fixture.h"
-
 #include <memory>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/signed_logical_time.h"
-#include "mongo/db/time_proof_service.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/vector_clock_test_fixture.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

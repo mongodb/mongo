@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/platform/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {

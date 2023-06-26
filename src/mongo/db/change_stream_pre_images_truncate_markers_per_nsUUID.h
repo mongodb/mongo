@@ -29,10 +29,23 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <deque>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 /**
  * There is up to one 'config.system.preimages' collection per tenant. This pre-images

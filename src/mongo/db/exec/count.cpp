@@ -27,15 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/count.h"
-
 #include <memory>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/exec/count.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

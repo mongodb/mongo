@@ -28,21 +28,30 @@
  */
 
 
-#include <boost/optional.hpp>
+// IWYU pragma: no_include <bits/types/clockid_t.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <string>
+#include <sys/types.h>
+#include <thread>
+#include <utility>
 
 #if defined(__linux__)
 #include <ctime>
 #endif  // defined(__linux__)
 
-#include "mongo/db/operation_cpu_timer.h"
-
 #include "mongo/base/error_codes.h"
-#include "mongo/db/client.h"
+#include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_cpu_timer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/fail_point.h"
 

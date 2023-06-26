@@ -29,8 +29,6 @@
 
 #include "mongo/db/catalog/capped_visibility.h"
 
-#include <type_traits>
-
 #include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/recovery_unit.h"

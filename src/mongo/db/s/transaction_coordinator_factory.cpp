@@ -27,7 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/shim.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"

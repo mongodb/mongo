@@ -28,21 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/index_scan.h"
-
+#include <absl/container/node_hash_map.h>
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <vector>
 
-#include "mongo/db/catalog/index_catalog.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/ordering.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/scoped_timer.h"
+#include "mongo/db/exec/index_scan.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/index_names.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/debug_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

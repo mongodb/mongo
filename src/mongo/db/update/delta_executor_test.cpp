@@ -28,14 +28,22 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/delta_executor.h"
 #include "mongo/db/update/document_diff_calculator.h"
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/update_index_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

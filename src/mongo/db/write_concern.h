@@ -29,7 +29,15 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/util/net/hostandport.h"
 

@@ -43,6 +43,7 @@
 #include <algorithm>
 #include <ostream>
 #include <set>
+#include <type_traits>
 #include <vector>
 
 #include "mongo/base/checked_cast.h"

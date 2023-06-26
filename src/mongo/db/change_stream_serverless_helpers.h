@@ -30,9 +30,11 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
+#include <cstdint>
 
 #include "mongo/db/operation_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 namespace change_stream_serverless_helpers {

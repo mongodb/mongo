@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/db/query/plan_yield_policy_impl.h"
-
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/restore_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 

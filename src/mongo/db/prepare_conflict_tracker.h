@@ -31,6 +31,8 @@
 
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/tick_source.h"
 
 namespace mongo {
 

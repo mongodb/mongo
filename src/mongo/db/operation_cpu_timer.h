@@ -29,13 +29,16 @@
 
 #pragma once
 
+#include <cstddef>
 #include <list>
+#include <memory>
 
 #include "mongo/util/duration.h"
 
 namespace mongo {
 
 class OperationContext;
+
 class OperationCPUTimer;
 
 /**

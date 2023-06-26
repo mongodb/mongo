@@ -31,21 +31,52 @@
 #include "mongo/db/exec/geo_near.h"
 
 #include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <limits>
 #include <memory>
 #include <s2regionintersection.h>  // For s2 search
+#include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/bson/dotted_path_support.h"
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <r1interval.h>
+#include <s1angle.h>
+#include <s2.h>
+#include <s2cap.h>
+#include <s2cell.h>
+#include <s2cellid.h>
+#include <s2cellunion.h>
+#include <s2latlng.h>
+#include <s2region.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/fetch.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/geo/geoconstants.h"
-#include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/hash.h"
 #include "mongo/db/index/expression_params.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/expression_index.h"
 #include "mongo/db/query/expression_index_knobs_gen.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/interval.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

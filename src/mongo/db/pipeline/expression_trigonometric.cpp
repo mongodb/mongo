@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "expression_trigonometric.h"
+
+#include "mongo/db/pipeline/expression.h"
 
 namespace mongo {
 

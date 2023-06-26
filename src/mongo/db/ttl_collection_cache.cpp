@@ -28,15 +28,16 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ttl_collection_cache.h"
-
 #include <algorithm>
+#include <mutex>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
 
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/db/ttl_collection_cache.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

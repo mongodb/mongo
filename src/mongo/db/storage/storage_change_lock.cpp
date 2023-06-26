@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/storage/storage_change_lock.h"
-
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

@@ -28,7 +28,11 @@
  */
 #pragma once
 
+#include <absl/container/node_hash_map.h>
 #include <boost/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/status.h"

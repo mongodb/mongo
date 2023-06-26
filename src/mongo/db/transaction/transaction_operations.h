@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
+#include <functional>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/repl/oplog.h"        // for OplogSlot
 #include "mongo/db/repl/oplog_entry.h"  // for ReplOperation
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

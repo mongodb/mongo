@@ -30,11 +30,15 @@
 #include "mongo/db/stats/counters.h"
 
 #include <fmt/format.h>
+#include <tuple>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/operation_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

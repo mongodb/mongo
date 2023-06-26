@@ -35,6 +35,7 @@
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/storage/data_protector.h"
 

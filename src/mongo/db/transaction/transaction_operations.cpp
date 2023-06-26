@@ -29,8 +29,25 @@
 
 #include "mongo/db/transaction/transaction_operations.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <memory>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

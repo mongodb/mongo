@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/cursor_server_params.h"
-
 #include "mongo/db/cursor_server_params_gen.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 

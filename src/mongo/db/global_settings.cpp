@@ -29,9 +29,25 @@
 
 #include "mongo/db/global_settings.h"
 
+#include <mutex>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/mongod_options_general_gen.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

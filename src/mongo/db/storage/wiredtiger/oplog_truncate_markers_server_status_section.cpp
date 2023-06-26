@@ -27,11 +27,19 @@
  *    it in the license file.
  */
 
+#include <memory>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/database_name.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/storage_engine.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

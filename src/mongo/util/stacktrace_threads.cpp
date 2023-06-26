@@ -40,25 +40,32 @@
 #include <cstdint>
 #include <cstdlib>
 #include <ctime>
-#include <dirent.h>
 #include <fcntl.h>
 #include <fmt/format.h>
 #include <string>
+#include <vector>
+
+#ifndef _WIN32
+#include <dirent.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
-#include <unistd.h>
-#include <vector>
+#endif
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/stacktrace_somap.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

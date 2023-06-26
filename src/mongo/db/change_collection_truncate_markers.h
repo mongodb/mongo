@@ -29,7 +29,15 @@
 
 #pragma once
 
+#include <cstdint>
+#include <deque>
+
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/time_support.h"
 
 /**
  * Implementation of truncate markers for Change Collections. Respects the requirement of always

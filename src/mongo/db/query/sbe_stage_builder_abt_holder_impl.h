@@ -29,7 +29,9 @@
 
 #pragma once
 
-#include "mongo/db/query/optimizer/node.h"
+#include <type_traits>
+
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 

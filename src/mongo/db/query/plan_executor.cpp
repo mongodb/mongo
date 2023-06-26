@@ -29,8 +29,17 @@
 
 #include "mongo/db/query/plan_executor.h"
 
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
 
 namespace mongo {

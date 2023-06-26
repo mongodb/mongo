@@ -28,17 +28,12 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/signal_handlers.h"
 
 #include <csignal>
 #include <ctime>
 
-#if !defined(_WIN32)
-#include <unistd.h>
-#endif
-
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
@@ -55,6 +50,11 @@
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/signal_win32.h"
 #include "mongo/util/stacktrace.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

@@ -29,6 +29,15 @@
 
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
 
+#include <absl/container/node_hash_map.h>
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <memory>
+#include <utility>
+#include <variant>
+
+#include <boost/optional/optional.hpp>
+
 namespace mongo {
 
 namespace {

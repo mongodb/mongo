@@ -30,9 +30,14 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <memory>
+#include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/version/releases.h"

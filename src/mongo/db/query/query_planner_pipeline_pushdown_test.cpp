@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <list>
 #include <map>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
@@ -54,7 +53,6 @@
 #include "mongo/stdx/type_traits.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace {
 using namespace mongo;

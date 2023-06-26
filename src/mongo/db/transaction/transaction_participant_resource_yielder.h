@@ -29,8 +29,15 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

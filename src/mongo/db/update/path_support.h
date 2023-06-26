@@ -29,16 +29,21 @@
 
 #pragma once
 
+#include <compare>
+#include <cstddef>
 #include <cstdint>
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

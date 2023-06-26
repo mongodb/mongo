@@ -49,12 +49,10 @@
 #include <io.h>
 #define SIGKILL 9
 #else
-#include <csignal>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #endif
 
 #include "mongo/base/environment_buffer.h"
@@ -62,6 +60,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/traffic_reader.h"
 #include "mongo/logv2/log.h"
@@ -83,6 +82,10 @@
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
 #include "mongo/util/version/releases.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -60,7 +60,6 @@
 #include "mongo/platform/atomic_word.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
-#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 const std::string kIndexName = "indexName";

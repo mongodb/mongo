@@ -28,8 +28,13 @@
  */
 
 #include "mongo/db/sorter/sorter_stats.h"
+
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

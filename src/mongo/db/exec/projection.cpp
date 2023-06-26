@@ -29,18 +29,28 @@
 
 #include "mongo/db/exec/projection.h"
 
-#include <boost/optional.hpp>
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/record_id.h"
-#include "mongo/util/str.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

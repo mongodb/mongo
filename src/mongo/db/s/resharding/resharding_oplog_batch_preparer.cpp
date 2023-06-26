@@ -29,13 +29,29 @@
 
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 
+#include <cstddef>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/s/resharding/resharding_server_parameters_gen.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/murmur3.h"
 #include "mongo/util/str.h"

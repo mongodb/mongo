@@ -30,12 +30,18 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <functional>
+#include <string>
+#include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace mongo {
 

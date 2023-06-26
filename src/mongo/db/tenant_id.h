@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <new>
 #include <ostream>
 #include <string>
 
@@ -38,6 +41,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

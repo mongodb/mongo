@@ -29,13 +29,17 @@
 
 #pragma once
 
+#include <ctime>
+#include <string>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
-
-#include <ctime>
 
 namespace mongo {
 

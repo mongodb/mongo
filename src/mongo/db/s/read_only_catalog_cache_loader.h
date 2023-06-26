@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/config_server_catalog_cache_loader.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

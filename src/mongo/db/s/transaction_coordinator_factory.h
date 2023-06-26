@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id.h"
 

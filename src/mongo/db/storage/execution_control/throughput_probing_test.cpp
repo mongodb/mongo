@@ -28,8 +28,23 @@
  */
 
 #include "mongo/db/storage/execution_control/throughput_probing.h"
+
+#include <cmath>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/storage/execution_control/throughput_probing_gen.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/periodic_runner.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 namespace mongo::execution_control {

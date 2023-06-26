@@ -27,14 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/json.h"
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <map>
+#include <ostream>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_dotted_path_support.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

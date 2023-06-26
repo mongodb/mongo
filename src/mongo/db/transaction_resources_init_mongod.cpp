@@ -27,7 +27,17 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/locker_impl.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 
 namespace mongo {
 namespace {

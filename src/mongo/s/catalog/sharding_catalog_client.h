@@ -40,6 +40,7 @@
 #include "mongo/db/write_concern_options.h"
 #include "mongo/s/catalog/type_index_catalog.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog/type_tags.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard.h"
 #include "mongo/s/index_version.h"

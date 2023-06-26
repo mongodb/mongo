@@ -30,8 +30,14 @@
 #pragma once
 
 #include <boost/filesystem/operations.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {

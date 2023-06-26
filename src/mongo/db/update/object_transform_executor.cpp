@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/update/object_transform_executor.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/update/object_replace_executor.h"
-#include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/object_transform_executor.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

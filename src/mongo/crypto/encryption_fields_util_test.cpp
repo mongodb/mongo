@@ -28,10 +28,9 @@
  */
 
 #include <boost/container/small_vector.hpp>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <boost/move/utility_core.hpp>
-
 #include <boost/optional/optional.hpp>
+
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/string_data.h"
 #include "mongo/crypto/encryption_fields_util.h"

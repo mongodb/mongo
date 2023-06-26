@@ -28,8 +28,24 @@
  */
 
 #include "mongo/db/s/operation_sharding_state.h"
+
+#include <boost/none.hpp>
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

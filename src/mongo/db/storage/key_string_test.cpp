@@ -28,30 +28,42 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
 #include <cmath>
-#include <functional>
+#include <future>
 #include <limits>
 #include <memory>
 #include <random>
-#include <typeinfo>
+#include <system_error>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj_comparator.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/future.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

@@ -27,11 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 
-#include "mongo/db/update/bit_node.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/update/bit_node.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

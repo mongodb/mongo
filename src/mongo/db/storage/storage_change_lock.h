@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <mutex>
 #include <shared_mutex>
 
 #include "mongo/platform/atomic_word.h"

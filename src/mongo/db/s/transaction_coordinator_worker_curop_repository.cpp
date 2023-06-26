@@ -29,6 +29,8 @@
 
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
 
+#include <string>
+
 #include "mongo/base/shim.h"
 
 namespace mongo {

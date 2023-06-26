@@ -27,21 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/debugger.h"
-
+#include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <iostream>
 #include <mutex>
 
-#ifndef _WIN32
-#include <csignal>
-#include <cstdio>
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/debug_util.h"
+#include "mongo/util/debugger.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
-
-#include "mongo/util/debug_util.h"
 
 #ifndef _WIN32
 namespace {

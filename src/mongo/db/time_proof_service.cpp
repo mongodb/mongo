@@ -27,13 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <array>
+#include <boost/none.hpp>
+#include <cstdint>
+#include <mutex>
 
-#include "mongo/db/time_proof_service.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/logical_time.h"
+#include "mongo/db/time_proof_service.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

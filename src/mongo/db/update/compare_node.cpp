@@ -27,11 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/update/compare_node.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/update/compare_node.h"
 
 namespace mongo {
 

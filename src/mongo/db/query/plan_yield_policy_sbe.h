@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 

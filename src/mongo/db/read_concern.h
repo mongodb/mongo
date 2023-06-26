@@ -29,18 +29,22 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/database_name.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
 
 class BSONObj;
+
 class OperationContext;
 class Status;
 template <typename T>
 class StatusWith;
+
 enum class PrepareConflictBehavior;
 class StringData;
+
 namespace repl {
 class ReadConcernArgs;
 class SpeculativeMajorityReadInfo;

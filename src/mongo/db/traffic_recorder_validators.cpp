@@ -31,6 +31,9 @@
 
 #include <boost/filesystem/operations.hpp>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

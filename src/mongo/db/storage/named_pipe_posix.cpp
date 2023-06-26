@@ -29,18 +29,22 @@
 
 #ifndef _WIN32
 
-#include "mongo/db/storage/named_pipe.h"
-
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <fmt/format.h>
+#include <fstream>  // IWYU pragma: keep
 #include <string>
 #include <sys/stat.h>
-#include <sys/types.h>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/storage/io_error_message.h"
+#include "mongo/db/storage/named_pipe.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/assert_util.h"
 

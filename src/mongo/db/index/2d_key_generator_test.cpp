@@ -29,13 +29,11 @@
 
 
 #include <algorithm>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 #include <memory>
 #include <ostream>
 #include <string>
-#include <utility>
-
-#include <boost/container/flat_set.hpp>
-#include <boost/container/vector.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

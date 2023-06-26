@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/background.h"

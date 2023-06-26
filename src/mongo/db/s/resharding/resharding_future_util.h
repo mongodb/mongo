@@ -29,9 +29,16 @@
 
 #pragma once
 
+#include <utility>
 #include <vector>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/future.h"

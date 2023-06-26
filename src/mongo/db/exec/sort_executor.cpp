@@ -32,7 +32,6 @@
 
 #include "mongo/db/exec/sort_executor.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/logv2/log_attr.h"
 #include "mongo/platform/atomic_word.h"
 
 namespace mongo {

@@ -29,12 +29,22 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/config/configsvr_coordinator_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/concurrency/thread_pool.h"
 
 namespace mongo {
 
 class ConfigsvrCoordinator;
+
 class ConfigsvrCoordinatorService final : public repl::PrimaryOnlyService {
 public:
     static constexpr StringData kServiceName = "ConfigsvrCoordinatorService"_sd;

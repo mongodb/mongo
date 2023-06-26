@@ -27,12 +27,29 @@
  *    it in the license file.
  */
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

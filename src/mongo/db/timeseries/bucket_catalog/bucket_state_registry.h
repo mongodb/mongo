@@ -29,10 +29,24 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <string>
+#include <variant>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

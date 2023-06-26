@@ -29,19 +29,27 @@
 
 #pragma once
 
+#include <memory>
 #include <s2cellunion.h>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/index_scan.h"
 #include "mongo/db/exec/near.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/hash.h"
 #include "mongo/db/geo/r2_region_coverer.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index/s2_common.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_geo.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_executor.h"
 
 
 namespace mongo {

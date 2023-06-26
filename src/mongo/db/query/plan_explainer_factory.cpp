@@ -27,15 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/query/plan_explainer_factory.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_explainer_impl.h"
 #include "mongo/db/query/plan_explainer_sbe.h"
-#include "mongo/util/duration.h"
-#include <ratio>
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::plan_explainer_factory {
 std::unique_ptr<PlanExplainer> make(PlanStage* root) {

@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {

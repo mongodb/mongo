@@ -28,14 +28,22 @@
  */
 
 
-#include <boost/optional.hpp>
 #include <s2cellid.h>
 #include <s2cellunion.h>
 #include <s2regioncoverer.h>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <s2latlng.h>
+#include <s2latlngrect.h>
+
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/geo/geoparser.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/timeseries/timeseries_constants.h"

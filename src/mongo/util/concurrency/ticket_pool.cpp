@@ -31,16 +31,22 @@
 
 #include "ticket_pool.h"
 
+#ifndef _WIN32
 // TODO SERVER-72616: Remove futex usage from this class in favour of atomic waits.
 #include <linux/futex.h> /* Definition of FUTEX_* constants */
 #include <sys/syscall.h> /* Definition of SYS_* constants */
-#include <unistd.h>
+#endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/errno_util.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 namespace mongo {
 namespace {

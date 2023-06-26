@@ -29,7 +29,11 @@
 
 #pragma once
 
+#include "mongo/db/client.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

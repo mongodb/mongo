@@ -29,6 +29,20 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
 
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo::timeseries::bucket_catalog {
 
 namespace {

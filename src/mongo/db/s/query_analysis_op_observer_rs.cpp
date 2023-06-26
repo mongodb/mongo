@@ -27,10 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/query_analysis_op_observer_rs.h"
-#include "mongo/logv2/log.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

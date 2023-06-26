@@ -28,16 +28,27 @@
  */
 
 #pragma once
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <functional>
+#include <ostream>
+#include <string>
+#include <vector>
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/util/assert_util.h"
-#include <boost/optional.hpp>
-#include <string>
 
 namespace mongo {
 namespace {

@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <limits>
 
 #include "mongo/db/field_parser.h"
 

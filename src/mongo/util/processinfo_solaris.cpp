@@ -34,21 +34,28 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <string>
+#include <vector>
+
+#ifndef _WIN32
 #include <malloc.h>
 #include <procfs.h>
-#include <string>
 #include <sys/lgrp_user.h>
 #include <sys/mman.h>
 #include <sys/systeminfo.h>
 #include <sys/utsname.h>
-#include <unistd.h>
-#include <vector>
+#endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/file.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

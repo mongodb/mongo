@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/namespace_string.h"
 
-#include <ostream>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/server_options.h"
-#include "mongo/util/str.h"
+// IWYU pragma: no_include "mongo/db/namespace_string_reserved.def.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {

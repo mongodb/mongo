@@ -29,9 +29,11 @@
 
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/write_block_bypass.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace rpc {

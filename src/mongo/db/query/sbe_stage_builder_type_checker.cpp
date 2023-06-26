@@ -29,9 +29,19 @@
 
 #include "mongo/db/query/sbe_stage_builder_type_checker.h"
 
-#include <stack>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder {
 

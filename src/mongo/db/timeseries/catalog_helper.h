@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 
 namespace mongo {

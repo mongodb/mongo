@@ -27,16 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <mutex>
 
-#include "mongo/db/vector_clock.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/client.h"
 #include "mongo/db/logical_time_validator.h"
-#include "mongo/db/vector_clock_document_gen.h"
+#include "mongo/db/signed_logical_time.h"
+#include "mongo/db/time_proof_service.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_gen.h"
-#include "mongo/util/static_immortal.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {

@@ -29,8 +29,16 @@
 
 #pragma once
 
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace keys_collection_util {

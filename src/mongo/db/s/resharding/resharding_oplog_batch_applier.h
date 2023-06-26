@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/s/resharding/resharding_oplog_batch_preparer.h"
 #include "mongo/executor/task_executor.h"
@@ -38,6 +40,7 @@
 namespace mongo {
 
 class ReshardingOplogApplicationRules;
+
 class ReshardingOplogSessionApplication;
 
 /**

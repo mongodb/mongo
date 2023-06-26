@@ -29,7 +29,14 @@
 
 #include "mongo/db/tenant_id.h"
 
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

@@ -31,6 +31,7 @@
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/sort_pattern.h"
 
 namespace mongo {
 /**

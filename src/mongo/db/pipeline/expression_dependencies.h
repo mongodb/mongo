@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include <set>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/variables.h"
 
 namespace mongo::expression {
 

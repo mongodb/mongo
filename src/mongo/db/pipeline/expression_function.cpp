@@ -29,6 +29,19 @@
 
 #include "mongo/db/pipeline/expression_function.h"
 
+#include <memory>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/pipeline/javascript_execution.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 
 REGISTER_STABLE_EXPRESSION(function, ExpressionFunction::parse);

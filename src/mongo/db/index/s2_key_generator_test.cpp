@@ -28,13 +28,11 @@
  */
 
 #include <algorithm>
-#include <ostream>
-#include <string>
-#include <utility>
-
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
+#include <ostream>
+#include <string>
 #include <util/math/mathutil.h>
 
 #include "mongo/base/string_data.h"

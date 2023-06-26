@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <functional>
 #include <string>
 #include <vector>
@@ -36,12 +38,16 @@
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/s/sharding_index_catalog_cache.h"

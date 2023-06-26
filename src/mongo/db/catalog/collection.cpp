@@ -29,9 +29,9 @@
 
 #include "mongo/db/catalog/collection.h"
 
-#include <sstream>
-
-#include "mongo/logv2/log.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

@@ -33,11 +33,20 @@
  * copy a database (export/import basically)
  */
 
+#include <list>
+#include <memory>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_base.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 

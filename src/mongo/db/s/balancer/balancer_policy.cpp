@@ -28,19 +28,40 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/balancer/balancer_policy.h"
-
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <ctime>
+#include <fmt/format.h>
+#include <limits>
+#include <memory>
 #include <random>
+#include <type_traits>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/balancer_configuration.h"
-#include "mongo/s/catalog/type_shard.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_tags.h"
-#include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

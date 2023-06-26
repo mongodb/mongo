@@ -28,12 +28,15 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <fmt/format.h>
+#include <vector>
 
 #include "mongo/db/s/global_index/global_index_metrics.h"
-#include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

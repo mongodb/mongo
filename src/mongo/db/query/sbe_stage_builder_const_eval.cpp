@@ -28,9 +28,22 @@
  */
 
 #include "mongo/db/query/sbe_stage_builder_const_eval.h"
+
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::stage_builder {
 bool ExpressionConstEval::optimize(optimizer::ABT& n) {

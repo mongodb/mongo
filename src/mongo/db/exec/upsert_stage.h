@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/shard_role.h"
 
 namespace mongo {
 

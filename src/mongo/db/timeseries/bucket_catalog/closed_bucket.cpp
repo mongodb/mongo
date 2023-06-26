@@ -28,7 +28,16 @@
  */
 
 #include "mongo/db/timeseries/bucket_catalog/closed_bucket.h"
+
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

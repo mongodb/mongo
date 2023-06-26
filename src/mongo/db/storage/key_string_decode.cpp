@@ -27,15 +27,34 @@
  *    it in the license file.
  */
 
+#include <cstdlib>
+#include <exception>
 #include <iostream>
 #include <string>
+#include <vector>
 
 #include "key_format.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/hex.h"
 #include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

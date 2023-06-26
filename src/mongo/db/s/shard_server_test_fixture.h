@@ -29,9 +29,19 @@
 
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "mongo/bson/oid.h"
+#include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
 #include "mongo/s/catalog_cache_mock.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

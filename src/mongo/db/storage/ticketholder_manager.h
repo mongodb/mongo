@@ -29,10 +29,17 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/ticketholder_monitor.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {

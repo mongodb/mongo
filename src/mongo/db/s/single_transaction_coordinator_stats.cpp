@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/s/single_transaction_coordinator_stats.h"
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/s/single_transaction_coordinator_stats.h"
 #include "mongo/util/net/socket_utils.h"
 
 namespace mongo {

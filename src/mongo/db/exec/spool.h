@@ -31,7 +31,9 @@
 #pragma once
 
 #include <deque>
+#include <exception>
 #include <memory>
+#include <system_error>
 #include <vector>
 
 #include "mongo/db/exec/plan_stage.h"
@@ -43,6 +45,7 @@
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/db/sorter/sorter_stats.h"
+#include "mongo/logv2/log_attr.h"
 
 namespace mongo {
 

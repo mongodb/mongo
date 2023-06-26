@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/index_bounds.h"

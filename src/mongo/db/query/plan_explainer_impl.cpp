@@ -28,10 +28,23 @@
  */
 
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
+#include <set>
+#include <utility>
+#include <variant>
 
-#include "mongo/db/query/plan_explainer_impl.h"
-
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/count_scan.h"
@@ -43,15 +56,18 @@
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/subplan.h"
 #include "mongo/db/exec/text_match.h"
-#include "mongo/db/exec/trial_stage.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/keypattern.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats_visitor.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

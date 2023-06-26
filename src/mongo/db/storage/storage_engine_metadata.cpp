@@ -28,33 +28,46 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/storage_engine_metadata.h"
-
-#include <boost/filesystem.hpp>
-#include <boost/optional.hpp>
-#include <cstdio>
-#include <fstream>
-#include <limits>
-#include <ostream>
+#include <boost/filesystem/operations.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cerrno>
+#include <cstdint>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
+#include <system_error>
 #include <vector>
 
 #ifdef __linux__  // Only needed by flushDirectory for Linux
 #include <boost/filesystem/path.hpp>
 #include <fcntl.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 #endif
 
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/storage/storage_engine_metadata.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

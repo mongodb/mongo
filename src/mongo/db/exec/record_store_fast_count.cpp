@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/record_store_fast_count.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 
