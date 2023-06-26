@@ -89,7 +89,7 @@ extern FailPoint maxTimeNeverTimeOut;
  * (RecoveryUnitState) to reduce complexity and duplication in the storage-engine specific
  * RecoveryUnit and to allow better invariant checking.
  */
-class OperationContext : public Interruptible, public Decorable<OperationContext> {
+class OperationContext final : public Interruptible, public Decorable<OperationContext> {
     OperationContext(const OperationContext&) = delete;
     OperationContext& operator=(const OperationContext&) = delete;
 

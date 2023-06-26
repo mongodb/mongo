@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/shell/mongo_main.h"
@@ -53,7 +52,6 @@
 #include "mongo/config.h"
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
@@ -717,9 +715,8 @@ int mongo_main(int argc, char* argv[]) {
         mongo::shell_utils::RecordMyLocation(argv[0]);
 
         mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
-        auto serviceContextHolder = ServiceContext::make();
-        serviceContextHolder->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-        setGlobalServiceContext(std::move(serviceContextHolder));
+        setGlobalServiceContext(ServiceContext::make());
+
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();
 

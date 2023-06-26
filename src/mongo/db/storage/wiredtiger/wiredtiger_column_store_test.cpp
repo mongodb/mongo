@@ -27,11 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/base/init.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/index/index_descriptor.h"
@@ -47,8 +42,6 @@
 
 namespace mongo {
 namespace {
-
-using std::string;
 
 TEST(WiredTigerColumnStoreTest, MakeKey) {
     std::string out = WiredTigerColumnStore::makeKey_ForTest("a.b", 66 /* RowId */);

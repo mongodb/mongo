@@ -27,25 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/record_store_test_harness.h"
-
-
-#include "mongo/db/storage/record_store.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
 
-using std::string;
-using std::stringstream;
-using std::unique_ptr;
-
 // Verify that a nonempty collection maybe takes up some space on disk.
 TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
     const auto harnessHelper(newRecordStoreHarnessHelper());
-    unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
+    std::unique_ptr<RecordStore> rs(harnessHelper->newRecordStore());
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -56,9 +48,9 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
     for (int i = 0; i < nToInsert; i++) {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
         {
-            stringstream ss;
+            std::stringstream ss;
             ss << "record " << i;
-            string data = ss.str();
+            std::string data = ss.str();
 
             WriteUnitOfWork uow(opCtx.get());
             StatusWith<RecordId> res =
@@ -75,6 +67,7 @@ TEST(RecordStoreTestHarness, StorageSizeNonEmpty) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT(rs->storageSize(opCtx.get(), nullptr) >= 0);
     }
 }

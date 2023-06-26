@@ -42,6 +42,7 @@
 
 namespace mongo {
 namespace {
+
 class ResourceCatalogTest : public unittest::Test {
 public:
     void setUp() {
@@ -167,5 +168,6 @@ DEATH_TEST_F(ResourceCatalogTest, AddDatabaseInvalidResourceType, "invariant") {
 DEATH_TEST_F(ResourceCatalogTest, AddCollectionInvalidResourceType, "invariant") {
     catalog.add({RESOURCE_GLOBAL, 0}, NamespaceString::createNamespaceString_forTest("db.coll"));
 }
+
 }  // namespace
 }  // namespace mongo

@@ -129,13 +129,6 @@ void insertToIndex(OperationContext* opCtx,
                    SortedDataInterface* index,
                    std::initializer_list<IndexKeyEntry> toInsert);
 
-inline void insertToIndex(HarnessHelper* harness,
-                          SortedDataInterface* index,
-                          std::initializer_list<IndexKeyEntry> toInsert) {
-    auto client = harness->serviceContext()->makeClient("insertToIndex");
-    insertToIndex(harness->newOperationContext(client.get()).get(), index, toInsert);
-}
-
 /**
  * Removes all entries in toRemove from index.
  * Always uses dupsAllowed=true.

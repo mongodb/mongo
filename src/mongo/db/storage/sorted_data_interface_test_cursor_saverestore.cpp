@@ -27,15 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-
-#include <limits>
-#include <memory>
-
-#include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 namespace {
@@ -50,12 +43,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -67,11 +62,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursor) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
         for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
@@ -98,12 +95,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithEndPositio
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -115,11 +114,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithEndPositio
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         cursor->setEndPosition(BSON("" << std::numeric_limits<double>::infinity()), true);
 
@@ -148,12 +149,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -165,11 +168,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -197,12 +202,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -214,11 +221,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorOnIdIndex) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -246,12 +255,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIn
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -263,11 +274,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorReversedOnIdIn
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -297,12 +310,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             RecordId loc(42, i * 2);
@@ -314,11 +329,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         int i = 0;
         for (auto entry = cursor->seek(makeKeyStringForSeek(sorted.get(), BSONObj(), true, true));
@@ -346,12 +363,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             RecordId loc(42, i * 2);
@@ -363,11 +382,13 @@ TEST(SortedDataInterface, SaveAndRestorePositionWhileIterateCursorWithDupKeysRev
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         int i = nToInsert - 1;
@@ -395,11 +416,13 @@ TEST(SortedDataInterface, SavePositionWithoutRestore) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), false));
@@ -409,11 +432,13 @@ TEST(SortedDataInterface, SavePositionWithoutRestore) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(sorted->newCursor(opCtx.get()));
         cursor->save();
     }
@@ -428,11 +453,13 @@ TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             ASSERT_OK(sorted->insert(opCtx.get(), makeKeyString(sorted.get(), key1, loc1), true));
@@ -442,11 +469,13 @@ TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         const std::unique_ptr<SortedDataInterface::Cursor> cursor(
             sorted->newCursor(opCtx.get(), false));
         cursor->save();
@@ -457,13 +486,15 @@ TEST(SortedDataInterface, SavePositionWithoutRestoreReversed) {
 // while saved.
 void testSaveAndRestorePositionSeesNewInserts(bool forward, bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
     const auto seekPoint = forward ? key1 : key3;
@@ -494,13 +525,15 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInserts_Reverse_Standard)
 // inserted while saved and the current position removed.
 void testSaveAndRestorePositionSeesNewInsertsAfterRemove(bool forward, bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
     const auto seekPoint = forward ? key1 : key3;
@@ -537,12 +570,14 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterRemove_Revers
 // cursor EOF.
 void testSaveAndRestorePositionSeesNewInsertsAfterEOF(bool forward, bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique=*/false,
                                                         /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), forward);
 
@@ -579,7 +614,6 @@ TEST(SortedDataInterface, SaveAndRestorePositionSeesNewInsertsAfterEOF_Reverse_S
 // Make sure we restore to a RecordId at or ahead of save point if same key.
 TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ false,
                                                         /*partial=*/false,
                                                         {
@@ -587,6 +621,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_F
                                                             {key2, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -622,11 +659,17 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_F
 // Test that cursors over unique indices will never return the same key twice.
 TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Forward) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ true,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key1, loc1},
+                                                            {key2, loc2},
+                                                            {key3, loc2},
+                                                            {key4, loc2},
+                                                        });
+
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        /*unique*/ true,
-        /*partial=*/false,
-        {{key1, loc1}, {key2, loc2}, {key3, loc2}, {key4, loc2}});
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
 
@@ -665,7 +708,6 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_For
 // Make sure we restore to a RecordId at or ahead of save point if same key on reverse cursor.
 TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_Reverse) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ false,
                                                         /*partial=*/false,
                                                         {
@@ -673,6 +715,9 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_R
                                                             {key1, loc1},
                                                             {key2, loc2},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -708,11 +753,17 @@ TEST(SortedDataInterface, SaveAndRestorePositionStandardIndexConsidersRecordId_R
 // Test that reverse cursors over unique indices will never return the same key twice.
 TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Reverse) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+    auto sorted = harnessHelper->newSortedDataInterface(/*unique*/ true,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key1, loc1},
+                                                            {key2, loc1},
+                                                            {key3, loc1},
+                                                            {key4, loc2},
+                                                        });
+
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        /*unique*/ true,
-        /*partial=*/false,
-        {{key1, loc1}, {key2, loc1}, {key3, loc1}, {key4, loc2}});
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
 
@@ -751,7 +802,6 @@ TEST(SortedDataInterface, SaveAndRestorePositionUniqueIndexWontReturnDupKeys_Rev
 // Ensure that SaveUnpositioned allows later use of the cursor.
 TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(/*unique=*/false,
                                                         /*partial=*/false,
                                                         {
@@ -759,6 +809,9 @@ TEST(SortedDataInterface, SaveUnpositionedAndRestore) {
                                                             {key2, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
 

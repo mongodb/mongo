@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
-
-#include <memory>
-
-#include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {
@@ -39,7 +36,6 @@ namespace {
 // Tests setEndPosition with next().
 void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -49,6 +45,9 @@ void testSetEndPosition_Next_Forward(bool unique, bool inclusive) {
                                                             {key4, loc1},
                                                             {key5, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     // Dup key on end point. Illegal for unique indexes.
     if (!unique)
@@ -84,7 +83,6 @@ TEST(SortedDataInterface, SetEndPosition_Next_Forward_Standard_Exclusive) {
 
 void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -94,6 +92,9 @@ void testSetEndPosition_Next_Reverse(bool unique, bool inclusive) {
                                                             {key4, loc1},
                                                             {key5, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     // Dup key on end point. Illegal for unique indexes.
     if (!unique)
@@ -130,7 +131,6 @@ TEST(SortedDataInterface, SetEndPosition_Next_Reverse_Standard_Exclusive) {
 // Tests setEndPosition with seek().
 void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -139,6 +139,9 @@ void testSetEndPosition_Seek_Forward(bool unique, bool inclusive) {
                                                             {key3, loc1},
                                                             {key4, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key3, inclusive);
@@ -177,7 +180,6 @@ TEST(SortedDataInterface, SetEndPosition_Seek_Forward_Standard_Exclusive) {
 
 void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -186,6 +188,9 @@ void testSetEndPosition_Seek_Reverse(bool unique, bool inclusive) {
                                                             // No key3
                                                             {key4, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key2, inclusive);
@@ -226,7 +231,6 @@ TEST(SortedDataInterface, SetEndPosition_Seek_Reverse_Standard_Exclusive) {
 // Test that restore never lands on the wrong side of the endPosition.
 void testSetEndPosition_Restore_Forward(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -235,6 +239,9 @@ void testSetEndPosition_Restore_Forward(bool unique) {
                                                             {key3, loc1},
                                                             {key4, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key3, false);  // Should never see key3 or key4.
@@ -267,7 +274,6 @@ TEST(SortedDataInterface, SetEndPosition_Restore_Forward_Standard) {
 
 void testSetEndPosition_Restore_Reverse(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -276,6 +282,9 @@ void testSetEndPosition_Restore_Reverse(bool unique) {
                                                             {key3, loc1},
                                                             {key4, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key2, false);  // Should never see key1 or key2.
@@ -313,13 +322,15 @@ TEST(SortedDataInterface, SetEndPosition_Restore_Reverse_Standard) {
 // restore end cursors would tend to fail this test.
 void testSetEndPosition_RestoreEndCursor_Forward(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             {key4, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key2, true);
@@ -351,13 +362,15 @@ TEST(SortedDataInterface, SetEndPosition_RestoreEndCursor_Forward_Standard) {
 
 void testSetEndPosition_RestoreEndCursor_Reverse(bool unique) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
                                                             {key1, loc1},
                                                             {key4, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(key3, true);
@@ -390,7 +403,6 @@ TEST(SortedDataInterface, SetEndPosition_RestoreEndCursor_Reverse_Unique) {
 // inclusive flag or direction.
 void testSetEndPosition_Empty_Forward(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -398,6 +410,9 @@ void testSetEndPosition_Empty_Forward(bool unique, bool inclusive) {
                                                             {key2, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(BSONObj(), inclusive);
@@ -423,7 +438,6 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Forward_Standard_Exclusive) {
 
 void testSetEndPosition_Empty_Reverse(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
-    auto opCtx = harnessHelper->newOperationContext();
     auto sorted = harnessHelper->newSortedDataInterface(unique,
                                                         /*partial=*/false,
                                                         {
@@ -431,6 +445,9 @@ void testSetEndPosition_Empty_Reverse(bool unique, bool inclusive) {
                                                             {key2, loc1},
                                                             {key3, loc1},
                                                         });
+
+    auto opCtx = harnessHelper->newOperationContext();
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get(), false);
     cursor->setEndPosition(BSONObj(), inclusive);
@@ -456,9 +473,15 @@ TEST(SortedDataInterface, SetEndPosition_Empty_Reverse_Standard_Exclusive) {
 
 void testSetEndPosition_Character_Limits(bool unique, bool inclusive) {
     const auto harnessHelper = newSortedDataInterfaceHarnessHelper();
+    auto sorted = harnessHelper->newSortedDataInterface(unique,
+                                                        /*partial=*/false,
+                                                        {
+                                                            {key7, loc1},
+                                                            {key8, loc1},
+                                                        });
+
     auto opCtx = harnessHelper->newOperationContext();
-    auto sorted = harnessHelper->newSortedDataInterface(
-        unique, /*partial=*/false, {{key7, loc1}, {key8, loc1}});
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
     auto cursor = sorted->newCursor(opCtx.get());
     cursor->setEndPosition(key7, inclusive);

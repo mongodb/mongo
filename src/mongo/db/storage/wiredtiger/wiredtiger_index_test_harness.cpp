@@ -31,10 +31,8 @@
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/catalog/index_catalog_entry.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/json.h"
-#include "mongo/db/operation_context_noop.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
@@ -42,7 +40,6 @@
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo {
@@ -51,9 +48,6 @@ namespace {
 class WiredTigerIndexHarnessHelper final : public SortedDataInterfaceHarnessHelper {
 public:
     WiredTigerIndexHarnessHelper() : _dbpath("wt_test"), _conn(nullptr) {
-        auto service = getServiceContext();
-        service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
         const char* config = "create,cache_size=1G,";
         int ret = wiredtiger_open(_dbpath.path().c_str(), nullptr, config, &_conn);
         invariantWTOK(ret, nullptr);
@@ -70,7 +64,8 @@ public:
     std::unique_ptr<SortedDataInterface> newIdIndexSortedDataInterface() final {
         std::string ns = "test.wt";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        OperationContextNoop opCtx(newRecoveryUnit().release());
+        auto opCtxHolder{newOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
 
         BSONObj spec = BSON("key" << BSON("_id" << 1) << "name"
                                   << "_id_"
@@ -87,10 +82,10 @@ public:
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
+        invariant(Status::OK() == WiredTigerIndex::create(opCtx, uri, result.getValue()));
 
         return std::make_unique<WiredTigerIdIndex>(
-            &opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
+            opCtx, uri, UUID::gen(), "" /* ident */, &desc, isLogged);
     }
 
     std::unique_ptr<SortedDataInterface> newSortedDataInterface(bool unique,
@@ -98,7 +93,8 @@ public:
                                                                 KeyFormat keyFormat) final {
         std::string ns = "test.wt";
         NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
-        OperationContextNoop opCtx(newRecoveryUnit().release());
+        auto opCtxHolder{newOperationContext()};
+        auto* const opCtx{opCtxHolder.get()};
 
         BSONObj spec = BSON("key" << BSON("a" << 1) << "name"
                                   << "testIndex"
@@ -121,10 +117,10 @@ public:
         ASSERT_OK(result.getStatus());
 
         std::string uri = "table:" + ns;
-        invariant(Status::OK() == WiredTigerIndex::create(&opCtx, uri, result.getValue()));
+        invariant(Status::OK() == WiredTigerIndex::create(opCtx, uri, result.getValue()));
 
         if (unique) {
-            return std::make_unique<WiredTigerIndexUnique>(&opCtx,
+            return std::make_unique<WiredTigerIndexUnique>(opCtx,
                                                            uri,
                                                            UUID::gen(),
                                                            "" /* ident */,
@@ -132,7 +128,7 @@ public:
                                                            &desc,
                                                            WiredTigerUtil::useTableLogging(nss));
         }
-        return std::make_unique<WiredTigerIndexStandard>(&opCtx,
+        return std::make_unique<WiredTigerIndexStandard>(opCtx,
                                                          uri,
                                                          UUID::gen(),
                                                          "" /* ident */,

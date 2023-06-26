@@ -144,7 +144,7 @@ private:
 };
 
 
-class DConcurrencyTestFixture : public ServiceContextMongoDTest {
+class DConcurrencyTestFixture : public ServiceContextTest {
 public:
     /**
      * Returns a vector of Clients of length 'k', each of which has an OperationContext with its

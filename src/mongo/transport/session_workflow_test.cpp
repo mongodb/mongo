@@ -205,13 +205,13 @@ private:
     std::unique_ptr<BasicExpectation> _cb;
 };
 
-/** Fixture that mocks interactions with a `SessionWorkflow`. */
-class SessionWorkflowTest : public LockerNoopServiceContextTest {
-    using Base = LockerNoopServiceContextTest;
-
+/**
+ * Fixture that mocks interactions with a `SessionWorkflow`.
+ */
+class SessionWorkflowTest : public ServiceContextTest {
 public:
     void setUp() override {
-        Base::setUp();
+        ServiceContextTest::setUp();
         auto sc = getServiceContext();
         sc->setServiceEntryPoint(_makeServiceEntryPoint(sc));
         initializeNewSession();
@@ -221,7 +221,7 @@ public:
 
     void tearDown() override {
         ScopeGuard guard = [&] {
-            Base::tearDown();
+            ServiceContextTest::tearDown();
         };
         // Normal shutdown is a noop outside of ASAN.
         invariant(sep()->shutdownAndWait(Seconds{10}));
