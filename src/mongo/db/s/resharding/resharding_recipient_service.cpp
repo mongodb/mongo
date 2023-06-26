@@ -824,7 +824,7 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                    auto buildUUID = UUID::gen();
                    IndexBuildsCoordinator::IndexBuildOptions indexBuildOptions{
                        CommitQuorumOptions(CommitQuorumOptions::kVotingMembers)};
-                   return uassertStatusOK(indexBuildsCoordinator->startIndexBuild(
+                   auto indexBuildFuture = indexBuildsCoordinator->startIndexBuild(
                        opCtx.get(),
                        _metadata.getTempReshardingNss().dbName(),
                        // When we create the collection we use the metadata resharding UUID as the
@@ -833,7 +833,20 @@ ReshardingRecipientService::RecipientStateMachine::_buildIndexThenTransitionToAp
                        indexSpecs,
                        buildUUID,
                        IndexBuildProtocol::kTwoPhase,
-                       indexBuildOptions));
+                       indexBuildOptions);
+                   if (indexBuildFuture.isOK()) {
+                       return indexBuildFuture.getValue();
+                   } else if (indexBuildFuture == ErrorCodes::IndexBuildAlreadyInProgress ||
+                              indexBuildFuture == ErrorCodes::IndexAlreadyExists) {
+                       // In case of failover, the index build could have been started by oplog
+                       // applier, so we just wait those finish.
+                       indexBuildsCoordinator->awaitNoIndexBuildInProgressForCollection(
+                           opCtx.get(), _metadata.getReshardingUUID());
+                       return SharedSemiFuture<ReplIndexBuildState::IndexCatalogStats>(
+                           ReplIndexBuildState::IndexCatalogStats());
+                   } else {
+                       return uassertStatusOK(indexBuildFuture);
+                   }
                }(),
                abortToken)
         .thenRunOn(**executor)
