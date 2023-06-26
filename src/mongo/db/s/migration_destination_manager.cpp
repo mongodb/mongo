@@ -296,6 +296,7 @@ MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep3);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep4);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep5);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep6);
+MONGO_FAIL_POINT_DEFINE(migrateThreadHangAfterSteadyTransition);
 MONGO_FAIL_POINT_DEFINE(migrateThreadHangAtStep7);
 
 MONGO_FAIL_POINT_DEFINE(failMigrationOnRecipient);
@@ -1486,6 +1487,7 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
         {
             // 6. Wait for commit
             _setState(kSteady);
+            migrateThreadHangAfterSteadyTransition.pauseWhileSet();
 
             bool transferAfterCommit = false;
             while (getState() == kSteady || getState() == kCommitStart) {
@@ -1513,7 +1515,8 @@ void MigrationDestinationManager::_migrateDriver(OperationContext* outerOpCtx,
 
                 auto mods = res.response;
 
-                if (mods["size"].number() > 0 && _applyMigrateOp(opCtx, mods)) {
+                if (mods["size"].number() > 0) {
+                    (void)_applyMigrateOp(opCtx, mods);
                     lastOpApplied = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
                     continue;
                 }
