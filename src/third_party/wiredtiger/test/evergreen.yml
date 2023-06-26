@@ -2853,8 +2853,8 @@ tasks:
             fi
 
   - name: format-stress-sanitizer-lsm-test
-    # Temporarily disabled (WT-6255)
-    # tags: ["stress-test-1"]
+    # FIXME-WT-6258: Re-enable the test once the outstanding issues with LSM are resolved.
+    # tags: ["stress-test"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger address sanitizer"
@@ -2929,28 +2929,28 @@ tasks:
     tags: ["stress-test-ppc-2"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-1
-    tags: ["stress-test-sanitizer-1"]
+    tags: ["stress-test-sanitizer"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-2
-    tags: ["stress-test-sanitizer-2"]
+    tags: ["stress-test-sanitizer"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-3
-    tags: ["stress-test-3"]
+    tags: ["stress-test-sanitizer"]
   - <<: *format-stress-sanitizer-test
     name: format-stress-sanitizer-test-4
-    tags: ["stress-test-4"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-1
-    tags: ["stress-test-1"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-2
-    tags: ["stress-test-2"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-3
-    tags: ["stress-test-3"]
+    tags: ["stress-test-sanitizer"]
   - <<: *race-condition-stress-sanitizer-test
     name: race-condition-stress-sanitizer-test-4
-    tags: ["stress-test-4"]
+    tags: ["stress-test-sanitizer"]
   - <<: *recovery-stress-test
     name: recovery-stress-test-1
     tags: ["stress-test-1", "stress-test-zseries-1"]
@@ -3924,7 +3924,7 @@ buildvariants:
 - name: ubuntu2004-stress-tests
   display_name: Ubuntu 20.04 Stress tests
   run_on:
-  - ubuntu2004-test
+  - ubuntu2004-small
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: PATH=/opt/mongodbtoolchain/v3/bin:$PATH make
@@ -3950,6 +3950,9 @@ buildvariants:
     - name: ".stress-test-2"
     - name: ".stress-test-3"
     - name: ".stress-test-4"
+    - name: ".stress-test-sanitizer"
+      run_on:
+      - ubuntu2004-medium
     - name: format-abort-recovery-stress-test
 
 - name: large-scale-tests
