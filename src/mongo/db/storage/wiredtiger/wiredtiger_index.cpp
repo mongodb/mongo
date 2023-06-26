@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/db/storage/wiredtiger/wiredtiger_index.h"
 
 #include "mongo/base/string_data.h"
@@ -45,7 +44,6 @@
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 #define TRACING_ENABLED 0
 
@@ -359,7 +357,6 @@ IndexValidateResults WiredTigerIndex::validate(OperationContext* opCtx, bool ful
     dassert(opCtx->lockState()->isReadLocked());
 
     IndexValidateResults results;
-
     WiredTigerUtil::validateTableLogging(opCtx,
                                          _uri,
                                          _isLogged,

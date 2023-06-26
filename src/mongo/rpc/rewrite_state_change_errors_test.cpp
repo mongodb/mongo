@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/rpc/rewrite_state_change_errors.h"
-
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/unittest/unittest.h"
 
@@ -46,7 +44,6 @@ class RewriteStateChangeErrorsTest : public unittest::Test {
 public:
     RewriteStateChangeErrorsTest() {
         sc = ServiceContext::make();
-        sc->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
         cc = sc->makeClient("test", nullptr);
         opCtx = sc->makeOperationContext(cc.get());
     }

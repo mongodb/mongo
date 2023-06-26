@@ -41,7 +41,7 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/resharding/common_types_gen.h"
@@ -49,14 +49,11 @@
 #include "mongo/util/future.h"
 
 namespace mongo {
-
 namespace executor {
 
 class TaskExecutor;
 
 }  // namespace executor
-
-class OperationContext;
 
 /**
  * Transfer config.transaction information from a given source shard to this shard.

@@ -39,6 +39,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
@@ -46,7 +47,6 @@
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"
-
 
 namespace mongo {
 namespace {
@@ -66,6 +66,7 @@ struct Fixture {
           harness(newSortedDataInterfaceHarnessHelper()),
           sorted(harness->newSortedDataInterface(uniqueness == kUnique, /*partial*/ false)),
           opCtx(harness->newOperationContext()),
+          globalLock(opCtx.get(), MODE_X),
           cursor(sorted->newCursor(opCtx.get(), direction == kForward)),
           firstKey(makeKeyStringForSeek(sorted.get(),
                                         BSON("" << (direction == kForward ? 1 : nToInsert)),
@@ -89,6 +90,7 @@ struct Fixture {
     std::unique_ptr<SortedDataInterfaceHarnessHelper> harness;
     std::unique_ptr<SortedDataInterface> sorted;
     ServiceContext::UniqueOperationContext opCtx;
+    Lock::GlobalLock globalLock;
     std::unique_ptr<SortedDataInterface::Cursor> cursor;
     KeyString::Value firstKey;
     size_t itemsProcessed = 0;

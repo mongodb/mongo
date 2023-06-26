@@ -49,6 +49,7 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store_test_harness.h"
@@ -125,6 +126,7 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
 
@@ -141,9 +143,14 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
     }
 
     {
-        ServiceContext::UniqueOperationContext t1(harnessHelper->newOperationContext());
+        auto client1 = harnessHelper->serviceContext()->makeClient("c1");
+        auto t1 = harnessHelper->newOperationContext(client1.get());
+        Lock::GlobalLock gl1(t1.get(), MODE_IX);
+
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto t2 = harnessHelper->newOperationContext(client2.get());
+        boost::optional<Lock::GlobalLock> gl2;
+        gl2.emplace(t2.get(), MODE_IX);
 
         std::unique_ptr<WriteUnitOfWork> w1(new WriteUnitOfWork(t1.get()));
         std::unique_ptr<WriteUnitOfWork> w2(new WriteUnitOfWork(t2.get()));
@@ -159,8 +166,9 @@ TEST(WiredTigerRecordStoreTest, Isolation1) {
             rs->updateRecord(t2.get(), id1, "c", 2).transitional_ignore();
             ASSERT(0);
         } catch (WriteConflictException&) {
-            w2.reset(nullptr);
-            t2.reset(nullptr);
+            w2.reset();
+            gl2.reset();
+            t2.reset();
         }
 
         w1->commit();  // this should succeed
@@ -176,6 +184,7 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
 
@@ -192,9 +201,13 @@ TEST(WiredTigerRecordStoreTest, Isolation2) {
     }
 
     {
-        ServiceContext::UniqueOperationContext t1(harnessHelper->newOperationContext());
+        auto client1 = harnessHelper->serviceContext()->makeClient("c1");
+        auto t1 = harnessHelper->newOperationContext(client1.get());
+        Lock::GlobalLock gl1(t1.get(), MODE_IX);
+
         auto client2 = harnessHelper->serviceContext()->makeClient("c2");
         auto t2 = harnessHelper->newOperationContext(client2.get());
+        Lock::GlobalLock gl2(t2.get(), MODE_IX);
 
         // ensure we start transactions
         rs->dataFor(t1.get(), id2);
@@ -235,9 +248,9 @@ StatusWith<RecordId> insertBSON(ServiceContext::UniqueOperationContext& opCtx,
     return res;
 }
 
-RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
-                                const std::unique_ptr<RecordStore>& rs,
-                                int inc) {
+RecordId oplogOrderInsertOplog(OperationContext* opCtx,
+                               const std::unique_ptr<RecordStore>& rs,
+                               int inc) {
     Timestamp opTime = Timestamp(5, inc);
     Status status = rs->oplogDiskLocRegister(opCtx, opTime, false);
     ASSERT_OK(status);
@@ -247,8 +260,10 @@ RecordId _oplogOrderInsertOplog(OperationContext* opCtx,
     return res.getValue();
 }
 
-// Test that even when the oplog durability loop is paused, we can still advance the commit point as
-// long as the commit for each insert comes before the next insert starts.
+/**
+ * Test that even when the oplog durability loop is paused, we can still advance the commit point as
+ * long as the commit for each insert comes before the next insert starts.
+ */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
     ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
     WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
@@ -259,8 +274,9 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         WriteUnitOfWork uow(opCtx.get());
-        RecordId id = _oplogOrderInsertOplog(opCtx.get(), rs, 1);
+        RecordId id = oplogOrderInsertOplog(opCtx.get(), rs, 1);
         ASSERT(wtrs->isOpHidden_forTest(id));
         uow.commit();
         ASSERT(wtrs->isOpHidden_forTest(id));
@@ -268,16 +284,19 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityInOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         WriteUnitOfWork uow(opCtx.get());
-        RecordId id = _oplogOrderInsertOplog(opCtx.get(), rs, 2);
+        RecordId id = oplogOrderInsertOplog(opCtx.get(), rs, 2);
         ASSERT(wtrs->isOpHidden_forTest(id));
         uow.commit();
         ASSERT(wtrs->isOpHidden_forTest(id));
     }
 }
 
-// Test that Oplog entries inserted while there are hidden entries do not become visible until the
-// op and all earlier ops are durable.
+/**
+ * Test that Oplog entries inserted while there are hidden entries do not become visible until the
+ * op and all earlier ops are durable.
+ */
 TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     ON_BLOCK_EXIT([] { WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::off); });
     WTPauseOplogVisibilityUpdateLoop.setMode(FailPoint::alwaysOn);
@@ -288,8 +307,9 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
     auto wtrs = checked_cast<WiredTigerRecordStore*>(rs.get());
 
     ServiceContext::UniqueOperationContext longLivedOp(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(longLivedOp.get(), MODE_IX);
     WriteUnitOfWork uow(longLivedOp.get());
-    RecordId id1 = _oplogOrderInsertOplog(longLivedOp.get(), rs, 1);
+    RecordId id1 = oplogOrderInsertOplog(longLivedOp.get(), rs, 1);
     ASSERT(wtrs->isOpHidden_forTest(id1));
 
 
@@ -298,8 +318,9 @@ TEST(WiredTigerRecordStoreTest, OplogDurableVisibilityOutOfOrder) {
         auto innerClient = harnessHelper->serviceContext()->makeClient("inner");
         ServiceContext::UniqueOperationContext opCtx(
             harnessHelper->newOperationContext(innerClient.get()));
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_IX);
         WriteUnitOfWork uow(opCtx.get());
-        id2 = _oplogOrderInsertOplog(opCtx.get(), rs, 2);
+        id2 = oplogOrderInsertOplog(opCtx.get(), rs, 2);
         ASSERT(wtrs->isOpHidden_forTest(id2));
         uow.commit();
     }
@@ -405,7 +426,9 @@ StatusWith<RecordId> insertBSONWithSize(OperationContext* opCtx,
     return res;
 }
 
-// Insert records into an oplog and verify the number of truncate markers that are created.
+/**
+ * Insert records into an oplog and verify the number of truncate markers that are created.
+ */
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CreateNewMarker) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
@@ -417,6 +440,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CreateNewMarker) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
 
@@ -460,8 +484,10 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CreateNewMarker) {
     }
 }
 
-// Insert records into an oplog and try to update them. The updates shouldn't succeed if the size of
-// record is changed.
+/**
+ * Insert records into an oplog and try to update them. The updates shouldn't succeed if the size of
+ * record is changed.
+ */
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_UpdateRecord) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
@@ -475,6 +501,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_UpdateRecord) {
     // the truncate marker currently being filled.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 50), RecordId(1, 2));
@@ -534,8 +561,10 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_UpdateRecord) {
     }
 }
 
-// Insert multiple records and truncate the oplog using RecordStore::truncate(). The operation
-// should leave no truncate markers, including the partially filled one.
+/**
+ * Insert multiple records and truncate the oplog using RecordStore::truncate(). The operation
+ * should leave no truncate markers, including the partially filled one.
+ */
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Truncate) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
@@ -547,6 +576,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Truncate) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 50), RecordId(1, 1));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 50), RecordId(1, 2));
@@ -559,6 +589,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Truncate) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
         ASSERT_EQ(150, rs->dataSize(opCtx.get()));
@@ -575,9 +606,11 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Truncate) {
     }
 }
 
-// Insert multiple records, truncate the oplog using RecordStore::cappedTruncateAfter(), and
-// verify that the metadata for each truncate marker is updated. If a full truncate marker is
-// partially truncated, then it should become the truncate marker currently being filled.
+/**
+ * Insert multiple records, truncate the oplog using RecordStore::cappedTruncateAfter(), and verify
+ * that the metadata for each truncate marker is updated. If a full truncate marker is partially
+ * truncated, then it should become the truncate marker currently being filled.
+ */
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
@@ -589,6 +622,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 400), RecordId(1, 1));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 800), RecordId(1, 2));
@@ -610,12 +644,16 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     }
 
     // Make sure all are visible.
-    rs->waitForAllEarlierOplogWritesToBeVisible(harnessHelper->newOperationContext().get());
+    {
+        ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        rs->waitForAllEarlierOplogWritesToBeVisible(opCtx.get());
+    }
 
     // Truncate data using an inclusive RecordId that exists inside the truncate marker currently
     // being filled.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         rs->cappedTruncateAfter(opCtx.get(),
                                 RecordId(1, 8),
@@ -634,6 +672,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // The truncate marker should become the one currently being filled.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         rs->cappedTruncateAfter(opCtx.get(),
                                 RecordId(1, 6),
@@ -651,6 +690,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // being filled.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         rs->cappedTruncateAfter(opCtx.get(),
                                 RecordId(1, 3),
@@ -669,6 +709,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // The truncate marker should remain intact.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         rs->cappedTruncateAfter(opCtx.get(),
                                 RecordId(1, 2),
@@ -686,6 +727,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     // truncate marker should become the one currently being filled.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         rs->cappedTruncateAfter(opCtx.get(),
                                 RecordId(1, 1),
@@ -700,7 +742,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_CappedTruncateAfter) {
     }
 }
 
-// Verify that oplog truncate markers are reclaimed when cappedMaxSize is exceeded.
+/**
+ * Verify that oplog truncate markers are reclaimed when cappedMaxSize is exceeded.
+ */
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
@@ -717,6 +761,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 1), 100), RecordId(1, 1));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 2), 110), RecordId(1, 2));
@@ -734,8 +779,9 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // rely on).
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
-        harnessHelper->advanceStableTimestamp(Timestamp(1, 0));
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
+        harnessHelper->advanceStableTimestamp(Timestamp(1, 0));
         wtrs->reclaimOplog(opCtx.get());
 
         ASSERT_EQ(3, rs->numRecords(opCtx.get()));
@@ -748,6 +794,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // Truncate a truncate marker when cappedMaxSize is exceeded.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         harnessHelper->advanceStableTimestamp(Timestamp(1, 3));
         wtrs->reclaimOplog(opCtx.get());
@@ -761,6 +808,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 4), 130), RecordId(1, 4));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 5), 140), RecordId(1, 5));
@@ -776,6 +824,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // Truncate multiple truncate markers if necessary.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         harnessHelper->advanceStableTimestamp(Timestamp(1, 6));
         wtrs->reclaimOplog(opCtx.get());
@@ -790,6 +839,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // No-op if dataSize <= cappedMaxSize.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         harnessHelper->advanceStableTimestamp(Timestamp(1, 6));
         wtrs->reclaimOplog(opCtx.get());
@@ -805,6 +855,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // is ahead of it.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 7), 190), RecordId(1, 7));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 9), 120), RecordId(1, 9));
@@ -817,6 +868,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         harnessHelper->advanceStableTimestamp(Timestamp(1, 8));
         wtrs->reclaimOplog(opCtx.get());
@@ -831,6 +883,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // Don't truncate entire oplog.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 10), 90), RecordId(1, 10));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 11), 210),
@@ -844,6 +897,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         harnessHelper->advanceStableTimestamp(Timestamp(1, 12));
         wtrs->reclaimOplog(opCtx.get());
@@ -859,6 +913,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     // the truncate-up-to point, that have not yet created a truncate marker.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         // Use timestamp (1, 13) as we can't commit at the stable timestamp (1, 12).
         auto t = insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 13), 90);
         ASSERT_EQ(t, RecordId(1, 13));
@@ -871,6 +927,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     }
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         harnessHelper->advanceStableTimestamp(Timestamp(1, 13));
         wtrs->reclaimOplog(opCtx.get());
@@ -883,8 +940,10 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_ReclaimTruncateMarkers) {
     }
 }
 
-// Verify that an oplog truncate marker isn't created if it would cause the logical representation
-// of the records to not be in increasing order.
+/**
+ * Verify that an oplog truncate marker isn't created if it would cause the logical representation
+ * of the records to not be in increasing order.
+ */
 TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_AscendingOrder) {
     std::unique_ptr<RecordStoreHarnessHelper> harnessHelper = newRecordStoreHarnessHelper();
     std::unique_ptr<RecordStore> rs(harnessHelper->newOplogRecordStore());
@@ -896,6 +955,7 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_AscendingOrder) {
 
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         ASSERT_EQ(0U, oplogTruncateMarkers->numMarkers_forTest());
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 2), 50), RecordId(2, 2));
@@ -944,6 +1004,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     int realSizePerRecord = 100;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         for (int i = 1; i <= realNumRecords; i++) {
             ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(i, 0), realSizePerRecord),
                       RecordId(i, 0));
@@ -954,13 +1016,14 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_NoMarkersGeneratedFromScann
     auto wtKvEngine = dynamic_cast<WiredTigerKVEngine*>(harnessHelper->getEngine());
     wtKvEngine->getOplogManager()->setOplogReadTimestamp(Timestamp(realNumRecords, 0));
 
-
     // Force the estimates of 'dataSize' and 'numRecords' to be lower than the real values.
     wtrs->setNumRecords(realNumRecords - 1);
     wtrs->setDataSize((realNumRecords - 1) * realSizePerRecord);
 
     // Initialize the truncate markers.
     ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     wtrs->postConstructorInit(opCtx.get(), NamespaceString::kRsOplogNamespace);
 
     auto oplogTruncateMarkers = wtrs->oplogTruncateMarkers();
@@ -991,6 +1054,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
         // Before initializing the RecordStore, which also starts the oplog sampling process,
         // populate with a few records.
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(1, 0), 100), RecordId(1, 0));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(2, 0), 100), RecordId(2, 0));
         ASSERT_EQ(insertBSONWithSize(opCtx.get(), rs.get(), Timestamp(3, 0), 100), RecordId(3, 0));
@@ -1021,6 +1086,8 @@ TEST(WiredTigerRecordStoreTest, OplogTruncateMarkers_Duplicates) {
     {
         // Reclaiming should do nothing because the data size is still under the maximum.
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         wtHarnessHelper->advanceStableTimestamp(Timestamp(4, 0));
         wtrs->reclaimOplog(opCtx.get());
         ASSERT_EQ(truncateMarkersBefore, oplogTruncateMarkers->numMarkers_forTest());
@@ -1099,15 +1166,12 @@ void testTruncateRange(int64_t numRecordsToInsert,
     }
     ASSERT_EQ(expectedRemainingRecordIds, actualRemainingRecordIds);
 }
-
 TEST(WiredTigerRecordStoreTest, RangeTruncateTest) {
     testTruncateRange(100, 3, 50);
 }
-
 TEST(WiredTigerRecordStoreTest, RangeTruncateSameValueTest) {
     testTruncateRange(100, 3, 3);
 }
-
 DEATH_TEST(WiredTigerRecordStoreTest,
            RangeTruncateIncorrectOrderTest,
            "Start position cannot be after end position") {
@@ -1122,39 +1186,50 @@ TEST(WiredTigerRecordStoreTest, GetLatestOplogTest) {
 
     // 1) Initialize the top of oplog to "1".
     ServiceContext::UniqueOperationContext op1(harnessHelper->newOperationContext());
-    op1->recoveryUnit()->beginUnitOfWork(op1->readOnly());
-    Timestamp tsOne = Timestamp(
-        static_cast<unsigned long long>(_oplogOrderInsertOplog(op1.get(), rs, 1).getLong()));
-    op1->recoveryUnit()->commitUnitOfWork();
+    Lock::GlobalLock gl1(op1.get(), MODE_IX);
+
+    Timestamp tsOne = [&] {
+        WriteUnitOfWork op1WUOW(op1.get());
+        Timestamp tsOne = Timestamp(
+            static_cast<unsigned long long>(oplogOrderInsertOplog(op1.get(), rs, 1).getLong()));
+        op1WUOW.commit();
+        return tsOne;
+    }();
     // Asserting on a recovery unit without a snapshot.
     ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op1.get()));
 
     // 2) Open a hole at time "2".
-    op1->recoveryUnit()->beginUnitOfWork(op1->readOnly());
+    boost::optional<WriteUnitOfWork> op1WUOW(op1.get());
     // Don't save the return value because the compiler complains about unused variables.
-    _oplogOrderInsertOplog(op1.get(), rs, 2);
+    oplogOrderInsertOplog(op1.get(), rs, 2);
 
     // Store the client with an uncommitted transaction. Create a new, concurrent client.
     auto client1 = Client::releaseCurrent();
     Client::initThread("client2");
 
     ServiceContext::UniqueOperationContext op2(harnessHelper->newOperationContext());
+    boost::optional<Lock::GlobalLock> gl2;
+    gl2.emplace(op2.get(), MODE_IX);
     // Should not see uncommited write from op1.
     ASSERT_EQ(tsOne, wtrs->getLatestOplogTimestamp(op2.get()));
 
-    op2->recoveryUnit()->beginUnitOfWork(op2->readOnly());
-    Timestamp tsThree = Timestamp(
-        static_cast<unsigned long long>(_oplogOrderInsertOplog(op2.get(), rs, 3).getLong()));
-    op2->recoveryUnit()->commitUnitOfWork();
+    Timestamp tsThree = [&] {
+        WriteUnitOfWork op2WUOW(op2.get());
+        Timestamp tsThree = Timestamp(
+            static_cast<unsigned long long>(oplogOrderInsertOplog(op2.get(), rs, 3).getLong()));
+        op2WUOW.commit();
+        return tsThree;
+    }();
     // After committing, three is the top of oplog.
     ASSERT_EQ(tsThree, wtrs->getLatestOplogTimestamp(op2.get()));
 
     // Switch to client 1.
+    gl2.reset();
     op2.reset();
     auto client2 = Client::releaseCurrent();
     Client::setCurrent(std::move(client1));
 
-    op1->recoveryUnit()->commitUnitOfWork();
+    op1WUOW->commit();
     // Committing the write at timestamp "2" does not change the top of oplog result. A new query
     // with client 1 will see timestamp "3".
     ASSERT_EQ(tsThree, wtrs->getLatestOplogTimestamp(op1.get()));
@@ -1167,6 +1242,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
     RecordId rid1;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
@@ -1182,6 +1258,8 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterNext) {
     // Cursors should always ensure they are in an active transaction when next() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = rs->getCursor(opCtx.get());
@@ -1207,6 +1285,7 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
     RecordId rid1;
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         StatusWith<RecordId> res = rs->insertRecord(opCtx.get(), "a", 2, Timestamp());
@@ -1222,6 +1301,8 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
     // Cursors should always ensure they are in an active transaction when seekExact() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = rs->getCursor(opCtx.get());
@@ -1246,8 +1327,8 @@ TEST(WiredTigerRecordStoreTest, CursorInActiveTxnAfterSeek) {
 TEST(WiredTigerRecordStoreTest, ClusteredRecordStore) {
     const std::unique_ptr<RecordStoreHarnessHelper> harnessHelper(newRecordStoreHarnessHelper());
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
-    ASSERT(opCtx.get());
     const std::string ns = "testRecordStore";
     const NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
     const std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
@@ -1325,6 +1406,8 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     RecordId rid;  // This record will be deleted by two transactions.
 
     ServiceContext::UniqueOperationContext ctx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(ctx.get(), MODE_IX);
+
     {
         WriteUnitOfWork uow(ctx.get());
         rid = rs->insertRecord(ctx.get(), "a", 2, Timestamp()).getValue();
@@ -1345,6 +1428,7 @@ TEST(WiredTigerRecordStoreTest, SizeInfoAccurateAfterRollbackWithDelete) {
     stdx::thread abortedThread([&harnessHelper, &rs, &rid, aborted, deleted]() {
         auto client = harnessHelper->serviceContext()->makeClient("c1");
         auto ctx = harnessHelper->newOperationContext(client.get());
+        Lock::GlobalLock globalLock(ctx.get(), MODE_IX);
         WriteUnitOfWork txn(ctx.get());
         // Registered changes are executed in reverse order.
         rs->deleteRecord(ctx.get(), rid);

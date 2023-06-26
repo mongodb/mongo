@@ -28,12 +28,10 @@
  */
 
 #include <chrono>
-#include <memory>
 
 #include <benchmark/benchmark.h>
 
 #include "mongo/bson/bsonelement.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
@@ -271,9 +269,6 @@ public:
 
         setGlobalServiceContext(ServiceContext::make());
         auto sc = getGlobalServiceContext();
-        invariant(sc);
-        sc->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
         _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
         sc->setServiceEntryPoint(_coordinator->makeServiceEntryPoint());
         sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());

@@ -27,26 +27,27 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem/fstream.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/filesystem/path.hpp>
-#include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-#include <fmt/format.h>
 #include <ostream>
 #include <utility>
 
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include <fmt/format.h>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/locker.h"
-#include "mongo/db/concurrency/locker_noop.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
@@ -157,7 +158,6 @@ protected:
         opCtx->setRecoveryUnit(
             std::unique_ptr<RecoveryUnit>(_helper.getEngine()->newRecoveryUnit()),
             WriteUnitOfWork::RecoveryUnitState::kNotInUnitOfWork);
-        opCtx->getClient()->swapLockState(std::make_unique<LockerNoop>());
         return opCtx;
     }
 
@@ -234,6 +234,7 @@ TEST_F(WiredTigerKVEngineRepairTest, OrphanedDataFilesCanBeRecovered) {
 
 TEST_F(WiredTigerKVEngineRepairTest, UnrecoverableOrphanedDataFilesAreRebuilt) {
     auto opCtxPtr = _makeOperationContext();
+    Lock::GlobalLock globalLk(opCtxPtr.get(), MODE_X);
 
     NamespaceString nss = NamespaceString::createNamespaceString_forTest("a.b");
     std::string ident = "collection-1234";

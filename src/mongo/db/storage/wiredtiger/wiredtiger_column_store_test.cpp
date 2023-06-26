@@ -36,8 +36,6 @@
 namespace mongo {
 namespace {
 
-using std::string;
-
 TEST(WiredTigerColumnStoreTest, MakeKey) {
     std::string out = WiredTigerColumnStore::makeKey_ForTest("a.b", 66 /* RowId */);
 

@@ -28,7 +28,6 @@
  */
 
 #include <benchmark/benchmark.h>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
@@ -37,16 +36,12 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 
-#include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/str.h"
 
@@ -55,21 +50,22 @@ namespace {
 
 const int kMaxPerfThreads = 16;  // max number of threads to use for lock perf
 
-MONGO_INITIALIZER_GENERAL(DConcurrencyTestServiceContext, ("DConcurrencyTestClientObserver"), ())
-(InitializerContext* context) {
-    setGlobalServiceContext(ServiceContext::make());
-}
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "DConcurrencyTestClientObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
-
 class DConcurrencyTest : public benchmark::Fixture {
 public:
+    void SetUp(benchmark::State& state) override {
+        if (state.thread_index == 0) {
+            setGlobalServiceContext(ServiceContext::make());
+            makeKClientsWithLockers(state.threads);
+        }
+    }
+
+    void TearDown(benchmark::State& state) override {
+        if (state.thread_index == 0) {
+            clients.clear();
+            setGlobalServiceContext({});
+        }
+    }
+
     /**
      * Returns a vector of Clients of length 'k', each of which has an OperationContext with its
      * lockState set to a LockerImpl.
@@ -91,10 +87,6 @@ protected:
 };
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     static auto mtx = MONGO_MAKE_LATCH();
 
     for (auto keepRunning : state) {
@@ -103,10 +95,6 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_StdMutex)(benchmark::State& state) {
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexShared)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
@@ -115,10 +103,6 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexShared)(benchmark::State& s
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexExclusive)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     static Lock::ResourceMutex mtx("testMutex");
 
     for (auto keepRunning : state) {
@@ -127,10 +111,6 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_ResourceMutexExclusive)(benchmark::State
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IS);
@@ -138,17 +118,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentSharedLock)(benchmark::S
                                  NamespaceString::createNamespaceString_forTest("test.coll"),
                                  MODE_IS);
     }
-
-    if (state.thread_index == 0) {
-        clients.clear();
-    }
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IX);
@@ -156,17 +128,9 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionIntentExclusiveLock)(benchmark
                                  NamespaceString::createNamespaceString_forTest("test.coll"),
                                  MODE_IX);
     }
-
-    if (state.thread_index == 0) {
-        clients.clear();
-    }
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionSharedLock)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IS);
@@ -174,27 +138,15 @@ BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionSharedLock)(benchmark::State& 
                                  NamespaceString::createNamespaceString_forTest("test.coll"),
                                  MODE_S);
     }
-
-    if (state.thread_index == 0) {
-        clients.clear();
-    }
 }
 
 BENCHMARK_DEFINE_F(DConcurrencyTest, BM_CollectionExclusiveLock)(benchmark::State& state) {
-    if (state.thread_index == 0) {
-        makeKClientsWithLockers(state.threads);
-    }
-
     DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "test");
     for (auto keepRunning : state) {
         Lock::DBLock dlk(clients[state.thread_index].second.get(), dbName, MODE_IX);
         Lock::CollectionLock clk(clients[state.thread_index].second.get(),
                                  NamespaceString::createNamespaceString_forTest("test.coll"),
                                  MODE_X);
-    }
-
-    if (state.thread_index == 0) {
-        clients.clear();
     }
 }
 

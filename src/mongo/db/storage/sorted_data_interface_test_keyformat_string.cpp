@@ -38,6 +38,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
@@ -58,6 +59,8 @@ TEST(SortedDataInterface, KeyFormatStringInsertDuplicates) {
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     ASSERT(sorted->isEmpty(opCtx.get()));
 
     char buf1[12];
@@ -129,6 +132,8 @@ TEST(SortedDataInterface, KeyFormatStringUniqueInsertRemoveDuplicates) {
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/true, /*partial=*/false, KeyFormat::String));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     ASSERT(sorted->isEmpty(opCtx.get()));
 
     std::string buf1(12, 0);
@@ -213,6 +218,8 @@ TEST(SortedDataInterface, KeyFormatStringSetEndPosition) {
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     ASSERT(sorted->isEmpty(opCtx.get()));
 
     char buf1[12];
@@ -282,6 +289,8 @@ TEST(SortedDataInterface, KeyFormatStringUnindex) {
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     ASSERT(sorted->isEmpty(opCtx.get()));
 
     char buf1[12];
@@ -331,6 +340,8 @@ TEST(SortedDataInterface, KeyFormatStringUniqueUnindex) {
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/true, /*partial=*/false, KeyFormat::String));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     ASSERT(sorted->isEmpty(opCtx.get()));
 
     std::string buf1(12, 0);
@@ -383,6 +394,8 @@ TEST(SortedDataInterface, InsertReservedRecordIdStr) {
     const std::unique_ptr<SortedDataInterface> sorted(harnessHelper->newSortedDataInterface(
         /*unique=*/false, /*partial=*/false, KeyFormat::String));
     const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+    Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
     ASSERT(sorted->isEmpty(opCtx.get()));
     WriteUnitOfWork uow(opCtx.get());
     RecordId reservedLoc(record_id_helpers::reservedIdFor(
@@ -420,6 +433,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdStr) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }

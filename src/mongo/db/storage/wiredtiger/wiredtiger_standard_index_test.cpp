@@ -38,6 +38,7 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_string.h"
@@ -60,6 +61,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     // Populate data.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -76,6 +78,8 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterNext) {
     // Cursors should always ensure they are in an active transaction when next() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = sdi->newCursor(opCtx.get());
@@ -105,6 +109,7 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     // Populate data.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
 
         WriteUnitOfWork uow(opCtx.get());
         auto ks = makeKeyString(sdi.get(), BSON("" << 1), RecordId(1));
@@ -121,6 +126,8 @@ TEST(WiredTigerStandardIndexText, CursorInActiveTxnAfterSeek) {
     // Cursors should always ensure they are in an active transaction when seek() is called.
     {
         ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
+
         auto ru = WiredTigerRecoveryUnit::get(opCtx.get());
 
         auto cursor = sdi->newCursor(opCtx.get());

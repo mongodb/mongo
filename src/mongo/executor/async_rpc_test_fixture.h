@@ -26,10 +26,10 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+
 #include <memory>
 
 #include "mongo/bson/oid.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/repl/hello_gen.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/async_rpc.h"
