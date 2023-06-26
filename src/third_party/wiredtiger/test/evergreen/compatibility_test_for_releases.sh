@@ -158,7 +158,7 @@ create_configs()
     echo "cache=80" >> $file_name                   # Medium cache so there's eviction
     echo "checksum=on" >> $file_name                # WT-7851 Fix illegal checksum configuration
     echo "checkpoints=1"  >> $file_name             # Force periodic writes
-    echo "compression=snappy"  >> $file_name        # We only built with snappy, force the choice
+    echo "compression=snappy"  >> $file_name        # We only build with snappy, force the choice
     echo "data_source=table" >> $file_name
     echo "debug.cursor_reposition=0" >> $file_name  # WT-10594 - Not supported by older releases
     echo "debug.log_retention=0" >> $file_name      # WT-10434 - Not supported by older releases
@@ -172,7 +172,13 @@ create_configs()
     echo "salvage=0" >> $file_name                  # Faster runs
     echo "stress.checkpoint=0" >> $file_name        # Faster runs
     echo "timer=4" >> $file_name
-    echo "verify=1" >> $file_name                   # Faster runs
+    echo "verify=1" >> $file_name
+    # WT-8601 has not been backported to 4.2 and transactions are expected to be timestamped.
+    if [ "$branch_name" == "mongodb-4.2" ] ; then
+        echo "transaction.timestamps=1" >> $file_name # WT-7545 - Older releases can't do non-timestamp transactions
+    else
+        echo "transaction.timestamps=0" >> $file_name # WT-8601 - Timestamps do not work with logged tables
+    fi
 
     # Append older release configs for newer compatibility release test
     if [ $newer = true ]; then
@@ -180,7 +186,6 @@ create_configs()
         do
             if [ "$i" == "$branch_name" ] ; then
                 echo "transaction.isolation=snapshot" >> $file_name # WT-7545 - Older releases can't do lower isolation levels
-                echo "transaction.timestamps=1" >> $file_name       # WT-7545 - Older releases can't do non-timestamp transactions
                 break
             fi
         done
@@ -464,11 +469,25 @@ upgrade_downgrade()
     # Loop twice, that is, run format twice using each branch.
     top="$PWD"
     for am in $3; do
-        for reps in {1..2}; do
+        config=$top/$format_dir_branch2/RUNDIR.$am/CONFIG
+        for _ in {1..2}; do
+            # In order to be able to test against 4.2, we need to have timestamped transactions. Those
+            # are incompatible with implicit transactions. Adjust the config temporarily.
+            if [ "$1" == "mongodb-4.2" ] ; then
+                echo "Temporarily forcing transaction.timestamps=1 for $config"
+                cp $config $config.orig
+                echo "transaction.timestamps=1" >> $config
+                echo "transaction.implicit=0" >> $config
+            fi
             echo "$1 format running on $2 access method $am..."
             cd "$top/$format_dir_branch1"
             flags="-1Rq $(bflag $1)"
             ./t $flags -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
+            # Revert to the original config.
+            if [ "$1" == "mongodb-4.2" ] ; then
+                echo "Reverting $config to its original state"
+                mv $config.orig $config
+            fi
 
             echo "$2 format running on $2 access method $am..."
             cd "$top/$format_dir_branch2"
