@@ -1231,11 +1231,12 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAnalysis::analyzeSort(
 
     if (!solnRoot->fetched()) {
         const bool sortIsCovered = std::all_of(sortObj.begin(), sortObj.end(), [&](BSONElement e) {
-            // Note that hasField() will return 'false' in the case that this field is a string
-            // and there is a non-simple collation on the index. This will lead to encoding of
-            // the field from the document on fetch, despite having read the encoded value from
-            // the index.
-            return solnRoot->hasField(e.fieldName());
+            // If the index has the collation that the query is expecting then kCollatedProvided
+            // will be returned hence we can use the index for sorting and grouping (distinct_scan)
+            // but need to add a fetch to retrieve a proper value of the key.
+            auto fieldAvailability = solnRoot->getFieldAvailability(e.fieldName());
+            return fieldAvailability == FieldAvailability::kCollatedProvided ||
+                fieldAvailability == FieldAvailability::kFullyProvided;
         });
 
         if (!sortIsCovered) {
@@ -1299,9 +1300,13 @@ std::unique_ptr<QuerySolution> QueryPlannerAnalysis::analyzeDataAccess(
             bool fetch = false;
             for (auto&& shardKeyField : params.shardKey) {
                 auto fieldAvailability = solnRoot->getFieldAvailability(shardKeyField.fieldName());
-                if (fieldAvailability == FieldAvailability::kNotProvided) {
-                    // One of the shard key fields is not provided by an index. We need to fetch the
-                    // full documents prior to shard filtering.
+                if (fieldAvailability == FieldAvailability::kNotProvided ||
+                    fieldAvailability == FieldAvailability::kCollatedProvided) {
+                    // One of the shard key fields are not  or only a collated version are provided
+                    // by an index. We need to fetch the full documents prior to shard filtering. In
+                    // the case of kCollatedProvided the fetch is needed to get a non-ICU encoded
+                    // value from the collection. Else the IDXScan would only return non-readable
+                    // ICU encoded values.
                     fetch = true;
                     break;
                 }
