@@ -50,6 +50,7 @@
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_version_observer.h"
+#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/remote_command_request.h"
@@ -398,6 +399,10 @@ void MirrorMaestroImpl::_mirror(const std::vector<HostAndPort>& hosts,
 
         // Limit the maxTimeMS
         bob.append("maxTimeMS", params.getMaxTimeMS());
+
+        if (invocation->ns().tenantId()) {
+            invocation->ns().tenantId()->serializeToBSON("$tenant", &bob);
+        }
 
         // Indicate that this is a mirrored read.
         bob.append("mirrored", true);
