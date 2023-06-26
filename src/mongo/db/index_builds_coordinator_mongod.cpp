@@ -759,8 +759,10 @@ void IndexBuildsCoordinatorMongod::_signalPrimaryForAbortAndWaitForExternalAbort
         }
         // The promise was fullfilled before waiting.
         return;
-    } catch (const DBException& ex) {
-        if (ex.code() == ErrorCodes::IndexBuildAborted) {
+    } catch (const DBException&) {
+        // External aborts must wait for the builder thread, so we cannot be in an already aborted
+        // state.
+        if (replState->isExternalAbort()) {
             // The build was aborted, and the opCtx interrupted, before the thread checked the
             // future.
             return;

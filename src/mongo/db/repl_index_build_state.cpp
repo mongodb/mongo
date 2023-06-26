@@ -548,7 +548,7 @@ ReplIndexBuildState::TryAbortResult ReplIndexBuildState::tryAbort(OperationConte
     auto serviceContext = opCtx->getServiceContext();
     if (auto target = serviceContext->getLockedClient(*_opId)) {
         auto targetOpCtx = target->getOperationContext();
-        serviceContext->killOperation(target, targetOpCtx, ErrorCodes::IndexBuildAborted);
+        serviceContext->killOperation(target, targetOpCtx);
     }
 
     // Set the signal. Because we have already interrupted the index build, it will not observe
@@ -586,9 +586,8 @@ bool ReplIndexBuildState::forceSelfAbort(OperationContext* opCtx, const Status& 
 
         LOGV2(7419400, "Forcefully aborting index build", "buildUUID"_attr = buildUUID);
 
-        // We don't pass IndexBuildAborted as the interruption error code because that would imply
-        // that we are taking responsibility for cleaning up the index build, when in fact the index
-        // builder thread is responsible.
+        // The index builder thread is responsible for cleaning up, as indicated by the
+        // kFailureCleanUp state.
         serviceContext->killOperation(target, targetOpCtx);
     }
     return true;

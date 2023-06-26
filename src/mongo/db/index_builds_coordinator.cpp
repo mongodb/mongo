@@ -2783,9 +2783,9 @@ void IndexBuildsCoordinator::_cleanUpTwoPhaseAfterNonShutdownFailure(
                 const NamespaceStringOrUUID dbAndUUID(replState->dbName, replState->collectionUUID);
                 auto replCoord = repl::ReplicationCoordinator::get(abortCtx);
                 if (!replCoord->canAcceptWritesFor(abortCtx, dbAndUUID)) {
-                    // Index builds may not fail on secondaries. If a primary replicated
-                    // an abortIndexBuild oplog entry, then this index build would have
-                    // received an IndexBuildAborted error code.
+                    // Index builds may not fail on secondaries. If a primary replicated an
+                    // abortIndexBuild oplog entry, then this index build would have been externally
+                    // aborted.
                     fassert(51101,
                             status.withContext(str::stream()
                                                << "Index build: " << replState->buildUUID
@@ -3392,14 +3392,13 @@ IndexBuildsCoordinator::CommitResult IndexBuildsCoordinator::_insertKeysFromSide
 
         // It is illegal to abort the index build at this point. Note that Interruption exceptions
         // are allowed because we cannot control them as they bypass the routine abort machinery.
-        invariant(e.code() != ErrorCodes::IndexBuildAborted);
+        invariant(!replState->isExternalAbort());
 
         // Index build commit may not fail on secondaries because it implies diverenge with data on
         // the primary. The only exception is single-phase builds started on primaries, which may
         // fail after a state transition. In this case, we have not replicated anything to
         // roll-back. With two-phase index builds, if a primary replicated an abortIndexBuild oplog
-        // entry, then this index build should have been interrupted before committing with an
-        // IndexBuildAborted error code.
+        // entry, then this index build should have been interrupted before committing.
         const bool twoPhaseAndNotPrimary =
             IndexBuildProtocol::kTwoPhase == replState->protocol && !isPrimary;
         if (twoPhaseAndNotPrimary) {
