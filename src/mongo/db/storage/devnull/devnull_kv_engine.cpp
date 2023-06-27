@@ -317,10 +317,10 @@ std::unique_ptr<RecordStore> DevNullKVEngine::getRecordStore(OperationContext* o
                                                              const CollectionOptions& options) {
     if (ident == "_mdb_catalog") {
         return std::make_unique<EphemeralForTestRecordStore>(
-            nss.ns(), options.uuid, ident, &_catalogInfo);
+            nss.ns_forTest(), options.uuid, ident, &_catalogInfo);
     }
     return std::make_unique<DevNullRecordStore>(
-        nss.ns(), options.uuid, ident, options, KeyFormat::Long);
+        nss.ns_forTest(), options.uuid, ident, options, KeyFormat::Long);
 }
 
 std::unique_ptr<RecordStore> DevNullKVEngine::makeTemporaryRecordStore(OperationContext* opCtx,
