@@ -391,6 +391,9 @@ functions:
           EOF
           fi
           tar czf mongodb${compile_variant|}.tar.gz mongodb
+          # Put all matching mongo debug from the build directory in an archive in the same location
+          # as the library archive (i.e. mongodb/bin).
+          tar czvf mongodb${compile_variant|}-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:mongodb/bin/:'
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -401,6 +404,16 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile_variant|}.tar.gz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb${compile_variant|}-debugsymbols.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}-debugsymbols.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo-debugsymbols.tgz
   ###
 
   ###
@@ -414,6 +427,9 @@ functions:
           set -o verbose
           source "${workdir}/compile_venv/bin/activate"
           python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args SPLIT_DWARF=0 archive-mongo-crypt-dev MONGO_VERSION=${version} DESTDIR=$(pwd)/crypt-lib-${version} PKGDIR=$(pwd) ${patch_compile_flags|}
+          # Put all matching mongo .debug from the build directory in an archive in the same location
+          # as the library archive (i.e. lib).
+          tar czvf mongo-crypt-dev-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:lib/:'
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -424,6 +440,16 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongo_crypt_shared_v1-${version|}-${compile_variant|}.tgz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongo-crypt-dev-debugsymbols.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongo_crypt_shared_v1-${compile_variant|}-${version_id}-debugsymbols.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo_crypt_shared_v1-debugsymbols.tgz
   ###
 
   ## Schedule Tasks ##
