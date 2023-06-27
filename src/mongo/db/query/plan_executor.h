@@ -56,6 +56,15 @@ class RecordId;
 extern const OperationContext::Decoration<repl::OpTime> clientsLastKnownCommittedOpTime;
 
 /**
+ * If a plan yielded because it encountered a sharding critical section,
+ * 'planExecutorShardingCriticalSectionFuture' will be set to a future that becomes ready when the
+ * critical section ends. This future can be waited on to hold off resuming the plan execution while
+ * the critical section is still active.
+ */
+extern const OperationContext::Decoration<boost::optional<SharedSemiFuture<void>>>
+    planExecutorShardingCriticalSectionFuture;
+
+/**
  * A PlanExecutor is the abstraction that knows how to crank a tree of stages into execution.
  * The executor is usually part of a larger abstraction that is interacting with the cache
  * and/or the query optimizer.

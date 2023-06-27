@@ -38,6 +38,10 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(planExecutorAlwaysFails);
 }  // namespace
 
+const OperationContext::Decoration<boost::optional<SharedSemiFuture<void>>>
+    planExecutorShardingCriticalSectionFuture =
+        OperationContext::declareDecoration<boost::optional<SharedSemiFuture<void>>>();
+
 std::string PlanExecutor::stateToStr(ExecState execState) {
     switch (execState) {
         case PlanExecutor::ADVANCED:
