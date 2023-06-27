@@ -12,6 +12,7 @@
  *   # worse CWI because the planner may not run sufficient trials if there's no enough docs in some
  *   # shard.
  *   assumes_unsharded_collection,
+ *   featureFlagCompoundWildcardIndexes,
  * ]
  */
 (function() {
@@ -123,7 +124,11 @@ const operationListCompound = [
 
     {
         query: {'a': 3, 'b.c': {$exists: true}, 'c': {$lt: 3}},
-        bounds: {'a': ['[3.0, 3.0]'], '$_path': ['[MinKey, MaxKey]'], 'c': ['[MinKey, MaxKey]']},
+        bounds: {
+            'a': ['[3.0, 3.0]'],
+            '$_path': ["[MinKey, MinKey]", "[\"\", {})"],
+            'c': ['[MinKey, MaxKey]']
+        },
         path: '$_path',
         subpathBounds: false,
         expectedKeyPattern: {'a': 1, '$_path': 1, 'c': 1}

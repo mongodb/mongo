@@ -894,6 +894,12 @@ last-lts:
     ticket: SERVER-77386
   - test_file: jstests/replsets/tenant_migrations_back_to_back_2.js
     ticket: SERVER-78176
+  - test_file: jstests/core/index/wildcard/compound_wildcard_index_or.js
+    ticket: SERVER-78307
+  - test_file: jstests/core/index/wildcard/compound_wildcard_index_unbounded.js
+    ticket: SERVER-78307
+  - test_file: jstests/core/index/wildcard/wildcard_index_basic_index_bounds.js
+    ticket: SERVER-78307
   - test_file: jstests/sharding/transfer_mods_large_batches.js
     ticket: SERVER-78414
   suites: null

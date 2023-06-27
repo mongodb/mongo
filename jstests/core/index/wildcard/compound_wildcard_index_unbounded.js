@@ -37,19 +37,21 @@ const ixscans = getPlanStages(plan, "IXSCAN");
 assert.gt(ixscans.length, 0, explain);
 ixscans.forEach(ixscan => {
     assert.eq({a: 1, $_path: 1}, ixscan.keyPattern, explain);
-    assert.eq({a: ["[MinKey, MaxKey]"], $_path: ["[MinKey, MaxKey]"]}, ixscan.indexBounds, explain);
+    assert.eq({a: ["[MinKey, MaxKey]"], $_path: ["[MinKey, MinKey]", "[\"\", {})"]},
+              ixscan.indexBounds,
+              explain);
 });
 
-// TODO SERVER-78307: Fix the erroneous index corruption result.
-const assertIndexCorruption = (executionStats) => {
+const assertNoIndexCorruption = (executionStats) => {
     if (typeof executionStats === 'object') {
         if ("executionSuccess" in executionStats) {
-            assert.eq(false, executionStats.executionSuccess, explain);
-            assert.eq(ErrorCodes.DataCorruptionDetected, executionStats.errorCode, explain);
+            // The execution should succeed rather than spot any index corruption.
+            assert.eq(true, executionStats.executionSuccess, explain);
         }
+        assert.eq(executionStats.nReturned, 1, executionStats);
     } else if (Array.isArray(executionStats)) {
-        executionStats.forEach(stats => assertIndexCorruption(stats));
+        executionStats.forEach(stats => assertNoIndexCorruption(stats));
     }
 };
-assertIndexCorruption(explain.executionStats);
+assertNoIndexCorruption(explain.executionStats);
 })();
