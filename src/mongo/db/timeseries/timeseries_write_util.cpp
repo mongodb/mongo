@@ -710,7 +710,12 @@ void performAtomicWrites(
         std::vector<InsertStatement> insertStatements;
         for (auto& op : insertOps) {
             invariant(op.getDocuments().size() == 1);
-            insertStatements.emplace_back(op.getDocuments().front());
+            if (modificationOp) {
+                insertStatements.emplace_back(op.getDocuments().front());
+            } else {
+                // Appends the stmtId for upsert.
+                insertStatements.emplace_back(stmtId, op.getDocuments().front());
+            }
         }
         uassertStatusOK(collection_internal::insertDocuments(
             opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug()));

@@ -133,6 +133,14 @@ function updateValidateFn(coll) {
               "Expected exactly one document to be updated.");
     assert.eq(coll.countDocuments({updated: 1}), 1, "Expected document to be updated only once.");
 }
+function updateUnorderedValidateFn(coll) {
+    updateValidateFn(coll);
+    assert.eq(coll.countDocuments({anotherUpdated: {$exists: true}}),
+              1,
+              "Expected exactly one document to be updated.");
+    assert.eq(
+        coll.countDocuments({anotherUpdated: 1}), 1, "Expected document to be updated only once.");
+}
 
 (function testPartialBucketUpdate() {
     runTest(allDocumentsSameBucket,
@@ -146,19 +154,39 @@ function updateValidateFn(coll) {
             updateValidateFn,
             /*expectError=*/ true);
 })();
-(function testPartialBucketUpdate() {
+(function testPartialBucketUpdateUnordered() {
     runTest(allDocumentsSameBucket,
             updateCmdUnorderedBuilderFn,
-            updateValidateFn,
+            updateUnorderedValidateFn,
             /*expectError=*/ true,
             /*statementRetried=*/ 2);
 })();
-(function testFullBucketUpdate() {
+(function testFullBucketUpdateUnordered() {
     runTest(allDocumentsDifferentBuckets,
             updateCmdUnorderedBuilderFn,
-            updateValidateFn,
+            updateUnorderedValidateFn,
             /*expectError=*/ true,
             /*statementRetried=*/ 2);
+})();
+
+function upsertCmdBuilderFn(coll) {
+    return {
+        update: coll.getName(),
+        updates: [{
+            q: {[timeFieldName]: dateTime, [metaFieldName]: "B"},
+            u: {$inc: {updated: 1}},
+            multi: false,
+            upsert: true,
+        }],
+    };
+}
+function upsertValidateFn(coll) {
+    assert.eq(coll.countDocuments({[metaFieldName]: "B", updated: 1}),
+              1,
+              "Expected exactly one document to be upserted once.");
+}
+(function testUpsert() {
+    runTest(allDocumentsSameBucket, upsertCmdBuilderFn, upsertValidateFn);
 })();
 
 rst.stopSet();
