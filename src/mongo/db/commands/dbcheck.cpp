@@ -716,14 +716,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto job = getRun(opCtx, dbName, cmdObj);
-        try {
-            (new DbCheckJob(dbName, std::move(job)))->go();
-        } catch (const DBException& e) {
-            result.append("ok", false);
-            result.append("err", e.toString());
-            return false;
-        }
-        result.append("ok", true);
+        (new DbCheckJob(dbName, std::move(job)))->go();
         return true;
     }
 } dbCheckCmd;
