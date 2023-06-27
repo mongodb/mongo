@@ -42,6 +42,14 @@ selector:
   # TODO (SERVER-78202): Investigate failing timeseries tests in the fcv jscore passthrough suite.
   - jstests/core/timeseries/timeseries_update.js
   - jstests/core/timeseries/timeseries_update_concurrent.js
+  - jstests/core/timeseries/timeseries_update_one.js
+  - jstests/core/timeseries/timeseries_update_multi.js
+  - jstests/core/timeseries/timeseries_find_and_modify_update.js
+  - jstests/core/timeseries/timeseries_delete_compressed_buckets.js
+  - jstests/core/timeseries/timeseries_bucket_limit_count.js
+
+  # TODO (SERVER-78409): Test fails with Error: attempt to copy-construct an iterator from a singular iterator.
+  - jstests/aggregation/bugs/server21632.js
 
   # These use "columnstore indexes are under development and cannot be used without enabling the feature flag"
   - jstests/core/query/null_query_semantics.js
@@ -58,12 +66,25 @@ selector:
   - src/mongo/db/modules/enterprise/jstests/fle/fle_use_cases.js
   - src/mongo/db/modules/enterprise/jstests/fle/fle_drivers_integration.js
 
+  # TODO (SERVER-78416): Failure in resume_query_from_non_existent_record.js in fcv upgrade downgrade suite.
+  - jstests/core/resume_query_from_non_existent_record.js
+
+  # TODO (SERVER-78417): Mongod invariant while running bucket_timestamp_rounding.js with new fcv upgrade downgrade suite.
+  - jstests/core/timeseries/bucket_timestamp_rounding.js
+  - jstests/core/timeseries/timeseries_filter_extended_range.js
+
+  # TODO (SERVER-78418): Investigate _requestResumeToken is not supported failure in resume_query.js.
+  - jstests/core/resume_query.js
+
   # TODO (SERVER-77387): The tests below sometimes hit an index build invariant failure when they run concurrently with a setFCV command.
   - jstests/core/query/array/arrayfind7.js
   - jstests/core/index/indexu.js
   - jstests/core/index/geo/geo_invalid_polygon.js
   - jstests/core/index/geo/geo_s2disjoint_holes.js
   - jstests/core/index/geo/geo_big_polygon2.js
+
+  # Expected failure due to command count being not precise due to potential retry of index build.
+  - jstests/core/operation_latency_histogram.js
 
   # Expected failures due to unexpected query execution stats from restarted operations from fcv upgrade.
   - jstests/aggregation/sources/lookup/lookup_query_stats.js
@@ -84,7 +105,9 @@ executor:
       - FCVUpgradeDowngradeInBackground
   config:
     shell_options:
-      eval: "testingReplication = true;"
+      eval: >-
+        testingReplication = true;
+        load("jstests/libs/override_methods/retry_aborted_index_build.js");
   hooks:
   - class: CheckReplOplogs
   - class: CheckReplDBHash
