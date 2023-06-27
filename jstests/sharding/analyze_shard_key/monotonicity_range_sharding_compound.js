@@ -68,7 +68,7 @@ const numDocsRange = {
 };
 
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS}});
+    const st = new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, oplogSize: 500}});
 
     testAnalyzeShardKeysUnshardedCollection(st.s, testCases, numDocsRange);
     testAnalyzeShardKeysShardedCollection(st, testCases, numDocsRange);
@@ -77,7 +77,7 @@ const numDocsRange = {
 }
 
 {
-    const rst = new ReplSetTest({nodes: numNodesPerRS});
+    const rst = new ReplSetTest({nodes: numNodesPerRS, oplogSize: 250});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();
