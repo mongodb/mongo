@@ -69,6 +69,7 @@ const expectedParamDefaults = {
     internalQueryMaxSpoolDiskUsageBytes: 10 * 100 * 1024 * 1024,
     deprioritizeUnboundedUserCollectionScans: true,
     deprioritizeUnboundedUserIndexScans: true,
+    internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
 };
 
 function assertDefaultParameterValues() {
@@ -300,6 +301,13 @@ assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", true);
 assertSetParameterSucceeds("deprioritizeUnboundedUserCollectionScans", false);
 assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", true);
 assertSetParameterSucceeds("deprioritizeUnboundedUserIndexScans", false);
+
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 10);
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                           4 * 1024 * 1024);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes", -1);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                        9 * 1024 * 1024);
 
 MongoRunner.stopMongod(conn);
 })();
