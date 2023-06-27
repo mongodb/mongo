@@ -942,7 +942,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
                 opCtx, *catalog, std::move(sortedAcquisitionRequests));
         } catch (...) {
-            if (openSnapshot)
+            if (openSnapshot && !opCtx->lockState()->inAWriteUnitOfWork())
                 opCtx->recoveryUnit()->abandonSnapshot();
             throw;
         }
