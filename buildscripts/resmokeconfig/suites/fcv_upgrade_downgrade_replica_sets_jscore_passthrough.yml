@@ -66,15 +66,13 @@ selector:
   - src/mongo/db/modules/enterprise/jstests/fle/fle_use_cases.js
   - src/mongo/db/modules/enterprise/jstests/fle/fle_drivers_integration.js
 
-  # TODO (SERVER-78416): Failure in resume_query_from_non_existent_record.js in fcv upgrade downgrade suite.
+  # The test uses a resumeToken from previous calls so FCV change will make the token invalid and fail.
   - jstests/core/resume_query_from_non_existent_record.js
+  - jstests/core/resume_query.js
 
   # TODO (SERVER-78417): Mongod invariant while running bucket_timestamp_rounding.js with new fcv upgrade downgrade suite.
   - jstests/core/timeseries/bucket_timestamp_rounding.js
   - jstests/core/timeseries/timeseries_filter_extended_range.js
-
-  # TODO (SERVER-78418): Investigate _requestResumeToken is not supported failure in resume_query.js.
-  - jstests/core/resume_query.js
 
   # TODO (SERVER-77387): The tests below sometimes hit an index build invariant failure when they run concurrently with a setFCV command.
   - jstests/core/query/array/arrayfind7.js
