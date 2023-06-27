@@ -9,6 +9,8 @@
 //   # former operation may be routed to a secondary in the replica set, whereas the latter must be
 //   # routed to the primary.
 //   assumes_read_preference_unchanged,
+//   # Make sure to obtain stable counts. Background tasks may create plan cache entries.
+//   assumes_standalone_mongod,
 //   assumes_unsharded_collection,
 //   does_not_support_stepdowns,
 //   requires_fcv_61,
