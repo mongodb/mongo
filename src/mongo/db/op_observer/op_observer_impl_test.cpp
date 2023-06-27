@@ -333,8 +333,10 @@ protected:
     bool didWriteImageEntryToSideCollection(OperationContext* opCtx,
                                             const LogicalSessionId& sessionId) {
         AutoGetCollection sideCollection(opCtx, NamespaceString::kConfigImagesNamespace, MODE_IS);
-        const auto imageEntry = Helpers::findOneForTesting(
-            opCtx, sideCollection.getCollection(), BSON("_id" << sessionId.toBSON()), false);
+        const auto imageEntry = Helpers::findOneForTesting(opCtx,
+                                                           sideCollection.getCollection(),
+                                                           BSON("_id" << sessionId.toBSON()),
+                                                           /*invariantOnError=*/false);
         return !imageEntry.isEmpty();
     }
 
@@ -342,28 +344,39 @@ protected:
                                                  const ChangeStreamPreImageId preImageId) {
         AutoGetCollection preImagesCollection(
             opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), LockMode::MODE_IS);
-        const auto preImage = Helpers::findOneForTesting(
-            opCtx, preImagesCollection.getCollection(), BSON("_id" << preImageId.toBSON()), false);
+        const auto preImage = Helpers::findOneForTesting(opCtx,
+                                                         preImagesCollection.getCollection(),
+                                                         BSON("_id" << preImageId.toBSON()),
+                                                         /*invariantOnError=*/false);
         return !preImage.isEmpty();
     }
 
     repl::ImageEntry getImageEntryFromSideCollection(OperationContext* opCtx,
                                                      const LogicalSessionId& sessionId) {
         AutoGetCollection sideCollection(opCtx, NamespaceString::kConfigImagesNamespace, MODE_IS);
-        return repl::ImageEntry::parse(
-            IDLParserContext("image entry"),
-            Helpers::findOneForTesting(
-                opCtx, sideCollection.getCollection(), BSON("_id" << sessionId.toBSON())));
+        auto doc = Helpers::findOneForTesting(opCtx,
+                                              sideCollection.getCollection(),
+                                              BSON("_id" << sessionId.toBSON()),
+                                              /*invariantOnError=*/false);
+        ASSERT_FALSE(doc.isEmpty())
+            << "Change stream pre-image not found: " << sessionId.toBSON()
+            << " (pre-images collection: " << sideCollection->ns().toStringForErrorMsg() << ")";
+        return repl::ImageEntry::parse(IDLParserContext("image entry"), doc);
     }
 
     SessionTxnRecord getTxnRecord(OperationContext* opCtx, const LogicalSessionId& sessionId) {
         AutoGetCollection configTransactions(
             opCtx, NamespaceString::kSessionTransactionsTableNamespace, MODE_IS);
 
-        return SessionTxnRecord::parse(
-            IDLParserContext("txn record"),
-            Helpers::findOneForTesting(
-                opCtx, configTransactions.getCollection(), BSON("_id" << sessionId.toBSON())));
+        auto doc = Helpers::findOneForTesting(opCtx,
+                                              configTransactions.getCollection(),
+                                              BSON("_id" << sessionId.toBSON()),
+                                              /*invariantOnError=*/false);
+        ASSERT_FALSE(doc.isEmpty())
+            << "Transaction not found for session: " << sessionId.toBSON()
+            << "(transactions collection: " << configTransactions->ns().toStringForErrorMsg()
+            << ")";
+        return SessionTxnRecord::parse(IDLParserContext("txn record"), doc);
     }
 
     /**
@@ -379,8 +392,12 @@ protected:
             opCtx, NamespaceString::makePreImageCollectionNSS(boost::none), LockMode::MODE_IS);
         *container = Helpers::findOneForTesting(opCtx,
                                                 preImagesCollection.getCollection(),
-                                                BSON("_id" << preImageId.toBSON()))
-                         .getOwned();
+                                                BSON("_id" << preImageId.toBSON()),
+                                                /*invariantOnError=*/false);
+        ASSERT_FALSE(container->isEmpty())
+            << "Change stream pre-image not found: " << preImageId.toBSON()
+            << " (pre-images collection: " << preImagesCollection->ns().toStringForErrorMsg()
+            << ")";
         return ChangeStreamPreImage::parse(IDLParserContext("pre-image"), *container);
     }
 
