@@ -53,6 +53,7 @@
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/views/view.h"
@@ -68,9 +69,6 @@ using BSONNumeric = long long;
 }  // namespace
 
 namespace query_stats {
-
-/** The type of algorithm to be used for transformIdentifiers */
-enum TransformAlgorithm { kHmacSha256, kNone };
 
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
@@ -154,7 +152,7 @@ public:
      * anonymized.
      */
     BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 TransformAlgorithm algorithm,
+                                 TransformAlgorithmEnum algorithm,
                                  std::string hmacKey) const;
 
     /**

@@ -24,7 +24,6 @@ function runTest(conn) {
     coll.insert({foo: 1});
     coll.find({foo: {$lte: 2}}).sort({bar: -1}).limit(2).toArray();
     // Default is no hmac.
-    let ret = getQueryStatsFindCmd(conn)[0].key.queryShape;
     assertQueryStatsKeyWithoutHmac(getQueryStatsFindCmd(conn)[0].key.queryShape);
 
     // Turning on hmac should apply hmac to all field names on all entries, even previously cached
@@ -47,49 +46,43 @@ function runTest(conn) {
     // Wrong parameter name throws error.
     let pipeline = [{$queryStats: {redactFields: true}}];
     assertAdminDBErrCodeAndErrMsgContains(
-        coll,
-        pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'transformIdentifiers'. Found: redactFields");
+        coll, pipeline, 40415, "BSON field '$queryStats.redactFields' is an unknown field.");
 
     // Wrong parameter name throws error.
     pipeline = [{$queryStats: {algorithm: "hmac-sha-256"}}];
     assertAdminDBErrCodeAndErrMsgContains(
-        coll,
-        pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats parameters object may only contain 'transformIdentifiers'. Found: algorithm");
+        coll, pipeline, 40415, "BSON field '$queryStats.algorithm' is an unknown field.");
 
     // Wrong parameter type throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: 1}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats algorithm parameter must be a string. Found type: double");
+        ErrorCodes.TypeMismatch,
+        "BSON field '$queryStats.transformIdentifiers.algorithm' is the wrong type 'double', expected type 'string'");
 
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-256", hmacKey: 1}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats hmacKey parameter must be bindata of length 32 or greater. Found type: double");
+        ErrorCodes.TypeMismatch,
+        "BSON field '$queryStats.transformIdentifiers.hmacKey' is the wrong type 'double', expected type 'binData'");
 
     // Unsupported algorithm throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {algorithm: "hmac-sha-1"}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats algorithm currently supported is only 'hmac-sha-256'. Found: hmac-sha-1");
+        ErrorCodes.BadValue,
+        "Enumeration value 'hmac-sha-1' for field '$queryStats.transformIdentifiers.algorithm' is not a valid value.");
 
     // TransformIdentifiers with missing algorithm throws error.
     pipeline = [{$queryStats: {transformIdentifiers: {}}}];
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats missing value for algorithm, which is required for 'transformIdentifiers'");
+        40414,
+        "BSON field '$queryStats.transformIdentifiers.algorithm' is missing but a required field");
 
     // Parameter object with unrecognized key throws error.
     pipeline =
@@ -97,8 +90,8 @@ function runTest(conn) {
     assertAdminDBErrCodeAndErrMsgContains(
         coll,
         pipeline,
-        ErrorCodes.FailedToParse,
-        "$queryStats parameters to 'transformIdentifiers' may only contain 'algorithm' or 'hmacKey' options. Found: hmacStrategy");
+        40415,
+        "BSON field '$queryStats.transformIdentifiers.hmacStrategy' is an unknown field.");
 }
 
 const conn = MongoRunner.runMongod({

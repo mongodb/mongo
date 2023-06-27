@@ -733,7 +733,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
         expCtx, *parsedFind, queryShape, collectionType)};
 
     auto hmacApplied =
-        testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithm::kNone, std::string{});
+        testMetrics.computeQueryStatsKey(opCtx.get(), TransformAlgorithmEnum::kNone, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {
@@ -767,7 +767,7 @@ TEST_F(QueryStatsStoreTest, DefinesLetVariables) {
     // Now be sure hmac is applied to variable names. We don't currently expose a different way to
     // do the hashing, so we'll just stick with the big long strings here for now.
     hmacApplied = testMetrics.computeQueryStatsKey(
-        opCtx.get(), TransformAlgorithm::kHmacSha256, std::string{});
+        opCtx.get(), TransformAlgorithmEnum::kHmacSha256, std::string{});
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({
             "queryShape": {

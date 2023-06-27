@@ -260,11 +260,11 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithm algorithm,
+                                              TransformAlgorithmEnum algorithm,
                                               std::string hmacKey) const {
     return keyGenerator->generate(
         opCtx,
-        algorithm == TransformAlgorithm::kHmacSha256
+        algorithm == TransformAlgorithmEnum::kHmacSha256
             ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
                   [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
             : boost::none);
