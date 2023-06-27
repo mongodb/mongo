@@ -42,7 +42,7 @@ struct ClusterCountCmdS {
         return kApiVersions1;
     }
 
-    static Status checkAuthForOperation(OperationContext*) {
+    static Status checkAuthForOperation(OperationContext*, const DatabaseName&, const BSONObj&) {
         // No additional required privileges on a mongos.
         return Status::OK();
     }

@@ -45,10 +45,12 @@ struct ClusterCountCmdD {
         return kNoApiVersions;
     }
 
-    static Status checkAuthForOperation(OperationContext* opCtx) {
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& cmdObj) {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::internal)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::internal)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 

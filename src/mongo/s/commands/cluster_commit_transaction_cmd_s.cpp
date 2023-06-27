@@ -42,7 +42,9 @@ struct ClusterCommitTransactionCmdS {
         return kApiVersions1;
     }
 
-    static Status checkAuthForOperation(OperationContext* opCtx) {
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName&,
+                                        const BSONObj&) {
         return Status::OK();
     }
 

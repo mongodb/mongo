@@ -47,7 +47,8 @@ struct ClusterInsertCmdD {
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized",
                 authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::internal));
+                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
+                    ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
@@ -78,7 +79,8 @@ struct ClusterUpdateCmdD {
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized",
                 authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::internal));
+                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
+                    ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {
@@ -108,7 +110,8 @@ struct ClusterDeleteCmdD {
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized",
                 authzSession->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::internal));
+                    ResourcePattern::forClusterResource(op.getDbName().tenantId()),
+                    ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

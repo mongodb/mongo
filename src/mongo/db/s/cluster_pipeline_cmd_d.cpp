@@ -45,12 +45,15 @@ struct ClusterPipelineCommandD {
         return kNoApiVersions;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx, const PrivilegeVector& privileges) {
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const OpMsgRequest& opMsgRequest,
+                                     const PrivilegeVector& privileges) {
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized",
                 AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(opMsgRequest.getValidatedTenantId()),
+                        ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

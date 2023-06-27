@@ -50,8 +50,8 @@ struct ClusterFindCmdD {
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized",
                 AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(nss.tenantId()), ActionType::internal));
     }
 
     static void checkCanRunHere(OperationContext* opCtx) {

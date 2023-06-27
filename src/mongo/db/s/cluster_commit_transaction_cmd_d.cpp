@@ -44,10 +44,13 @@ struct ClusterCommitTransactionCmdD {
         return kNoApiVersions;
     }
 
-    static Status checkAuthForOperation(OperationContext* opCtx) {
+    static Status checkAuthForOperation(OperationContext* opCtx,
+                                        const DatabaseName& dbName,
+                                        const BSONObj& cmdObj) {
         if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::internal)) {
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forClusterResource(dbName.tenantId()),
+                     ActionType::internal)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
