@@ -351,6 +351,9 @@ functions:
           EOF
           fi
           tar czf mongodb${compile_variant|}.tar.gz mongodb
+          # Put all matching mongo debug from the build directory in an archive in the same location
+          # as the library archive (i.e. mongodb/bin).
+          tar czvf mongodb${compile_variant|}-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:mongodb/bin/:'
     - command: s3.put
       params:
         aws_key: ${aws_key}
@@ -361,6 +364,16 @@ functions:
         permissions: public-read
         content_type: ${content_type|application/x-gzip}
         display_name: mongodb${compile_variant|}.tar.gz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb${compile_variant|}-debugsymbols.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}-debugsymbols.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo-debugsymbols.tgz
   ###
 
   ## Schedule Tasks ##
