@@ -50,7 +50,7 @@ namespace {
 
 const NamespaceString nss0 = NamespaceString::createNamespaceString_forTest("testDb", "testColl0");
 const NamespaceString nss1 = NamespaceString::createNamespaceString_forTest("testDb", "testColl1");
-const int sampleRate = 100;
+const int samplesPerSecond = 100;
 
 TEST(QueryAnalysisWriterBufferTest, AddBasic) {
     auto buffer = QueryAnalysisWriter::Buffer(nss0);
@@ -180,9 +180,9 @@ public:
 
         auto& tracker = QueryAnalysisSampleTracker::get(operationContext());
         auto configuration0 = CollectionQueryAnalyzerConfiguration(
-            nss0, getCollectionUUID(nss0), sampleRate, Date_t::now());
+            nss0, getCollectionUUID(nss0), samplesPerSecond, Date_t::now());
         auto configuration1 = CollectionQueryAnalyzerConfiguration(
-            nss1, getCollectionUUID(nss1), sampleRate, Date_t::now());
+            nss1, getCollectionUUID(nss1), samplesPerSecond, Date_t::now());
         tracker.refreshConfigurations({configuration0, configuration1});
     }
 

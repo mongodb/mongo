@@ -51,7 +51,7 @@ assert.commandWorked(
     st.s.adminCommand({moveChunk: foreignNs, find: {x: 1000}, to: st.shard2.name}));
 
 assert.commandWorked(
-    st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", sampleRate: 1000}));
+    st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}));
 const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(
     st, foreignNs, foreignCollUUid, {skipMongoses: true});

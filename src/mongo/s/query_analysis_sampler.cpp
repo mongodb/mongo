@@ -266,7 +266,7 @@ bool QueryAnalysisSampler::SampleRateLimiter::tryConsume() {
     return false;
 }
 
-void QueryAnalysisSampler::SampleRateLimiter::refreshRate(double numTokensPerSecond) {
+void QueryAnalysisSampler::SampleRateLimiter::refreshSamplesPerSecond(double numTokensPerSecond) {
     // Fill the bucket with tokens created by the previous rate before setting a new rate.
     _refill(_numTokensPerSecond, _getBurstCapacity(numTokensPerSecond));
     _numTokensPerSecond = numTokensPerSecond;
@@ -332,10 +332,10 @@ void QueryAnalysisSampler::_refreshConfigurations(OperationContext* opCtx) {
                                        SampleRateLimiter{opCtx->getServiceContext(),
                                                          configuration.getNs(),
                                                          configuration.getCollectionUuid(),
-                                                         configuration.getSampleRate()});
+                                                         configuration.getSamplesPerSecond()});
         } else {
             auto rateLimiter = it->second;
-            rateLimiter.refreshRate(configuration.getSampleRate());
+            rateLimiter.refreshSamplesPerSecond(configuration.getSamplesPerSecond());
             sampleRateLimiters.emplace(configuration.getNs(), std::move(rateLimiter));
         }
     }

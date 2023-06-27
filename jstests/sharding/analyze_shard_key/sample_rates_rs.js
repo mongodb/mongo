@@ -73,11 +73,11 @@ function getSampleSize() {
  */
 function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
     const sampledNs = dbName + "." + collNameSampled;
-    const sampleRate = 5;
+    const samplesPerSecond = 5;
     const durationSecs = 90;
 
     assert.commandWorked(
-        primary.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", sampleRate}));
+        primary.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
     sleep(queryAnalysisSamplerConfigurationRefreshSecs * 1000);
 
     // Define a thread for executing find commands via one of the secondaries.
@@ -139,7 +139,7 @@ function testQuerySampling(dbName, collNameNotSampled, collNameSampled) {
 
     // Verify that the difference between the actual and expected number of samples is within the
     // expected threshold.
-    const expectedTotalCount = durationSecs * sampleRate;
+    const expectedTotalCount = durationSecs * samplesPerSecond;
     const expectedFindPercentage =
         AnalyzeShardKeyUtil.calculatePercentage(actualNumFindPerSec, actualTotalQueriesPerSec);
     const expectedDeletePercentage =

@@ -29,7 +29,7 @@ const dbName = "testDb";
 const collName = "testColl";
 const ns = dbName + "." + collName;
 
-const sampleRate = 10000;
+const samplesPerSecond = 10000;
 const numSampledQueries = 10;
 
 const shard0Primary = st.rs0.getPrimary();
@@ -41,7 +41,8 @@ const testColl = testDb.getCollection(collName);
 assert.commandWorked(testColl.insert([{x: 1}]));
 const collUuid = QuerySamplingUtil.getCollectionUuid(testDb, collName);
 
-assert.commandWorked(st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
+assert.commandWorked(
+    st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}));
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
 assert.commandWorked(shard0Primary.adminCommand(

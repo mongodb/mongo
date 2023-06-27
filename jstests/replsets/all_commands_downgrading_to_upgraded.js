@@ -508,7 +508,7 @@ const allCommands = {
                 assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
             }
         },
-        command: {configureQueryAnalyzer: fullNs, mode: "full", sampleRate: 1},
+        command: {configureQueryAnalyzer: fullNs, mode: "full", samplesPerSecond: 1},
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },

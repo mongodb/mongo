@@ -493,8 +493,8 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     assertMetricsEmptySampleSize(res);
 
     // Turn on query sampling and wait for sampling to become active.
-    assert.commandWorked(
-        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", sampleRate}));
+    assert.commandWorked(fixture.conn.adminCommand(
+        {configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
     fixture.waitForActiveSamplingFn(sampledNs, sampledCollUuid);
 
     // Create and run test queries.
@@ -528,7 +528,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
 
-const sampleRate = 10000;
+const samplesPerSecond = 10000;
 const analyzeShardKeyNumRanges = 10;
 
 const mongodSetParameterOpts = {
@@ -564,7 +564,7 @@ const mongosSetParametersOpts = {
 
     // This test expects every query to get sampled regardless of which mongos or mongod routes it.
     st.configRS.nodes.forEach(node => {
-        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSampleRateEqually");
+        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
     });
 
     const fixture = {
@@ -633,7 +633,7 @@ const mongosSetParametersOpts = {
 
     // This test expects every query to get sampled regardless of which mongod it runs against.
     rst.nodes.forEach(node => {
-        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSampleRateEqually");
+        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
     });
 
     const fixture = {

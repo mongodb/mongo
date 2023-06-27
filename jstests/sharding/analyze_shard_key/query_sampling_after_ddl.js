@@ -34,7 +34,7 @@ function enableQuerySampling(conn, dbName, collName, {rst, st}) {
     const ns = dbName + "." + collName;
     const collUuid = QuerySamplingUtil.getCollectionUuid(conn.getDB(dbName), collName);
     assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000}));
+        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
     QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {rst, st});
 }
 

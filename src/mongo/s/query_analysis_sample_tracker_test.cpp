@@ -92,9 +92,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
 
     // Add the configuration for collection0 and refresh.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV1;
-    const double sampleRate0Before = 0.0;
+    const double samplesPerSec0Before = 0.0;
     const auto startTime0Before = now();
-    configurationsV1.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
+    configurationsV1.emplace_back(nss0, collUuid0, samplesPerSec0Before, startTime0Before);
     tracker.refreshConfigurations(configurationsV1);
 
     // Verify currentOp, one active collection.
@@ -108,7 +108,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec0Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
@@ -135,10 +135,10 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
 
     // Add the configuration for collection1 and refresh.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV2;
-    configurationsV2.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
-    const double sampleRate1Before = 0.0000000001;
+    configurationsV2.emplace_back(nss0, collUuid0, samplesPerSec0Before, startTime0Before);
+    const double samplesPerSec1Before = 0.0000000001;
     const auto startTime1Before = now();
-    configurationsV2.emplace_back(nss1, collUuid1, sampleRate1Before, startTime1Before);
+    configurationsV2.emplace_back(nss1, collUuid1, samplesPerSec1Before, startTime1Before);
     tracker.refreshConfigurations(configurationsV2);
 
     // Verify currentOp, two active collections.
@@ -152,7 +152,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec0Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
@@ -167,7 +167,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec1Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime1Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
@@ -193,8 +193,8 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
 
     // Update the sample rate for collection1 and refresh.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV3;
-    configurationsV3.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
-    configurationsV3.emplace_back(nss1, collUuid1, sampleRate1Before, startTime1Before);
+    configurationsV3.emplace_back(nss0, collUuid0, samplesPerSec0Before, startTime0Before);
+    configurationsV3.emplace_back(nss1, collUuid1, samplesPerSec1Before, startTime1Before);
     tracker.refreshConfigurations(configurationsV3);
 
     // Increment read and write counters.
@@ -222,7 +222,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec0Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
@@ -237,7 +237,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec1Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime1Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 2);
@@ -263,7 +263,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
 
     // Remove the configuration for collection1.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV4;
-    configurationsV4.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
+    configurationsV4.emplace_back(nss0, collUuid0, samplesPerSec0Before, startTime0Before);
     tracker.refreshConfigurations(configurationsV4);
 
     // Verify currentOp, one active configuration.
@@ -276,7 +276,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec0Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
@@ -302,10 +302,10 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
 
     // Add new configuration for collection1 (same collection uuid).
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV5;
-    configurationsV5.emplace_back(nss0, collUuid0, sampleRate0Before, startTime0Before);
-    const double sampleRate1After = 222.2;
+    configurationsV5.emplace_back(nss0, collUuid0, samplesPerSec0Before, startTime0Before);
+    const double samplesPerSec1After = 222.2;
     const auto startTime1After = now();
-    configurationsV5.emplace_back(nss1, collUuid1, sampleRate1After, startTime1After);
+    configurationsV5.emplace_back(nss1, collUuid1, samplesPerSec1After, startTime1After);
     tracker.refreshConfigurations(configurationsV5);
 
     // Verify currentOp, two active collections.
@@ -319,7 +319,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0Before);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec0Before);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime0Before);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 1);
@@ -335,7 +335,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss1);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid1);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate1After);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec1After);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime1After);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
@@ -363,9 +363,9 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     // a different collection uuid.
     std::vector<CollectionQueryAnalyzerConfiguration> configurationsV6;
     const auto collUuid0After = UUID::gen();
-    const auto sampleRate0After = 1.5;
+    const auto samplesPerSec0After = 1.5;
     const auto startTime0After = now();
-    configurationsV6.emplace_back(nss0, collUuid0After, sampleRate0After, startTime0After);
+    configurationsV6.emplace_back(nss0, collUuid0After, samplesPerSec0After, startTime0After);
     tracker.refreshConfigurations(configurationsV6);
 
     // Verify currentOp, one active collection. The counters should have been reset.
@@ -379,7 +379,7 @@ void QueryAnalysisSampleTrackerTest::testRefreshConfigIncrementAndReport() {
     ASSERT_EQ(parsedOp.getNs(), nss0);
     ASSERT_EQ(parsedOp.getCollUuid(), collUuid0After);
     if (supportsSampling) {
-        ASSERT_EQ(parsedOp.getSampleRate(), sampleRate0After);
+        ASSERT_EQ(parsedOp.getSamplesPerSecond(), samplesPerSec0After);
     }
     ASSERT_EQ(parsedOp.getStartTime(), startTime0After);
     ASSERT_EQ(parsedOp.getSampledReadsCount(), 0);
@@ -443,7 +443,7 @@ TEST_F(QueryAnalysisSampleTrackerTest, IsSamplingActive) {
 
     ASSERT_FALSE(tracker.isSamplingActive(nss0, collUuid0));
     auto configuration0 =
-        CollectionQueryAnalyzerConfiguration(nss0, collUuid0, 100 /* sampleRate */, now());
+        CollectionQueryAnalyzerConfiguration(nss0, collUuid0, 100 /* samplesPerSec */, now());
     tracker.refreshConfigurations({configuration0});
     ASSERT(tracker.isSamplingActive(nss0, collUuid0));
     ASSERT_FALSE(tracker.isSamplingActive(nss0, UUID::gen()));

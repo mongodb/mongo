@@ -45,7 +45,7 @@ namespace analyze_shard_key {
 namespace {
 
 MONGO_FAIL_POINT_DEFINE(disableQueryAnalysisCoordinator);
-MONGO_FAIL_POINT_DEFINE(queryAnalysisCoordinatorDistributeSampleRateEqually);
+MONGO_FAIL_POINT_DEFINE(queryAnalysisCoordinatorDistributeSamplesPerSecondEqually);
 
 const auto getQueryAnalysisCoordinator =
     ServiceContext::declareDecoration<QueryAnalysisCoordinator>();
@@ -79,7 +79,7 @@ void QueryAnalysisCoordinator::onConfigurationInsert(const QueryAnalyzerDocument
         return;
     }
     auto configuration = CollectionQueryAnalyzerConfiguration{
-        doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
+        doc.getNs(), doc.getCollectionUuid(), *doc.getSamplesPerSecond(), doc.getStartTime()};
     _configurations.emplace(doc.getNs(), std::move(configuration));
 }
 
@@ -93,11 +93,13 @@ void QueryAnalysisCoordinator::onConfigurationUpdate(const QueryAnalyzerDocument
     } else {
         auto it = _configurations.find(doc.getNs());
         if (it == _configurations.end()) {
-            auto configuration = CollectionQueryAnalyzerConfiguration{
-                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
+            auto configuration = CollectionQueryAnalyzerConfiguration{doc.getNs(),
+                                                                      doc.getCollectionUuid(),
+                                                                      *doc.getSamplesPerSecond(),
+                                                                      doc.getStartTime()};
             _configurations.emplace(doc.getNs(), std::move(configuration));
         } else {
-            it->second.setSampleRate(*doc.getSampleRate());
+            it->second.setSamplesPerSecond(*doc.getSamplesPerSecond());
             it->second.setStartTime(doc.getStartTime());
             // The collection could have been dropped and recreated.
             it->second.setCollectionUuid(doc.getCollectionUuid());
@@ -181,8 +183,10 @@ void QueryAnalysisCoordinator::onStartup(OperationContext* opCtx) {
             auto doc = QueryAnalyzerDocument::parse(IDLParserContext("QueryAnalysisCoordinator"),
                                                     cursor->next());
             invariant(doc.getMode() != QueryAnalyzerModeEnum::kOff);
-            auto configuration = CollectionQueryAnalyzerConfiguration{
-                doc.getNs(), doc.getCollectionUuid(), *doc.getSampleRate(), doc.getStartTime()};
+            auto configuration = CollectionQueryAnalyzerConfiguration{doc.getNs(),
+                                                                      doc.getCollectionUuid(),
+                                                                      *doc.getSamplesPerSecond(),
+                                                                      doc.getStartTime()};
             auto [_, inserted] = _configurations.emplace(doc.getNs(), std::move(configuration));
             invariant(inserted);
         }
@@ -281,9 +285,9 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     // If the coordinator doesn't yet have a full view of the query distribution or no samplers
     // have executed any queries, each sampler gets an equal ratio of the sample rates. Otherwise,
     // the ratio is weighted based on the query distribution across samplers.
-    double sampleRateRatio =
+    double samplesPerSecRatio =
         ((numWeights < numActiveSamplers) || (totalWeight == 0) ||
-         MONGO_unlikely(queryAnalysisCoordinatorDistributeSampleRateEqually.shouldFail()))
+         MONGO_unlikely(queryAnalysisCoordinatorDistributeSamplesPerSecondEqually.shouldFail()))
         ? (1.0 / numActiveSamplers)
         : (weight / totalWeight);
 
@@ -292,7 +296,7 @@ QueryAnalysisCoordinator::getNewConfigurationsForSampler(OperationContext* opCtx
     for (const auto& [_, configuration] : _configurations) {
         configurations.emplace_back(configuration.getNs(),
                                     configuration.getCollectionUuid(),
-                                    sampleRateRatio * configuration.getSampleRate(),
+                                    samplesPerSecRatio * configuration.getSamplesPerSecond(),
                                     configuration.getStartTime());
     }
     return configurations;

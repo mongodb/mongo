@@ -54,7 +54,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-constexpr int kMaxSampleRate = 50;
+constexpr int kMaxSamplesPerSecond = 50;
 
 /**
  * RAII type for the DDL lock. On a sharded cluster, the lock is the DDLLockManager collection lock.
@@ -126,26 +126,27 @@ public:
 
             const auto& nss = ns();
             const auto mode = request().getMode();
-            const auto sampleRate = request().getSampleRate();
+            const auto samplesPerSec = request().getSamplesPerSecond();
             const auto newConfig = request().getConfiguration();
 
             uassertStatusOK(validateNamespace(nss));
             if (mode == QueryAnalyzerModeEnum::kOff) {
                 uassert(ErrorCodes::InvalidOptions,
-                        "Cannot specify 'sampleRate' when 'mode' is \"off\"",
-                        !sampleRate);
+                        "Cannot specify 'samplesPerSecond' when 'mode' is \"off\"",
+                        !samplesPerSec);
             } else {
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream()
-                            << "'sampleRate' must be specified when 'mode' is not \"off\"",
-                        sampleRate);
+                            << "'samplesPerSecond' must be specified when 'mode' is not \"off\"",
+                        samplesPerSec);
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "'sampleRate' must be greater than 0",
-                        *sampleRate > 0);
+                        str::stream() << "'samplesPerSecond' must be greater than 0",
+                        *samplesPerSec > 0);
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "'sampleRate' must be less than or equal to " << kMaxSampleRate,
-                        (*sampleRate <= kMaxSampleRate) || TestingProctor::instance().isEnabled());
+                        str::stream() << "'samplesPerSecond' must be less than or equal to "
+                                      << kMaxSamplesPerSecond,
+                        (*samplesPerSec <= kMaxSamplesPerSecond) ||
+                            TestingProctor::instance().isEnabled());
             }
 
             // Take the DDL lock to serialize this command with DDL commands.
@@ -162,7 +163,7 @@ public:
                   logAttrs(nss),
                   "collectionUUID"_attr = collUuid,
                   "mode"_attr = mode,
-                  "sampleRate"_attr = sampleRate);
+                  "samplesPerSecond"_attr = samplesPerSec);
 
             write_ops::FindAndModifyCommandRequest request(
                 NamespaceString::kConfigQueryAnalyzersNamespace);

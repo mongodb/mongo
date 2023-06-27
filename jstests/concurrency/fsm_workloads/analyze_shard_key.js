@@ -48,8 +48,8 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.iterations = 500;
 
     // The sample rate range for query sampling.
-    $config.data.minSampleRate = 1000;
-    $config.data.maxSampleRate = 1500;
+    $config.data.minSamplesPerSecond = 1000;
+    $config.data.maxSamplesPerSecond = 1500;
     // The comment to attached to queries in the read and write states below to mark them as
     // eligible for sampling. Queries such as the aggregate queries for looking up documents to
     // update will not have this comment attached since they do not follow the query patterns
@@ -987,7 +987,8 @@ var $config = extendWorkload($config, function($config, $super) {
         assert.commandWorked(db.adminCommand({
             configureQueryAnalyzer: ns,
             mode: "full",
-            sampleRate: AnalyzeShardKeyUtil.getRandInteger(this.minSampleRate, this.maxSampleRate)
+            samplesPerSecond: AnalyzeShardKeyUtil.getRandInteger(this.minSamplesPerSecond,
+                                                                 this.maxSamplesPerSecond)
         }));
         print("Finished enableQuerySampling state");
     };

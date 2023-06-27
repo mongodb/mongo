@@ -83,19 +83,19 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, BurstMultiplierEqualToOne) {
     // multiplier * rate > 1
     auto rateLimiter0 =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 5);
-    ASSERT_EQ(rateLimiter0.getRate(), 5);
+    ASSERT_EQ(rateLimiter0.getSamplesPerSecond(), 5);
     ASSERT_EQ(rateLimiter0.getBurstCapacity(), 5);
 
     // multiplier * rate = 1
     auto rateLimiter1 =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter1.getRate(), 1);
+    ASSERT_EQ(rateLimiter1.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter1.getBurstCapacity(), 1);
 
     // multiplier * rate < 1
     auto rateLimiter2 =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 0.1);
-    ASSERT_EQ(rateLimiter2.getRate(), 0.1);
+    ASSERT_EQ(rateLimiter2.getSamplesPerSecond(), 0.1);
     ASSERT_EQ(rateLimiter2.getBurstCapacity(), 1);
 }
 
@@ -106,19 +106,19 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, BurstMultiplierGreaterThanOne) {
     // multiplier * rate > 1
     auto rateLimiter0 =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 5);
-    ASSERT_EQ(rateLimiter0.getRate(), 5);
+    ASSERT_EQ(rateLimiter0.getSamplesPerSecond(), 5);
     ASSERT_EQ(rateLimiter0.getBurstCapacity(), 12.5);
 
     // multiplier * rate = 1
     auto rateLimiter1 =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 0.4);
-    ASSERT_EQ(rateLimiter1.getRate(), 0.4);
+    ASSERT_EQ(rateLimiter1.getSamplesPerSecond(), 0.4);
     ASSERT_EQ(rateLimiter1.getBurstCapacity(), 1);
 
     // multiplier * rate < 1
     auto rateLimiter2 =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 0.1);
-    ASSERT_EQ(rateLimiter2.getRate(), 0.1);
+    ASSERT_EQ(rateLimiter2.getSamplesPerSecond(), 0.1);
     ASSERT_EQ(rateLimiter2.getBurstCapacity(), 1);
 }
 
@@ -128,7 +128,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterOneSecond) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 2);
-    ASSERT_EQ(rateLimiter.getRate(), 2);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 2);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -146,7 +146,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterLessThanOneSecond) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 4);
-    ASSERT_EQ(rateLimiter.getRate(), 4);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 4);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 4);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -164,7 +164,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterMoreThanOneSecond) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 0.5);
-    ASSERT_EQ(rateLimiter.getRate(), 0.5);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 0.5);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 1);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -181,7 +181,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeEpsilonAbove) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 1);
     ASSERT_GTE(QueryAnalysisSampler::SampleRateLimiter::kEpsilon, 0.001);
     // There are no token available in the bucket initially.
@@ -199,7 +199,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeRemainingTokens) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 2);
-    ASSERT_EQ(rateLimiter.getRate(), 2);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 2);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -221,7 +221,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeBurstCapacity) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -239,7 +239,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAboveBurstCapacity) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -257,7 +257,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeBelowBurstCapacity) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -278,7 +278,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateIncreased) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 0.1);
-    ASSERT_EQ(rateLimiter.getRate(), 0.1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 0.1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 1);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -286,8 +286,8 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateIncreased) {
     advanceTime(Milliseconds(20000));
     // The number of tokens available in the bucket right after the refill is 2 (note that this is
     // greater than the pre-refresh capacity).
-    rateLimiter.refreshRate(1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    rateLimiter.refreshSamplesPerSecond(1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     ASSERT(rateLimiter.tryConsume());
     ASSERT(rateLimiter.tryConsume());
@@ -307,7 +307,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateDecreased) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -315,8 +315,8 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateDecreased) {
     advanceTime(Milliseconds(2000));
     // The number of tokens available in the bucket right after the refill is 1 (note that this is
     // less than the pre-refresh capacity).
-    rateLimiter.refreshRate(0.1);
-    ASSERT_EQ(rateLimiter.getRate(), 0.1);
+    rateLimiter.refreshSamplesPerSecond(0.1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 0.1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 1);
     ASSERT(rateLimiter.tryConsume());
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -338,15 +338,15 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, ConsumeAfterRefresh_RateUnchanged) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket right after the refill is 1.
-    rateLimiter.refreshRate(1);
-    ASSERT_EQ(rateLimiter.getRate(), 1);
+    rateLimiter.refreshSamplesPerSecond(1);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 2);
 
     advanceTime(Milliseconds(1000));
@@ -362,7 +362,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, MicrosecondResolution) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1e6);
-    ASSERT_EQ(rateLimiter.getRate(), 1e6);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1e6);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 1e6);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -379,7 +379,7 @@ TEST_F(QueryAnalysisSamplerRateLimiterTest, NanosecondsResolution) {
 
     auto rateLimiter =
         QueryAnalysisSampler::SampleRateLimiter(getServiceContext(), nss, collUuid, 1e9);
-    ASSERT_EQ(rateLimiter.getRate(), 1e9);
+    ASSERT_EQ(rateLimiter.getSamplesPerSecond(), 1e9);
     ASSERT_EQ(rateLimiter.getBurstCapacity(), 1e9);
     // There are no token available in the bucket initially.
     ASSERT_FALSE(rateLimiter.tryConsume());
@@ -876,12 +876,12 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     auto it0 = rateLimiters1.find(refreshedConfigurations1[0].getNs());
     ASSERT(it0 != rateLimiters1.end());
     ASSERT_EQ(it0->second.getCollectionUuid(), refreshedConfigurations1[0].getCollectionUuid());
-    ASSERT_EQ(it0->second.getRate(), refreshedConfigurations1[0].getSampleRate());
+    ASSERT_EQ(it0->second.getSamplesPerSecond(), refreshedConfigurations1[0].getSamplesPerSecond());
 
     auto it1 = rateLimiters1.find(refreshedConfigurations1[1].getNs());
     ASSERT(it1 != rateLimiters1.end());
     ASSERT_EQ(it1->second.getCollectionUuid(), refreshedConfigurations1[1].getCollectionUuid());
-    ASSERT_EQ(it1->second.getRate(), refreshedConfigurations1[1].getSampleRate());
+    ASSERT_EQ(it1->second.getSamplesPerSecond(), refreshedConfigurations1[1].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2].
     globalOpCounters.gotUpdate();
@@ -913,7 +913,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshQueryStatsAndConfigurations) {
     auto it = rateLimiters2.find(refreshedConfigurations2[0].getNs());
     ASSERT(it != rateLimiters2.end());
     ASSERT_EQ(it->second.getCollectionUuid(), refreshedConfigurations2[0].getCollectionUuid());
-    ASSERT_EQ(it->second.getRate(), refreshedConfigurations2[0].getSampleRate());
+    ASSERT_EQ(it->second.getSamplesPerSecond(), refreshedConfigurations2[0].getSamplesPerSecond());
 
     // The per-second counts after: [0, 2, 5].
     globalOpCounters.gotQuery();
@@ -1055,7 +1055,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     auto oldIt = oldRateLimiters.find(oldConfigurations[0].getNs());
     ASSERT(oldIt != oldRateLimiters.end());
     ASSERT_EQ(oldIt->second.getCollectionUuid(), oldConfigurations[0].getCollectionUuid());
-    ASSERT_EQ(oldIt->second.getRate(), oldConfigurations[0].getSampleRate());
+    ASSERT_EQ(oldIt->second.getSamplesPerSecond(), oldConfigurations[0].getSamplesPerSecond());
 
     advanceTime(Milliseconds(1000));
     // The number of tokens available in the bucket right after the refill is 0 + 2.
@@ -1079,7 +1079,7 @@ TEST_F(QueryAnalysisSamplerTest, RefreshConfigurationsNewCollectionUuid) {
     auto newIt = newRateLimiters.find(newConfigurations[0].getNs());
     ASSERT(newIt != newRateLimiters.end());
     ASSERT_EQ(newIt->second.getCollectionUuid(), newConfigurations[0].getCollectionUuid());
-    ASSERT_EQ(newIt->second.getRate(), newConfigurations[0].getSampleRate());
+    ASSERT_EQ(newIt->second.getSamplesPerSecond(), newConfigurations[0].getSamplesPerSecond());
 
     // Cannot sample if time has not elapsed. There should be no tokens available in the bucket
     // right after the refill unless the one token from the previous configurations was

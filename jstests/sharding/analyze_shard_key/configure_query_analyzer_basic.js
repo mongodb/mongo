@@ -6,7 +6,7 @@
 (function() {
 "use strict";
 
-// Set this to opt into the sampleRate check.
+// Set this to opt into the 'samplesPerSecond' check.
 TestData.testingDiagnosticsEnabled = false;
 
 const dbNameBase = "testDb";
@@ -19,7 +19,7 @@ function testNonExistingCollection(testCases, tenantId) {
     testCases.forEach(testCase => {
         jsTest.log(`Running configureQueryAnalyzer command against an non-existing collection: ${
             tojson({testCase, ns})}`);
-        const cmdObj = {configureQueryAnalyzer: ns, mode: "full", sampleRate: 1};
+        const cmdObj = {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1};
         if (tenantId) {
             cmdObj.$tenant = tenantId;
         }
@@ -47,33 +47,36 @@ function testExistingCollection(writeConn, testCases) {
             `Running configureQueryAnalyzer command against an existing collection:
         ${tojson(testCase)}`);
 
-        // Can set 'sampleRate' to > 0.
-        const basicRes =
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 0.1});
+        // Can set 'samplesPerSecond' to > 0.
+        const basicRes = testCase.conn.adminCommand(
+            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 0.1});
         if (testCase.expectedErrorCode) {
             assert.commandFailedWithCode(basicRes, testCase.expectedErrorCode);
             // There is no need to test the remaining cases.
             return;
         }
         assert.commandWorked(basicRes);
-        assert.commandWorked(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}));
-        assert.commandWorked(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 50}));
+        assert.commandWorked(testCase.conn.adminCommand(
+            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}));
+        assert.commandWorked(testCase.conn.adminCommand(
+            {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 50}));
 
-        // Cannot set 'sampleRate' to 0.
+        // Cannot set 'samplesPerSecond' to 0.
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 0}),
+            testCase.conn.adminCommand(
+                {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 0}),
             ErrorCodes.InvalidOptions);
 
-        // Cannot set 'sampleRate' to larger than 50.
+        // Cannot set 'samplesPerSecond' to larger than 50.
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 51}),
+            testCase.conn.adminCommand(
+                {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 51}),
             ErrorCodes.InvalidOptions);
 
-        // Cannot specify 'sampleRate' when 'mode' is "off".
+        // Cannot specify 'samplesPerSecond' when 'mode' is "off".
         assert.commandFailedWithCode(
-            testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off", sampleRate: 1}),
+            testCase.conn.adminCommand(
+                {configureQueryAnalyzer: ns, mode: "off", samplesPerSecond: 1}),
             ErrorCodes.InvalidOptions);
         assert.commandWorked(testCase.conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 
@@ -81,14 +84,14 @@ function testExistingCollection(writeConn, testCases) {
         assert.commandFailedWithCode(testCase.conn.adminCommand({
             configureQueryAnalyzer: ns,
             mode: "full",
-            sampleRate: 1,
+            samplesPerSecond: 1,
             readConcern: {level: "available"}
         }),
                                      ErrorCodes.InvalidOptions);
         assert.commandFailedWithCode(testCase.conn.adminCommand({
             configureQueryAnalyzer: ns,
             mode: "full",
-            sampleRate: 1,
+            samplesPerSecond: 1,
             writeConcern: {w: "majority"}
         }),
                                      ErrorCodes.InvalidOptions);
@@ -218,7 +221,7 @@ if (!TestData.auth) {
     assert.commandWorked(st.s.getCollection(ns).insert({x: 1}));
 
     const configureRes = assert.commandFailedWithCode(
-        shard0Primary.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1}),
+        shard0Primary.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1}),
         ErrorCodes.IllegalOperation);
     // Verify that the error message is as expected.
     assert.eq(configureRes.errmsg,

@@ -42,7 +42,7 @@ const collName = "testColl";
 const ns = dbName + "." + collName;
 
 const numDocs = 10;
-const sampleRate = 1000;
+const samplesPerSecond = 1000;
 
 const db = st.s0.getDB(dbName);
 const coll = db.getCollection(collName);
@@ -79,8 +79,11 @@ function runCommandAndAssertCurrentOpAndServerStatus(opKind, cmdObj, oldState) {
         newState = getCurrentOpAndServerStatus();
         return assertCurrentOpAndServerStatusMongos(
                    ns, opKind, oldState.mongos0, newState.mongos0) &&
-            assertCurrentOpAndServerStatusMongos(
-                   ns, opKindNoop, oldState.mongos1, newState.mongos1, {expectedSampleRate: 0}) &&
+            assertCurrentOpAndServerStatusMongos(ns,
+                                                 opKindNoop,
+                                                 oldState.mongos1,
+                                                 newState.mongos1,
+                                                 {expectedSamplesPerSecond: 0}) &&
             assertCurrentOpAndServerStatusMongod(
                    ns, opKind, oldState.mongod, newState.mongod, true /* isShardSvr */);
     });
@@ -91,8 +94,8 @@ let currentState = getCurrentOpAndServerStatus();
 assert.eq(bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatus(0)), 0, {currentState});
 
 // Start query sampling.
-assert.commandWorked(
-    st.s0.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
+assert.commandWorked(st.s0.adminCommand(
+    {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}));
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collUuid);
 
 // Execute different kinds of queries and check counters.

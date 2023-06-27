@@ -296,7 +296,7 @@ let viewsCommandTests = {
     configureFailPoint: {skip: isUnrelated},
     configureCollectionBalancing: {skip: isUnrelated},
     configureQueryAnalyzer: {
-        command: {configureQueryAnalyzer: "test.view", mode: "full", sampleRate: 1},
+        command: {configureQueryAnalyzer: "test.view", mode: "full", samplesPerSecond: 1},
         skipStandalone: true,
         expectFailure: true,
         isAdminCommand: true,
