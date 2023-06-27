@@ -1,0 +1,3732 @@
+command_type: system
+stepback: false
+
+
+## Parameters for parameterized builds (see https://github.com/evergreen-ci/evergreen/wiki/Parameterized-Builds)
+parameters:
+  - key: patch_compile_flags
+    description: "Additional SCons flags to be applied during scons compile invocations in this patch"
+
+
+variables:
+  ###
+  # Leave this section uncommented to enable compile.
+  _real_compile_amazon2: &_compile_amazon2
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _real_compile_rhel70: &_compile_rhel70
+      - name: compile
+        variant: compile-rhel70
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _real_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _real_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: compile_mongocrypt_shlib
+        variant: compile-amazon-linux2-arm64-mongocrypt-shlib
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+  _real_expansions: &_expansion_updates
+      []
+  ###
+
+###
+# **Or**: Leave this section uncommented to bypass/skip compile.
+#  _skip_compile_amazon2: &_compile_amazon2
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
+#  _skip_compile_rhel70: &_compile_rhel70
+#      - name: schedule_global_auto_tasks
+#        variant: task_generation
+#  _skip_compile_amazon_linux2_arm64: &_compile_amazon_linux2_arm64
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
+#  _skip_compile_amazon_linux2_arm64_with_mongocrypt_shlib: &_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+#     - name: schedule_global_auto_tasks
+#       variant: task_generation
+#  _skip_expansions: &_expansion_updates
+#      # This is the normal (amazon2) "compile" artifact from https://evergreen.mongodb.com/version/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9
+#      - key: mdb_binary_for_client
+#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+#      - key: mdb_binary_for_server
+#        value: https://mciuploads.s3.amazonaws.com/dsi/sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9/97c6a9e443ff7e171b7310a1fa5c05d0768faff9/linux/mongodb-sys_perf_97c6a9e443ff7e171b7310a1fa5c05d0768faff9.tar.gz
+###
+
+  _src_dir: &src_dir src/mongo
+  _modules: &modules
+    - enterprise
+    - mongo-tools
+    # - mongo
+    - dsi
+    - genny
+    - workloads
+    - linkbench
+    - linkbench2
+    - tsbs
+    - mongo-perf
+    - YCSB
+    - py-tpcc
+    - PrivateWorkloads
+    - flamegraph
+
+
+modules:
+  ###
+  # Same in every DSI project. Ensure that this block is synchronized with
+  # evergreen-dsitest.yml, atlas/system_perf_atlas.yml, and src/dsi/onboarding.py
+  # (search update-repos-here) in this repo, and etc/system_perf.yml and
+  # etc/perf.yml in mongodb/mongo
+  - name: dsi
+    repo: git@github.com:10gen/dsi.git
+    prefix: ${workdir}/src
+    branch: master
+  - name: genny
+    repo: git@github.com:10gen/genny.git
+    prefix: ${workdir}/src
+    branch: master
+  - name: workloads
+    repo: git@github.com:10gen/workloads.git
+    prefix: ${workdir}/src
+    branch: master
+  - name: linkbench
+    repo: git@github.com:10gen/linkbench.git
+    prefix: ${workdir}/src
+    branch: master
+  - name: linkbench2
+    repo: git@github.com:10gen/linkbench2.git
+    prefix: ${workdir}/src
+    branch: master
+  - name: tsbs
+    repo: git@github.com:mongodb-forks/tsbs.git
+    prefix: ${workdir}/src
+    branch: main
+  - name: mongo-perf
+    repo: git@github.com:mongodb/mongo-perf.git
+    prefix: ${workdir}/src
+    branch: master
+  - name: YCSB
+    repo: git@github.com:mongodb-labs/YCSB.git
+    prefix: ${workdir}/src
+    branch: production
+  - name: py-tpcc
+    repo: git@github.com:mongodb-labs/py-tpcc.git
+    prefix: ${workdir}/src
+    branch: production
+  - name: flamegraph
+    repo: git@github.com:mongodb-forks/flamegraph.git
+    prefix: ${workdir}/src
+    branch: master
+#  - name: mongo
+#    repo: git@github.com:mongodb/mongo.git
+#    prefix: ${workdir}/src
+#    branch: master
+  ###
+  - name: enterprise
+    repo: git@github.com:10gen/mongo-enterprise-modules.git
+    prefix: src/mongo/db/modules
+    branch: master
+# Pinned to version 100.7.2
+  - name: mongo-tools
+    repo: git@github.com:mongodb/mongo-tools.git
+    prefix: mongo-tools/src/github.com/mongodb
+    branch: db8c5c4
+  - name: PrivateWorkloads
+    repo: git@github.com:10gen/PrivateWorkloads.git
+    prefix: ${workdir}/src
+    branch: production
+
+###
+# Same in every DSI project
+pre:
+  - func: f_other_pre_ops
+  - func: f_dsi_pre_run
+post:
+  - func: f_dsi_post_run
+  - func: f_other_post_ops
+timeout:
+  - func: f_dsi_timeout
+  - func: f_other_timeout
+###
+
+
+functions:
+  ###
+  # Same in every DSI project
+  f_dsi_pre_run:
+    - command: manifest.load
+    - command: expansions.update
+      params:
+        updates: *_expansion_updates
+  f_run_dsi_workload:
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
+          workloads: ${workloads_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          py-tpcc: ${py-tpcc_rev}
+          flamegraph: ${flamegraph_rev}
+          # mongo: ${mongo_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: echo run_workload ${build_variant} ${task_id}
+    - command: shell.exec
+      type: system
+      params:
+        script: echo determine_failure SYSTEM ${build_variant} ${task_id}
+    - command: shell.exec
+      type: setup
+      params:
+        script: echo determine_failure -m SETUP ${build_variant} ${task_id}
+    - command: shell.exec
+      type: test
+      params:
+        script: echodetermine_failure -m TEST ${build_variant} ${task_id}
+  f_dsi_post_run:
+    - command: shell.exec
+      params:
+        script: echo post_run ${build_variant} ${task_id}
+  f_dsi_timeout:
+    - command: shell.exec
+      params:
+        script: echo post_run ${build_variant} ${task_id}
+  ###
+
+  f_other_post_ops:
+      - command: shell.exec
+        params:
+          working_dir: src
+          script: echo other_post_ops ${build_variant} ${task_id}
+  f_other_pre_ops:
+    - &f_other_pre_ops
+      command: shell.exec
+      params:
+        silent: true
+        script: |
+          for PS in mongo{,d,s,import,export,dump,restore,stat,files,top,bridge} resmoke.py python{,2} lldb _test; do
+              pkill -9 "$PS"
+          done
+  f_other_timeout:
+    # Can't be empty so just `echo`.
+    - command: shell.exec
+      params: {script: "echo"}
+
+  ###
+  # Prepares the environment before compiling the binaries
+  compile prep:
+    # We create a virtual environment with the Python dependencies for compiling the server
+    # installed.
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          mkdir -p mongodb/bin
+
+          /opt/mongodbtoolchain/v4/bin/virtualenv --python /opt/mongodbtoolchain/v4/bin/python3 "${workdir}/compile_venv"
+          source "${workdir}/compile_venv/bin/activate"
+
+          python -m pip install -r etc/pip/compile-requirements.txt
+    - command: expansions.write
+      params:
+         file: expansions.yml
+         redacted: true
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          source "${workdir}/compile_venv/bin/activate"
+
+          # We get the raw version string (r1.2.3-45-gabcdef) from git
+          export MONGO_VERSION=$(git describe --abbrev=7)
+
+          # If this is a patch build, we add the patch version id to the version string so we know
+          # this build was a patch, and which evergreen task it came from
+          if [ "${is_patch|false}" = "true" ]; then
+            MONGO_VERSION="$MONGO_VERSION-patch-${version_id}"
+          fi
+
+          # This script handles sanitizing the version string for use during SCons build
+          # and when pushing artifacts up to S3.
+          IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
+            buildscripts/generate_version_expansions.py --out version_expansions.yml
+    - command: expansions.update
+      params:
+        file: src/version_expansions.yml
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+
+          # This script handles whether the SCons cache should be used
+          source "${workdir}/compile_venv/bin/activate"
+          SCONS_CACHE_MODE=${scons_cache_mode|} USE_SCONS_CACHE=${use_scons_cache|false} \
+            IS_PATCH=${is_patch|false} IS_COMMIT_QUEUE=${is_commit_queue|false} \
+            python buildscripts/generate_compile_expansions.py --out compile_expansions.yml
+    - command: expansions.update
+      params:
+        file: src/compile_expansions.yml
+  ###
+
+  ###
+  # Compile mongodb
+  compile mongodb:
+    - command: shell.exec
+      params:
+        working_dir: src/mongo-tools/src/github.com/mongodb/mongo-tools
+        script: |
+          set -o verbose
+          set -o errexit
+
+          # make sure newlines in the scripts are handled correctly by windows
+          if [ "Windows_NT" = "$OS" ]; then
+            set -o igncr
+          fi;
+
+          # set_goenv provides set_goenv()
+          . ./set_goenv.sh
+          GOROOT="" set_goenv || exit
+          go version
+
+          build_tools="bsondump mongostat mongofiles mongoexport mongoimport mongorestore mongodump mongotop"
+          if [ "${build_mongoreplay}" = "true" ]; then
+              build_tools="$build_tools mongoreplay"
+          fi
+          for i in $build_tools; do
+              go build -o "../../../../../mongodb/bin/$i${exe|}" $i/main/$i.go
+              "../../../../../mongodb/bin/$i${exe|}" --version
+          done
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source "${workdir}/compile_venv/bin/activate"
+          python ./buildscripts/idl/gen_all_feature_flag_list.py
+          mkdir -p mongodb/feature_flags
+          cp ./all_feature_flags.txt mongodb/feature_flags
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source "${workdir}/compile_venv/bin/activate"
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args install-core install-jstestshell SPLIT_DWARF=0 MONGO_VERSION=${version} DESTDIR=$(pwd)/mongodb ${patch_compile_flags|}
+          mkdir -p mongodb/jstests/hooks
+          if [ -d jstests/hooks ]
+          then
+            echo "Fetching JS test DB correctness checks from directory jstests"
+            cp -a jstests/* mongodb/jstests
+
+            echo "Now adding our own special run_validate_collections.js wrapper"
+            mv mongodb/jstests/hooks/run_validate_collections.js mongodb/jstests/hooks/run_validate_collections.actual.js
+
+            cat << EOF > mongodb/jstests/hooks/run_validate_collections.js
+            print("NOTE: run_validate_collections.js will skip the oplog!");
+            TestData = { skipValidationNamespaces: ['local.oplog.rs'] };
+            load('jstests/hooks/run_validate_collections.actual.js');
+          EOF
+          fi
+          tar czf mongodb${compile_variant|}.tar.gz mongodb
+          # Put all matching mongo debug from the build directory in an archive in the same location
+          # as the library archive (i.e. mongodb/bin).
+          tar czvf mongodb${compile_variant|}-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:mongodb/bin/:'
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb${compile_variant|}.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongodb${compile_variant|}.tar.gz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongodb${compile_variant|}-debugsymbols.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongodb${compile_variant|}-${version_id}-debugsymbols.tar.gz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo-debugsymbols.tgz
+  ###
+
+  ###
+  # Compile mongo_crypt_v1 shared library
+  compile mongocrypt shlib:
+    - command: shell.exec
+      params:
+        working_dir: src
+        script: |
+          set -o errexit
+          set -o verbose
+          source "${workdir}/compile_venv/bin/activate"
+          python ./buildscripts/scons.py ${compile_flags|} ${scons_cache_args|} $extra_args SPLIT_DWARF=0 archive-mongo-crypt-dev MONGO_VERSION=${version} DESTDIR=$(pwd)/crypt-lib-${version} PKGDIR=$(pwd) ${patch_compile_flags|}
+          # Put all matching mongo .debug from the build directory in an archive in the same location
+          # as the library archive (i.e. lib).
+          tar czvf mongo-crypt-dev-debugsymbols.tar.gz $(find ./build/cached -name mongo\*.debug -type f) --xform 's:^.*/:lib/:'
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongo-crypt-dev.tgz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongo_crypt_shared_v1-${compile_variant|}-${version_id}.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo_crypt_shared_v1-${version|}-${compile_variant|}.tgz
+    - command: s3.put
+      params:
+        aws_key: ${aws_key}
+        aws_secret: ${aws_secret}
+        local_file: src/mongo-crypt-dev-debugsymbols.tar.gz
+        remote_file: ${project_dir}/${version_id}/${revision}/${platform}/mongo_crypt_shared_v1-${compile_variant|}-${version_id}-debugsymbols.tgz
+        bucket: mciuploads
+        permissions: public-read
+        content_type: ${content_type|application/x-gzip}
+        display_name: mongo_crypt_shared_v1-debugsymbols.tgz
+  ###
+
+  ## Schedule Tasks ##
+  f_schedule_tasks:
+    - command: git.get_project
+      params:
+        directory: *src_dir
+        revisions:
+          dsi: ${dsi_rev}
+          genny: ${genny_rev}
+          linkbench: ${linkbench_rev}
+          linkbench2: ${linkbench2_rev}
+          tsbs: ${tsbs_rev}
+          workloads: ${workloads_rev}
+          mongo-perf: ${mongo-perf_rev}
+          YCSB: ${YCSB_rev}
+          py-tpcc: ${py-tpcc_rev}
+          PrivateWorkloads: ${PrivateWorkloads_rev}
+    - command: expansions.write
+      params:
+        file: ./expansions.yml
+    - command: shell.exec
+      params:
+        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks}
+    - command: generate.tasks
+      params:
+        files:
+          - build/TaskJSON/Tasks.json
+
+
+tasks:
+  ###
+  # Same in every DSI project
+  - name: schedule_global_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: all_tasks
+  - name: schedule_variant_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: variant_tasks
+  - name: schedule_patch_auto_tasks
+    priority: 5
+    commands:
+      - func: f_schedule_tasks
+        vars:
+          tasks: patch_tasks
+  - name: smoke_test
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: short
+  - name: smoke_test_ssl
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: short
+          mongodb_setup: replica-ssl
+          infrastructure_provisioning: replica
+  - name: smoke_test_standalone_auth
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: short
+          mongodb_setup: standalone-auth
+          infrastructure_provisioning: single
+  - name: smoke_test_replset_auth
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: short
+          mongodb_setup: replica-auth
+          infrastructure_provisioning: replica
+  - name: smoke_test_shard_lite_auth
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: short
+          mongodb_setup: shard-lite-auth
+          infrastructure_provisioning: shard-lite
+  - name: dsi_integ_test_run_command_simple
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: run_command_simple
+  ###
+
+  - name: compile
+    commands:
+      - command: manifest.load
+      - command: git.get_project
+        params:
+          directory: src
+          revisions:
+            enterprise: ${enterprise_rev}
+            mongo-tools: ${mongo-tools_rev}
+
+  - name: compile_mongocrypt_shlib
+    commands:
+      - command: manifest.load
+      - command: git.get_project
+        params:
+          directory: src
+          revisions:
+            enterprise: ${enterprise_rev}
+
+  - name: renew_ssl_cert
+    commands:
+      - command: git.get_project
+        params:
+          directory: *src_dir
+          revisions:
+            dsi: ${dsi_rev}
+      # Run the script to generate ssl cert files
+      - command: shell.exec
+        params:
+          script: AWS_ACCESS_KEY_ID=${terraform_key} AWS_SECRET_ACCESS_KEY=${terraform_secret} ./src/dsi/run-dsi generate_ssl_cert
+      # Upload files for further DSI usage
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: member.pem
+          # path to the remote file is intended to be static
+          remote_file: dsi/ssl/member.pem
+          bucket: mciuploads
+          # the visibility has to be public for consumption by DSI
+          permissions: public-read
+          content_type: text/plain
+          display_name: member.pem
+      - command: s3.put
+        params:
+          aws_key: ${aws_key}
+          aws_secret: ${aws_secret}
+          local_file: root.crt
+          # path to the remote file is intended to be static
+          remote_file: dsi/ssl/root.crt
+          bucket: mciuploads
+          # the visibility has to be public for consumption by DSI
+          permissions: public-read
+          content_type: text/plain
+          display_name: root.crt
+
+  - name: linkbench
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "linkbench"
+
+  - name: linkbench_stepdowns
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "linkbench_stepdowns"
+
+  - name: linkbench_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "linkbench_rolling_restarts"
+
+  - name: linkbench_non_retryable_writes_stepdowns
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "linkbench_non_retryable_writes_stepdowns"
+
+  - name: linkbench_non_retryable_writes_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "linkbench_non_retryable_writes_rolling_restarts"
+
+  - name: linkbench2
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "linkbench2"
+          additional_tfvars: "tags: {expire-on-delta: 12}"
+
+  - name: tsbs_load
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_load"
+
+  - name: tsbs_query
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query"
+
+  - name: tsbs_query_finance
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_finance"
+
+  - name: tsbs_query_high_cardinality
+    priority: 5
+    exec_timeout_secs: 432000 # 5 days
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_high_cardinality"
+
+  - name: tsbs_query_sharded
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_sharded"
+
+  - name: tsbs_query_finance_sharded
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_finance_sharded"
+
+  - name: tsbs_query_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_sharded_balancer"
+
+  - name: tsbs_query_finance_sharded_balancer
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_finance_sharded_balancer"
+
+  - name: tsbs_query_manual_bucketing
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tsbs_query_manual_bucketing"
+
+  - name: tpcc
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpcc"
+
+  - name: tpcc_majority
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpcc_majority"
+
+  - name: industry_benchmarks
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb"
+
+  - name: ycsb_60GB
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb-60GB"
+
+  - name: ycsb_60GB.long
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb-60GB.long"
+
+  - name: industry_benchmarks_secondary_reads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb-secondary-reads"
+
+  - name: industry_benchmarks_w1
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb-w1.2023-02"
+
+  - name: industry_benchmarks_stepdowns
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb_stepdowns"
+
+  - name: industry_benchmarks_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb_rolling_restarts"
+
+  - name: industry_benchmarks_non_retryable_writes_stepdowns
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb_non_retryable_writes_stepdowns"
+
+  - name: industry_benchmarks_non_retryable_writes_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ycsb_non_retryable_writes_rolling_restarts"
+
+  - name: crud_workloads_w1
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "crud_workloads_w1.2023-02"
+
+  - name: crud_workloads_majority
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "crud_workloads_majority"
+
+  - name: cursor_manager
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "cursor_manager"
+
+  - name: mixed_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "mixed_workloads"
+
+  - name: mixed_workloads_genny_stepdowns
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "mixed_workloads_genny_stepdowns"
+
+  - name: mixed_workloads_genny_rolling_restarts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "mixed_workloads_genny_rolling_restarts"
+
+  - name: big_update_10k
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "BigUpdate10k"
+
+  - name: misc_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "misc_workloads"
+
+
+  - name: map_reduce_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "map_reduce_workloads"
+
+  - name: genny_canaries
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "genny_canaries"
+
+  - name: retryable_writes_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "retryable_writes"
+
+  - name: snapshot_reads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "snapshot_reads"
+
+  - name: secondary_reads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "secondary_reads"
+
+  - name: bestbuy_agg
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_agg"
+
+  - name: bestbuy_agg_merge_same_db
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_agg_merge_same_db"
+
+  - name: bestbuy_agg_merge_different_db
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_agg_merge_different_db"
+
+  - name: bestbuy_agg_merge_target_hashed
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_agg_merge_target_hashed"
+
+  - name: bestbuy_agg_merge_wordcount
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_agg_merge_wordcount"
+
+  - name: bestbuy_query
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_query"
+
+  - name: bestbuy_4_analytics
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_analytics"
+          test_control_params: |
+            {scale: 4,
+             columnstore: false}
+
+  - name: bestbuy_4_analytics_columnstore
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_analytics"
+          test_control_params: |
+            {scale: 4,
+             columnstore: true}
+
+  # Named Pipes single concurrent query benchmarks
+  - name: external_data_source_1
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          mongodb_setup: "external_data_source"
+          test_control: "external_data_source_1"
+
+  # Named Pipes four concurrent query benchmarks
+  - name: external_data_source_4
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          mongodb_setup: "external_data_source"
+          test_control: "external_data_source_4"
+
+
+  - name: tpch_1_normalized
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 1,
+             schema: normalized}
+
+  - name: tpch_1_denormalized
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 1,
+             schema: denormalized}
+
+  - name: tpch_10_normalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: normalized}
+
+  - name: tpch_10_denormalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized}
+
+  - name: ssb_column_store_comparison
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "ssb_column_store_index"
+          test_control_params: |
+            {scale: 5}
+  - name: column_store_tpch_10_denormalized
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "column_store_tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized,
+             columnstore: true}
+  - name: column_store_tpch_10_denormalized_unindexed
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "column_store_tpch"
+          test_control_params: |
+            {scale: 10,
+             schema: denormalized,
+             columnstore: false}
+
+# TODO PERF-3094: Remove these charts_events tasks.
+  - name: column_store_index_charts_events_1G
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "charts_events"
+          test_control_params: |
+            {scale: 1}
+
+  - name: column_store_index_charts_events_10G
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "charts_events"
+          test_control_params: |
+            {scale: 10}
+
+# TODO PERF-3094: Remove this task.
+  - name: bestbuy_4_inserts
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "bestbuy_4_inserts"
+
+  - name: non_sharded_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "non_sharded"
+
+  - name: mongos_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "mongos"
+
+  - name: mongos_large_catalog_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "mongos_large_catalog"
+
+  - name: move_chunk_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "move_chunk"
+
+  - name: move_chunk_waiting_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "move_chunk_waiting"
+
+  - name: move_chunk_large_chunk_map_workloads
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "move_chunk_large_chunk_map"
+
+  - name: refine_shard_key_transaction_stress
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "refine_shard_key_transaction_stress"
+
+  - name: secondary_performance
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          # Unfortunately the dash/underscore style is different for mongodb_setup and test_control
+          test_control: "secondary_performance"
+          mongodb_setup: "secondary-performance"
+
+  - name: initialsync
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync"
+
+  - name: initialsync-fcbis
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync"
+          mongodb_setup: "replica-2node-fcbis"
+
+  - name: initialsync-logkeeper-short
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-logkeeper"
+          mongodb_setup: "initialsync-logkeeper-short"
+          # Logkeeper dataset with FCV set to 6.0
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.0.tgz"
+
+  - name: initialsync-logkeeper-short-fcbis
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-logkeeper"
+          mongodb_setup: "initialsync-logkeeper-short-fcbis"
+          # Logkeeper dataset with FCV set to 6.0
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.0.tgz"
+
+  - name: initialsync-logkeeper
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        timeout_secs: 43200 # 12 hours
+        vars:
+          test_control: "initialsync-logkeeper"
+
+  - name: initialsync-logkeeper-fcbis
+    priority: 5
+    exec_timeout_secs: 43200 # 12 hours
+    commands:
+      - func: f_run_dsi_workload
+        timeout_secs: 43200 # 12 hours
+        vars:
+          test_control: "initialsync-logkeeper"
+          mongodb_setup: "initialsync-logkeeper-fcbis"
+
+  # The following two initial sync logkeeper automation tasks are only used in the commented-out
+  # "Linux ReplSet Initial Sync LogKeeper Snapshot Update" variant below and are only intended to be
+  # run in patch builds to update FCV for logkeeper datasets.
+  - name: initialsync-logkeeper-short-s3-update
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-logkeeper-short-s3-update"
+          mongodb_setup: "initialsync-logkeeper-short-s3-update"
+          # Update this to Logkeeper dataset with FCV set to latest after each LTS release.
+          mongodb_dataset: "https://dsi-donot-remove.s3-us-west-2.amazonaws.com/InitialSyncLogKeeper/logkeeper-slice-data-mongodb-7.0.tgz"
+
+  - name: initialsync-logkeeper-snapshot-update
+    priority: 5
+    exec_timeout_secs: 216000 # 2.5 days
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-logkeeper-snapshot-update"
+
+  - name: initialsync-large
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-large"
+
+  - name: initialsync-large-fcbis
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "initialsync-large"
+          mongodb_setup: "replica-2node-fcbis"
+
+  - name: change_streams_latency
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_latency"
+
+  - name: change_streams_preimage_throughput
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_preimage_throughput"
+
+  - name: change_streams_preimage_latency
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_preimage_latency"
+
+  - name: change_streams_listen_throughput
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_listen_throughput"
+
+  - name: change_streams_multi_mongos
+    priority: 5
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: "change_streams_multi_mongos"
+
+  - name: genny_execution_UserAcquisition
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/execution/UserAcquisition.yml
+  - name: genny_scale_InsertRemove
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: auto_genny_workload
+          auto_workload_path: ./src/genny/dist/etc/genny/workloads/scale/InsertRemove.yml
+  - name: query_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: query,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: query_read_commands_large_dataset
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: query_large_dataset,
+             include_filter_2: regression,
+             exclude_filter: none,
+             threads: "1 4",
+             read_cmd: 'true',
+             share_dataset: 'true'}
+  - name: fast_running_queries
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          # We can see tests start to peak throughput around 4 threads, but we go much higher to
+          # purposefully stress out the system. We can see that we can get pretty high concurrency
+          # levels and maintain throughput, so we want to test this still holds on experimental
+          # variants like those testing query shape stats.
+          test_control_params: |
+            {include_filter_1: fast_running_query,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "128",
+             read_cmd: 'true'}
+  - name: fast_running_queries_large_dataset
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: fast_running_query,
+             include_filter_2: query_large_dataset,
+             exclude_filter: none,
+             threads: "128",
+             read_cmd: 'true',
+             share_dataset: 'true'}
+  - name: big_collection
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: query,
+             include_filter_2: getmore,
+             exclude_filter: none,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: views-query
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: query_identityview,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: views-aggregation
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: aggregation_identityview,
+             include_filter_2: regression,
+             exclude_filter: none,
+             threads: "1",
+             read_cmd: 'true'}
+  - name: where_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: where,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: update_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: update,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: insert_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: insert,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: compound_wildcard_index_write_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: compound-wildcard-insert compound-wildcard-remove compound-wildcard-update,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: compound_wildcard_index_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: compound-wildcard-query,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: wildcard-index-read_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: wildcard_read,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: wildcard-index-write_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: wildcard_write,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: geo_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: geo,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: misc_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: misc_custom_filter_default_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-default.2023-02
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: misc_custom_filter_slow_or_sample_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-slow-or-sample.2023-02
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: misc_custom_filter_complex_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-complex.2023-02
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: misc_custom_filter_whole_doc_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-custom-filter-whole-doc.2023-02
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: misc_slowms_everything_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          mongodb_setup: mongo-perf-standalone-slowms-everything.2023-02
+          test_control_params: |
+            {include_filter_1: command multi remove mixed,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: singleThreaded_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: single_threaded,
+             include_filter_2: core regression,
+             exclude_filter: none,
+             threads: "1",
+             read_cmd: 'true'}
+  - name: aggregation_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: aggregation,
+             include_filter_2: regression,
+             exclude_filter: js,
+             threads: "1",
+             read_cmd: 'true'}
+  - name: aggregation_read_commands_large_dataset
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: aggregation_large_dataset,
+             include_filter_2: regression,
+             exclude_filter: js,
+             threads: "1 4",
+             read_cmd: 'true',
+             share_dataset: 'true'}
+  - name: agg-query-comparison_read_commands
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: agg_query_comparison,
+             include_filter_2: core regression,
+             exclude_filter: single_threaded,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: pipeline-updates
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: pipeline-updates,
+             include_filter_2: regression,
+             exclude_filter: none,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+  - name: javascript
+    commands:
+      - func: f_run_dsi_workload
+        vars:
+          test_control: mongo-perf.2023-02
+          test_control_params: |
+            {include_filter_1: js,
+             include_filter_2: aggregation,
+             exclude_filter: none,
+             threads: "1 2 4 8",
+             read_cmd: 'true'}
+
+buildvariants:
+  - name: task_generation
+    display_name: Task Generation
+    cron: "0 0 1 1 *"  # Every year starting 1/1 at 00:00
+    modules: *modules
+    expansions:
+      platform: linux
+      project_dir: dsi
+    run_on:
+      - amazon2-build
+    tasks:
+      - name: schedule_global_auto_tasks
+
+  - &compile-amazon2
+    name: compile-amazon2
+    display_name: Compile
+    modules: *modules
+    cron: "0 0 * * *"  # Everyday at 00:00
+    expansions: &compile-expansions
+      platform: linux
+      project_dir: &project_dir dsi
+      tooltags: ""
+      use_scons_cache: true
+      compile_flags: >-
+        --ssl
+        --separate-debug
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
+        install-mongocryptd
+    run_on:
+      - "amazon2-xlarge"
+    tasks:
+      - name: compile
+
+  - &compile-amazon-linux2-arm64
+    name: compile-amazon-linux2-arm64
+    display_name: Compile for Amazon Linux 2 arm64
+    modules: *modules
+    cron: "0 0 * * *"  # Everyday at 00:00
+    expansions:
+      <<: *compile-expansions
+      compile_variant: -arm64
+    run_on:
+      - "amazon2-arm64-large"
+    tasks:
+      - name: compile
+
+  - name: compile-amazon-linux2-arm64-mongocrypt-shlib
+    display_name: Compile mongo_crypt_v1.so for Amazon Linux 2 arm64
+    modules: *modules
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    expansions:
+      <<: *compile-expansions
+      compile_variant: -arm64
+      compile_flags: >-
+        --separate-debug
+        MONGO_DISTMOD=amazon2
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
+        --allocator=system
+        --enable-free-mon=off
+        --enterprise-features=fle,search
+        --js-engine=none
+        --link-model=dynamic-sdk
+        --enable-http-client=off
+        --ssl=off
+        SHLINKFLAGS_EXTRA="-Wl,-Bsymbolic -Wl,--no-gnu-unique"
+        CCFLAGS="-fno-gnu-unique"
+    run_on:
+      - "amazon2-arm64-large"
+    tasks:
+      - name: compile_mongocrypt_shlib
+
+  - name: linux-intel-standalone-classic-query-engine
+    display_name: Linux Intel Standalone (Classic Query Engine)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-classic-query-engine
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: &classic_engine_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: cursor_manager
+      - name: map_reduce_workloads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  - name: linux-intel-standalone-sbe
+    display_name: Linux Intel Standalone (SBE)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sbe
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_tasks
+
+  - name: linux-intel-1-node-replSet-classic-query-engine
+    display_name: Linux Intel 1-Node ReplSet (Classic Query Engine)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-classic-query-engine
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: &classic_engine_1nodereplset_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: linkbench
+      - name: linkbench2
+      - name: snapshot_reads
+
+  - name: linux-intel-1-node-replSet-sbe
+    display_name: Linux Intel 1-Node ReplSet (SBE)
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sbe
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-1-node-replSet-lite-all-feature-flags.2022-11
+    display_name: Linux 1-Node ReplSet (graviton lite, all FF) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      workload_setup: 2022-11
+      mongodb_setup: single-replica-all-feature-flags
+      infrastructure_provisioning: graviton-single-lite.2022-11
+      infrastructure_provisioning_release: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: -arm64
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_4_analytics
+      - name: bestbuy_4_analytics_columnstore
+      - name: bestbuy_4_inserts
+      - name: column_store_index_charts_events_1G
+      - name: column_store_index_charts_events_10G
+      - name: column_store_tpch_10_denormalized
+      - name: column_store_tpch_10_denormalized_unindexed
+      - name: ssb_column_store_comparison
+
+  - name: compile-rhel70
+    display_name: Compile for Atlas-like
+    modules: *modules
+    cron: "0 0 * * *"  # Everyday at 00:00
+    expansions:
+      <<: *compile-expansions
+      compile_flags: >-
+        --ssl
+        --separate-debug
+        MONGO_DISTMOD=rhel70
+        -j$(grep -c ^processor /proc/cpuinfo)
+        --release
+        --variables-files=etc/scons/mongodbtoolchain_stable_gcc.vars
+        --use-diagnostic-latches=off
+      compile_variant: -rhel70
+    run_on:
+      - rhel70-large
+    tasks:
+      - name: compile
+
+  - name: atlas-like-replica.2022-10
+    display_name: M60-like-replica.2022-10 3-Node ReplSet
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas-like-replica.2022-10
+      infrastructure_provisioning: M60-like-replica.2023-04
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: -arm64
+    run_on:
+      - "rhel70-perf-M60-like"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:  # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup.
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: tpcc
+      - name: tpcc_majority
+      - name: linkbench
+      - name: linkbench2
+
+  - name: atlas-M60-real
+    display_name: M60-Atlas ReplSet AWS
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas
+      canaries: none
+      atlas_setup: M60-repl
+      use_custom_build: true
+      infrastructure_provisioning: workload_client_arm.2023-04
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-atlas-large"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: tpcc
+      - name: tpcc_majority
+      - name: linkbench
+      - name: linkbench2
+
+  - name: atlas-M60-real-azure
+    display_name: M60-Atlas ReplSet Azure
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas
+      canaries: none
+      atlas_setup: M60-repl-azure
+      use_custom_build_azure: true
+      compile_variant: -rhel70
+      infrastructure_provisioning: workload_client
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-atlas-large"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-rhel70
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: tpcc
+      - name: tpcc_majority
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-standalone.2022-11
+    display_name: Linux Standalone 2022-11
+    # TODO SERVER-74399 Reduce frequency back to baseline.
+    # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &standalonetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: dsi_integ_test_run_command_simple
+      - name: smoke_test
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: genny_canaries
+      - name: cursor_manager
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  - name: linux-standalone-all-feature-flags.2022-11
+    display_name: Linux Standalone (all feature flags) 2022-11
+    cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-all-feature-flags
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_4_analytics
+      - name: bestbuy_4_analytics_columnstore
+      - name: bestbuy_4_inserts
+      - name: bestbuy_query
+      - name: cursor_manager
+      - name: map_reduce_workloads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+      - name: column_store_index_charts_events_1G
+      - name: column_store_tpch_10_denormalized
+      - name: column_store_tpch_10_denormalized_unindexed
+      - name: ssb_column_store_comparison
+
+  - name: linux-standalone-classic-query-engine.2022-11
+    display_name: Linux Standalone (Classic Query Engine) 2022-11
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-classic-query-engine
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_tasks
+
+  - name: linux-standalone-sbe.2022-11
+    display_name: Linux Standalone (SBE) 2022-11
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sbe
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_tasks
+
+  - name: linux-standalone-sampling-bonsai.2022-11
+    display_name: Linux Standalone (Bonsai with Sampling CE) 2022-11
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_tasks
+
+  - name: linux-intel-standalone-sampling-bonsai
+    display_name: Linux Intel Standalone (Bonsai with Sampling CE)
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_tasks
+
+  - name: linux-standalone-heuristic-bonsai.2022-11
+    display_name: Linux Standalone (Bonsai with Heuristic CE) 2022-11
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-heuristic-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_tasks
+
+  - name: linux-intel-standalone-heuristic-bonsai
+    display_name: Linux Intel Standalone (Bonsai with Heuristic CE)
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-heuristic-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_tasks
+
+  - name: linux-intel-1-node-replSet-sampling-bonsai
+    display_name: Linux Intel 1-Node ReplSet (Bonsai with Sampling CE)
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-1-node-replSet-sampling-bonsai.2022-11
+    display_name: Linux 1-Node ReplSet (Bonsai with Sampling CE) 2022-11
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sampling-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-intel-1-node-replSet-heuristic-bonsai
+    display_name: Linux Intel 1-Node ReplSet (Bonsai with Heuristic CE)
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-heuristic-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single-intel
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon2
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-1-node-replSet-heuristic-bonsai.2022-11
+    display_name: Linux 1-Node ReplSet (Bonsai with Heuristic CE) 2022-11
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-heuristic-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-1-node-replSet-classic-query-engine.2022-11
+    display_name: Linux 1-Node ReplSet (Classic Query Engine) 2022-11
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-classic-query-engine
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-1-node-replSet-sbe.2022-11
+    display_name: Linux 1-Node ReplSet (SBE) 2022-11
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-sbe
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *classic_engine_1nodereplset_tasks
+
+  - name: linux-standalone-query-stats
+    display_name: Linux Standalone 2022-11 (QueryStats)
+    # Match the baseline non-query-stats cron
+    cron: *linux-standalone-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-query-stats
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: tpcc
+
+  - name: linux-standalone-limited-query-stats
+    display_name: Linux Standalone 2022-11 (Rate Limited QueryStats)
+    # Match the baseline non-query-stats cron
+    cron: *linux-standalone-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-query-stats-small-rate-limit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - name: linux-1-node-replSet-all-feature-flags.2022-11
+    display_name: Linux 1-Node ReplSet (all feature flags) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-all-feature-flags
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-1-node-replSet.2022-11
+    display_name: Linux 1-Node ReplSet 2022-11
+    cron: &linux-1-node-repl-cron "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &1nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: smoke_test
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_listen_throughput
+      - name: snapshot_reads
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      - name: tpch_10_normalized
+      - name: tpch_10_denormalized
+
+  - name: linux-standalone-audit.2022-11
+    display_name: Linux Standalone Audit 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-audit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &audit-tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: crud_workloads_majority
+      - name: smoke_test
+
+  - name: linux-1-node-replSet-audit-log-encryption-no-compression.2022-11
+    display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (No compression) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-audit-log-encryption-no-compression
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *audit-tasks
+
+  - name: linux-1-node-replSet-audit.2022-11
+    display_name: Linux Single-node Replica Set Audit 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-audit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *audit-tasks
+
+  - name: linux-1-node-replSet-query-stats
+    display_name: Linux 1-Node ReplSet 2022-11 (QueryStats)
+    cron: *linux-1-node-repl-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-query-stats
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: mixed_workloads
+      - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-shard-lite-fle.2022-11
+    display_name: Linux Shard Lite FLE 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite-fle
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      requires_mongocrypt_shlib: true
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - name: linux-1-node-replSet-audit-log-encryption-compression.2022-11
+    display_name: Linux Single-node Replica Set Audit w/ At-Rest Log Encryption (With compression) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-audit-log-encryption-compression
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *audit-tasks
+
+  - name: linux-1-node-replSet-fle.2022-11
+    display_name: Linux 1-Node ReplSet FLE 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-fle
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      fle: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      requires_mongocrypt_shlib: true
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64_with_mongocrypt_shlib
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: linkbench
+
+  - name: linux-1-node-replSet-ese-cbc.2022-11
+    display_name: Linux 1-Node ReplSet ESE CBC 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-ese-cbc
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: smoke_test
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+
+  - name: linux-1-node-replSet-ese-gcm.2022-11
+    display_name: Linux 1-Node ReplSet ESE GCM 2022-11
+    cron: "0 0 1 * *"  # 00:00 on the first of each month
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-ese-gcm
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: smoke_test
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+
+  - name: linux-1-node-15gbwtcache.2022-11
+    display_name: Linux 1-Node ReplSet 15 GB WiredTiger Cache 2022-11
+    cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica-15gbwtcache
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: smoke_test
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+
+  - name: linux-3-node-1dayhistory-15gbwtcache.2022-11
+    display_name: Linux 3-Node ReplSet 1 Day History 15 GB WiredTiger Cache 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-1dayhistory-15gbwtcache
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: smoke_test
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+
+  - name: linux-3-shard.2022-11
+    display_name: Linux 3-Shard Cluster 2022-11
+    cron: &linux-3-shard-cron "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &linux_3_shard_tasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: industry_benchmarks_w1
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: smoke_test
+      - name: mongos_workloads
+      - name: mongos_large_catalog_workloads
+      - name: change_streams_latency
+      - name: change_streams_listen_throughput
+      - name: change_streams_multi_mongos
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
+
+  - name: linux-3-shard-query-stats
+    display_name: Linux 3-Shard Cluster 2022-11 (QueryStats)
+    cron: *linux-3-shard-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-query-stats
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+
+  - name: linux-3-shard-heuristic-bonsai.2022-11
+    display_name: Linux 3-Shard Cluster 2022-11 (Bonsai with Heuristic CE)
+    cron: *linux-3-shard-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-heuristic-bonsai
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: *linux_3_shard_tasks
+
+  - name: linux-shard-lite-audit.2022-11
+    display_name: Linux Shard Lite Cluster Audit 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite-audit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: industry_benchmarks
+
+  - name: linux-shard-lite.2022-11
+    display_name: Linux Shard Lite Cluster 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &shardlitetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_target_hashed
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_preimage_latency
+      - name: change_streams_preimage_throughput
+      - name: change_streams_listen_throughput
+      - name: industry_benchmarks
+      - name: linkbench
+      - name: mixed_workloads
+      - name: mongos_workloads
+      - name: mongos_large_catalog_workloads
+      - name: move_chunk_large_chunk_map_workloads
+      - name: move_chunk_workloads
+      - name: move_chunk_waiting_workloads
+      - name: smoke_test
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
+
+  - name: linux-shard-lite-intel.2022-11
+    display_name: Linux Shard Lite Cluster Intel 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon2
+    tasks: &shardlitetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: mixed_workloads
+      - name: mongos_workloads
+      - name: move_chunk_workloads
+      - name: move_chunk_waiting_workloads
+      - name: smoke_test
+
+  - name: linux-shard-lite-read-concern-available.2022-11
+    display_name: Linux Shard Lite ReadConcern Available 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite-read-concern-available
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: linkbench
+
+  - name: linux-shard-lite-all-feature-flags.2022-11
+    display_name: Linux Shard Lite (all feature flags) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-lite-all-feature-flags
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-lite
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: change_streams_preimage_throughput
+      - name: change_streams_preimage_latency
+      - name: tsbs_query_sharded
+      - name: tsbs_query_finance_sharded
+      - name: tsbs_query_sharded_balancer
+      - name: tsbs_query_finance_sharded_balancer
+
+  - name: linux-shard-single.2022-11
+    display_name: Linux Shard Single 2022-11
+    cron: "0 0 * * 2,4"  # 00:00 on Tuesday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: shard-single
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: shard-single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-shard-lite"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - name: linux-3-node-replSet.2022-11
+    display_name: Linux 3-Node ReplSet 2022-11
+    cron: &linux-3-node-cron "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks: &3nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: industry_benchmarks_w1
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: industry_benchmarks_secondary_reads
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: refine_shard_key_transaction_stress
+      - name: smoke_test
+      - name: secondary_performance  # Uses a special 2 node mongodb setup
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_preimage_throughput
+      - name: change_streams_latency
+      - name: change_streams_preimage_latency
+      - name: change_streams_listen_throughput
+      - name: snapshot_reads
+      - name: secondary_reads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+      - name: big_update_10k
+
+  - name: linux-3-node-replSet-intel.2022-11
+    display_name: Linux 3-Node ReplSet Intel 2022-11
+    cron: "0 0 * * 1,2,3,4,5,6"  # Everyday except Sunday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica-intel.2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon2
+    tasks: &3nodetasks
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: crud_workloads_majority
+      - name: mixed_workloads
+      - name: smoke_test
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-3-node-replSet-last-continuous-fcv.2022-11
+    display_name: Linux 3-Node ReplSet (Last Continuous FCV) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-last-continuous-fcv
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: industry_benchmarks_secondary_reads
+      - name: industry_benchmarks_w1
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: refine_shard_key_transaction_stress
+      - name: smoke_test
+      - name: secondary_performance # Uses a special 2 node mongodb setup
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_listen_throughput
+      - name: snapshot_reads
+      - name: secondary_reads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+
+  - name: linux-3-node-replSet-last-lts-fcv.2022-11
+    display_name: Linux 3-Node ReplSet (Last LTS FCV) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-last-lts-fcv
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: industry_benchmarks_secondary_reads
+      - name: industry_benchmarks_w1
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: refine_shard_key_transaction_stress
+      - name: smoke_test
+      - name: secondary_performance # Uses a special 2 node mongodb setup
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_listen_throughput
+      - name: snapshot_reads
+      - name: secondary_reads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+
+  - name: linux-3-node-replSet-all-feature-flags.2022-11
+    display_name: Linux 3-Node ReplSet (all feature flags) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-all-feature-flags
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: industry_benchmarks_secondary_reads
+      - name: industry_benchmarks_w1
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: misc_workloads
+      - name: map_reduce_workloads
+      - name: refine_shard_key_transaction_stress
+      - name: smoke_test
+      - name: secondary_performance # Uses a special 2 node mongodb setup
+      - name: non_sharded_workloads
+      - name: bestbuy_agg
+      - name: bestbuy_agg_merge_different_db
+      - name: bestbuy_agg_merge_same_db
+      - name: bestbuy_agg_merge_wordcount
+      - name: bestbuy_query
+      - name: change_streams_latency
+      - name: change_streams_listen_throughput
+      - name: change_streams_preimage_throughput
+      - name: change_streams_preimage_latency
+      - name: snapshot_reads
+      - name: secondary_reads
+      - name: tpcc
+      - name: tpcc_majority
+      - name: tpch_1_normalized
+      - name: tpch_1_denormalized
+      # TODO: Enable in SERVER-66572.
+      # - name: tpch_10_normalized
+      # - name: tpch_10_denormalized
+      - name: linkbench
+      - name: linkbench2
+      - name: tsbs_load
+      - name: tsbs_query
+      - name: tsbs_query_finance
+      - name: tsbs_query_manual_bucketing
+
+  - name: linux-3-node-replSet-notls.2022-11
+    display_name: Linux 3-Node ReplSet (No TLS) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: replica-tls-disabled
+      mongodb_setup_release: 2022-11
+      infrastructure_provisioning: replica
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: crud_workloads_majority
+      - name: industry_benchmarks
+      - name: mixed_workloads
+
+  - name: linux-3-node-replSet-maintenance-events.2022-11
+    display_name: Linux 3-Node ReplSet (Maintenance Events) 2022-11
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday,Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-maintenance-events
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      platform: linux
+      workload_setup: 2022-11
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks_stepdowns
+      - name: industry_benchmarks_rolling_restarts
+      - name: industry_benchmarks_non_retryable_writes_stepdowns
+      - name: industry_benchmarks_non_retryable_writes_rolling_restarts
+      - name: linkbench_stepdowns
+      - name: linkbench_rolling_restarts
+      - name: linkbench_non_retryable_writes_stepdowns
+      - name: linkbench_non_retryable_writes_rolling_restarts
+      - name: mixed_workloads_genny_stepdowns
+      - name: mixed_workloads_genny_rolling_restarts
+
+  - name: linux-3-node-replSet-initialsync.2022-11
+    display_name: Linux 3-Node ReplSet Initial Sync 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-2node
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      authentication: disabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      project_dir: *project_dir
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+      - "rhel70-perf-replset"
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: initialsync-large
+      - name: initialsync-large-fcbis
+
+  - name: linux-3-node-replSet-cpu-cycle-metrics.2023-06
+    display_name: Linux 3-Node ReplSet CPU Cycle Metrics 2023-06
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-ipc-counters.2023-06
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      authentication: disabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      project_dir: *project_dir
+    depends_on: *_compile_amazon_linux2_arm64
+    run_on:
+      - "rhel70-perf-replset"
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - name: linux-replSet-initialsync-logkeeper.2022-11
+    display_name: Linux ReplSet Initial Sync LogKeeper 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: initialsync-logkeeper
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: initialsync-logkeeper
+      workload_setup: 2022-11
+      # EBS logkeeper snapshot with FCV set to 6.0
+      snapshotId: snap-0eca13ca4935455a2
+      platform: linux
+      authentication: disabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      project_dir: *project_dir
+    run_on:
+      - "rhel70-perf-initialsync-logkeeper"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: initialsync-logkeeper
+      - name: initialsync-logkeeper-fcbis
+
+  # Uncomment this to run logkeeper FCV updates automatically. This is only intended to be run in
+  # patch builds.
+  #- name: linux-replSet-initialsync-logkeeper-snapshot-update
+  #  display_name: Linux ReplSet Initial Sync LogKeeper Snapshot Update
+  #  cron: "0 0 * * 4"  # 00:00 on Thursday
+  #  modules: *modules
+  #  expansions:
+  #    mongodb_setup_release: 2022-11
+  #    mongodb_setup: initialsync-logkeeper-snapshot-update
+  #    infrastructure_provisioning_release: 2022-11
+  #    infrastructure_provisioning: initialsync-logkeeper-snapshot-update
+  #    # Update this to latest snapshot after each LTS release.
+  #    snapshotId: snap-0eca13ca4935455a2
+  #    platform: linux
+  #    authentication: disabled
+  #    storageEngine: wiredTiger
+  #    project_dir: *project_dir
+  #  run_on:
+  #    - "rhel70-perf-initialsync-logkeeper"
+  #  depends_on: *_compile_amazon2
+  #  tasks:
+  #    - name: schedule_patch_auto_tasks
+  #    - name: schedule_variant_auto_tasks
+  #    - name: initialsync-logkeeper-snapshot-update
+  #    - name: initialsync-logkeeper-short-s3-update
+
+  - name: linux-replSet-audit.2022-11
+    display_name: Linux 3-Node ReplSet Audit 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-audit
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+
+  - name: linux-replSet-auth-delay.2022-11
+    display_name: Linux 3-Node ReplSet (Auth Delay) 2022-11
+    cron: "0 0 * * 4"  # 00:00 on Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-auth-cluster-delay
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - name: linux-3-node-replSet-query-stats
+    display_name: Linux 3-Node ReplSet 2022-11 (QueryStats)
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-query-stats
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: ycsb_60GB
+      - name: ycsb_60GB.long
+      - name: crud_workloads_majority
+      - name: crud_workloads_w1
+      - name: mixed_workloads
+      - name: tpcc
+      - name: linkbench
+      - name: linkbench2
+
+  - name: linux-3-node-replSet-disable-execution-control
+    display_name: Linux 3-Node ReplSet 2022-11 (Execution Control Off)
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-disable-execution-control
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: bestbuy_agg_merge_wordcount
+      - name: industry_benchmarks
+      - name: linkbench2
+      - name: misc_workloads
+      - name: mixed_workloads
+      - name: snapshot_reads
+      - name: tpcc
+      - name: ycsb_60GB
+
+  - name: linux-3-node-replSet-250mbwtcache.2023-05
+    display_name: Linux 3-Node ReplSet 250 MB WiredTiger Cache 2023-05
+    cron: *linux-3-node-cron
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: replica-250mbwtcache.2023-05
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: replica
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-replset"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
+  - &linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01
+    # TODO SERVER-74399 Reduce frequency back to baseline.
+    # cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    cron: &linux-microbench-cron "0 0 * * *"  # Everyday at 00:00
+    modules: *modules
+    expansions: &standalone-arm-expansions
+      mongodb_setup_release: 2022-11
+      mongodb_setup: mongo-perf-standalone.2023-02
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: workload_client_mongod_combined.2023-01
+      workload_setup: 2022-11
+      use_scons_cache: true
+      platform: linux
+      canaries: none
+      storageEngine: inMemory
+      project_dir: *project_dir
+      compile_variant: "-arm64"
+    run_on:
+    - "rhel70-perf-microbenchmarks"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+    - name: big_collection
+    - name: genny_scale_InsertRemove
+    - name: genny_execution_UserAcquisition
+    - name: aggregation_read_commands
+    - name: aggregation_read_commands_large_dataset
+    - name: agg-query-comparison_read_commands
+    - name: query_read_commands
+    - name: query_read_commands_large_dataset
+    - name: views-aggregation
+    - name: views-query
+    - name: where_read_commands
+    - name: update_read_commands
+    - name: insert_read_commands
+    - name: wildcard-index-read_read_commands
+    - name: wildcard-index-write_read_commands
+    - name: geo_read_commands
+    - name: misc_read_commands
+    - name: misc_custom_filter_default_read_commands
+    - name: misc_custom_filter_slow_or_sample_read_commands
+    - name: misc_custom_filter_complex_read_commands
+    - name: misc_custom_filter_whole_doc_read_commands
+    - name: misc_slowms_everything_read_commands
+    - name: singleThreaded_read_commands
+    - name: pipeline-updates
+    - name: javascript
+    - name: compound_wildcard_index_write_commands
+    - name: compound_wildcard_index_read_commands
+
+# Specialized Temporary Variants to understand the impact of query stats better.
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: fast-query-microbenchmarks-baseline.2023-06
+    display_name: Fast Query Microbenchmarks (Baseline)
+    # TODO SERVER-78295 Fold these tasks in to the regular variants on the normal schedule.
+    cron: &fast-query-cron 0 */4 * * * # Every 4 hours, temporarily.
+    tasks:
+    - name: fast_running_queries
+    - name: fast_running_queries_large_dataset
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: fast-query-microbenchmarks-query-stats.2023-06
+    display_name: Fast Query Microbenchmarks (QueryStats)
+    cron: *fast-query-cron
+    tasks:
+    - name: fast_running_queries
+    - name: fast_running_queries_large_dataset
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-query-stats
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: fast-query-microbenchmarks-limited-query-stats.2023-06
+    display_name: Fast Query Microbenchmarks (Limited QueryStats)
+    cron: *fast-query-cron
+    tasks:
+    - name: fast_running_queries
+    - name: fast_running_queries_large_dataset
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
+
+# Variant: Microbenchmarks with QueryStats
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-arm-query-stats.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory.2023-01 (QueryStats)
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-query-stats
+
+# Variant: Microbenchmarks with rate limited QueryStats
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-arm-limited-query-stats.2023-01
+    display_name: MicroBenchmarks (Rate Limitied QueryStats)
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-query-stats-small-rate-limit
+
+  - &linux-microbenchmarks-repl-arm
+    name: linux-microbenchmarks-repl-arm.2023-01
+    display_name: MicroBenchmarks Arm 1-Node ReplSet inMemory.2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    modules: *modules
+    expansions: &repl-arm-expansions
+      mongodb_setup_release: 2022-11
+      mongodb_setup: mongo-perf-replica.2023-02
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: workload_client_mongod_combined.2023-01
+      workload_setup: 2022-11
+      use_scons_cache: true
+      platform: linux
+      canaries: none
+      storageEngine: inMemory
+      project_dir: *project_dir
+      compile_variant: "-arm64"
+    run_on:
+    - "rhel70-perf-microbenchmarks"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+    - name: genny_scale_InsertRemove
+    - name: update_read_commands
+    - name: insert_read_commands
+    - name: misc_read_commands
+    - name: singleThreaded_read_commands
+    - name: wildcard-index-write_read_commands
+    - name: pipeline-updates
+
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-all-feature-flags-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory (all feature flags).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
+    # Same as standalone tasks, but with tasks required all feature flags added
+    tasks: &mirobenchmarks-all-feature-flags-tasks
+    - name: big_collection
+    - name: genny_scale_InsertRemove
+    - name: genny_execution_UserAcquisition
+    - name: aggregation_read_commands
+    - name: aggregation_read_commands_large_dataset
+    - name: agg-query-comparison_read_commands
+    - name: query_read_commands
+    - name: query_read_commands_large_dataset
+    - name: views-aggregation
+    - name: views-query
+    - name: where_read_commands
+    - name: update_read_commands
+    - name: insert_read_commands
+    - name: wildcard-index-read_read_commands
+    - name: wildcard-index-write_read_commands
+    - name: geo_read_commands
+    - name: misc_read_commands
+    - name: misc_custom_filter_default_read_commands
+    - name: misc_custom_filter_slow_or_sample_read_commands
+    - name: misc_custom_filter_complex_read_commands
+    - name: misc_custom_filter_whole_doc_read_commands
+    - name: misc_slowms_everything_read_commands
+    - name: singleThreaded_read_commands
+    - name: pipeline-updates
+    - name: javascript
+    - name: compound_wildcard_index_write_commands
+    - name: compound_wildcard_index_read_commands
+
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-classic-query-engine-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory (Classic Query Engine).2023-01
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-sbe-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory (SBE).2023-01
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-sbe.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-sampling-bonsai-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory (Bonsai with Sampling CE).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-heuristic-bonsai-arm.2023-01
+    display_name: MicroBenchmarks Arm Standalone inMemory (Bonsai with Heuristic CE).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-arm-expansions
+      mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-repl-arm
+    name: linux-microbenchmarks-repl-all-feature-flags-arm.2023-01
+    display_name: MicroBenchmarks Arm 1-Node ReplSet inMemory (all feature flags).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *repl-arm-expansions
+      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - &linux-microbenchmarks-standalone-intel
+    <<: *linux-microbenchmarks-standalone-arm
+    name: linux-microbenchmarks-standalone-intel.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory.2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions: &standalone-intel-expansions
+      <<: *standalone-arm-expansions
+      infrastructure_provisioning: workload_client_mongod_combined_intel.2023-01
+      compile_variant: ""
+    run_on:
+    - "rhel70-perf-microbenchmarks"
+    depends_on: *_compile_amazon2
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - &linux-microbenchmarks-repl-intel
+    <<: *linux-microbenchmarks-repl-arm
+    name: linux-microbenchmarks-repl-intel.2023-01
+    display_name: MicroBenchmarks Intel 1-Node ReplSet inMemory.2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions: &repl-intel-expansions
+      <<: *repl-arm-expansions
+      infrastructure_provisioning: workload_client_mongod_combined_intel.2023-01
+      compile_variant: ""
+    run_on:
+    - "rhel70-perf-microbenchmarks"
+    depends_on: *_compile_amazon2
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-intel
+    name: linux-microbenchmarks-standalone-all-feature-flags.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory (all feature flags).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-intel-expansions
+      mongodb_setup: mongo-perf-standalone-all-feature-flags.2023-02
+    tasks: *mirobenchmarks-all-feature-flags-tasks
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-intel
+    name: linux-microbenchmarks-standalone-classic-query-engine.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory (Classic Query Engine).2023-01
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-intel-expansions
+      mongodb_setup: mongo-perf-standalone-classic-query-engine.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-intel
+    name: linux-microbenchmarks-standalone-sbe.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory (SBE).2023-01
+    # Will make it less frequent when the current SBE perf improvement is finished (SERVER-69799).
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-intel-expansions
+      mongodb_setup: mongo-perf-standalone-sbe.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-intel
+    name: linux-microbenchmarks-standalone-sampling-bonsai.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory (Bonsai with Sampling CE).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-intel-expansions
+      mongodb_setup: mongo-perf-standalone-sampling-bonsai.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-standalone-intel
+    name: linux-microbenchmarks-standalone-heuristic-bonsai.2023-01
+    display_name: MicroBenchmarks Intel Standalone inMemory (Bonsai with Heuristic CE).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *standalone-intel-expansions
+      mongodb_setup: mongo-perf-standalone-heuristic-bonsai.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - <<: *linux-microbenchmarks-repl-intel
+    name: linux-microbenchmarks-repl-all-feature-flags.2023-01
+    display_name: MicroBenchmarks Intel 1-Node ReplSet inMemory (all feature flags).2023-01
+    cron: "0 0 * * 0,2,3,4,5"  # Run it every day except Saturday and Monday.
+    expansions:
+      <<: *repl-intel-expansions
+      mongodb_setup: mongo-perf-replica-all-feature-flags.2023-02
+    # yaml does not nicely merge arrays, so DO NOT ADD INDIVIDUAL TASKS HERE.
+    # Add tasks to the anchor that this variant references
+    # If diverging from that list, add the entire list of desired tasks here
+
+  - name: linux-1-node-replSet-longRunning.2023-02
+    display_name: Linux 1-Node ReplSet Long-Running 2023-02
+    cron: "0 0 1 * *"  # 00:00 on the first of each month
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: M60-like-single-large-volume.2023-02
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    depends_on: *_compile_amazon_linux2_arm64
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: tsbs_query_high_cardinality
