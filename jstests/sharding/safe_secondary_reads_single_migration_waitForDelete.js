@@ -143,7 +143,7 @@ let testCases = {
     balancerStatus: {skip: "primary only"},
     balancerStop: {skip: "primary only"},
     buildInfo: {skip: "does not return user data"},
-    bulkWrite: {skip: "not yet implemented"},
+    bulkWrite: {skip: "primary only"},
     captrunc: {skip: "primary only"},
     checkMetadataConsistency: {skip: "primary only"},
     checkShardingIndex: {skip: "primary only"},
