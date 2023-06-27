@@ -42,7 +42,7 @@ st.ensurePrimaryShard(dbName, st.shard0.name);
 assert.commandWorked(mongosDB.createCollection(foreignCollName));
 
 assert.commandWorked(
-    st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", sampleRate: 1000}));
+    st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "full", samplesPerSecond: 1000}));
 const foreignCollUUid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(
     st, foreignNs, foreignCollUUid, {skipMongoses: true});

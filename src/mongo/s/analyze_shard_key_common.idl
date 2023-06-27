@@ -62,8 +62,8 @@ structs:
       mode:
         type: QueryAnalyzerMode
         description: "The query analyzer mode."
-      sampleRate:
-        type: double
+      samplesPerSecond:
+        type: safeDouble
         description: "The maximum number of queries to sample per second, in total across the
                       cluster (not per mongos or mongod)."
         optional: true
@@ -79,8 +79,8 @@ structs:
       collectionUuid:
           type: uuid
           description: "The UUID of the collection."
-      sampleRate:
-        type: double
+      samplesPerSecond:
+        type: safeDouble
         description: "The maximum number of queries to sample per second."
       startTime:
         type: date
@@ -102,8 +102,8 @@ structs:
         type: uuid
         description: "The UUID of the collection."
         optional: true
-      sampleRate:
-        type: double
+      samplesPerSecond:
+        type: safeDouble
         description: "The maximum number of queries to sample per second. Only reported by mongos."
         optional: true
       startTime:

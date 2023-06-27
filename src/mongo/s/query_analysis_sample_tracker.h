@@ -57,9 +57,12 @@ public:
     public:
         CollectionSampleTracker(const NamespaceString& nss,
                                 const UUID& collUuid,
-                                double sampleRate,
+                                double samplesPerSec,
                                 const Date_t& startTime)
-            : _nss(nss), _collUuid(collUuid), _sampleRate(sampleRate), _startTime(startTime){};
+            : _nss(nss),
+              _collUuid(collUuid),
+              _samplesPerSec(samplesPerSec),
+              _startTime(startTime){};
 
         NamespaceString getNs() const {
             return _nss;
@@ -69,8 +72,8 @@ public:
             return _collUuid;
         }
 
-        void setSampleRate(double sampleRate) {
-            _sampleRate = sampleRate;
+        void setSamplesPerSecond(double samplesPerSec) {
+            _samplesPerSec = samplesPerSec;
         }
 
         void setStartTime(Date_t startTime) {
@@ -106,7 +109,7 @@ public:
         int64_t _sampledReadsBytes = 0;
         int64_t _sampledWritesCount = 0;
         int64_t _sampledWritesBytes = 0;
-        double _sampleRate;
+        double _samplesPerSec;
         Date_t _startTime;
     };
 

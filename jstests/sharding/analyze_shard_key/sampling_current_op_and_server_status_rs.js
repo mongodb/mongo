@@ -32,7 +32,7 @@ const collName = "testColl";
 const ns = dbName + "." + collName;
 
 const numDocs = 10;
-const sampleRate = 1000;
+const samplesPerSecond = 1000;
 
 const db = primary.getDB(dbName);
 const coll = db.getCollection(collName);
@@ -61,8 +61,8 @@ assert.eq(
     bsonWoCompare(currentState, makeInitialCurrentOpAndServerStatusMongod(0)), 0, {currentState});
 
 // Start query sampling.
-assert.commandWorked(
-    primary.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
+assert.commandWorked(primary.adminCommand(
+    {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}));
 QuerySamplingUtil.waitForActiveSamplingReplicaSet(rst, ns, collUuid);
 
 // Execute different kinds of queries and check counters.

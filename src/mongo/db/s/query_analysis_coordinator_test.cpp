@@ -72,7 +72,7 @@ protected:
         const NamespaceString& nss,
         const UUID& collUuid,
         QueryAnalyzerModeEnum mode,
-        boost::optional<double> sampleRate = boost::none,
+        boost::optional<double> samplesPerSec = boost::none,
         boost::optional<Date_t> startTime = boost::none,
         boost::optional<Date_t> stopTime = boost::none) {
         QueryAnalyzerDocument doc;
@@ -80,7 +80,7 @@ protected:
         doc.setCollectionUuid(collUuid);
         QueryAnalyzerConfiguration configuration;
         configuration.setMode(mode);
-        configuration.setSampleRate(sampleRate);
+        configuration.setSamplesPerSecond(samplesPerSec);
         doc.setConfiguration(configuration);
         doc.setStartTime(startTime ? *startTime : now());
         if (mode == QueryAnalyzerModeEnum::kOff) {
@@ -97,7 +97,7 @@ protected:
         auto& configuration = it->second;
         ASSERT_EQ(configuration.getNs(), analyzerDoc.getNs());
         ASSERT_EQ(configuration.getCollectionUuid(), analyzerDoc.getCollectionUuid());
-        ASSERT_EQ(configuration.getSampleRate(), *analyzerDoc.getSampleRate());
+        ASSERT_EQ(configuration.getSamplesPerSecond(), *analyzerDoc.getSamplesPerSecond());
         ASSERT_EQ(configuration.getStartTime(), analyzerDoc.getStartTime());
     }
 
@@ -105,12 +105,12 @@ protected:
         std::vector<CollectionQueryAnalyzerConfiguration>& configurations,
         const NamespaceString& nss,
         const UUID& collUuid,
-        double sampleRate,
+        double samplesPerSec,
         Date_t startTime) {
         for (const auto& configuration : configurations) {
             if (configuration.getNs() == nss) {
                 ASSERT_EQ(configuration.getCollectionUuid(), collUuid);
-                ASSERT_EQ(configuration.getSampleRate(), sampleRate);
+                ASSERT_EQ(configuration.getSamplesPerSecond(), samplesPerSec);
                 ASSERT_EQ(configuration.getStartTime(), startTime);
                 return;
             }
@@ -671,12 +671,12 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerBasic) {
     assertContainsConfiguration(configurations,
                                 analyzerDoc0.getNs(),
                                 analyzerDoc0.getCollectionUuid(),
-                                *analyzerDoc0.getSampleRate(),
+                                *analyzerDoc0.getSamplesPerSecond(),
                                 startTime0);
     assertContainsConfiguration(configurations,
                                 analyzerDoc1.getNs(),
                                 analyzerDoc1.getCollectionUuid(),
-                                *analyzerDoc1.getSampleRate(),
+                                *analyzerDoc1.getSamplesPerSecond(),
                                 startTime1);
 }
 
@@ -685,7 +685,7 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerOneDisabledCo
 
     auto startTime0 = now();
     auto analyzerDoc0 = makeConfigQueryAnalyzersDocument(
-        nss0, collUuid0, QueryAnalyzerModeEnum::kOff, boost::none /* sampleRate */, startTime0);
+        nss0, collUuid0, QueryAnalyzerModeEnum::kOff, boost::none /* samplesPerSec */, startTime0);
     uassertStatusOK(insertToConfigCollection(operationContext(),
                                              NamespaceString::kConfigQueryAnalyzersNamespace,
                                              analyzerDoc0.toBSON()));
@@ -706,7 +706,7 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsOneSamplerOneDisabledCo
     assertContainsConfiguration(configurations,
                                 analyzerDoc1.getNs(),
                                 analyzerDoc1.getCollectionUuid(),
-                                *analyzerDoc1.getSampleRate(),
+                                *analyzerDoc1.getSamplesPerSecond(),
                                 startTime1);
 }
 
@@ -752,12 +752,12 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) 
     assertContainsConfiguration(configurations0,
                                 analyzerDoc0.getNs(),
                                 analyzerDoc0.getCollectionUuid(),
-                                expectedRatio0 * analyzerDoc0.getSampleRate().get(),
+                                expectedRatio0 * analyzerDoc0.getSamplesPerSecond().get(),
                                 startTime0);
     assertContainsConfiguration(configurations0,
                                 analyzerDoc1.getNs(),
                                 analyzerDoc1.getCollectionUuid(),
-                                expectedRatio0 * analyzerDoc1.getSampleRate().get(),
+                                expectedRatio0 * analyzerDoc1.getSamplesPerSecond().get(),
                                 startTime1);
 
     // Query distribution after: [1, 4.5].
@@ -768,12 +768,12 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) 
     assertContainsConfiguration(configurations1,
                                 analyzerDoc0.getNs(),
                                 analyzerDoc0.getCollectionUuid(),
-                                expectedRatio1 * analyzerDoc0.getSampleRate().get(),
+                                expectedRatio1 * analyzerDoc0.getSamplesPerSecond().get(),
                                 startTime0);
     assertContainsConfiguration(configurations1,
                                 analyzerDoc1.getNs(),
                                 analyzerDoc1.getCollectionUuid(),
-                                expectedRatio1 * analyzerDoc1.getSampleRate().get(),
+                                expectedRatio1 * analyzerDoc1.getSamplesPerSecond().get(),
                                 startTime1);
 
     // Query distribution after: [1.5, 4.5].
@@ -783,12 +783,12 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) 
     assertContainsConfiguration(configurations0,
                                 analyzerDoc0.getNs(),
                                 analyzerDoc0.getCollectionUuid(),
-                                expectedRatio0 * analyzerDoc0.getSampleRate().get(),
+                                expectedRatio0 * analyzerDoc0.getSamplesPerSecond().get(),
                                 startTime0);
     assertContainsConfiguration(configurations0,
                                 analyzerDoc1.getNs(),
                                 analyzerDoc1.getCollectionUuid(),
-                                expectedRatio0 * analyzerDoc1.getSampleRate().get(),
+                                expectedRatio0 * analyzerDoc1.getSamplesPerSecond().get(),
                                 startTime1);
 
     // Query distribution after: [1.5, 0].
@@ -804,12 +804,12 @@ TEST_F(QueryAnalysisCoordinatorTest, GetNewConfigurationsMultipleSamplersBasic) 
     assertContainsConfiguration(configurations0,
                                 analyzerDoc0.getNs(),
                                 analyzerDoc0.getCollectionUuid(),
-                                expectedRatio0 * analyzerDoc0.getSampleRate().get(),
+                                expectedRatio0 * analyzerDoc0.getSamplesPerSecond().get(),
                                 startTime0);
     assertContainsConfiguration(configurations0,
                                 analyzerDoc1.getNs(),
                                 analyzerDoc1.getCollectionUuid(),
-                                expectedRatio0 * analyzerDoc1.getSampleRate().get(),
+                                expectedRatio0 * analyzerDoc1.getSamplesPerSecond().get(),
                                 startTime1);
 }
 

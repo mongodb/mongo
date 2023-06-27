@@ -120,14 +120,15 @@ function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
 
     jsTest.log(`Testing configureQueryAnalyzer command ${tojson({testCase, dbName, collName})}`);
 
-    const runCmdFunc = (host, ns, mode, sampleRate) => {
+    const runCmdFunc = (host, ns, mode, samplesPerSecond) => {
         load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
         const conn = new Mongo(host);
         sleep(AnalyzeShardKeyUtil.getRandInteger(10, 100));
-        return conn.adminCommand({configureQueryAnalyzer: ns, mode, sampleRate});
+        return conn.adminCommand({configureQueryAnalyzer: ns, mode, samplesPerSecond});
     };
 
-    let runCmdThread = new Thread(runCmdFunc, conn.host, ns, "full" /* mode */, 1 /* sampleRate */);
+    let runCmdThread =
+        new Thread(runCmdFunc, conn.host, ns, "full" /* mode */, 1 /* samplesPerSecond */);
     runCmdThread.start();
     setUpTestCase(conn, dbName, collName, testCase.operationType);
     const res =
@@ -155,7 +156,7 @@ function runConfigureQueryAnalyzerTest(conn, testCase, {rst} = {}) {
     // lead to a crash.
     sleep(queryAnalysisSamplerConfigurationRefreshSecs);
     assert.commandWorkedOrFailedWithCode(
-        runCmdFunc(conn.host, ns, "full" /* mode */, 10 /* sampleRate */),
+        runCmdFunc(conn.host, ns, "full" /* mode */, 10 /* samplesPerSecond */),
         testCase.expectedErrCodes);
     sleep(queryAnalysisSamplerConfigurationRefreshSecs);
     assert.commandWorkedOrFailedWithCode(runCmdFunc(conn.host, ns, "off" /* mode */),

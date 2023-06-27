@@ -12,7 +12,7 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 load("jstests/sharding/analyze_shard_key/libs/sampling_current_op_and_server_status_common.js");
 
-const sampleRate = 10000;
+const samplesPerSecond = 10000;
 
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
@@ -71,8 +71,8 @@ function runTest(conn, {rst, st}) {
     let actualSamples = adminDb.aggregate([{$listSampledQueries: {}}]).toArray();
     assert.eq(actualSamples.length, 0);
 
-    conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", sampleRate});
-    conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", sampleRate});
+    conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", samplesPerSecond});
+    conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", samplesPerSecond});
     QuerySamplingUtil.waitForActiveSampling(ns0, collUuid0, {rst, st});
     QuerySamplingUtil.waitForActiveSampling(ns1, collUuid1, {rst, st});
 

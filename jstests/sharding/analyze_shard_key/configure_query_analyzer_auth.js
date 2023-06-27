@@ -27,7 +27,7 @@ function testConfigureQueryAnalyzer(conn) {
     assert(adminDb.logout());
 
     const mode = "full";
-    const sampleRate = 1;
+    const samplesPerSecond = 1;
 
     // Set up a user without any role or privilege.
     assert(adminDb.auth("super", "super"));
@@ -36,10 +36,10 @@ function testConfigureQueryAnalyzer(conn) {
     // Verify that the user is not authorized to run the configureQueryAnalyzer command.
     assert(adminDb.auth("user_no_priv", "pwd"));
     assert.commandFailedWithCode(
-        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, sampleRate}),
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}),
         ErrorCodes.Unauthorized);
     assert.commandFailedWithCode(
-        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, sampleRate}),
+        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
         ErrorCodes.Unauthorized);
     assert(adminDb.logout());
 
@@ -60,9 +60,10 @@ function testConfigureQueryAnalyzer(conn) {
     // Verify that the user is authorized to run the configureQueryAnalyzer command against ns0
     // but not ns1.
     assert(adminDb.auth("user_with_explicit_ns0_priv", "pwd"));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, sampleRate}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
     assert.commandFailedWithCode(
-        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, sampleRate}),
+        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}),
         ErrorCodes.Unauthorized);
     assert(adminDb.logout());
 
@@ -77,8 +78,10 @@ function testConfigureQueryAnalyzer(conn) {
     // Verify that the user is authorized to run the configureQueryAnalyzer command against both
     // ns0 and ns1.
     assert(adminDb.auth("user_cluster_mgr", "pwd"));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, sampleRate}));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, sampleRate}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
     assert(adminDb.logout());
 
     // Set up a user with the 'dbAdmin' role.
@@ -89,10 +92,13 @@ function testConfigureQueryAnalyzer(conn) {
     // Verify that the user is authorized to run the configureQueryAnalyzer command against both
     // ns0 and ns1 but not against a ns in some other database.
     assert(adminDb.auth("user_db_admin", "pwd"));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, sampleRate}));
-    assert.commandWorked(adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, sampleRate}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns0, mode, samplesPerSecond}));
+    assert.commandWorked(
+        adminDb.runCommand({"configureQueryAnalyzer": ns1, mode, samplesPerSecond}));
     assert.commandFailedWithCode(
-        adminDb.runCommand({"configureQueryAnalyzer": otherDbName + collName0, mode, sampleRate}),
+        adminDb.runCommand(
+            {"configureQueryAnalyzer": otherDbName + collName0, mode, samplesPerSecond}),
         ErrorCodes.Unauthorized);
     assert(adminDb.logout());
 }

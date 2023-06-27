@@ -11,7 +11,7 @@
 load("jstests/libs/fail_point_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
-const sampleRate = 1000;
+const samplesPerSecond = 1000;
 const queryAnalysisWriterIntervalSecs = 1;
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const mongodSetParameterOpts = {
@@ -35,7 +35,8 @@ function runTest(conn, primary, {st, rst}) {
     assert.commandWorked(testColl.insert([{x: 1}]));
     const collUuid = QuerySamplingUtil.getCollectionUuid(testDb, collName);
 
-    assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate}));
+    assert.commandWorked(
+        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond}));
     QuerySamplingUtil.waitForActiveSampling(ns, collUuid, {st, rst});
 
     // Test insert to config.sampledQueries.

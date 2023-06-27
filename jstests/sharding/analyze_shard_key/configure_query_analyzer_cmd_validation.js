@@ -17,7 +17,7 @@ function runTest(conn) {
         const aggCmdObj = {
             configureQueryAnalyzer: dbName + "." + collName,
             mode: "full",
-            sampleRate: 1
+            samplesPerSecond: 1
         };
         assert.commandFailedWithCode(
             conn.adminCommand(aggCmdObj),

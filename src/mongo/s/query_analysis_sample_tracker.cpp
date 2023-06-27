@@ -68,10 +68,10 @@ void QueryAnalysisSampleTracker::refreshConfigurations(
                 configuration.getNs(),
                 std::make_shared<CollectionSampleTracker>(configuration.getNs(),
                                                           configuration.getCollectionUuid(),
-                                                          configuration.getSampleRate(),
+                                                          configuration.getSamplesPerSecond(),
                                                           configuration.getStartTime())));
         } else {
-            it->second->setSampleRate(configuration.getSampleRate());
+            it->second->setSamplesPerSecond(configuration.getSamplesPerSecond());
             it->second->setStartTime(configuration.getStartTime());
             newTrackers.emplace(std::make_pair(configuration.getNs(), it->second));
         }
@@ -121,7 +121,7 @@ QueryAnalysisSampleTracker::_getOrCreateCollectionSampleTracker(
                  .emplace(std::make_pair(
                      nss,
                      std::make_shared<QueryAnalysisSampleTracker::CollectionSampleTracker>(
-                         nss, *collUuid, 0 /* sampleRate */, startTime)))
+                         nss, *collUuid, 0 /* samplesPerSec */, startTime)))
                  .first;
         _sampledNamespaces.insert(nss);
     }
@@ -146,7 +146,7 @@ BSONObj QueryAnalysisSampleTracker::CollectionSampleTracker::reportForCurrentOp(
         report.setSampledWritesBytes(_sampledWritesBytes);
     }
     if (isMongos() || serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-        report.setSampleRate(_sampleRate);
+        report.setSamplesPerSecond(_samplesPerSec);
     }
     report.setStartTime(_startTime);
 

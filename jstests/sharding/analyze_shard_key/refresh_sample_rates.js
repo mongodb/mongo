@@ -26,11 +26,11 @@ function testBasic(createConnFn, rst, samplerNames) {
 
     const collName0 = "testColl0";
     const ns0 = dbName + "." + collName0;
-    const sampleRate0 = 5;
+    const samplesPerSecond0 = 5;
 
     const collName1 = "testColl1";
     const ns1 = dbName + "." + collName1;
-    const sampleRate1 = 50;
+    const samplesPerSecond1 = 50;
 
     const db = conn.getDB(dbName);
     assert.commandWorked(db.createCollection(collName0));
@@ -39,16 +39,16 @@ function testBasic(createConnFn, rst, samplerNames) {
     const collUuid1 = QuerySamplingUtil.getCollectionUuid(db, collName1);
 
     jsTest.log("Verifying that refreshing returns the correct configurations");
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", sampleRate: sampleRate0}));
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", sampleRate: sampleRate1}));
+    assert.commandWorked(conn.adminCommand(
+        {configureQueryAnalyzer: ns0, mode: "full", samplesPerSecond: samplesPerSecond0}));
+    assert.commandWorked(conn.adminCommand(
+        {configureQueryAnalyzer: ns1, mode: "full", samplesPerSecond: samplesPerSecond1}));
     const configColl = conn.getCollection("config.queryAnalyzers");
     const startTime0 = configColl.findOne({_id: ns0}).startTime;
     const startTime1 = configColl.findOne({_id: ns1}).startTime;
 
     // Query distribution after: [1, unknown, unknown]. Verify that refreshing returns
-    // sampleRate / numSamplers.
+    // samplesPerSecond / numSamplers.
     let res0 = assert.commandWorked(primary.adminCommand({
         _refreshQueryAnalyzerConfiguration: 1,
         name: samplerNames[0],
@@ -59,19 +59,19 @@ function testBasic(createConnFn, rst, samplerNames) {
         {
             ns: ns0,
             collectionUuid: collUuid0,
-            sampleRate: expectedRatio0 * sampleRate0,
+            samplesPerSecond: expectedRatio0 * samplesPerSecond0,
             startTime: startTime0
         },
         {
             ns: ns1,
             collectionUuid: collUuid1,
-            sampleRate: expectedRatio0 * sampleRate1,
+            samplesPerSecond: expectedRatio0 * samplesPerSecond1,
             startTime: startTime1
         },
     ]);
 
     // Query distribution after: [1, 0, unknown]. Verify that refreshing returns
-    // sampleRate / numSamplers.
+    // samplesPerSecond / numSamplers.
     let res1 = assert.commandWorked(primary.adminCommand({
         _refreshQueryAnalyzerConfiguration: 1,
         name: samplerNames[1],
@@ -82,13 +82,13 @@ function testBasic(createConnFn, rst, samplerNames) {
         {
             ns: ns0,
             collectionUuid: collUuid0,
-            sampleRate: expectedRatio1 * sampleRate0,
+            samplesPerSecond: expectedRatio1 * samplesPerSecond0,
             startTime: startTime0
         },
         {
             ns: ns1,
             collectionUuid: collUuid1,
-            sampleRate: expectedRatio1 * sampleRate1,
+            samplesPerSecond: expectedRatio1 * samplesPerSecond1,
             startTime: startTime1
         },
     ]);
@@ -105,13 +105,13 @@ function testBasic(createConnFn, rst, samplerNames) {
         {
             ns: ns0,
             collectionUuid: collUuid0,
-            sampleRate: expectedRatio2 * sampleRate0,
+            samplesPerSecond: expectedRatio2 * samplesPerSecond0,
             startTime: startTime0
         },
         {
             ns: ns1,
             collectionUuid: collUuid1,
-            sampleRate: expectedRatio2 * sampleRate1,
+            samplesPerSecond: expectedRatio2 * samplesPerSecond1,
             startTime: startTime1
         },
     ]);
@@ -128,13 +128,13 @@ function testBasic(createConnFn, rst, samplerNames) {
         {
             ns: ns0,
             collectionUuid: collUuid0,
-            sampleRate: expectedRatio0 * sampleRate0,
+            samplesPerSecond: expectedRatio0 * samplesPerSecond0,
             startTime: startTime0
         },
         {
             ns: ns1,
             collectionUuid: collUuid1,
-            sampleRate: expectedRatio0 * sampleRate1,
+            samplesPerSecond: expectedRatio0 * samplesPerSecond1,
             startTime: startTime1
         },
     ]);
@@ -148,8 +148,8 @@ function testBasic(createConnFn, rst, samplerNames) {
     }));
     assert.eq(res1.configurations.length, 2);
     assert.sameMembers(res1.configurations, [
-        {ns: ns0, collectionUuid: collUuid0, sampleRate: 0, startTime: startTime0},
-        {ns: ns1, collectionUuid: collUuid1, sampleRate: 0, startTime: startTime1},
+        {ns: ns0, collectionUuid: collUuid0, samplesPerSecond: 0, startTime: startTime0},
+        {ns: ns1, collectionUuid: collUuid1, samplesPerSecond: 0, startTime: startTime1},
     ]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns1, mode: "off"}));
@@ -166,7 +166,7 @@ function testBasic(createConnFn, rst, samplerNames) {
         {
             ns: ns0,
             collectionUuid: collUuid0,
-            sampleRate: expectedRatio1 * sampleRate0,
+            samplesPerSecond: expectedRatio1 * samplesPerSecond0,
             startTime: startTime0
         },
     ]);
@@ -190,15 +190,15 @@ function testFailover(createConnFn, rst, samplerNames) {
     const dbName = "testDbFailover-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
-    const sampleRate = 5;
+    const samplesPerSecond = 5;
 
     let db = conn.getDB(dbName);
     assert.commandWorked(db.createCollection(collName));
     const collUuid = QuerySamplingUtil.getCollectionUuid(db, collName);
 
     jsTest.log("Verify that configurations are persisted and available after failover");
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
+    assert.commandWorked(conn.adminCommand(
+        {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}));
     const configColl = conn.getCollection("config.queryAnalyzers");
     const startTime = configColl.findOne({_id: ns}).startTime;
 
@@ -210,16 +210,19 @@ function testFailover(createConnFn, rst, samplerNames) {
     db = conn.getDB(dbName);
 
     // Query distribution after: [1, unknown, unknown]. Verify that refreshing returns
-    // sampleRate / numSamplers.
+    // samplesPerSecond / numSamplers.
     let res = assert.commandWorked(primary.adminCommand({
         _refreshQueryAnalyzerConfiguration: 1,
         name: samplerNames[0],
         numQueriesExecutedPerSecond: 1
     }));
     const expectedRatio = 1.0 / 3;
-    assert.sameMembers(
-        res.configurations,
-        [{ns: ns, collectionUuid: collUuid, sampleRate: expectedRatio * sampleRate, startTime}]);
+    assert.sameMembers(res.configurations, [{
+                           ns: ns,
+                           collectionUuid: collUuid,
+                           samplesPerSecond: expectedRatio * samplesPerSecond,
+                           startTime
+                       }]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 }
@@ -232,15 +235,15 @@ function testRestart(createConnFn, rst, samplerNames) {
     const dbName = "testDbRestart-" + extractUUIDFromObject(UUID());
     const collName = "testColl";
     const ns = dbName + "." + collName;
-    const sampleRate = 5;
+    const samplesPerSecond = 5;
 
     let db = conn.getDB(dbName);
     assert.commandWorked(db.createCollection(collName));
     const collUuid = QuerySamplingUtil.getCollectionUuid(db, collName);
 
     jsTest.log("Verify that configurations are persisted and available after restart");
-    assert.commandWorked(
-        conn.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: sampleRate}));
+    assert.commandWorked(conn.adminCommand(
+        {configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: samplesPerSecond}));
     const configColl = conn.getCollection("config.queryAnalyzers");
     const startTime = configColl.findOne({_id: ns}).startTime;
 
@@ -251,16 +254,19 @@ function testRestart(createConnFn, rst, samplerNames) {
     db = conn.getDB(dbName);
 
     // Query distribution after: [1, unknown, unknown]. Verify that refreshing returns
-    // sampleRate / numSamplers.
+    // samplesPerSecond / numSamplers.
     let res = assert.commandWorked(primary.adminCommand({
         _refreshQueryAnalyzerConfiguration: 1,
         name: samplerNames[0],
         numQueriesExecutedPerSecond: 1
     }));
     const expectedRatio = 1.0 / 3;
-    assert.sameMembers(
-        res.configurations,
-        [{ns: ns, collectionUuid: collUuid, sampleRate: expectedRatio * sampleRate, startTime}]);
+    assert.sameMembers(res.configurations, [{
+                           ns: ns,
+                           collectionUuid: collUuid,
+                           samplesPerSecond: expectedRatio * samplesPerSecond,
+                           startTime
+                       }]);
 
     assert.commandWorked(conn.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
 }
