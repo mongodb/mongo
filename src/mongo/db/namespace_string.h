@@ -703,7 +703,7 @@ public:
      * valid.
      */
     bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
-        return validDBName(db(), behavior) && !coll().empty();
+        return validDBName(dbName(), behavior) && !coll().empty();
     }
 
     /**
@@ -745,7 +745,7 @@ public:
 
     static bool validDBName(const DatabaseName& dbName,
                             DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
-        return validDBName(dbName.db(), behavior);
+        return validDBName(dbName.toStringWithTenantId(), behavior);
     }
 
     /**

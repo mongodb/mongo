@@ -128,7 +128,7 @@ public:
                             NamespaceString toNss,
                             bool stayTemp) const final;
 
-    static Status validateDBName(StringData dbname);
+    static Status validateDBName(const DatabaseName& dbname);
 
     const NamespaceString& getSystemViewsName() const final {
         return _viewsName;

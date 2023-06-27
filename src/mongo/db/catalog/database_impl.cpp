@@ -165,7 +165,8 @@ static const BSONObj kColumnStoreSpec = BSON("name"
                                              << "v" << 2);
 }  // namespace
 
-Status DatabaseImpl::validateDBName(StringData dbname) {
+Status DatabaseImpl::validateDBName(const DatabaseName& dbName) {
+    const auto dbname = DatabaseNameUtil::serializeForCatalog(dbName);
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
 
@@ -189,7 +190,7 @@ DatabaseImpl::DatabaseImpl(const DatabaseName& dbName)
     : _name(dbName), _viewsName(NamespaceString::makeSystemDotViewsNamespace(_name)) {}
 
 void DatabaseImpl::init(OperationContext* const opCtx) {
-    Status status = validateDBName(_name.db());
+    Status status = validateDBName(_name);
 
     if (!status.isOK()) {
         LOGV2_WARNING(

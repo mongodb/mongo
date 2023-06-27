@@ -1563,18 +1563,17 @@ void ExecCommandDatabase::_initiateCommand() {
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
-    const auto dbname = request.getDatabase().toString();
+    const auto dbName =
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
     uassert(ErrorCodes::InvalidNamespace,
-            fmt::format("Invalid database name: '{}'", dbname),
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+            fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
+
 
     // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
     // not contribute to resource consumption metrics.
     const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
-    _scopedMetrics.emplace(
-        opCtx,
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
-        collect);
+    _scopedMetrics.emplace(opCtx, dbName, collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
@@ -1582,7 +1581,6 @@ void ExecCommandDatabase::_initiateCommand() {
         client->isFromSystemConnection();
 
     const auto invocationNss = _invocation->ns();
-
     validateSessionOptions(
         _sessionOptions, command->getName(), invocationNss, allowTransactionsOnConfigDatabase);
 
@@ -1636,8 +1634,6 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     _invocation->checkAuthorization(opCtx, request);
-    const auto dbName =
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {

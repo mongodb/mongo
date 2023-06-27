@@ -607,5 +607,12 @@ const testColl = testDb.getCollection(kCollName);
     assert.commandWorked(testDb.runCommand({find: kCollName, '$tenant': kTenant}));
 }
 
+// Test invalid db name length which is more than 38 chars.
+{
+    const longDb = primary.getDB("ThisIsADbExceedsTheMaxLengthOfTenantDB38");
+    assert.commandFailedWithCode(longDb.createCollection("testColl", {'$tenant': kTenant}),
+                                 ErrorCodes.InvalidNamespace);
+}
+
 rst.stopSet();
 })();

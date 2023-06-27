@@ -75,10 +75,9 @@
 namespace mongo {
 
 Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName& dbName) const {
-    uassert(
-        13280,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(13280,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
 
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IS) ||
               (dbName.db().compare("local") == 0 && opCtx->lockState()->isLocked()));
@@ -93,10 +92,9 @@ Database* DatabaseHolderImpl::getDb(OperationContext* opCtx, const DatabaseName&
 }
 
 bool DatabaseHolderImpl::dbExists(OperationContext* opCtx, const DatabaseName& dbName) const {
-    uassert(
-        6198702,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(6198702,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     stdx::lock_guard<SimpleMutex> lk(_m);
     auto it = _dbs.find(dbName);
     return it != _dbs.end() && it->second != nullptr;
@@ -131,10 +129,9 @@ std::vector<DatabaseName> DatabaseHolderImpl::getNames() {
 Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
                                      const DatabaseName& dbName,
                                      bool* justCreated) {
-    uassert(
-        6198701,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(6198701,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_IX));
 
     if (justCreated)
@@ -264,10 +261,9 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
 }
 
 void DatabaseHolderImpl::close(OperationContext* opCtx, const DatabaseName& dbName) {
-    uassert(
-        6198700,
-        "invalid db name: " + dbName.toStringForErrorMsg(),
-        NamespaceString::validDBName(dbName.db(), NamespaceString::DollarInDbNameBehavior::Allow));
+    uassert(6198700,
+            "invalid db name: " + dbName.toStringForErrorMsg(),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
     invariant(opCtx->lockState()->isDbLockedForMode(dbName, MODE_X));
 
     stdx::lock_guard<SimpleMutex> lk(_m);

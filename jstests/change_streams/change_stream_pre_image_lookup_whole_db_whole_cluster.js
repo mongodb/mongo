@@ -13,7 +13,7 @@
 
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
-const testDB = db.getSiblingDB(jsTestName());
+const testDB = db.getSiblingDB("preImage_lookup_whole_db_whole_cluster");
 const adminDB = db.getSiblingDB("admin");
 const collWithPreImageName = "coll_with_pre_images";
 const collWithNoPreImageName = "coll_with_no_pre_images";

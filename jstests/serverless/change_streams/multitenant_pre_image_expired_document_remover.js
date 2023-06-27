@@ -88,12 +88,13 @@ const stocks = [
 
 // Create the 'stocks' collection on all three tenants.
 // Enable pre-images collection for 'tenant1' and 'tenant2' but not for 'notUsedTenant'.
+const dbName = "mt_pre_image_expired_doc_remover";
 const stocksCollTenant1 = assertDropAndRecreateCollection(
-    connTenant1.getDB(jsTestName()), "stocks", {changeStreamPreAndPostImages: {enabled: true}});
+    connTenant1.getDB(dbName), "stocks", {changeStreamPreAndPostImages: {enabled: true}});
 const stocksCollTenant2 = assertDropAndRecreateCollection(
-    connTenant2.getDB(jsTestName()), "stocks", {changeStreamPreAndPostImages: {enabled: true}});
+    connTenant2.getDB(dbName), "stocks", {changeStreamPreAndPostImages: {enabled: true}});
 const stocksCollNotUsedTenant =
-    assertDropAndRecreateCollection(connNotUsedTenant.getDB(jsTestName()), "stocks");
+    assertDropAndRecreateCollection(connNotUsedTenant.getDB(dbName), "stocks");
 
 // Insert some documents. They should not create pre-images documents.
 assert.commandWorked(stocksCollTenant1.insertMany(stocks));
