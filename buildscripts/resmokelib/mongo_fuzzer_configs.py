@@ -142,10 +142,6 @@ def generate_mongod_parameters(rng, mode):
     ret["throughputProbingReadWriteRatio"] = rng.uniform(0, 1)
     ret["throughputProbingConcurrencyMovingAverageWeight"] = 1 - rng.random()
 
-    if rng.choice(3 * [True] + [False]):
-        # The old retryable writes format is used by other variants. Weight towards turning on the
-        # new retryable writes format on in this one.
-        ret["storeFindAndModifyImagesInSideCollection"] = True
     ret["wiredTigerConcurrentWriteTransactions"] = rng.randint(5, 32)
     ret["wiredTigerConcurrentReadTransactions"] = rng.randint(5, 32)
     ret["wiredTigerStressConfig"] = False if mode != 'stress' else rng.choice([True, False])

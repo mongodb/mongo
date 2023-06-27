@@ -17,12 +17,7 @@ let replTest = new ReplSetTest({
         {/* secondary */ rsConfig: {priority: 0}},
         {/* arbiter */ rsConfig: {arbiterOnly: true}}
     ],
-    nodeOptions: {
-        setParameter: {
-            TransactionRecordMinimumLifetimeMinutes: 0,
-            storeFindAndModifyImagesInSideCollection: true
-        }
-    }
+    nodeOptions: {setParameter: {TransactionRecordMinimumLifetimeMinutes: 0}}
 });
 let nodes = replTest.startSet();
 

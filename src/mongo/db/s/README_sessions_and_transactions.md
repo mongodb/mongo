@@ -374,11 +374,7 @@ To reconstruct responses for retryable internal transactions, we use the applyOp
 
 #### Special considerations for findAndModify
 
-`findAndModify` additionally, requires the storage of pre/post images. The behavior of recovery differs based on the setting of `storeFindAndModifyImagesInSideCollection`.
-
-If `storeFindAndModifyImagesInSideCollection` is **false**, then upon committing or preparing an internal transaction, we generate a no-op oplog entry that stores either stores the pre or post image of the document involved. The operation entry for the `findAndModify` statement inside the applyOps oplog entry will have a `preImageOpTime` or a `postImageOpTime` field that is set to the opTime of the no-op oplog entry. That opTime will be used to lookup the pre/post image when reconstructing the write response.
-
-If `storeFindAndModifyImagesInSideCollection` is **true**, then upon committing or preparing an internal transaction, we insert a document into `config.image_collection` containing the pre/post image. The operation entry for the findAndModify statement inside the applyOps oplog entry will have a `needsRetryImage` field that is set to `true` to indicate that a pre/post image should be loaded from the side collection when reconstructing the write response. We can do the lookup using a transaction's `lsid` and `txnNumber`.
+`findAndModify` additionally, requires the storage of pre/post images. Upon committing or preparing an internal transaction, we insert a document into `config.image_collection` containing the pre/post image. The operation entry for the findAndModify statement inside the applyOps oplog entry will have a `needsRetryImage` field that is set to `true` to indicate that a pre/post image should be loaded from the side collection when reconstructing the write response. We can do the lookup using a transaction's `lsid` and `txnNumber`.
 
 Currently, a retryable internal transaction can only support a **single** `findAndModify` statement at a time, due to the limitation that `config.image_collection` can only support storing one pre/post image entry for a given `(lsid, txnNumber)`. 
 

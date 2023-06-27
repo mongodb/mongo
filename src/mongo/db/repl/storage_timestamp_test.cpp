@@ -3319,8 +3319,6 @@ protected:
 };
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
     const auto criteria = BSON("_id" << 0);
@@ -3366,8 +3364,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     namespace mmb = mongo::mutablebson;
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
     // Create a new document representing BSONObj with the above contents.
     mmb::Document doc(bsonObj, mmb::Document::kInPlaceEnabled);
@@ -3426,8 +3422,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 }
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
