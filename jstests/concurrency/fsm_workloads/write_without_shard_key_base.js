@@ -186,6 +186,8 @@ var $config = extendWorkload($config, function($config, $super) {
             ErrorCodes.IncompleteTransactionHistory,
             ErrorCodes.NoSuchTransaction,
             ErrorCodes.StaleConfig,
+            ErrorCodes.ShardCannotRefreshDueToLocksHeld,
+            ErrorCodes.WriteConflict
         ];
 
         // If we're running in a stepdown suite, then attempting to update the shard key may
@@ -222,7 +224,8 @@ var $config = extendWorkload($config, function($config, $super) {
                 // WouldChangeOwningShard update).
                 if (res.code === ErrorCodes.LockTimeout || res.code === ErrorCodes.StaleConfig ||
                     res.code === ErrorCodes.ConflictingOperationInProgress ||
-                    res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld) {
+                    res.code === ErrorCodes.ShardCannotRefreshDueToLocksHeld ||
+                    res.code == ErrorCodes.WriteConflict) {
                     if (!msg.includes(otherErrorsInChangeShardKeyMsg)) {
                         return false;
                     }
