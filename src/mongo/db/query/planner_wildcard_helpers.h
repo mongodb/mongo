@@ -105,6 +105,13 @@ bool isWildcardObjectSubpathScan(const IndexScanNode* node);
 BSONElement getWildcardField(const IndexEntry& index);
 
 /**
+ * This helper generates index intervals for the "$_path" field to scan all keys indexing a
+ * document. The index intervals will be ['[MinKey, MinKey]', '["", {})]' ]. The "MinKey" key value
+ * is for documents missing the wildcard field.
+ */
+std::vector<Interval> makeAllValuesForPath();
+
+/**
  * If the compound wildcard index is expanded to any known field and the index is used to answer a
  * $or query, we should expand the index bounds of the wildcard field in such IndexEntry to include
  * all keys. Returns false if the query plan cannot use the index.

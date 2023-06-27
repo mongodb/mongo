@@ -688,12 +688,12 @@ void finalizeWildcardIndexScanConfiguration(
     index->wildcardFieldPos++;
 
     // If the wildcard field is "$_path", the index is used to answer query only on the non-wildcard
-    // prefix of a compound wildcard index. The bounds for both "$_path" fields should be
-    // "[MinKey, MaxKey]". Because the wildcard field can generate multiple keys for one single
-    // document, we should also instruct the IXSCAN to dedup keys.
+    // prefix of a compound wildcard index. The bounds for the "$_path" field should scan all
+    // string values and 'MinKey'. The bounds for the generic wildcard field should scan all values
+    // with bounds, "[MinKey, MaxKey]". Because the wildcard field can generate multiple keys for
+    // one single document, we should also instruct the IXSCAN to dedup keys.
     if (wildcardFieldName == "$_path"_sd) {
-        bounds->fields[index->wildcardFieldPos - 1].intervals.push_back(
-            IndexBoundsBuilder::allValues());
+        bounds->fields[index->wildcardFieldPos - 1].intervals = makeAllValuesForPath();
         bounds->fields[index->wildcardFieldPos].intervals.push_back(
             IndexBoundsBuilder::allValues());
         bounds->fields[index->wildcardFieldPos].name = "$_path";
@@ -774,6 +774,26 @@ BSONElement getWildcardField(const IndexEntry& index) {
     return wildcardElt;
 }
 
+std::vector<Interval> makeAllValuesForPath() {
+    std::vector<Interval> intervals;
+
+    // Generating a [MinKey, MinKey] point interval. We use 'MinKey' as the "$_path" key value for
+    // documents that don't have any wildcard field.
+    BSONObjBuilder minKeyBob;
+    minKeyBob.appendMinKey("");
+    intervals.push_back(IndexBoundsBuilder::makePointInterval(minKeyBob.obj()));
+
+    // Generating a all-value index bounds for only string type, because "$_path" with a string
+    // value tracks the wildcard path.
+    BSONObjBuilder allStringBob;
+    allStringBob.appendMinForType("", BSONType::String);
+    allStringBob.appendMaxForType("", BSONType::String);
+    intervals.push_back(IndexBoundsBuilder::makeRangeInterval(
+        allStringBob.obj(), BoundInclusion::kIncludeStartKeyOnly));
+
+    return intervals;
+}
+
 bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& ixscanNodes) {
     // Check if the index is a CWI and its wildcard field was expanded to a specific field.
     auto isCompoundWildcardIndexToExpand = [](const IndexScanNode* idxNode) {
@@ -790,8 +810,7 @@ bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& 
     // field.
     auto expandIndexBoundsForCWI = [](IndexScanNode* idxNode) {
         IndexEntry& index = idxNode->index;
-        idxNode->bounds.fields[index.wildcardFieldPos - 1].intervals =
-            std::vector<Interval>{IndexBoundsBuilder::allValues()};
+        idxNode->bounds.fields[index.wildcardFieldPos - 1].intervals = makeAllValuesForPath();
         idxNode->bounds.fields[index.wildcardFieldPos].intervals =
             std::vector<Interval>{IndexBoundsBuilder::allValues()};
         idxNode->bounds.fields[index.wildcardFieldPos - 1].name = "$_path";
@@ -805,6 +824,17 @@ bool expandWildcardFieldBounds(std::vector<std::unique_ptr<QuerySolutionNode>>& 
         }
         index.multikeyPaths[index.wildcardFieldPos] = MultikeyComponents();
         idxNode->shouldDedup = true;
+
+        // Reverse the index bounds of the wildcard field.
+        size_t idx = 0;
+        for (auto elem : index.keyPattern) {
+            if (idx == index.wildcardFieldPos) {
+                if (elem.number() < 0) {
+                    idxNode->bounds.fields[index.wildcardFieldPos].reverse();
+                }
+            }
+            idx++;
+        }
     };
 
     // Expand the index bounds of certain compound wildcard indexes in order to avoid missing any

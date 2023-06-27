@@ -1015,14 +1015,17 @@ ProvidedSortSet computeSortsForScan(const IndexEntry& index,
                     tassert(7767200,
                             "The bounds cannot be empty.",
                             bounds.fields[index.wildcardFieldPos - 1].intervals.size() > 0u);
+
+                    auto allValuePath = wcp::makeAllValuesForPath();
                     // No sorts on the following fields should be provided if it's full scan on the
                     // '$_path' field or the bounds for '$_path' consist of multiple intervals. This
                     // can happen for existence queries. For example, {a: {$exists: true}} results
                     // in bounds [["a","a"], ["a.", "a/")] for '$_path' so that keys from documents
                     // where "a" is a nested object are in bounds.
                     if (bounds.fields[index.wildcardFieldPos - 1].intervals.size() != 1u ||
-                        bounds.fields[index.wildcardFieldPos - 1].intervals[0] ==
-                            IndexBoundsBuilder::allValues()) {
+                        std::equal(bounds.fields[index.wildcardFieldPos - 1].intervals.begin(),
+                                   bounds.fields[index.wildcardFieldPos - 1].intervals.end(),
+                                   allValuePath.begin())) {
                         break;
                     }
                 } else {
