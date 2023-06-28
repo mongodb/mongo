@@ -71,24 +71,24 @@ void ReplicaSetNodeProcessInterface::setReplicaSetNodeExecutor(
 
 Status ReplicaSetNodeProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const NamespaceString& ns,
-                                              std::vector<BSONObj>&& objs,
+                                              std::unique_ptr<write_ops::Insert> insertCommand,
                                               const WriteConcernOptions& wc,
                                               boost::optional<OID> targetEpoch) {
     auto&& opCtx = expCtx->opCtx;
     if (_canWriteLocally(opCtx, ns)) {
-        return NonShardServerProcessInterface::insert(expCtx, ns, std::move(objs), wc, targetEpoch);
+        return NonShardServerProcessInterface::insert(
+            expCtx, ns, std::move(insertCommand), wc, targetEpoch);
     }
 
-    BatchedCommandRequest insertCommand(
-        buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+    BatchedCommandRequest batchInsertCommand(std::move(insertCommand));
 
-    return _executeCommandOnPrimary(opCtx, ns, std::move(insertCommand.toBSON())).getStatus();
+    return _executeCommandOnPrimary(opCtx, ns, batchInsertCommand.toBSON()).getStatus();
 }
 
 StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    BatchedObjects&& batch,
+    std::unique_ptr<write_ops::Update> updateCommand,
     const WriteConcernOptions& wc,
     UpsertType upsert,
     bool multi,
@@ -96,11 +96,11 @@ StatusWith<MongoProcessInterface::UpdateResult> ReplicaSetNodeProcessInterface::
     auto&& opCtx = expCtx->opCtx;
     if (_canWriteLocally(opCtx, ns)) {
         return NonShardServerProcessInterface::update(
-            expCtx, ns, std::move(batch), wc, upsert, multi, targetEpoch);
+            expCtx, ns, std::move(updateCommand), wc, upsert, multi, targetEpoch);
     }
+    BatchedCommandRequest batchUpdateCommand(std::move(updateCommand));
 
-    BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
-    auto result = _executeCommandOnPrimary(opCtx, ns, std::move(updateCommand.toBSON()));
+    auto result = _executeCommandOnPrimary(opCtx, ns, batchUpdateCommand.toBSON());
     if (!result.isOK()) {
         return result.getStatus();
     }

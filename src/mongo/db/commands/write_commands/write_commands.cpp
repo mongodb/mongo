@@ -227,6 +227,9 @@ public:
         return shouldBypassDocumentValidationForCommand(_request->body);
     }
 
+protected:
+    const OpMsgRequest* _request;
+
 private:
     // Customization point for 'doCheckAuthorization'.
     virtual void doCheckAuthorizationImpl(AuthorizationSession* authzSession) const = 0;
@@ -272,8 +275,6 @@ private:
                               << " within a transaction.",
                 !replCoord->isOplogDisabledFor(opCtx, ns()));
     }
-
-    const OpMsgRequest* _request;
 };
 
 class CmdInsert final : public WriteCommand {
@@ -296,6 +297,11 @@ private:
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+            // On debug builds, verify that the estimated size of the insert command is at least as
+            // large as the size of the actual, serialized insert command. This ensures that the
+            // logic which estimates the size of insert commands is correct.
+            dassert(write_ops::verifySizeEstimate(_batch, _request));
+
             auto reply = performInserts(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kNotUpdate,
@@ -394,6 +400,11 @@ private:
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+            // On debug builds, verify that the estimated size of the update command is at least as
+            // large as the size of the actual, serialized update command. This ensures that the
+            // logic which estimates the size of update commands is correct.
+            dassert(write_ops::verifySizeEstimate(_batch, _request));
+
             auto reply = performUpdates(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kUpdate,
@@ -507,6 +518,11 @@ private:
         }
 
         void runImpl(OperationContext* opCtx, BSONObjBuilder& result) const override {
+            // On debug builds, verify that the estimated size of the delete command is at least as
+            // large as the size of the actual, serialized delete command. This ensures that the
+            // logic which estimates the size of delete commands is correct.
+            dassert(write_ops::verifySizeEstimate(_batch, _request));
+
             auto reply = performDeletes(opCtx, _batch);
             serializeReply(opCtx,
                            ReplyStyle::kNotUpdate,

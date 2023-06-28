@@ -56,7 +56,8 @@ types:
         deserializer: "mongo::write_ops::UpdateModification::parseFromBSON"
 
 structs:
-
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding size
+    # estimation functions in 'write_ops.cpp'. 
     WriteCommandBase:
         description: "Contains basic information included by all write commands"
         strict: false
@@ -160,7 +161,8 @@ structs:
                 optional: true
 
 commands:
-
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding insert
+    # size estimation functions in 'write_ops.cpp'.
     insert:
         description: "Parser for the 'insert' command."
         strict: true
@@ -173,6 +175,8 @@ commands:
                 type: array<object>
                 supports_doc_sequence: true
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding update
+    # size estimation functions in 'write_ops.cpp'. 
     update:
         description: "Parser for the 'update' command."
         strict: true
@@ -190,6 +194,8 @@ commands:
                 type: RuntimeConstants
                 optional: true
 
+    # IMPORTANT: If any changes are made to the fields here, please update the corresponding delete
+    # size estimation functions in 'write_ops.cpp'. 
     delete:
         description: "Parser for the 'delete' command."
         strict: true

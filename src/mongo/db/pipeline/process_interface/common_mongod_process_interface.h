@@ -118,22 +118,6 @@ public:
                                            const NamespaceString& outputNs) const final;
 
 protected:
-    /**
-     * Builds an ordered insert op on namespace 'nss' and documents to be written 'objs'.
-     */
-    Insert buildInsertOp(const NamespaceString& nss,
-                         std::vector<BSONObj>&& objs,
-                         bool bypassDocValidation);
-
-    /**
-     * Builds an ordered update op on namespace 'nss' with update entries contained in 'batch'.
-     */
-    Update buildUpdateOp(const boost::intrusive_ptr<ExpressionContext>& expCtx,
-                         const NamespaceString& nss,
-                         BatchedObjects&& batch,
-                         UpsertType upsert,
-                         bool multi);
-
     BSONObj _reportCurrentOpForClient(OperationContext* opCtx,
                                       Client* client,
                                       CurrentOpTruncateMode truncateOps,

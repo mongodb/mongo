@@ -55,6 +55,14 @@ public:
 
     class StubWriteSizeEstimator final : public WriteSizeEstimator {
     public:
+        int estimateInsertHeaderSize(const write_ops::Insert& insertReq) const override {
+            return 0;
+        }
+
+        int estimateUpdateHeaderSize(const write_ops::Update& insertReq) const override {
+            return 0;
+        }
+
         int estimateInsertSizeBytes(const BSONObj& insert) const override {
             MONGO_UNREACHABLE;
         }
@@ -64,6 +72,7 @@ public:
             MONGO_UNREACHABLE;
         }
     };
+
     std::unique_ptr<WriteSizeEstimator> getWriteSizeEstimator(
         OperationContext* opCtx, const NamespaceString& ns) const override {
         return std::make_unique<StubWriteSizeEstimator>();
@@ -82,7 +91,7 @@ public:
 
     Status insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                   const NamespaceString& ns,
-                  std::vector<BSONObj>&& objs,
+                  std::unique_ptr<write_ops::Insert> insertCommand,
                   const WriteConcernOptions& wc,
                   boost::optional<OID>) override {
         MONGO_UNREACHABLE;
@@ -90,7 +99,7 @@ public:
 
     StatusWith<UpdateResult> update(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                     const NamespaceString& ns,
-                                    BatchedObjects&& batch,
+                                    std::unique_ptr<write_ops::Update> updateCommand,
                                     const WriteConcernOptions& wc,
                                     UpsertType upsert,
                                     bool multi,

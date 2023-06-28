@@ -90,8 +90,8 @@ const std::vector<BSONObj>& arrayFiltersOf(const T& opEntry) {
 }
 
 /**
- * Utility which estimates the size in bytes of an update statement with the given parameters, when
- * serialized in the format used for the update command.
+ * Utilities which estimate the size, in bytes, of an update/delete statement, respectively with
+ * the given parameters, when serialized in the format used for their respective commands.
  */
 int getUpdateSizeEstimate(const BSONObj& q,
                           const write_ops::UpdateModification& u,
@@ -100,6 +100,33 @@ int getUpdateSizeEstimate(const BSONObj& q,
                           const boost::optional<mongo::BSONObj>& collation,
                           const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
                           const mongo::BSONObj& hint);
+
+int getDeleteSizeEstimate(const BSONObj& q,
+                          const boost::optional<mongo::BSONObj>& collation,
+                          const mongo::BSONObj& hint);
+
+/**
+ * Set of utilities which return true if the estimated write size is greater than or equal to the
+ * actual write size, false otherwise.
+ *
+ * If the caller specifies 'unparsedRequest', these utilities will also return true if the request
+ * used document sequences and the size estimate is greater than the maximum size of a BSONObj. This
+ * indicates that 'unparsedRequest' cannot be serialized to a BSONObj because it exceeds the maximum
+ * BSONObj size.
+ */
+bool verifySizeEstimate(const write_ops::UpdateOpEntry& update);
+bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp);
+bool verifySizeEstimate(const Insert& insertReq, const OpMsgRequest* unparsedRequest = nullptr);
+bool verifySizeEstimate(const Update& updateReq, const OpMsgRequest* unparsedRequest = nullptr);
+bool verifySizeEstimate(const Delete& deleteReq, const OpMsgRequest* unparsedRequest = nullptr);
+
+/**
+ * Set of utilities which estimate the size of the headers (that is, all fields in a write command
+ * outside of the write statements themselves) of an insert/update/delete command, respectively.
+ */
+int getInsertHeaderSizeEstimate(const Insert& insertReq);
+int getUpdateHeaderSizeEstimate(const Update& updateReq);
+int getDeleteHeaderSizeEstimate(const Delete& deleteReq);
 
 /**
  * If the response from a write command contains any write errors, it will throw the first one. All

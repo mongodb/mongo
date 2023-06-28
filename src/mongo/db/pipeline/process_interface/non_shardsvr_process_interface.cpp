@@ -68,11 +68,10 @@ std::vector<FieldPath> NonShardServerProcessInterface::collectDocumentKeyFieldsA
 
 Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                               const NamespaceString& ns,
-                                              std::vector<BSONObj>&& objs,
+                                              std::unique_ptr<write_ops::Insert> insert,
                                               const WriteConcernOptions& wc,
                                               boost::optional<OID> targetEpoch) {
-    auto writeResults = performInserts(
-        expCtx->opCtx, buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+    auto writeResults = performInserts(expCtx->opCtx, *insert);
 
     // Need to check each result in the batch since the writes are unordered.
     for (const auto& result : writeResults.results) {
@@ -86,13 +85,12 @@ Status NonShardServerProcessInterface::insert(const boost::intrusive_ptr<Express
 StatusWith<MongoProcessInterface::UpdateResult> NonShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    BatchedObjects&& batch,
+    std::unique_ptr<write_ops::Update> update,
     const WriteConcernOptions& wc,
     UpsertType upsert,
     bool multi,
     boost::optional<OID> targetEpoch) {
-    auto writeResults =
-        performUpdates(expCtx->opCtx, buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
+    auto writeResults = performUpdates(expCtx->opCtx, *update);
 
     // Need to check each result in the batch since the writes are unordered.
     UpdateResult updateResult;

@@ -48,6 +48,42 @@ using write_ops::UpdateOpEntry;
 
 namespace {
 
+// This constant accounts for the null terminator in each field name and the BSONType byte for
+// each element.
+static constexpr int kPerElementOverhead = 2;
+
+// This constant accounts for the size of a bool.
+static constexpr int kBoolSize = 1;
+
+// Utility which estimates the size of 'WriteCommandBase' when serialized.
+int getWriteCommandBaseSize(const write_ops::WriteCommandBase& base) {
+    static const int kSizeOfOrderedField =
+        write_ops::WriteCommandBase::kOrderedFieldName.size() + kBoolSize + kPerElementOverhead;
+    static const int kSizeOfBypassDocumentValidationField =
+        write_ops::WriteCommandBase::kBypassDocumentValidationFieldName.size() + kBoolSize +
+        kPerElementOverhead;
+
+    auto estSize = static_cast<int>(BSONObj::kMinBSONLength) + kSizeOfOrderedField +
+        kSizeOfBypassDocumentValidationField;
+
+    if (auto stmtId = base.getStmtId(); stmtId) {
+        estSize += write_ops::WriteCommandBase::kStmtIdFieldName.size() + sizeof(std::int32_t) +
+            kPerElementOverhead;
+    }
+
+    if (auto stmtIds = base.getStmtIds(); stmtIds) {
+        estSize += write_ops::WriteCommandBase::kStmtIdsFieldName.size();
+        estSize += static_cast<int>(BSONObj::kMinBSONLength);
+        estSize +=
+            ((sizeof(std::int32_t) + write_ops::kWriteCommandBSONArrayPerElementOverheadBytes) *
+             stmtIds->size());
+        estSize += kPerElementOverhead;
+    }
+
+    return estSize;
+}
+
+
 template <class T>
 void checkOpCountForCommand(const T& op, size_t numOps) {
     uassert(ErrorCodes::InvalidLength,
@@ -98,6 +134,168 @@ int32_t getStmtIdForWriteAt(const WriteCommandBase& writeCommandBase, size_t wri
     const auto& stmtId = writeCommandBase.getStmtId();
     const int32_t kFirstStmtId = stmtId ? *stmtId : 0;
     return kFirstStmtId + writePos;
+}
+
+
+int estimateRuntimeConstantsSize(const mongo::RuntimeConstants& constants) {
+    int size = write_ops::Update::kRuntimeConstantsFieldName.size() +
+        static_cast<int>(BSONObj::kMinBSONLength) + kPerElementOverhead;
+
+    // $$NOW
+    size += RuntimeConstants::kLocalNowFieldName.size() + sizeof(Date_t) + kPerElementOverhead;
+
+    // $$CLUSTER_TIME
+    size +=
+        RuntimeConstants::kClusterTimeFieldName.size() + sizeof(Timestamp) + kPerElementOverhead;
+
+    // $$JS_SCOPE
+    if (const auto& scope = constants.getJsScope(); scope.has_value()) {
+        size += RuntimeConstants::kJsScopeFieldName.size() + scope->objsize() + kPerElementOverhead;
+    }
+
+    // $$IS_MR
+    if (const auto& isMR = constants.getIsMapReduce(); isMR.has_value()) {
+        size += RuntimeConstants::kIsMapReduceFieldName.size() + kBoolSize + kPerElementOverhead;
+    }
+
+    return size;
+}
+
+int getDeleteSizeEstimate(const BSONObj& q,
+                          const boost::optional<mongo::BSONObj>& collation,
+                          const mongo::BSONObj& hint) {
+    using DeleteOpEntry = write_ops::DeleteOpEntry;
+
+    static const int kIntSize = 4;
+    int estSize = static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Add the size of the 'q' field.
+    estSize += DeleteOpEntry::kQFieldName.size() + q.objsize() + kPerElementOverhead;
+
+    // Add the size of the 'collation' field, if present.
+    if (collation) {
+        estSize +=
+            DeleteOpEntry::kCollationFieldName.size() + collation->objsize() + kPerElementOverhead;
+    }
+
+    // Add the size of the 'limit' field.
+    estSize += DeleteOpEntry::kMultiFieldName.size() + kIntSize + kPerElementOverhead;
+
+    // Add the size of the 'hint' field, if present.
+    if (!hint.isEmpty()) {
+        estSize += DeleteOpEntry::kHintFieldName.size() + hint.objsize() + kPerElementOverhead;
+    }
+
+    return estSize;
+}
+
+bool verifySizeEstimate(const write_ops::UpdateOpEntry& update) {
+    return write_ops::getUpdateSizeEstimate(update.getQ(),
+                                            update.getU(),
+                                            update.getC(),
+                                            update.getUpsertSupplied().has_value(),
+                                            update.getCollation(),
+                                            update.getArrayFilters(),
+                                            update.getHint()) >= update.toBSON().objsize();
+}
+
+bool verifySizeEstimate(const Insert& insertReq, const OpMsgRequest* unparsedRequest) {
+    int size = getInsertHeaderSizeEstimate(insertReq);
+    for (auto&& docToInsert : insertReq.getDocuments()) {
+        size += docToInsert.objsize() + kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'insertReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
+    return size >= insertReq.toBSON({} /* commandPassthroughFields */).objsize();
+}
+
+bool verifySizeEstimate(const Update& updateReq, const OpMsgRequest* unparsedRequest) {
+    int size = getUpdateHeaderSizeEstimate(updateReq);
+
+    for (auto&& update : updateReq.getUpdates()) {
+        size += getUpdateSizeEstimate(update.getQ(),
+                                      update.getU(),
+                                      update.getC(),
+                                      update.getUpsertSupplied().has_value(),
+                                      update.getCollation(),
+                                      update.getArrayFilters(),
+                                      update.getHint()) +
+            kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'updateReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
+    return size >= updateReq.toBSON({} /* commandPassthroughFields */).objsize();
+}
+
+bool verifySizeEstimate(const Delete& deleteReq, const OpMsgRequest* unparsedRequest) {
+    int size = getDeleteHeaderSizeEstimate(deleteReq);
+
+    for (auto&& deleteOp : deleteReq.getDeletes()) {
+        size += write_ops::getDeleteSizeEstimate(
+                    deleteOp.getQ(), deleteOp.getCollation(), deleteOp.getHint()) +
+            kWriteCommandBSONArrayPerElementOverheadBytes;
+    }
+
+    // Return true if 'deleteReq' originated from a document sequence and our size estimate exceeds
+    // the size limit.
+    if (unparsedRequest && !unparsedRequest->sequences.empty() && size > BSONObjMaxUserSize) {
+        return true;
+    }
+    return size >= deleteReq.toBSON({} /* commandPassthroughFields */).objsize();
+}
+
+int getInsertHeaderSizeEstimate(const Insert& insertReq) {
+    int size = getWriteCommandBaseSize(insertReq.getWriteCommandBase()) +
+        write_ops::Insert::kDocumentsFieldName.size() + kPerElementOverhead +
+        static_cast<int>(BSONObj::kMinBSONLength);
+
+    size += Insert::kCommandName.size() + kPerElementOverhead + insertReq.getNamespace().size() +
+        1 /* ns string null terminator */;
+
+    return size;
+}
+
+int getUpdateHeaderSizeEstimate(const Update& updateReq) {
+    int size = getWriteCommandBaseSize(updateReq.getWriteCommandBase());
+
+    size += Update::kCommandName.size() + kPerElementOverhead + updateReq.getNamespace().size() +
+        1 /* ns string null terminator */;
+
+    size += write_ops::Update::kUpdatesFieldName.size() + kPerElementOverhead +
+        static_cast<int>(BSONObj::kMinBSONLength);
+
+    // Handle runtime constants.
+    if (auto runtimeConstants = updateReq.getRuntimeConstants(); runtimeConstants.has_value()) {
+        size += estimateRuntimeConstantsSize(*runtimeConstants);
+    }
+
+    return size;
+}
+
+int getDeleteHeaderSizeEstimate(const Delete& deleteReq) {
+    int size = getWriteCommandBaseSize(deleteReq.getWriteCommandBase());
+
+    size += Delete::kCommandName.size() + kPerElementOverhead + deleteReq.getNamespace().size() +
+        1 /* ns string null terminator */;
+
+    size += write_ops::Delete::kDeletesFieldName.size() + kPerElementOverhead +
+        static_cast<int>(BSONObj::kMinBSONLength);
+
+    return size;
+}
+
+bool verifySizeEstimate(const write_ops::DeleteOpEntry& deleteOp) {
+    return write_ops::getDeleteSizeEstimate(deleteOp.getQ(),
+                                            deleteOp.getCollation(),
+                                            deleteOp.getHint()) >= deleteOp.toBSON().objsize();
 }
 
 int getUpdateSizeEstimate(const BSONObj& q,

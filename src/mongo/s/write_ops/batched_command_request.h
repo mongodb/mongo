@@ -47,19 +47,26 @@ class BatchedCommandRequest {
 public:
     enum BatchType { BatchType_Insert, BatchType_Update, BatchType_Delete };
 
+    BatchedCommandRequest(std::unique_ptr<write_ops::Insert> insertOp)
+        : _batchType(BatchType_Insert), _insertReq(std::move(insertOp)) {}
+
     BatchedCommandRequest(write_ops::Insert insertOp)
-        : _batchType(BatchType_Insert),
-          _insertReq(std::make_unique<write_ops::Insert>(std::move(insertOp))) {}
+        : BatchedCommandRequest(std::make_unique<write_ops::Insert>(std::move(insertOp))) {}
+
+    BatchedCommandRequest(std::unique_ptr<write_ops::Update> updateOp)
+        : _batchType(BatchType_Update), _updateReq(std::move(updateOp)) {}
 
     BatchedCommandRequest(write_ops::Update updateOp)
-        : _batchType(BatchType_Update),
-          _updateReq(std::make_unique<write_ops::Update>(std::move(updateOp))) {}
+        : BatchedCommandRequest(std::make_unique<write_ops::Update>(std::move(updateOp))) {}
+
+    BatchedCommandRequest(std::unique_ptr<write_ops::Delete> deleteOp)
+        : _batchType(BatchType_Delete), _deleteReq(std::move(deleteOp)) {}
 
     BatchedCommandRequest(write_ops::Delete deleteOp)
-        : _batchType(BatchType_Delete),
-          _deleteReq(std::make_unique<write_ops::Delete>(std::move(deleteOp))) {}
+        : BatchedCommandRequest(std::make_unique<write_ops::Delete>(std::move(deleteOp))) {}
 
     BatchedCommandRequest(BatchedCommandRequest&&) = default;
+    BatchedCommandRequest& operator=(BatchedCommandRequest&&) = default;
 
     static BatchedCommandRequest parseInsert(const OpMsgRequest& request);
     static BatchedCommandRequest parseUpdate(const OpMsgRequest& request);
@@ -84,6 +91,18 @@ public:
     const auto& getDeleteRequest() const {
         invariant(_deleteReq);
         return *_deleteReq;
+    }
+
+    std::unique_ptr<write_ops::Insert> extractInsertRequest() {
+        return std::move(_insertReq);
+    }
+
+    std::unique_ptr<write_ops::Update> extractUpdateRequest() {
+        return std::move(_updateReq);
+    }
+
+    std::unique_ptr<write_ops::Delete> extractDeleteRequest() {
+        return std::move(_deleteReq);
     }
 
     std::size_t sizeWriteOps() const;

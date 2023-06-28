@@ -106,14 +106,13 @@ ShardServerProcessInterface::collectDocumentKeyFieldsForHostedCollection(Operati
 
 Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                                            const NamespaceString& ns,
-                                           std::vector<BSONObj>&& objs,
+                                           std::unique_ptr<write_ops::Insert> insert,
                                            const WriteConcernOptions& wc,
                                            boost::optional<OID> targetEpoch) {
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    BatchedCommandRequest insertCommand(
-        buildInsertOp(ns, std::move(objs), expCtx->bypassDocumentValidation));
+    BatchedCommandRequest insertCommand(std::move(insert));
 
     insertCommand.setWriteConcern(wc.toBSON());
 
@@ -125,7 +124,7 @@ Status ShardServerProcessInterface::insert(const boost::intrusive_ptr<Expression
 StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::update(
     const boost::intrusive_ptr<ExpressionContext>& expCtx,
     const NamespaceString& ns,
-    BatchedObjects&& batch,
+    std::unique_ptr<write_ops::Update> update,
     const WriteConcernOptions& wc,
     UpsertType upsert,
     bool multi,
@@ -133,8 +132,7 @@ StatusWith<MongoProcessInterface::UpdateResult> ShardServerProcessInterface::upd
     BatchedCommandResponse response;
     BatchWriteExecStats stats;
 
-    BatchedCommandRequest updateCommand(buildUpdateOp(expCtx, ns, std::move(batch), upsert, multi));
-
+    BatchedCommandRequest updateCommand(std::move(update));
     updateCommand.setWriteConcern(wc.toBSON());
 
     ClusterWriter::write(expCtx->opCtx, updateCommand, &stats, &response, targetEpoch);
