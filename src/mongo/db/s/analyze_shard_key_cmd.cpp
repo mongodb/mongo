@@ -73,6 +73,9 @@ public:
                     "Cannot skip analyzing all metrics",
                     request().getAnalyzeKeyCharacteristics() ||
                         request().getAnalyzeReadWriteDistribution());
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot specify both 'sampleRate' and 'sampleSize'",
+                    !request().getSampleRate() || !request().getSampleSize());
 
             const auto& nss = ns();
             const auto& key = request().getKey();
@@ -97,7 +100,13 @@ public:
             // Calculate metrics about the characteristics of the shard key.
             if (request().getAnalyzeKeyCharacteristics()) {
                 auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
-                    opCtx, analyzeShardKeyId, nss, collUuid, key);
+                    opCtx,
+                    analyzeShardKeyId,
+                    nss,
+                    collUuid,
+                    key,
+                    request().getSampleRate(),
+                    request().getSampleSize());
                 if (!keyCharacteristics) {
                     // No calculation was performed. By design this must be because the shard key
                     // does not have a supporting index. If the command is not requesting the

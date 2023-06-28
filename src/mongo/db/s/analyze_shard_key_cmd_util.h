@@ -45,7 +45,9 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
     const UUID& analyzeShardKeyId,
     const NamespaceString& nss,
     const UUID& collUuid,
-    const KeyPattern& shardKey);
+    const KeyPattern& shardKey,
+    boost::optional<double> sampleRate,
+    boost::optional<int64_t> sampleSize);
 
 /**
  * Returns metrics about the read and write distribution based on sampled queries.

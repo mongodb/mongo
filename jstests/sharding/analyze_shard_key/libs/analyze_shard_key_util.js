@@ -175,11 +175,21 @@ var AnalyzeShardKeyUtil = (function() {
 
     function validateKeyCharacteristicsMetrics(metrics) {
         assert.gt(metrics.numDocsTotal, 0, metrics);
+        assert.gt(metrics.numDocsSampled, 0, metrics);
         assert.gt(metrics.numDistinctValues, 0, metrics);
         assert.gt(metrics.mostCommonValues.length, 0, metrics);
         assert.gt(metrics.avgDocSizeBytes, 0, metrics);
 
-        assert.gte(metrics.numDocsTotal, metrics.numDistinctValues, metrics);
+        assert.gte(metrics.numDocsTotal, metrics.numDocsSampled, metrics);
+        if (metrics.hasOwnProperty("numOrphanDocs")) {
+            assert.gte(metrics.numOrphanDocs, 0, metrics);
+            assert.gte(metrics.numDocsTotal, metrics.numOrphanDocs);
+        }
+        if (metrics.isUnique) {
+            assert.eq(metrics.numDocsSampled, metrics.numDistinctValues, metrics);
+        } else {
+            assert.gte(metrics.numDocsSampled, metrics.numDistinctValues, metrics);
+        }
         assert.gte(metrics.numDistinctValues, metrics.mostCommonValues.length, metrics);
 
         let totalFrequency = 0;
@@ -222,6 +232,7 @@ var AnalyzeShardKeyUtil = (function() {
 
     function assertKeyCharacteristicsMetrics(actual, expected) {
         assert.eq(actual.numDocsTotal, expected.numDocs, {actual, expected});
+        assert.eq(actual.numDocsSampled, expected.numDocs, {actual, expected});
         assert.eq(actual.isUnique, expected.isUnique, {actual, expected});
         assert.eq(actual.numDistinctValues, expected.numDistinctValues, {actual, expected});
 

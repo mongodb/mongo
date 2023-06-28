@@ -66,6 +66,7 @@ namespace {
 
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics);
 MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingReadWriteDistributionMetrics);
+MONGO_FAIL_POINT_DEFINE(analyzeShardKeyPauseBeforeCalculatingCollStatsMetrics);
 
 constexpr StringData kIndexKeyFieldName = "key"_sd;
 constexpr StringData kDocFieldName = "doc"_sd;
@@ -76,14 +77,42 @@ constexpr StringData kMostCommonValuesFieldName = "mostCommonValues"_sd;
 constexpr StringData kFrequencyFieldName = "frequency"_sd;
 constexpr StringData kNumOrphanDocsFieldName = "numOrphanDocs"_sd;
 
-const int64_t kEmptyDocSizeBytes = BSONObj().objsize();
-
 const std::string kOrphanDocsWarningMessage = "If \"" +
     KeyCharacteristicsMetrics::kNumOrphanDocsFieldName + "\" is large relative to \"" +
     KeyCharacteristicsMetrics::kNumDocsTotalFieldName +
     "\", you may want to rerun the command at some other time to get more accurate \"" +
     KeyCharacteristicsMetrics::kNumDistinctValuesFieldName + "\" and \"" +
     KeyCharacteristicsMetrics::kMostCommonValuesFieldName + "\" metrics.";
+
+/**
+ * Validates that exactly one of 'sampleRate' and 'sampleSize' is specified.
+ */
+void validateSamplingOptions(boost::optional<double> sampleRate,
+                             boost::optional<int64_t> sampleSize) {
+    invariant(sampleRate || sampleSize, "Must specify one of 'sampleRate' and 'sampleSize'");
+    invariant(!sampleRate || !sampleSize, "Cannot specify both 'sampleRate' and 'sampleSize'");
+}
+
+/**
+ * Validates the metrics about the characteristics of a shard key.
+ */
+void validateKeyCharacteristicsMetrics(KeyCharacteristicsMetrics metrics) {
+    const auto msg =
+        "Unexpected error when calculating metrics about the cardinality and frequency of the "
+        "shard key " +
+        metrics.toBSON().toString();
+    tassert(7826508, msg, metrics.getNumDocsTotal() >= metrics.getNumDocsSampled());
+    if (metrics.getIsUnique()) {
+        tassert(7826509, msg, metrics.getNumDocsSampled() == metrics.getNumDistinctValues());
+    } else {
+        tassert(7826510, msg, metrics.getNumDocsSampled() >= metrics.getNumDistinctValues());
+    }
+    tassert(
+        7826511, msg, metrics.getNumDocsSampled() >= (int64_t)metrics.getMostCommonValues().size());
+    if (auto numOrphanDocs = metrics.getNumOrphanDocs()) {
+        tassert(7826512, msg, metrics.getNumDocsTotal() >= *numOrphanDocs);
+    }
+}
 
 /**
  * Returns an aggregate command request for calculating the cardinality and frequency metrics for
@@ -112,7 +141,9 @@ const std::string kOrphanDocsWarningMessage = "If \"" +
 AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const NamespaceString& nss,
                                                                        const BSONObj& shardKey,
                                                                        const BSONObj& hintIndexKey,
-                                                                       int numMostCommonValues) {
+                                                                       int numMostCommonValues,
+                                                                       int64_t numDocsTotal,
+                                                                       int64_t numDocsToSample) {
     uassertStatusOK(validateIndexKey(hintIndexKey));
 
     std::vector<BSONObj> pipeline;
@@ -120,6 +151,12 @@ AggregateCommandRequest makeAggregateRequestForCardinalityAndFrequency(const Nam
     pipeline.push_back(BSON("$project" << BSON("_id" << 0 << kIndexKeyFieldName
                                                      << BSON("$meta"
                                                              << "indexKey"))));
+
+    if (numDocsTotal > numDocsToSample) {
+        pipeline.push_back(
+            BSON("$match" << BSON("$sampleRate" << (numDocsToSample * 1.0 / numDocsTotal))));
+        pipeline.push_back(BSON("$limit" << numDocsToSample));
+    }
 
     // Calculate the "frequency" of each original/hashed shard key value by doing a $group.
     BSONObjBuilder groupByBuilder;
@@ -382,7 +419,8 @@ boost::optional<IndexSpec> findCompatiblePrefixedIndex(OperationContext* opCtx,
 }
 
 struct CardinalityFrequencyMetrics {
-    int64_t numDocs = 0;
+    int64_t numDocsTotal = 0;
+    int64_t numDocsSampled = 0;
     int64_t numDistinctValues = 0;
     std::vector<ValueFrequencyMetrics> mostCommonValues;
 };
@@ -436,16 +474,21 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
                                                                    const UUID& analyzeShardKeyId,
                                                                    const NamespaceString& nss,
                                                                    const BSONObj& shardKey,
-                                                                   int64_t numDocs) {
+                                                                   int64_t numDocsTotal,
+                                                                   int64_t numDocsToSample,
+                                                                   int numMostCommonValues) {
     LOGV2(6915302,
           "Calculating cardinality and frequency for a unique shard key",
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
-          "shardKey"_attr = shardKey);
+          "shardKey"_attr = shardKey,
+          "numDocsTotal"_attr = numDocsTotal,
+          "numDocsToSample"_attr = numDocsToSample,
+          "numMostCommonValues"_attr = numMostCommonValues);
 
     CardinalityFrequencyMetrics metrics;
 
-    const auto numMostCommonValues = gNumMostCommonValues.load();
+    numMostCommonValues = std::min(numMostCommonValues, (int)numDocsToSample);
     const auto maxSizeBytesPerValue = kMaxBSONObjSizeMostCommonValues / numMostCommonValues;
 
     std::vector<BSONObj> pipeline;
@@ -462,29 +505,13 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyUnique(OperationCont
         metrics.mostCommonValues.emplace_back(std::move(value), 1);
     });
 
-    uassert(ErrorCodes::IllegalOperation,
+    uassert(7826506,
             "Cannot analyze the cardinality and frequency of a shard key for an empty collection",
             metrics.mostCommonValues.size() > 0);
 
-    metrics.numDistinctValues = [&] {
-        if (int64_t numMostCommonValues = metrics.mostCommonValues.size();
-            numDocs < numMostCommonValues) {
-            LOGV2_WARNING(
-                7477402,
-                "The number of documents returned by $collStats appears to be less than the number "
-                "of sampled documents for cardinality and frequency metrics calculation. This is "
-                "likely caused by an unclean shutdown that resulted in an inaccurate fast count "
-                "or by insertions that have occurred since the command started. Setting the number "
-                "of documents to the number of sampled documents.",
-                "analyzeShardKeyId"_attr = analyzeShardKeyId,
-                "numCountedDocs"_attr = numDocs,
-                "numSampledDocs"_attr = numMostCommonValues);
-            return numMostCommonValues;
-        }
-        return numDocs;
-    }();
-    metrics.numDocs = metrics.numDistinctValues;
-
+    metrics.numDistinctValues = numDocsToSample;
+    metrics.numDocsSampled = numDocsToSample;
+    metrics.numDocsTotal = numDocsTotal;
     return metrics;
 }
 
@@ -497,29 +524,34 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
                                                                     const UUID& analyzeShardKeyId,
                                                                     const NamespaceString& nss,
                                                                     const BSONObj& shardKey,
-                                                                    const BSONObj& hintIndexKey) {
+                                                                    const BSONObj& hintIndexKey,
+                                                                    int64_t numDocsTotal,
+                                                                    int64_t numDocsToSample,
+                                                                    int numMostCommonValues) {
     LOGV2(6915303,
           "Calculating cardinality and frequency for a non-unique shard key",
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey,
-          "indexKey"_attr = hintIndexKey);
+          "indexKey"_attr = hintIndexKey,
+          "numDocsTotal"_attr = numDocsTotal,
+          "numDocsToSample"_attr = numDocsToSample,
+          "numMostCommonValues"_attr = numMostCommonValues);
 
     CardinalityFrequencyMetrics metrics;
 
-    const auto numMostCommonValues = gNumMostCommonValues.load();
     const auto maxSizeBytesPerValue = kMaxBSONObjSizeMostCommonValues / numMostCommonValues;
 
     auto aggRequest = makeAggregateRequestForCardinalityAndFrequency(
-        nss, shardKey, hintIndexKey, numMostCommonValues);
+        nss, shardKey, hintIndexKey, numMostCommonValues, numDocsTotal, numDocsToSample);
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         auto numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
         invariant(numDocs > 0);
-        if (metrics.numDocs == 0) {
-            metrics.numDocs = numDocs;
+        if (metrics.numDocsSampled == 0) {
+            metrics.numDocsSampled = numDocs;
         } else {
-            invariant(metrics.numDocs == numDocs);
+            invariant(metrics.numDocsSampled == numDocs);
         }
 
         auto numDistinctValues = doc.getField(kNumDistinctValuesFieldName).exactNumberLong();
@@ -555,11 +587,57 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
         metrics.mostCommonValues.emplace_back(std::move(value), frequency);
     });
 
+    uassert(7826507,
+            "Cannot analyze the cardinality and frequency of a shard key because the number of "
+            "sampled documents is zero",
+            metrics.numDocsSampled > 0);
+
+    metrics.numDocsTotal = std::max(numDocsTotal, metrics.numDocsSampled);
+    return metrics;
+}
+
+/**
+ * Returns the cardinality and frequency metrics for a shard key given that the shard key is unique
+ * and the collection has the the given fast count of the number of documents.
+ */
+CardinalityFrequencyMetrics calculateCardinalityAndFrequency(OperationContext* opCtx,
+                                                             const UUID& analyzeShardKeyId,
+                                                             const NamespaceString& nss,
+                                                             const BSONObj& shardKey,
+                                                             const BSONObj& hintIndexKey,
+                                                             bool isUnique,
+                                                             int64_t numDocsTotal,
+                                                             boost::optional<double> sampleRate,
+                                                             boost::optional<int64_t> sampleSize) {
+    validateSamplingOptions(sampleRate, sampleSize);
     uassert(ErrorCodes::IllegalOperation,
             "Cannot analyze the cardinality and frequency of a shard key for an empty collection",
-            metrics.numDocs > 0);
+            numDocsTotal > 0);
 
-    return metrics;
+    const auto numMostCommonValues = gNumMostCommonValues.load();
+    uassert(ErrorCodes::InvalidOptions,
+            str::stream() << "The requested number of most common values is " << numMostCommonValues
+                          << " but the requested number of documents according to 'sampleSize'"
+                          << " is " << sampleSize,
+            !sampleSize || (*sampleSize >= numMostCommonValues));
+
+    const auto numDocsToSample =
+        sampleRate ? std::ceil(*sampleRate * numDocsTotal) : std::min(*sampleSize, numDocsTotal);
+    return isUnique ? calculateCardinalityAndFrequencyUnique(opCtx,
+                                                             analyzeShardKeyId,
+                                                             nss,
+                                                             shardKey,
+                                                             numDocsTotal,
+                                                             numDocsToSample,
+                                                             numMostCommonValues)
+                    : calculateCardinalityAndFrequencyGeneric(opCtx,
+                                                              analyzeShardKeyId,
+                                                              nss,
+                                                              shardKey,
+                                                              hintIndexKey,
+                                                              numDocsTotal,
+                                                              numDocsToSample,
+                                                              numMostCommonValues);
 }
 
 /**
@@ -571,12 +649,18 @@ CardinalityFrequencyMetrics calculateCardinalityAndFrequencyGeneric(OperationCon
 MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
                                           const UUID& analyzeShardKeyId,
                                           const CollectionPtr& collection,
-                                          const BSONObj& shardKey) {
+                                          const BSONObj& shardKey,
+                                          boost::optional<double> sampleRate,
+                                          boost::optional<int64_t> sampleSize) {
+    validateSamplingOptions(sampleRate, sampleSize);
+
     LOGV2(6915304,
           "Calculating monotonicity",
           logAttrs(collection->ns()),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
-          "shardKey"_attr = shardKey);
+          "shardKey"_attr = shardKey,
+          "sampleRate"_attr = sampleRate,
+          "sampleSize"_attr = sampleSize);
 
     MonotonicityMetrics metrics;
 
@@ -613,6 +697,28 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
     bool scannedMultipleShardKeys = false;
     BSONObj firstShardKey;
 
+    const int64_t numRecordsTotal = collection->numRecords(opCtx);
+    uassert(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)
+                ? ErrorCodes::CollectionIsEmptyLocally
+                : ErrorCodes::IllegalOperation,
+            "Cannot analyze the monotonicity of a shard key for an empty collection",
+            numRecordsTotal > 0);
+
+    const auto numRecordsToSample = sampleRate ? std::ceil(*sampleRate * numRecordsTotal)
+                                               : std::min(*sampleSize, numRecordsTotal);
+    const auto recordSampleRate =
+        sampleRate ? *sampleRate : (numRecordsToSample * 1.0 / numRecordsTotal);
+
+    LOGV2(7826504,
+          "Start scanning the supporting index to get record ids",
+          logAttrs(collection->ns()),
+          "analyzeShardKeyId"_attr = analyzeShardKeyId,
+          "shardKey"_attr = shardKey,
+          "indexKey"_attr = index->keyPattern(),
+          "numRecordsTotal"_attr = numRecordsTotal,
+          "recordSampleRate"_attr = recordSampleRate,
+          "numRecordsToSample"_attr = numRecordsToSample);
+
     KeyPattern indexKeyPattern(index->keyPattern());
     auto exec = InternalPlanner::indexScan(opCtx,
                                            &collection,
@@ -621,10 +727,25 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
                                            indexKeyPattern.globalMax(),
                                            BoundInclusion::kExcludeBothStartAndEndKeys,
                                            PlanYieldPolicy::YieldPolicy::INTERRUPT_ONLY);
+    auto prng = opCtx->getClient()->getPrng();
+
     try {
         RecordId recordId;
         BSONObj recordVal;
-        while (PlanExecutor::ADVANCED == exec->getNext(&recordVal, &recordId)) {
+        while (recordIds.size() < numRecordsToSample) {
+            auto shouldSample =
+                (recordSampleRate == 1) || (prng.nextCanonicalDouble() < recordSampleRate);
+            auto execState = shouldSample
+                ? exec->getNext(scannedMultipleShardKeys ? nullptr : &recordVal, &recordId)
+                : exec->getNext(nullptr, nullptr);
+
+            if (execState != PlanExecutor::ADVANCED) {
+                break;
+            }
+            if (!shouldSample) {
+                continue;
+            }
+
             recordIds.push_back(recordId.getLong());
             if (!scannedMultipleShardKeys) {
                 auto currentShardKey = dotted_path_support::extractElementsBasedOnTemplate(
@@ -643,19 +764,18 @@ MonotonicityMetrics calculateMonotonicity(OperationContext* opCtx,
         throw;
     }
 
-    uassert(serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)
-                ? ErrorCodes::CollectionIsEmptyLocally
-                : ErrorCodes::IllegalOperation,
-            "Cannot analyze the monotonicity of a shard key for an empty collection",
+    uassert(7826505,
+            "Cannot analyze the monotonicity because the number of sampled records is zero",
             recordIds.size() > 0);
 
     LOGV2(779009,
-          "Start calculating correlation coefficient for the record ids in the supporting index",
+          "Finished scanning the supporting index. Start calculating correlation coefficient for "
+          "the record ids in the supporting index",
           logAttrs(collection->ns()),
           "analyzeShardKeyId"_attr = analyzeShardKeyId,
           "shardKey"_attr = shardKey,
           "indexKey"_attr = indexKeyPattern,
-          "numRecords"_attr = recordIds.size());
+          "numRecordIds"_attr = recordIds.size());
 
     if (!scannedMultipleShardKeys) {
         metrics.setType(MonotonicityTypeEnum::kNotMonotonic);
@@ -696,6 +816,8 @@ struct CollStatsMetrics {
  * document size in bytes and the number of orphan documents if the collection is sharded.
  */
 CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceString& nss) {
+    analyzeShardKeyPauseBeforeCalculatingCollStatsMetrics.pauseWhileSet(opCtx);
+
     CollStatsMetrics metrics;
 
     std::vector<BSONObj> pipeline;
@@ -724,22 +846,24 @@ CollStatsMetrics calculateCollStats(OperationContext* opCtx, const NamespaceStri
 
     runAggregate(opCtx, aggRequest, [&](const BSONObj& doc) {
         metrics.numDocs = doc.getField(kNumDocsFieldName).exactNumberLong();
-        if (metrics.numDocs == 0) {
-            LOGV2_WARNING(
-                7477403,
-                "The number of documents returned by $collStats indicates that the collection is "
-                "empty. This is likely caused by an unclean shutdown that resulted in an "
-                "inaccurate fast count or by deletions that have occurred since the command "
-                "started.");
-            metrics.avgDocSizeBytes = 0;
-            if (isShardedCollection) {
-                metrics.numOrphanDocs = 0;
-            }
-            return;
-        }
+        uassert(7826501,
+                str::stream() << "The number of documents returned by $collStats indicates "
+                                 "that the collection is empty. This is likely caused by an "
+                                 "unclean shutdown that resulted in an inaccurate fast count or "
+                                 "by deletions that have occurred since the command started. "
+                              << doc,
+                metrics.numDocs > 0);
 
         metrics.avgDocSizeBytes =
             doc.getField(kNumBytesFieldName).exactNumberLong() / metrics.numDocs;
+        uassert(7826502,
+                str::stream() << "The average document size calculated from metrics returned "
+                                 "by $collStats is zero. This is likely caused by an unclean "
+                                 "shutdown that resulted in an inaccurate fast count or by "
+                                 "deletions that have occurred since the command started. "
+                              << doc,
+                metrics.avgDocSizeBytes > 0);
+
         if (isShardedCollection) {
             metrics.numOrphanDocs = doc.getField(kNumOrphanDocsFieldName).exactNumberLong();
         }
@@ -872,7 +996,15 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
     const UUID& analyzeShardKeyId,
     const NamespaceString& nss,
     const UUID& collUuid,
-    const KeyPattern& shardKey) {
+    const KeyPattern& shardKey,
+    boost::optional<double> sampleRate,
+    boost::optional<int64_t> sampleSize) {
+    invariant(!sampleRate || !sampleSize, "Cannot specify both 'sampleRate' and 'sampleSize'");
+    // If both 'sampleRate' and 'sampleSize' are not specified, set 'sampleSize' to the default.
+    if (!sampleRate && !sampleSize) {
+        sampleSize = gKeyCharacteristicsDefaultSampleSize.load();
+    }
+
     KeyCharacteristicsMetrics metrics;
 
     auto shardKeyBson = shardKey.toBSON();
@@ -926,7 +1058,9 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
               logAttrs(nss),
               "analyzeShardKeyId"_attr = analyzeShardKeyId,
               "shardKey"_attr = shardKeyBson,
-              "indexKey"_attr = indexKeyBson);
+              "indexKey"_attr = indexKeyBson,
+              "sampleRate"_attr = sampleRate,
+              "sampleSize"_attr = sampleSize);
         analyzeShardKeyPauseBeforeCalculatingKeyCharacteristicsMetrics.pauseWhileSet(opCtx);
 
         metrics.setIsUnique(shardKeyBson.nFields() == indexKeyBson.nFields() ? indexSpec->isUnique
@@ -935,8 +1069,8 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
               "Start calculating metrics about the monotonicity of the shard key",
               logAttrs(nss),
               "analyzeShardKeyId"_attr = analyzeShardKeyId);
-        auto monotonicityMetrics =
-            calculateMonotonicity(opCtx, analyzeShardKeyId, *collection, shardKeyBson);
+        auto monotonicityMetrics = calculateMonotonicity(
+            opCtx, analyzeShardKeyId, *collection, shardKeyBson, sampleRate, sampleSize);
         LOGV2(7790002,
               "Finished calculating metrics about the monotonicity of the shard key",
               logAttrs(nss),
@@ -959,11 +1093,15 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
           "Start calculating metrics about the cardinality and frequency of the shard key",
           logAttrs(nss),
           "analyzeShardKeyId"_attr = analyzeShardKeyId);
-    auto cardinalityFrequencyMetrics = metrics.getIsUnique()
-        ? calculateCardinalityAndFrequencyUnique(
-              opCtx, analyzeShardKeyId, nss, shardKeyBson, collStatsMetrics.numDocs)
-        : calculateCardinalityAndFrequencyGeneric(
-              opCtx, analyzeShardKeyId, nss, shardKeyBson, indexKeyBson);
+    auto cardinalityFrequencyMetrics = calculateCardinalityAndFrequency(opCtx,
+                                                                        analyzeShardKeyId,
+                                                                        nss,
+                                                                        shardKeyBson,
+                                                                        indexKeyBson,
+                                                                        metrics.getIsUnique(),
+                                                                        collStatsMetrics.numDocs,
+                                                                        sampleRate,
+                                                                        sampleSize);
     LOGV2(7790006,
           "Finished calculating metrics about the cardinality and frequency of the shard key",
           logAttrs(nss),
@@ -973,21 +1111,19 @@ boost::optional<KeyCharacteristicsMetrics> calculateKeyCharacteristicsMetrics(
     // calculating about the cardinality and frequency of the shard key.
     tassert(ErrorCodes::IllegalOperation,
             "Cannot analyze the characteristics of a shard key for an empty collection",
-            cardinalityFrequencyMetrics.numDocs > 0);
+            cardinalityFrequencyMetrics.numDocsSampled > 0);
 
-    metrics.setNumDocsTotal(cardinalityFrequencyMetrics.numDocs);
+    metrics.setNumDocsTotal(cardinalityFrequencyMetrics.numDocsTotal);
     if (collStatsMetrics.numOrphanDocs) {
         metrics.setNumOrphanDocs(collStatsMetrics.numOrphanDocs);
         metrics.setNote(StringData(kOrphanDocsWarningMessage));
     }
-    // The average document size returned by $collStats can be inaccurate (or even zero) if there
-    // has been an unclean shutdown since that can result in inaccurate fast data statistics. To
-    // avoid nonsensical metrics, set the lower limit for the average document size to the size of
-    // an empty document.
-    metrics.setAvgDocSizeBytes(std::max(kEmptyDocSizeBytes, collStatsMetrics.avgDocSizeBytes));
+    metrics.setAvgDocSizeBytes(collStatsMetrics.avgDocSizeBytes);
 
+    metrics.setNumDocsSampled(cardinalityFrequencyMetrics.numDocsSampled);
     metrics.setNumDistinctValues(cardinalityFrequencyMetrics.numDistinctValues);
     metrics.setMostCommonValues(cardinalityFrequencyMetrics.mostCommonValues);
+    validateKeyCharacteristicsMetrics(metrics);
 
     LOGV2(7790007,
           "Finished calculating metrics about the characteristics of the shard key",

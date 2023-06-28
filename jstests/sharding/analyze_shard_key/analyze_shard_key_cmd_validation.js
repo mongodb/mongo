@@ -40,7 +40,7 @@ function testValidationBeforeMetricsCalculation(conn, mongodConn, validationTest
     fp.off();
 }
 
-function testValidationDuringKeyCharactericsMetricsCalculation(conn, validationTest) {
+function testValidationDuringKeyCharacteristicsMetricsCalculation(conn, validationTest) {
     const dbName = validationTest.dbName;
     const collName = validationTest.collName;
     const ns = dbName + "." + collName;
@@ -133,7 +133,7 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
 
     // Disable the calculation of all metrics to test validation at the start of the command.
     testValidationBeforeMetricsCalculation(st.s, shard0Primary, validationTest);
-    testValidationDuringKeyCharactericsMetricsCalculation(st.s, validationTest);
+    testValidationDuringKeyCharacteristicsMetricsCalculation(st.s, validationTest);
     testValidationDuringReadWriteDistributionMetricsCalculation(
         st.s, validationTest, shard0Primary);
 
@@ -149,7 +149,7 @@ const setParameterOpts = {analyzeShardKeyNumRanges};
     const validationTest = ValidationTest(primary);
 
     testValidationBeforeMetricsCalculation(primary, primary, validationTest);
-    testValidationDuringKeyCharactericsMetricsCalculation(primary, validationTest);
+    testValidationDuringKeyCharacteristicsMetricsCalculation(primary, validationTest);
     testValidationDuringReadWriteDistributionMetricsCalculation(primary, validationTest, primary);
 
     rst.stopSet();
