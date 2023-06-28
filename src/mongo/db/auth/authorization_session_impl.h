@@ -104,6 +104,8 @@ public:
 
     boost::optional<UserHandle> getAuthenticatedUser() override;
 
+    boost::optional<TenantId> getUserTenantId() const override;
+
     boost::optional<UserName> getAuthenticatedUserName() override;
 
     RoleNameIterator getAuthenticatedRoleNames() override;
@@ -214,7 +216,6 @@ private:
     std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         return std::make_tuple(&_impersonatedUserName, &_impersonatedRoleNames);
     }
-
 
     // Generates a vector of default privileges that are granted to any user,
     // regardless of which roles that user does or does not possess.

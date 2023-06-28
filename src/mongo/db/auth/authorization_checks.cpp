@@ -107,8 +107,8 @@ Status checkAuthForFind(AuthorizationSession* authSession,
     // the 'term' field in a find operation. Use of this field could trigger changes
     // in the receiving server's replication state and should be protected.
     if (hasTerm &&
-        !authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal)) {
+        !authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()), ActionType::internal)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream()
                           << "not authorized for query with term on " << ns.toStringForErrorMsg());
@@ -133,8 +133,8 @@ Status checkAuthForGetMore(AuthorizationSession* authSession,
     // the 'term' field in a getMore operation. Use of this field could trigger changes
     // in the receiving server's replication state and should be protected.
     if (hasTerm &&
-        !authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal)) {
+        !authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()), ActionType::internal)) {
         return Status(ErrorCodes::Unauthorized,
                       str::stream() << "not authorized for getMore with term on "
                                     << ns.toStringForErrorMsg());
@@ -200,8 +200,8 @@ Status checkAuthForDelete(AuthorizationSession* authSession,
 Status checkAuthForKillCursors(AuthorizationSession* authSession,
                                const NamespaceString& ns,
                                const boost::optional<UserName>& cursorOwner) {
-    if (authSession->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                      ActionType::killAnyCursor)) {
+    if (authSession->isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(ns.tenantId()), ActionType::killAnyCursor)) {
         return Status::OK();
     }
 

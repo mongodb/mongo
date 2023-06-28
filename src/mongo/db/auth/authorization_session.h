@@ -175,6 +175,9 @@ public:
     // Get the authenticated user's object handle, if any.
     virtual boost::optional<UserHandle> getAuthenticatedUser() = 0;
 
+    // Get the authenticated user's tenant ID, if any.
+    virtual boost::optional<TenantId> getUserTenantId() const = 0;
+
     // Is auth disabled? Returns true if auth is disabled.
     virtual bool shouldIgnoreAuthChecks() = 0;
 

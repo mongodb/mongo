@@ -86,6 +86,10 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
+    boost::optional<TenantId> getUserTenantId() const override {
+        return boost::none;
+    }
+
     bool shouldIgnoreAuthChecks() override {
         return true;
     }

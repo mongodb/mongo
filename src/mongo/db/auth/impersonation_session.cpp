@@ -54,7 +54,8 @@ ImpersonationSessionGuard::ImpersonationSessionGuard(OperationContext* opCtx) : 
         uassert(ErrorCodes::Unauthorized,
                 "Unauthorized use of impersonation metadata.",
                 authSession->isAuthorizedForPrivilege(
-                    Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate)));
+                    Privilege(ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+                              ActionType::impersonate)));
         fassert(ErrorCodes::InternalError, !authSession->isImpersonating());
         if (impersonatedUsersAndRoles->getUser()) {
             fassert(ErrorCodes::InternalError,
