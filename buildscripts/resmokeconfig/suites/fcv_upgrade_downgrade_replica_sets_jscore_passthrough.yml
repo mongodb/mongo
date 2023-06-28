@@ -74,13 +74,6 @@ selector:
   - jstests/core/timeseries/bucket_timestamp_rounding.js
   - jstests/core/timeseries/timeseries_filter_extended_range.js
 
-  # TODO (SERVER-77387): The tests below sometimes hit an index build invariant failure when they run concurrently with a setFCV command.
-  - jstests/core/query/array/arrayfind7.js
-  - jstests/core/index/indexu.js
-  - jstests/core/index/geo/geo_invalid_polygon.js
-  - jstests/core/index/geo/geo_s2disjoint_holes.js
-  - jstests/core/index/geo/geo_big_polygon2.js
-
   # Expected failure due to command count being not precise due to potential retry of index build.
   - jstests/core/operation_latency_histogram.js
 
