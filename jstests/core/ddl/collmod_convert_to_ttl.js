@@ -57,14 +57,12 @@ assert.commandFailedWithCode(
         {"collMod": collName, "index": {"keyPattern": {_id: 1}, "expireAfterSeconds": 100}}),
     ErrorCodes.InvalidOptions);
 
-// Tries to convert an index on a capped collection to a TTL index.
+// Successfully converts an index on a capped collection to a TTL index.
 const collCapped = db.getCollection(collName + "_capped");
 collCapped.drop();
 db.createCollection(collCapped.getName(), {capped: true, size: 1024 * 1024});
 collCapped.createIndex({a: 1});
-assert.commandFailedWithCode(db.runCommand({
-    "collMod": collCapped.getName(),
-    "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}
-}),
-                             ErrorCodes.InvalidOptions);
+assert.commandWorked(db.runCommand(
+    {"collMod": collCapped.getName(), "index": {"keyPattern": {a: 1}, "expireAfterSeconds": 100}}));
+assert(findTTL({a: 1}, 100), "TTL index should be 100 now");
 })();

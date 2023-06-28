@@ -278,10 +278,9 @@ void IndexBuildBlock::success(OperationContext* opCtx, Collection* collection) {
                   "commitTimestamp"_attr = commitTime);
 
             // Add the index to the TTLCollectionCache upon successfully committing the index build.
-            // TTL indexes are not compatible with capped collections.  Note that TTL deletion is
-            // supported on capped clustered collections via bounded collection scan, which does not
-            // use an index.
-            if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName) && !coll->isCapped()) {
+            // Note that TTL deletion is supported on capped clustered collections via bounded
+            // collection scan, which does not use an index.
+            if (spec.hasField(IndexDescriptor::kExpireAfterSecondsFieldName)) {
                 auto validateStatus = index_key_validate::validateExpireAfterSeconds(
                     spec[IndexDescriptor::kExpireAfterSecondsFieldName],
                     index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);

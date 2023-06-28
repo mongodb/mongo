@@ -302,10 +302,6 @@ StatusWith<std::pair<ParsedCollModRequest, BSONObj>> parseCollModRequest(
                         "Please refer to the documentation and use the top-level "
                         "'expireAfterSeconds' option instead"};
             }
-            if (coll->isCapped()) {
-                return {ErrorCodes::InvalidOptions,
-                        "TTL indexes are not supported for capped collections."};
-            }
             if (auto status = index_key_validate::validateExpireAfterSeconds(
                     *cmdIndex.getExpireAfterSeconds(),
                     index_key_validate::ValidateExpireAfterSecondsMode::kSecondaryTTLIndex);
