@@ -302,6 +302,8 @@ last-continuous:
     ticket: SERVER-60466
   - test_file: jstests/change_streams/split_large_event.js
     ticket: SERVER-67699
+  - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
+    ticket: SERVER-74954
   suites: null
 last-lts:
   all:
@@ -677,4 +679,6 @@ last-lts:
     ticket: SERVER-61127
   - test_file: jstests/sharding/cluster_time_across_add_shard.js
     ticket: SERVER-60466
+  - test_file: jstests/core/query/elemmatch/elemmatch_or_pushdown_paths.js
+    ticket: SERVER-74954
   suites: null
