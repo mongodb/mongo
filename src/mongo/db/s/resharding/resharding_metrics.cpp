@@ -44,6 +44,7 @@
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
@@ -56,9 +57,15 @@ const auto kTimedPhaseNamesMap = [] {
     return ReshardingMetrics::TimedPhaseNameMap{
         {TimedPhase::kCloning, "totalCopyTimeElapsedSecs"},
         {TimedPhase::kApplying, "totalApplyTimeElapsedSecs"},
+        {TimedPhase::kCriticalSection, "totalCriticalSectionTimeElapsedSecs"},
+        {TimedPhase::kBuildingIndex, "totalIndexBuildTimeElapsedSecs"}};
+}();
+const auto kTimedPhaseNamesMapWithoutReshardingImprovements = [] {
+    return ReshardingMetrics::TimedPhaseNameMap{
+        {TimedPhase::kCloning, "totalCopyTimeElapsedSecs"},
+        {TimedPhase::kApplying, "totalApplyTimeElapsedSecs"},
         {TimedPhase::kCriticalSection, "totalCriticalSectionTimeElapsedSecs"}};
 }();
-
 inline ReshardingMetrics::State getDefaultState(ReshardingMetrics::Role role) {
     using Role = ReshardingMetrics::Role;
     switch (role) {
@@ -234,8 +241,16 @@ StringData ReshardingMetrics::getStateString() const noexcept {
 
 BSONObj ReshardingMetrics::reportForCurrentOp() const noexcept {
     BSONObjBuilder builder;
-    reportDurationsForAllPhases<Seconds>(
-        kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        reportDurationsForAllPhases<Seconds>(
+            kTimedPhaseNamesMap, getClockSource(), &builder, Seconds{0});
+    } else {
+        reportDurationsForAllPhases<Seconds>(kTimedPhaseNamesMapWithoutReshardingImprovements,
+                                             getClockSource(),
+                                             &builder,
+                                             Seconds{0});
+    }
     if (_role == Role::kRecipient) {
         reportOplogApplicationCountMetrics(_reshardingFieldNames, &builder);
     }
@@ -260,10 +275,17 @@ void ReshardingMetrics::restoreRecipientSpecificFields(
         restoreDocumentsProcessed(*docsCopied, *bytesCopied);
     }
     restorePhaseDurationFields(document);
+    restoreIndexBuildDurationFields(*metrics);
 }
 
 void ReshardingMetrics::restoreCoordinatorSpecificFields(
     const ReshardingCoordinatorDocument& document) {
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        auto isSameKeyResharding =
+            document.getForceRedistribution() && *document.getForceRedistribution();
+        setIsSameKeyResharding(isSameKeyResharding);
+    }
     restorePhaseDurationFields(document);
 }
 
@@ -280,5 +302,19 @@ void ReshardingMetrics::restoreExternallyTrackedRecipientFields(
     invokeIfAllSet(&ReshardingMetrics::restoreWritesToStashCollections,
                    values.writesToStashCollections);
     _ableToEstimateRemainingRecipientTime.store(true);
+}
+
+void ReshardingMetrics::restoreIndexBuildDurationFields(const ReshardingRecipientMetrics& metrics) {
+    auto indexBuildTime = metrics.getIndexBuildTime();
+    if (indexBuildTime) {
+        auto indexBuildBegin = indexBuildTime->getStart();
+        if (indexBuildBegin) {
+            setStartFor(TimedPhase::kBuildingIndex, *indexBuildBegin);
+        }
+        auto indexBuildEnd = indexBuildTime->getStop();
+        if (indexBuildEnd) {
+            setEndFor(TimedPhase::kBuildingIndex, *indexBuildEnd);
+        }
+    }
 }
 }  // namespace mongo

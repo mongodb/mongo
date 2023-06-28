@@ -38,6 +38,7 @@
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/s/metrics/metrics_state_holder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
@@ -67,8 +68,8 @@ namespace mongo {
 
 namespace resharding_metrics {
 
-enum TimedPhase { kCloning, kApplying, kCriticalSection };
-constexpr auto kNumTimedPhase = 3;
+enum TimedPhase { kCloning, kApplying, kCriticalSection, kBuildingIndex };
+constexpr auto kNumTimedPhase = 4;
 
 namespace detail {
 using PartialBase1 = WithTypedCumulativeMetricsProvider<ShardingDataTransformInstanceMetrics,
@@ -187,6 +188,7 @@ private:
     std::string createOperationDescription() const noexcept override;
     void restoreRecipientSpecificFields(const ReshardingRecipientDocument& document);
     void restoreCoordinatorSpecificFields(const ReshardingCoordinatorDocument& document);
+    void restoreIndexBuildDurationFields(const ReshardingRecipientMetrics& metrics);
     ReshardingCumulativeMetrics* getReshardingCumulativeMetrics();
 
     template <typename T>

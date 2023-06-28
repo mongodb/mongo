@@ -67,11 +67,12 @@ const auto kReportedStateFieldNamesMap = [] {
         {RecipientStateEnum::kCreatingCollection,
          "countInstancesInRecipientState2CreatingCollection"},
         {RecipientStateEnum::kCloning, "countInstancesInRecipientState3Cloning"},
-        {RecipientStateEnum::kApplying, "countInstancesInRecipientState4Applying"},
-        {RecipientStateEnum::kError, "countInstancesInRecipientState5Error"},
+        {RecipientStateEnum::kBuildingIndex, "countInstancesInRecipientState4BuildingIndex"},
+        {RecipientStateEnum::kApplying, "countInstancesInRecipientState5Applying"},
+        {RecipientStateEnum::kError, "countInstancesInRecipientState6Error"},
         {RecipientStateEnum::kStrictConsistency,
-         "countInstancesInRecipientState6StrictConsistency"},
-        {RecipientStateEnum::kDone, "countInstancesInRecipientState7Done"},
+         "countInstancesInRecipientState7StrictConsistency"},
+        {RecipientStateEnum::kDone, "countInstancesInRecipientState8Done"},
     };
 }();
 

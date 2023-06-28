@@ -156,6 +156,10 @@ void ShardingDataTransformCumulativeMetrics::reportForServerStatus(BSONObjBuilde
     root.append(_fieldNames->getForCountSucceeded(), _countSucceeded.load());
     root.append(_fieldNames->getForCountFailed(), _countFailed.load());
     root.append(_fieldNames->getForCountCanceled(), _countCancelled.load());
+    root.append(_fieldNames->getForCountSameKeyStarted(), _countSameKeyStarted.load());
+    root.append(_fieldNames->getForCountSameKeySucceeded(), _countSameKeySucceeded.load());
+    root.append(_fieldNames->getForCountSameKeyFailed(), _countSameKeyFailed.load());
+    root.append(_fieldNames->getForCountSameKeyCanceled(), _countSameKeyCancelled.load());
     root.append(_fieldNames->getForLastOpEndingChunkImbalance(),
                 _lastOpEndingChunkImbalance.load());
     {
@@ -249,20 +253,36 @@ void ShardingDataTransformCumulativeMetrics::deregisterMetrics(
     getMetricsSetForRole(role).erase(metricsIterator);
 }
 
-void ShardingDataTransformCumulativeMetrics::onStarted() {
-    _countStarted.fetchAndAdd(1);
+void ShardingDataTransformCumulativeMetrics::onStarted(bool isSameKeyResharding) {
+    if (isSameKeyResharding) {
+        _countSameKeyStarted.fetchAndAdd(1);
+    } else {
+        _countStarted.fetchAndAdd(1);
+    }
 }
 
-void ShardingDataTransformCumulativeMetrics::onSuccess() {
-    _countSucceeded.fetchAndAdd(1);
+void ShardingDataTransformCumulativeMetrics::onSuccess(bool isSameKeyResharding) {
+    if (isSameKeyResharding) {
+        _countSameKeySucceeded.fetchAndAdd(1);
+    } else {
+        _countSucceeded.fetchAndAdd(1);
+    }
 }
 
-void ShardingDataTransformCumulativeMetrics::onFailure() {
-    _countFailed.fetchAndAdd(1);
+void ShardingDataTransformCumulativeMetrics::onFailure(bool isSameKeyResharding) {
+    if (isSameKeyResharding) {
+        _countSameKeyFailed.fetchAndAdd(1);
+    } else {
+        _countFailed.fetchAndAdd(1);
+    }
 }
 
-void ShardingDataTransformCumulativeMetrics::onCanceled() {
-    _countCancelled.fetchAndAdd(1);
+void ShardingDataTransformCumulativeMetrics::onCanceled(bool isSameKeyResharding) {
+    if (isSameKeyResharding) {
+        _countSameKeyCancelled.fetchAndAdd(1);
+    } else {
+        _countCancelled.fetchAndAdd(1);
+    }
 }
 
 void ShardingDataTransformCumulativeMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {

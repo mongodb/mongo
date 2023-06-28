@@ -38,6 +38,7 @@
 
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/namespace_string_util.h"
@@ -182,6 +183,11 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
                 _fieldNames->getForAllShardsLowestRemainingOperationTimeEstimatedSecs(),
                 getLowEstimateRemainingTimeMillis());
             builder.append(_fieldNames->getForCoordinatorState(), getStateString());
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                builder.append(_fieldNames->getForIsSameKeyResharding(),
+                               _isSameKeyResharding.load());
+            }
             break;
         case Role::kDonor:
             builder.append(_fieldNames->getForDonorState(), getStateString());
@@ -203,6 +209,11 @@ BSONObj ShardingDataTransformInstanceMetrics::reportForCurrentOp() const noexcep
             builder.append(_fieldNames->getForCountWritesToStashCollections(),
                            _writesToStashCollections.load());
             builder.append(_fieldNames->getForDocumentsProcessed(), _documentsProcessed.load());
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                builder.append(_fieldNames->getForIndexesToBuild(), _indexesToBuild.load());
+                builder.append(_fieldNames->getForIndexesBuilt(), _indexesBuilt.load());
+            }
             break;
         default:
             MONGO_UNREACHABLE;
@@ -290,24 +301,36 @@ ClockSource* ShardingDataTransformInstanceMetrics::getClockSource() const {
     return _clockSource;
 }
 
-void ShardingDataTransformInstanceMetrics::onStarted() {
-    _cumulativeMetrics->onStarted();
+void ShardingDataTransformInstanceMetrics::onStarted(bool isSameKeyResharding) {
+    _cumulativeMetrics->onStarted(isSameKeyResharding);
 }
 
-void ShardingDataTransformInstanceMetrics::onSuccess() {
-    _cumulativeMetrics->onSuccess();
+void ShardingDataTransformInstanceMetrics::onSuccess(bool isSameKeyResharding) {
+    _cumulativeMetrics->onSuccess(isSameKeyResharding);
 }
 
-void ShardingDataTransformInstanceMetrics::onFailure() {
-    _cumulativeMetrics->onFailure();
+void ShardingDataTransformInstanceMetrics::onFailure(bool isSameKeyResharding) {
+    _cumulativeMetrics->onFailure(isSameKeyResharding);
 }
 
-void ShardingDataTransformInstanceMetrics::onCanceled() {
-    _cumulativeMetrics->onCanceled();
+void ShardingDataTransformInstanceMetrics::onCanceled(bool isSameKeyResharding) {
+    _cumulativeMetrics->onCanceled(isSameKeyResharding);
 }
 
 void ShardingDataTransformInstanceMetrics::setLastOpEndingChunkImbalance(int64_t imbalanceCount) {
     _cumulativeMetrics->setLastOpEndingChunkImbalance(imbalanceCount);
+}
+
+void ShardingDataTransformInstanceMetrics::setIsSameKeyResharding(bool isSameKeyResharding) {
+    _isSameKeyResharding.store(isSameKeyResharding);
+}
+
+void ShardingDataTransformInstanceMetrics::setIndexesToBuild(int64_t numIndexes) {
+    _indexesToBuild.store(numIndexes);
+}
+
+void ShardingDataTransformInstanceMetrics::setIndexesBuilt(int64_t numIndexes) {
+    _indexesBuilt.store(numIndexes);
 }
 
 ShardingDataTransformInstanceMetrics::UniqueScopedObserver

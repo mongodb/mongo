@@ -53,6 +53,10 @@ public:
     StringData getForCollectionCloningTotalRemoteBatchesRetrieved() const;
     StringData getForCollectionCloningTotalLocalInsertTimeMillis() const;
     StringData getForCollectionCloningTotalLocalInserts() const;
+    StringData getForCountSameKeyStarted() const;
+    StringData getForCountSameKeySucceeded() const;
+    StringData getForCountSameKeyFailed() const;
+    StringData getForCountSameKeyCanceled() const;
 };
 
 }  // namespace mongo

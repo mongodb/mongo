@@ -51,6 +51,7 @@
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
@@ -324,6 +325,22 @@ TEST_F(ReshardingMetricsTest, RestoresFinishedApplyingTimeFromRecipientStateDocu
         "totalApplyTimeElapsedSecs");
 }
 
+TEST_F(ReshardingMetricsTest, RestoresOngoingBuildIndexTimeFromRecipientStateDocument) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    doRestoreOngoingPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
+        [this] { return createRecipientDocument(RecipientStateEnum::kBuildingIndex, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setIndexBuildTime(std::move(interval)); },
+        "totalIndexBuildTimeElapsedSecs");
+}
+
+TEST_F(ReshardingMetricsTest, RestoresFinishedBuildIndexTimeFromRecipientStateDocument) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    doRestoreCompletedPhaseTest<ReshardingRecipientMetrics, ReshardingRecipientDocument>(
+        [this] { return createRecipientDocument(RecipientStateEnum::kApplying, UUID::gen()); },
+        [this](auto& doc, auto interval) { doc.setIndexBuildTime(std::move(interval)); },
+        "totalIndexBuildTimeElapsedSecs");
+}
+
 TEST_F(ReshardingMetricsTest, RestoresGeneralFieldsFromDonorStateDocument) {
     auto state = DonorStateEnum::kDonatingInitialData;
     auto opId = UUID::gen();
@@ -395,6 +412,7 @@ TEST_F(ReshardingMetricsTest, RestoresFinishedApplyingTimeFromCoordinatorStateDo
         [this](auto& doc, auto interval) { doc.setOplogApplication(std::move(interval)); },
         "totalApplyTimeElapsedSecs");
 }
+
 
 TEST_F(ReshardingMetricsTest, OnInsertAppliedShouldIncrementInsertsApplied) {
     auto metrics = createInstanceMetrics(getClockSource(), UUID::gen(), Role::kRecipient);
@@ -548,6 +566,20 @@ TEST_F(ReshardingMetricsTest, CurrentOpReportsCopyingTime) {
         },
         [this](ReshardingMetrics* metrics) {
             metrics->setEndFor(TimedPhase::kCloning, getClockSource()->now());
+        });
+}
+
+TEST_F(ReshardingMetricsTest, CurrentOpReportsBuildIndexTime) {
+    RAIIServerParameterControllerForTest controller("featureFlagReshardingImprovements", true);
+    runTimeReportTest<ReshardingMetrics>(
+        "CurrentOpReportsBuildIndexTime",
+        {Role::kRecipient},
+        "totalIndexBuildTimeElapsedSecs",
+        [this](ReshardingMetrics* metrics) {
+            metrics->setStartFor(TimedPhase::kBuildingIndex, getClockSource()->now());
+        },
+        [this](ReshardingMetrics* metrics) {
+            metrics->setEndFor(TimedPhase::kBuildingIndex, getClockSource()->now());
         });
 }
 

@@ -55,6 +55,11 @@ structs:
                 description: >-
                     The time interval that it takes to apply oplog entries on this recipient.
                 optional: true
+            indexBuildTime:
+                type: ReshardingMetricsTimeInterval
+                description: >-
+                    The time interval that it takes to build the indexes on this recipient.
+                optional: true
             approxDocumentsToCopy:
                 type: long
                 optional: true

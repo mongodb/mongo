@@ -1380,13 +1380,15 @@ void ReshardingCoordinator::installCoordinatorDoc(
                                            kMajorityWriteConcern);
 }
 
-void markCompleted(const Status& status, ReshardingMetrics* metrics) {
+void markCompleted(const Status& status,
+                   ReshardingMetrics* metrics,
+                   const bool isSameKeyResharding) {
     if (status.isOK()) {
-        metrics->onSuccess();
+        metrics->onSuccess(isSameKeyResharding);
     } else if (status == ErrorCodes::ReshardCollectionAborted) {
-        metrics->onCanceled();
+        metrics->onCanceled(isSameKeyResharding);
     } else {
-        metrics->onFailure();
+        metrics->onFailure(isSameKeyResharding);
     }
 }
 
@@ -1817,7 +1819,9 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
 
                // Notify metrics as the operation is now complete for external observers.
-               markCompleted(status, _metrics.get());
+               const bool isSameKeyResharding = _coordinatorDoc.getForceRedistribution() &&
+                   *_coordinatorDoc.getForceRedistribution();
+               markCompleted(status, _metrics.get(), isSameKeyResharding);
 
                // The temporary collection and its corresponding entries were never created. Only
                // the coordinator document and reshardingFields require cleanup.
@@ -2013,8 +2017,11 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
 
     {
         // Note: don't put blocking or interruptible code in this block.
+        const bool isSameKeyResharding =
+            _coordinatorDoc.getForceRedistribution() && *_coordinatorDoc.getForceRedistribution();
         _coordinatorDocWrittenPromise.emplaceValue();
-        _metrics->onStarted();
+        _metrics->onStarted(isSameKeyResharding);
+        _metrics->setIsSameKeyResharding(isSameKeyResharding);
     }
 
     pauseAfterInsertCoordinatorDoc.pauseWhileSet();
@@ -2352,7 +2359,10 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                 opCtx.get(), _ctHolder->getStepdownToken());
 
             // Notify metrics as the operation is now complete for external observers.
-            markCompleted(abortReason ? *abortReason : Status::OK(), _metrics.get());
+            const bool isSameKeyResharding = _coordinatorDoc.getForceRedistribution() &&
+                *_coordinatorDoc.getForceRedistribution();
+            markCompleted(
+                abortReason ? *abortReason : Status::OK(), _metrics.get(), isSameKeyResharding);
 
             resharding::removeCoordinatorDocAndReshardingFields(
                 opCtx.get(), _metrics.get(), coordinatorDoc, abortReason);

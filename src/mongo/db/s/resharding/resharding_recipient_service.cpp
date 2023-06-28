@@ -172,11 +172,27 @@ void buildStateDocumentCloneMetricsForUpdate(BSONObjBuilder& bob, Date_t timesta
                timestamp);
 }
 
+void buildStateDocumentBuildingIndexMetricsForUpdate(BSONObjBuilder& bob, Date_t timestamp) {
+    bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
+               timestamp);
+    bob.append(
+        getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kIndexBuildTimeFieldName),
+        timestamp);
+}
+
 void buildStateDocumentApplyMetricsForUpdate(BSONObjBuilder& bob,
                                              ReshardingMetrics* metrics,
                                              Date_t timestamp) {
-    bob.append(getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
-               timestamp);
+    if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        bob.append(
+            getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kIndexBuildTimeFieldName),
+            timestamp);
+    } else {
+        bob.append(
+            getIntervalEndFieldName<DocT>(ReshardingRecipientMetrics::kDocumentCopyFieldName),
+            timestamp);
+    }
     bob.append(
         getIntervalStartFieldName<DocT>(ReshardingRecipientMetrics::kOplogApplicationFieldName),
         timestamp);
@@ -201,6 +217,9 @@ void buildStateDocumentMetricsForUpdate(BSONObjBuilder& bob,
         case RecipientStateEnum::kCloning:
             buildStateDocumentCloneMetricsForUpdate(bob, timestamp);
             return;
+        case RecipientStateEnum::kBuildingIndex:
+            buildStateDocumentBuildingIndexMetricsForUpdate(bob, timestamp);
+            return;
         case RecipientStateEnum::kApplying:
             buildStateDocumentApplyMetricsForUpdate(bob, metrics, timestamp);
             return;
@@ -219,8 +238,17 @@ void setMeticsAfterWrite(ReshardingMetrics* metrics,
         case RecipientStateEnum::kCloning:
             metrics->setStartFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
             return;
-        case RecipientStateEnum::kApplying:
+        case RecipientStateEnum::kBuildingIndex:
             metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
+            metrics->setStartFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
+            return;
+        case RecipientStateEnum::kApplying:
+            if (resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                metrics->setEndFor(ReshardingMetrics::TimedPhase::kBuildingIndex, timestamp);
+            } else {
+                metrics->setEndFor(ReshardingMetrics::TimedPhase::kCloning, timestamp);
+            }
             metrics->setStartFor(ReshardingMetrics::TimedPhase::kApplying, timestamp);
             return;
         case RecipientStateEnum::kStrictConsistency:
@@ -583,6 +611,9 @@ void ReshardingRecipientService::RecipientStateMachine::interrupt(Status status)
 boost::optional<BSONObj> ReshardingRecipientService::RecipientStateMachine::reportForCurrentOp(
     MongoProcessInterface::CurrentOpConnectionsMode,
     MongoProcessInterface::CurrentOpSessionsMode) noexcept {
+    if (_recipientCtx.getState() == RecipientStateEnum::kBuildingIndex) {
+        _fetchBuildIndexMetrics();
+    }
     return _metrics->reportForCurrentOp();
 }
 
@@ -1453,6 +1484,20 @@ CancellationToken ReshardingRecipientService::RecipientStateMachine::_initAbortS
     }
 
     return _abortSource->token();
+}
+
+void ReshardingRecipientService::RecipientStateMachine::_fetchBuildIndexMetrics() {
+    auto opCtx = cc().getOperationContext();
+    if (!opCtx) {
+        opCtx = cc().makeOperationContext().get();
+    }
+    AutoGetCollection tempReshardingColl(opCtx, _metadata.getTempReshardingNss(), MODE_IS);
+    auto indexCatalog = tempReshardingColl->getIndexCatalog();
+    invariant(indexCatalog,
+              str::stream() << "Collection is missing index catalog: "
+                            << _metadata.getTempReshardingNss().toStringForErrorMsg());
+    _metrics->setIndexesToBuild(indexCatalog->numIndexesTotal());
+    _metrics->setIndexesBuilt(indexCatalog->numIndexesReady());
 }
 
 void ReshardingRecipientService::RecipientStateMachine::abort(bool isUserCancelled) {
