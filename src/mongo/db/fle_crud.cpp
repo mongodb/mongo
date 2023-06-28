@@ -1096,16 +1096,17 @@ write_ops::UpdateCommandReply processUpdate(FLEQueryInterface* queryImpl,
     // Fail if we could not find the new document
     uassert(6371505, "Could not find pre-image document by _id", !newDocument.isEmpty());
 
-    if (hasIndexedFieldsInSchema(efc.getFields())) {
-        // Check the user did not remove/destroy the __safeContent__ array. If there are no
-        // indexed fields, then there will not be a safeContent array in the document.
-        FLEClientCrypto::validateTagsArray(newDocument);
-    }
-
     // Step 5 ----
     auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
     auto newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
 
+    if (hasIndexedFieldsInSchema(efc.getFields()) && !(newFields.empty())) {
+        // Check the user did not remove/destroy the __safeContent__ array. If there are no
+        // indexed fields, then there will not be a safeContent array in the document.
+        FLEClientCrypto::validateTagsArray(newDocument);
+    } else {
+        return updateReply;
+    }
 
     // Step 6 ----
     // GarbageCollect steps:
@@ -1359,15 +1360,17 @@ write_ops::FindAndModifyCommandReply processFindAndModify(
     // Fail if we could not find the new document
     uassert(7293302, "Could not find pre-image document by _id", !newDocument.isEmpty());
 
-    if (hasIndexedFieldsInSchema(efc.getFields())) {
-        // Check the user did not remove/destroy the __safeContent__ array. If there are no
-        // indexed fields, then there will not be a safeContent array in the document.
-        FLEClientCrypto::validateTagsArray(newDocument);
-    }
-
     // Step 5 ----
     auto originalFields = EDCServerCollection::getEncryptedIndexedFields(originalDocument);
     auto newFields = EDCServerCollection::getEncryptedIndexedFields(newDocument);
+
+    if (hasIndexedFieldsInSchema(efc.getFields()) && !(newFields.empty())) {
+        // Check the user did not remove/destroy the __safeContent__ array. If there are no
+        // indexed fields, then there will not be a safeContent array in the document.
+        FLEClientCrypto::validateTagsArray(newDocument);
+    } else {
+        return reply;
+    }
 
     // Step 6 ----
     // GarbageCollect steps:
