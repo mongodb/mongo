@@ -122,7 +122,7 @@ bool PartialSchemaRequirements::isNoop() const {
     // ...or if it has exactly one predicate which is a no-op.
     auto reqIsNoop = false;
 
-    auto checkNoop = [&](const Entry& entry) {
+    auto checkNoop = [&](const Entry& entry, const PSRExpr::VisitorContext&) {
         reqIsNoop = (entry == makeNoopPartialSchemaEntry());
     };
     if (PSRExpr::isCNF(_expr)) {
@@ -141,7 +141,7 @@ boost::optional<ProjectionName> PartialSchemaRequirements::findProjection(
             PSRExpr::isSingletonDisjunction(getRoot()));
 
     boost::optional<ProjectionName> proj;
-    PSRExpr::visitDNF(_expr, [&](const Entry& entry) {
+    PSRExpr::visitDNF(_expr, [&](const Entry& entry, const PSRExpr::VisitorContext&) {
         if (!proj && entry.first == key) {
             proj = entry.second.getBoundProjectionName();
         }
@@ -157,12 +157,15 @@ PartialSchemaRequirements::findFirstConjunct(const PartialSchemaKey& key) const 
 
     size_t i = 0;
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> res;
-    PSRExpr::visitDNF(_expr, [&](const PartialSchemaEntry& entry) {
-        if (!res && entry.first == key) {
-            res = {{i, entry.second}};
-        }
-        ++i;
-    });
+    PSRExpr::visitDNF(_expr,
+                      [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& ctx) {
+                          if (entry.first == key) {
+                              res = {{i, entry.second}};
+                              ctx.returnEarly();
+                              return;
+                          }
+                          ++i;
+                      });
     return res;
 }
 
@@ -171,13 +174,13 @@ void PartialSchemaRequirements::add(PartialSchemaKey key, PartialSchemaRequireme
     tassert(7453912, "Expected a singleton disjunction", PSRExpr::isSingletonDisjunction(_expr));
 
     // Add an entry to the first conjunction
-    PSRExpr::visitDisjuncts(_expr, [&](PSRExpr::Node& disjunct, const size_t i) {
-        if (i == 0) {
+    PSRExpr::visitDisjuncts(
+        _expr, [&](PSRExpr::Node& disjunct, const PSRExpr::VisitorContext& ctx) {
             const auto& conjunction = disjunct.cast<PSRExpr::Conjunction>();
             conjunction->nodes().emplace_back(
                 PSRExpr::make<PSRExpr::Atom>(Entry(std::move(key), std::move(req))));
-        }
-    });
+            ctx.returnEarly();
+        });
     normalize();
 }
 
@@ -328,12 +331,13 @@ std::vector<std::pair<PartialSchemaKey, ProjectionName>> getBoundProjections(
     const PartialSchemaRequirements& reqs) {
     // For now we assume no projections inside a nontrivial disjunction.
     std::vector<std::pair<PartialSchemaKey, ProjectionName>> result;
-    PSRExpr::visitAnyShape(reqs.getRoot(), [&](const PartialSchemaEntry& e) {
-        const auto& [key, req] = e;
-        if (auto proj = req.getBoundProjectionName()) {
-            result.emplace_back(key, *proj);
-        }
-    });
+    PSRExpr::visitAnyShape(reqs.getRoot(),
+                           [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                               const auto& [key, req] = e;
+                               if (auto proj = req.getBoundProjectionName()) {
+                                   result.emplace_back(key, *proj);
+                               }
+                           });
     tassert(7453906,
             "Expected no bound projections in a nontrivial disjunction",
             result.empty() || PSRExpr::isSingletonDisjunction(reqs.getRoot()));

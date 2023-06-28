@@ -81,71 +81,6 @@ class PartialSchemaRequirements {
 public:
     using Entry = std::pair<PartialSchemaKey, PartialSchemaRequirement>;
 
-    // TODO SERVER-73828: Remove these iterator constructs.
-    using ConstNodeVecIter = std::vector<PSRExpr::Node>::const_iterator;
-    using NodeVecIter = std::vector<PSRExpr::Node>::iterator;
-
-    template <bool IsConst>
-    using MaybeConstNodeVecIter =
-        typename std::conditional<IsConst, ConstNodeVecIter, NodeVecIter>::type;
-
-    template <bool IsConst>
-    struct PSRIterator {
-        using iterator_category = std::forward_iterator_tag;
-        using difference_type = ptrdiff_t;
-        using value_type = Entry;
-        using pointer = typename std::conditional<IsConst, const Entry*, Entry*>::type;
-        using reference = typename std::conditional<IsConst, const Entry&, Entry&>::type;
-
-        PSRIterator(MaybeConstNodeVecIter<IsConst> atomsIt) : _atomsIt(atomsIt) {}
-
-        reference operator*() const {
-            return _atomsIt->template cast<PSRExpr::Atom>()->getExpr();
-        }
-        pointer operator->() {
-            return &(_atomsIt->template cast<PSRExpr::Atom>()->getExpr());
-        }
-
-        PSRIterator& operator++() {
-            _atomsIt++;
-            return *this;
-        }
-
-        PSRIterator operator++(int) {
-            PSRIterator tmp = *this;
-            ++(*this);
-            return tmp;
-        }
-
-        friend bool operator==(const PSRIterator& a, const PSRIterator& b) {
-            return a._atomsIt == b._atomsIt;
-        };
-        friend bool operator!=(const PSRIterator& a, const PSRIterator& b) {
-            return a._atomsIt != b._atomsIt;
-        };
-
-        MaybeConstNodeVecIter<IsConst> _atomsIt;
-    };
-
-    template <bool IsConst>
-    struct Range {
-        auto begin() const {
-            return PSRIterator<IsConst>(_begin);
-        }
-        auto end() const {
-            return PSRIterator<IsConst>(_end);
-        }
-        auto cbegin() const {
-            return PSRIterator<true>(_begin);
-        }
-        auto cend() const {
-            return PSRIterator<true>(_end);
-        }
-
-        MaybeConstNodeVecIter<IsConst> _begin;
-        MaybeConstNodeVecIter<IsConst> _end;
-    };
-
     // Default PartialSchemaRequirements is a singular DNF of an empty PartialSchemaKey and
     // fully-open PartialSchemaRequirement which does not bind.
     PartialSchemaRequirements();
@@ -173,31 +108,6 @@ public:
      */
     boost::optional<std::pair<size_t, PartialSchemaRequirement>> findFirstConjunct(
         const PartialSchemaKey&) const;
-
-    // TODO SERVER-73828: Remove these methods in favor of visitDis/Conjuncts().
-    Range<true> conjuncts() const {
-        tassert(7453905,
-                "Expected PartialSchemaRequirement to be a singleton disjunction",
-                PSRExpr::isSingletonDisjunction(_expr));
-        const auto& atoms = _expr.cast<PSRExpr::Disjunction>()
-                                ->nodes()
-                                .begin()
-                                ->cast<PSRExpr::Conjunction>()
-                                ->nodes();
-        return {atoms.begin(), atoms.end()};
-    }
-
-    Range<false> conjuncts() {
-        tassert(7453904,
-                "Expected PartialSchemaRequirement to be a singleton disjunction",
-                PSRExpr::isSingletonDisjunction(_expr));
-        auto& atoms = _expr.cast<PSRExpr::Disjunction>()
-                          ->nodes()
-                          .begin()
-                          ->cast<PSRExpr::Conjunction>()
-                          ->nodes();
-        return {atoms.begin(), atoms.end()};
-    }
 
     /**
      * Conjunctively combine 'this' with another PartialSchemaRequirement.

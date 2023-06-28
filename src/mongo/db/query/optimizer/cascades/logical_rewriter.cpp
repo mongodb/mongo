@@ -1187,18 +1187,21 @@ struct SubstituteConvert<EvaluationNode> {
             return;
         }
 
-        PSRExpr::visitDNF(conversion->_reqMap.getRoot(), [&](PartialSchemaEntry& entry) {
-            auto& [key, req] = entry;
-            req = {
-                evalNode.getProjectionName(), std::move(req.getIntervals()), req.getIsPerfOnly()};
+        PSRExpr::visitDNF(conversion->_reqMap.getRoot(),
+                          [&](PartialSchemaEntry& entry, const PSRExpr::VisitorContext&) {
+                              auto& [key, req] = entry;
+                              req = {evalNode.getProjectionName(),
+                                     std::move(req.getIntervals()),
+                                     req.getIsPerfOnly()};
 
-            uassert(6624114,
-                    "Eval partial schema requirement must contain a variable name.",
-                    key._projectionName);
-            uassert(6624115,
-                    "Eval partial schema requirement cannot have a range",
-                    isIntervalReqFullyOpenDNF(req.getIntervals()));
-        });
+                              uassert(
+                                  6624114,
+                                  "Eval partial schema requirement must contain a variable name.",
+                                  key._projectionName);
+                              uassert(6624115,
+                                      "Eval partial schema requirement cannot have a range",
+                                      isIntervalReqFullyOpenDNF(req.getIntervals()));
+                          });
 
         ProjectionRenames projectionRenames_unused;
         const bool hasEmptyInterval = simplifyPartialSchemaReqPaths(scanProjName,

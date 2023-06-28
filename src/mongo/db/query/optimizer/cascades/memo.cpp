@@ -468,20 +468,24 @@ static bool isSimpleIdLookup(ABT::reference_type n) {
     }
 
     bool isIdLookup = false;
-    PSRExpr::visitAnyShape(node->getReqMap().getRoot(), [&](const PartialSchemaEntry& entry) {
-        if (const auto interval = IntervalReqExpr::getSingularDNF(entry.second.getIntervals());
-            !interval || !interval->isEquality()) {
-            return;
-        }
-        if (const PathGet* getPtr = entry.first._path.cast<PathGet>();
-            getPtr && getPtr->name() == "_id") {
-            if (getPtr->getPath().is<PathIdentity>()) {
-                isIdLookup = true;
-            } else if (const PathTraverse* traversePtr = getPtr->getPath().cast<PathTraverse>()) {
-                isIdLookup = traversePtr->getPath().is<PathIdentity>();
+    PSRExpr::visitAnyShape(
+        node->getReqMap().getRoot(),
+        [&](const PartialSchemaEntry& entry, const PSRExpr::VisitorContext& ctx) {
+            if (const auto interval = IntervalReqExpr::getSingularDNF(entry.second.getIntervals());
+                !interval || !interval->isEquality()) {
+                return;
             }
-        }
-    });
+            if (const PathGet* getPtr = entry.first._path.cast<PathGet>();
+                getPtr && getPtr->name() == "_id") {
+                if (getPtr->getPath().is<PathIdentity>()) {
+                    isIdLookup = true;
+                    ctx.returnEarly();
+                } else if (const PathTraverse* traversePtr =
+                               getPtr->getPath().cast<PathTraverse>()) {
+                    isIdLookup = traversePtr->getPath().is<PathIdentity>();
+                }
+            }
+        });
     return isIdLookup;
 }
 
@@ -508,19 +512,20 @@ void Memo::estimateCE(const Context& ctx, const GroupIdType groupId) {
         invariant(partialSchemaKeyCE.empty());
 
         // Cache estimation for each individual requirement.
-        PSRExpr::visitDNF(sargablePtr->getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
-            ABT singularReq =
-                make<SargableNode>(PartialSchemaRequirements{PSRExpr::makeSingularDNF(e)},
-                                   CandidateIndexes{},
-                                   ScanParams{},
-                                   sargablePtr->getTarget(),
-                                   sargablePtr->getChild());
-            const CEType singularEst = simpleIdLookup
-                ? CEType{1.0}
-                : ctx._cardinalityEstimator->deriveCE(
-                      *ctx._metadata, *this, props, singularReq.ref());
-            partialSchemaKeyCE.emplace_back(e.first, singularEst);
-        });
+        PSRExpr::visitDNF(sargablePtr->getReqMap().getRoot(),
+                          [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                              ABT singularReq = make<SargableNode>(
+                                  PartialSchemaRequirements{PSRExpr::makeSingularDNF(e)},
+                                  CandidateIndexes{},
+                                  ScanParams{},
+                                  sargablePtr->getTarget(),
+                                  sargablePtr->getChild());
+                              const CEType singularEst = simpleIdLookup
+                                  ? CEType{1.0}
+                                  : ctx._cardinalityEstimator->deriveCE(
+                                        *ctx._metadata, *this, props, singularReq.ref());
+                              partialSchemaKeyCE.emplace_back(e.first, singularEst);
+                          });
     }
 
     properties::setPropertyOverwrite(props, std::move(ceProp));

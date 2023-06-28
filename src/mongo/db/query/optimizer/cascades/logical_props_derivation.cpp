@@ -123,41 +123,51 @@ static void populateDistributionPaths(const PartialSchemaRequirements& req,
  */
 static bool computeEqPredsOnly(const PartialSchemaRequirements& reqMap) {
     bool eqPredsOnly = true;
-    PSRExpr::visitDisjuncts(reqMap.getRoot(), [&](const PSRExpr::Node& child, const size_t) {
-        PartialSchemaKeySet equalityKeys;
-        PartialSchemaKeySet fullyOpenKeys;
+    PSRExpr::visitDisjuncts(
+        reqMap.getRoot(), [&](const PSRExpr::Node& child, const PSRExpr::VisitorContext& disjCtx) {
+            PartialSchemaKeySet equalityKeys;
+            PartialSchemaKeySet fullyOpenKeys;
 
-        PSRExpr::visitConjuncts(child, [&](const PSRExpr::Node& atom, const size_t) {
-            PSRExpr::visitAtom(atom, [&](const PartialSchemaEntry& e) {
-                if (!eqPredsOnly) {
+            PSRExpr::visitConjuncts(
+                child, [&](const PSRExpr::Node& atom, const PSRExpr::VisitorContext& conjCtx) {
+                    PSRExpr::visitAtom(
+                        atom, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                            const auto& [key, req] = e;
+                            const auto& intervals = req.getIntervals();
+                            if (auto singularInterval =
+                                    IntervalReqExpr::getSingularDNF(intervals)) {
+                                if (singularInterval->isFullyOpen()) {
+                                    fullyOpenKeys.insert(key);
+                                } else if (singularInterval->isEquality()) {
+                                    equalityKeys.insert(key);
+                                } else {
+                                    // Encountered a non-equality and not-fully-open interval.
+                                    eqPredsOnly = false;
+                                }
+                            } else {
+                                // Encountered a non-trivial interval.
+                                eqPredsOnly = false;
+                            }
+
+                            if (!eqPredsOnly) {
+                                conjCtx.returnEarly();
+                            }
+                        });
+
+                    if (!eqPredsOnly) {
+                        disjCtx.returnEarly();
+                    }
+                });
+
+            for (const auto& key : fullyOpenKeys) {
+                if (equalityKeys.count(key) == 0) {
+                    // No possible match for fully open requirement.
+                    eqPredsOnly = false;
+                    disjCtx.returnEarly();
                     return;
                 }
-
-                const auto& [key, req] = e;
-                const auto& intervals = req.getIntervals();
-                if (auto singularInterval = IntervalReqExpr::getSingularDNF(intervals)) {
-                    if (singularInterval->isFullyOpen()) {
-                        fullyOpenKeys.insert(key);
-                    } else if (singularInterval->isEquality()) {
-                        equalityKeys.insert(key);
-                    } else {
-                        // Encountered a non-equality and not-fully-open interval.
-                        eqPredsOnly = false;
-                    }
-                } else {
-                    // Encountered a non-trivial interval.
-                    eqPredsOnly = false;
-                }
-            });
-        });
-
-        for (const auto& key : fullyOpenKeys) {
-            if (equalityKeys.count(key) == 0) {
-                // No possible match for fully open requirement.
-                eqPredsOnly = false;
             }
-        }
-    });
+        });
 
     return eqPredsOnly;
 }

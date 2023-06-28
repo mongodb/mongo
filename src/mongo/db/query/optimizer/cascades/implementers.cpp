@@ -96,23 +96,30 @@ static bool propertyAffectsProjection(const PhysProps& props,
 // SortedMerge and MergeJoin to produce a stream of sorted RIDs, allowing us to potentially
 // deduplicate with a streaming Unique.
 static bool canReturnSortedOutput(const CompoundIntervalReqExpr::Node& intervals) {
+    using CIQExpr = CompoundIntervalReqExpr;
     bool canBeSorted = true;
-    // TODO SERVER-73828 this pattern could use early return.
-    CompoundIntervalReqExpr::visitDisjuncts(
-        intervals, [&](const CompoundIntervalReqExpr::Node& conj, size_t) {
-            CompoundIntervalReqExpr::visitConjuncts(
-                conj, [&](const CompoundIntervalReqExpr::Node& atom, size_t i) {
-                    if (i > 0) {
+    CIQExpr::visitDisjuncts(
+        intervals, [&](const CIQExpr::Node& conj, const CIQExpr::VisitorContext& disjCtx) {
+            CIQExpr::visitConjuncts(
+                conj, [&](const CIQExpr::Node& atom, const CIQExpr::VisitorContext& conjCtx) {
+                    if (conjCtx.getChildIndex() > 0) {
                         canBeSorted = false;
                     } else {
-                        CompoundIntervalReqExpr::visitAtom(
-                            atom, [&](const CompoundIntervalRequirement& req) {
-                                if (!req.isEquality()) {
-                                    canBeSorted = false;
-                                }
-                            });
+                        CIQExpr::visitAtom(atom,
+                                           [&](const CompoundIntervalRequirement& req,
+                                               const CIQExpr::VisitorContext&) {
+                                               if (!req.isEquality()) {
+                                                   canBeSorted = false;
+                                               }
+                                           });
+                    }
+                    if (!canBeSorted) {
+                        conjCtx.returnEarly();
                     }
                 });
+            if (!canBeSorted) {
+                disjCtx.returnEarly();
+            }
         });
     // We shouldn't use a SortedMerge for a singleton disjunction, because with one child there is
     // nothing to sort-merge.
@@ -485,16 +492,10 @@ public:
         const ProjectionName& scanProjectionName = indexingAvailability.getScanProjection();
 
         // We can only satisfy partial schema requirements using our root projection.
-        {
-            bool anyNonRoot = false;
-            PSRExpr::visitAnyShape(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
-                if (e.first._projectionName != scanProjectionName) {
-                    anyNonRoot = true;
-                }
-            });
-            if (anyNonRoot) {
-                return;
-            }
+        if (PSRExpr::any(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
+                return e.first._projectionName != scanProjectionName;
+            })) {
+            return;
         }
 
         const auto& requiredProjections =
@@ -589,7 +590,9 @@ public:
                     std::set<size_t> residIndexes;
                     if (residualReqs) {
                         ResidualRequirements::visitDNF(
-                            *residualReqs, [&](const ResidualRequirement& residReq) {
+                            *residualReqs,
+                            [&](const ResidualRequirement& residReq,
+                                const ResidualRequirements::VisitorContext&) {
                                 residIndexes.emplace(residReq._entryIndex);
                             });
                     }
@@ -601,13 +604,17 @@ public:
                         std::vector<SelectivityType> atomSels;
                         std::vector<SelectivityType> conjuctionSels;
                         PSRExpr::visitDisjuncts(
-                            reqMap.getRoot(), [&](const PSRExpr::Node& child, const size_t) {
+                            reqMap.getRoot(),
+                            [&](const PSRExpr::Node& child, const PSRExpr::VisitorContext&) {
                                 atomSels.clear();
 
                                 PSRExpr::visitConjuncts(
-                                    child, [&](const PSRExpr::Node& atom, const size_t) {
+                                    child,
+                                    [&](const PSRExpr::Node& atom, const PSRExpr::VisitorContext&) {
                                         PSRExpr::visitAtom(
-                                            atom, [&](const PartialSchemaEntry& entry) {
+                                            atom,
+                                            [&](const PartialSchemaEntry& entry,
+                                                const PSRExpr::VisitorContext&) {
                                                 if (residIndexes.count(entryIndex) == 0) {
                                                     const SelectivityType sel =
                                                         partialSchemaKeyCE.at(entryIndex).second /

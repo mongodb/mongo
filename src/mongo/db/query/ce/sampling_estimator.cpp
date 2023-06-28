@@ -112,18 +112,20 @@ public:
         PhysPlanBuilder result{childResult};
 
         // Retain only output bindings without applying filters.
-        PSRExpr::visitAnyShape(node.getReqMap().getRoot(), [&](const PartialSchemaEntry& e) {
-            const auto& [key, req] = e;
-            if (const auto& boundProjName = req.getBoundProjectionName()) {
-                lowerPartialSchemaRequirement(
-                    key,
-                    PartialSchemaRequirement{
-                        boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
-                    _phaseManager.getPathToInterval(),
-                    boost::none /*residualCE*/,
-                    result);
-            }
-        });
+        PSRExpr::visitAnyShape(
+            node.getReqMap().getRoot(),
+            [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext& ctx) {
+                const auto& [key, req] = e;
+                if (const auto& boundProjName = req.getBoundProjectionName()) {
+                    lowerPartialSchemaRequirement(
+                        key,
+                        PartialSchemaRequirement{
+                            boundProjName, IntervalReqExpr::makeSingularDNF(), req.getIsPerfOnly()},
+                        _phaseManager.getPathToInterval(),
+                        boost::none /*residualCE*/,
+                        result);
+                }
+            });
         std::swap(n, result._node);
     }
 
