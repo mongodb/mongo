@@ -3,6 +3,7 @@
  * already aborted.
  *
  *  @tags: [
+ *    requires_fcv_71,
  *    featureFlagOnlineMovePrimaryLifecycle
  * ]
  */
@@ -13,7 +14,7 @@ load("jstests/libs/parallel_shell_helpers.js");
 
 const st = new ShardingTest({mongos: 1, shards: 2, rs: {nodes: 3}});
 
-if (!FeatureFlagUtil.isEnabled(st.s.getDB(jsTestName()), "OnlineMovePrimaryLifecycle")) {
+if (!FeatureFlagUtil.isPresentAndEnabled(st.s.getDB(jsTestName()), "OnlineMovePrimaryLifecycle")) {
     jsTestLog('Skipping test because the featureFlagOnlineMovePrimaryLifecycle is disabled.');
     st.stop();
     return;
