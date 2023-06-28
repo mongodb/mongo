@@ -48,7 +48,7 @@ const expectedParamDefaults = {
     internalQueryIgnoreUnknownJSONSchemaKeywords: false,
     internalQueryProhibitBlockingMergeOnMongoS: false,
     internalQuerySlotBasedExecutionMaxStaticIndexScanIntervals: 1000,
-    documentSourceWriterBatchBuffer: 0,
+    internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
 };
 
 function assertDefaultParameterValues() {
@@ -202,6 +202,13 @@ assertSetParameterFails("internalQuerySlotBasedExecutionMaxStaticIndexScanInterv
 
 assertSetParameterSucceeds("internalQueryEnableSlotBasedExecutionEngine", true);
 assertSetParameterSucceeds("internalQueryEnableSlotBasedExecutionEngine", false);
+
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 10);
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                           4 * 1024 * 1024);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes", -1);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                        9 * 1024 * 1024);
 
 MongoRunner.stopMongod(conn);
 })();
