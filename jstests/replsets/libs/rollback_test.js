@@ -107,6 +107,34 @@ function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
 
     // Make sure we have a replica set up and running.
     replSet = (replSet === undefined) ? performStandardSetup(nodeOptions) : replSet;
+
+    // Return an helper function to set a tenantId on commands if it is required.
+    let addTenantIdIfNeeded = (function() {
+        const adminDB = replSet.getPrimary().getDB("admin");
+        const flagDoc = assert.commandWorked(
+            adminDB.adminCommand({getParameter: 1, featureFlagRequireTenantID: 1}));
+        const multitenancyDoc =
+            assert.commandWorked(adminDB.adminCommand({getParameter: 1, multitenancySupport: 1}));
+        const fcvDoc = assert.commandWorked(
+            adminDB.adminCommand({getParameter: 1, featureCompatibilityVersion: 1}));
+        if (multitenancyDoc.hasOwnProperty("multitenancySupport") &&
+            multitenancyDoc.multitenancySupport &&
+            flagDoc.hasOwnProperty("featureFlagRequireTenantID") &&
+            flagDoc.featureFlagRequireTenantID.value &&
+            MongoRunner.compareBinVersions(fcvDoc.featureCompatibilityVersion.version,
+                                           flagDoc.featureFlagRequireTenantID.version) >= 0) {
+            const tenantId = ObjectId();
+
+            return function(cmdObj) {
+                return Object.assign(cmdObj, {'$tenant': tenantId});
+            };
+        } else {
+            return function(cmdObj) {
+                return cmdObj;
+            };
+        }
+    })();
+
     validateAndUseSetup(replSet);
 
     // Majority writes in the initial phase, before transitionToRollbackOperations(), should be
@@ -181,9 +209,12 @@ function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // ensure the insert was replicated and written to the on-disk journal of all 3
         // nodes, with the exception of ephemeral and in-memory storage engines where
         // journaling isn't supported.
-        assert.commandWorked(curPrimary.getDB(dbName).ensureSyncSource.insert(
-            {thisDocument: 'is inserted to ensure any node can sync from any other'},
-            {writeConcern: {w: 3, j: config.writeConcernMajorityJournalDefault}}));
+
+        assert.commandWorked(curPrimary.getDB(dbName).runCommand(addTenantIdIfNeeded({
+            insert: "ensureSyncSource",
+            documents: [{thisDocument: 'is inserted to ensure any node can sync from any other'}],
+            writeConcern: {w: 3, j: config.writeConcernMajorityJournalDefault}
+        })));
     }
 
     /**
@@ -455,9 +486,11 @@ function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
         // storage engines are an exception because journaling isn't supported.
         let writeConcern = TestData.rollbackShutdowns ? {w: 1, j: true} : {w: 1};
         let dbName = "EnsureThereIsAtLeastOneOperationToRollback";
-        assert.commandWorked(curPrimary.getDB(dbName).ensureRollback.insert(
-            {thisDocument: 'is inserted to ensure rollback is not skipped'},
-            {writeConcern: writeConcern}));
+        assert.commandWorked(curPrimary.getDB(dbName).runCommand(addTenantIdIfNeeded({
+            insert: "ensureRollback",
+            documents: [{thisDocument: 'is inserted to ensure rollback is not skipped'}],
+            writeConcern
+        })));
 
         log(`Isolating the primary ${curPrimary.host} so it will step down`);
         // We should have already disconnected the primary from the secondary during the first stage

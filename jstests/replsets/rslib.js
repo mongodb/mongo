@@ -130,13 +130,13 @@ reconnect = function(conn) {
         try {
             // Make this work with either dbs or connections.
             if (typeof (conn.getDB) == "function") {
-                db = conn.getDB('foo');
+                db = conn.getDB('config');
             } else {
                 db = conn;
             }
 
             // Run a simple command to re-establish connection.
-            db.bar.stats();
+            db.settings.stats();
 
             // SERVER-4241: Shell connections don't re-authenticate on reconnect.
             if (jsTest.options().keyFile) {

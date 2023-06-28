@@ -41,6 +41,7 @@
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/object_check.h"
 #include "mongo/util/bufreader.h"
@@ -170,9 +171,9 @@ OpMsg OpMsg::parse(const Message& message, Client* client) try {
                 haveBody = true;
                 msg.body = sectionsBuf.read<Validated<BSONObj>>();
 
-                uassert(ErrorCodes::InvalidOptions,
-                        "Multitenancy not enabled, cannot set $tenant in command body",
-                        gMultitenancySupport || !msg.body["$tenant"_sd]);
+                if (auto* multitenancyCheck = MultitenancyCheck::getPtr()) {
+                    multitenancyCheck->checkDollarTenantField(msg.body);
+                }
                 break;
             }
 
