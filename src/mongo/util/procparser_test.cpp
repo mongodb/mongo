@@ -33,6 +33,7 @@
 #include "mongo/util/procparser.h"
 
 #include <boost/filesystem.hpp>
+#include <fcntl.h>
 #include <map>
 
 #include "mongo/bson/bsonobj.h"
@@ -80,6 +81,25 @@ StringMap toNestedStringMap(BSONObj& obj) {
     }
 
     return map;
+}
+
+bool isPSISupported(StringData filename) {
+    int fd = open(filename.toString().c_str(), 0);
+    if (fd == -1) {
+        return false;
+    }
+    ScopeGuard scopedGuard([fd] { close(fd); });
+
+    std::array<char, 1> buf;
+
+    while (read(fd, buf.data(), buf.size()) == -1) {
+        auto ec = lastPosixError();
+        if (ec == posixError(EOPNOTSUPP)) {
+            return false;
+        }
+        ASSERT_EQ(ec, posixError(EINTR));
+    }
+    return true;
 }
 
 #define ASSERT_KEY(_key) ASSERT_TRUE(stringMap.find(_key) != stringMap.end());
@@ -1003,7 +1023,7 @@ TEST(FTDCProcPressure, TestFailure) {
 }
 
 TEST(FTDCProcPressure, TestLocalPressureInfo) {
-    if (boost::filesystem::exists("/proc/pressure/cpu")) {
+    if (isPSISupported("/proc/pressure/cpu")) {
         BSONObjBuilder builder;
 
         ASSERT_OK(procparser::parseProcPressureFile("cpu", "/proc/pressure/cpu", &builder));
@@ -1016,7 +1036,7 @@ TEST(FTDCProcPressure, TestLocalPressureInfo) {
         ASSERT(!obj["cpu"]["full"]);
     }
 
-    if (boost::filesystem::exists("/proc/pressure/memory")) {
+    if (isPSISupported("/proc/pressure/memory")) {
         BSONObjBuilder builder;
 
         ASSERT_OK(procparser::parseProcPressureFile("memory", "/proc/pressure/memory", &builder));
@@ -1030,7 +1050,7 @@ TEST(FTDCProcPressure, TestLocalPressureInfo) {
         ASSERT(obj["memory"]["full"]["totalMicros"]);
     }
 
-    if (boost::filesystem::exists("/proc/pressure/io")) {
+    if (isPSISupported("/proc/pressure/io")) {
         BSONObjBuilder builder;
 
         ASSERT_OK(procparser::parseProcPressureFile("io", "/proc/pressure/io", &builder));
