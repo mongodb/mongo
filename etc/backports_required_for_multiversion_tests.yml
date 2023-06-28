@@ -396,6 +396,10 @@ last-continuous:
     ticket: SERVER-60466
   - test_file: jstests/sharding/transfer_mods_large_batches.js
     ticket: SERVER-78414
+  - test_file: jstests/core/find_with_resume_after_param.js
+    ticket: SERVER-77386
+  - test_file: jstests/core/timeseries/timeseries_resume_after.js
+    ticket: SERVER-77386
   suites: null
 last-lts:
   all:
