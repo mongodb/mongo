@@ -122,6 +122,7 @@ class test_prepare_hs01(wttest.WiredTigerTestCase):
         # aborted
         self.check(uri, ds, nrows, nsessions, nkeys, 3, bigvalue1, bigvalue2)
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_prepare_hs(self):
         # Create a small table.
         uri = "table:test_prepare_hs01"

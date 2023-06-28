@@ -27,6 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
+from unittest import skip
 import wiredtiger, wttest
 
 # test_stat08.py
@@ -69,7 +70,7 @@ class test_stat08(wttest.WiredTigerTestCase):
         cur.search()
         [desc, pvalue, value] = cur.get_values()
         self.pr('  stat: \'%s\', \'%s\', \'%s\'' % (desc, pvalue, str(value)))
-        self.assertEqual(desc, exp_desc )
+        self.assertEqual(desc, exp_desc)
         if k is self.BYTES_READ or k is self.READ_TIME:
             self.assertTrue(value > 0)
 

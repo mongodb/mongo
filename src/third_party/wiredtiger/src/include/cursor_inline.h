@@ -75,6 +75,31 @@ __cursor_novalue(WT_CURSOR *cursor)
 }
 
 /*
+ * __wt_cursor_bound_reset --
+ *     Clear any bounds on the cursor if they are set.
+ */
+static inline void
+__wt_cursor_bound_reset(WT_CURSOR *cursor)
+{
+    WT_SESSION_IMPL *session;
+
+    session = CUR2S(cursor);
+
+    /* Clear bounds if they are set. */
+    if (WT_CURSOR_BOUNDS_SET(cursor)) {
+        WT_STAT_CONN_DATA_INCR(session, cursor_bounds_reset);
+        /* Clear upper bound, and free the buffer. */
+        F_CLR(cursor, WT_CURSTD_BOUND_UPPER | WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+        __wt_buf_free(session, &cursor->upper_bound);
+        WT_CLEAR(cursor->upper_bound);
+        /* Clear lower bound, and free the buffer. */
+        F_CLR(cursor, WT_CURSTD_BOUND_LOWER | WT_CURSTD_BOUND_LOWER_INCLUSIVE);
+        __wt_buf_free(session, &cursor->lower_bound);
+        WT_CLEAR(cursor->lower_bound);
+    }
+}
+
+/*
  * __cursor_checkkey --
  *     Check if a key is set without making a copy.
  */
@@ -225,7 +250,7 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
 
     /* If the cursor was active, deactivate it. */
     if (F_ISSET(cbt, WT_CBT_ACTIVE)) {
-        if (!F_ISSET(cbt, WT_CBT_NO_TRACKING))
+        if (!WT_READING_CHECKPOINT(session))
             __cursor_leave(session);
         F_CLR(cbt, WT_CBT_ACTIVE);
     }
@@ -234,7 +259,7 @@ __cursor_reset(WT_CURSOR_BTREE *cbt)
      * When the count of active cursors in the session goes to zero, there are no active cursors,
      * and we can release any snapshot we're holding for read committed isolation.
      */
-    if (session->ncursors == 0 && !F_ISSET(cbt, WT_CBT_NO_TXN))
+    if (session->ncursors == 0 && !WT_READING_CHECKPOINT(session))
         __wt_txn_read_last(session);
 
     /* If we're not holding a cursor reference, we're done. */
@@ -400,7 +425,7 @@ __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
 
     /* Activate the file cursor. */
     if (!F_ISSET(cbt, WT_CBT_ACTIVE)) {
-        if (!F_ISSET(cbt, WT_CBT_NO_TRACKING))
+        if (!WT_READING_CHECKPOINT(session))
             WT_RET(__cursor_enter(session));
         F_SET(cbt, WT_CBT_ACTIVE);
     }
@@ -408,7 +433,7 @@ __wt_cursor_func_init(WT_CURSOR_BTREE *cbt, bool reenter)
     /*
      * If this is an ordinary transactional cursor, make sure we are set up to read.
      */
-    if (!F_ISSET(cbt, WT_CBT_NO_TXN))
+    if (!WT_READING_CHECKPOINT(session))
         __wt_txn_cursor_op(session);
     return (0);
 }

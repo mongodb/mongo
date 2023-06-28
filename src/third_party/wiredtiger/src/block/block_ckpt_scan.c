@@ -175,7 +175,7 @@ __block_checkpoint_update(WT_SESSION_IMPL *session, WT_BLOCK *block, struct save
     memset(&ci, 0, sizeof(ci));
     checkpoint = info->checkpoint;
 
-    if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_2))
         __wt_ckpt_verbose(
           session, block, "import original", NULL, checkpoint->mem, checkpoint->size);
 
@@ -193,7 +193,7 @@ __block_checkpoint_update(WT_SESSION_IMPL *session, WT_BLOCK *block, struct save
     WT_RET(__wt_block_ckpt_pack(session, block, &endp, &ci, false));
     checkpoint->size = WT_PTRDIFF(endp, checkpoint->mem);
 
-    if (WT_VERBOSE_ISSET(session, WT_VERB_CHECKPOINT))
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_2))
         __wt_ckpt_verbose(
           session, block, "import replace", NULL, checkpoint->mem, checkpoint->size);
 
@@ -321,7 +321,7 @@ __wt_block_checkpoint_last(WT_SESSION_IMPL *session, WT_BLOCK *block, char **met
         if (write_gen < best->write_gen)
             continue;
 
-        __wt_verbose(session, WT_VERB_CHECKPOINT,
+        __wt_verbose_level(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_2,
           "scan: checkpoint block at offset %" PRIuMAX ", generation #%" PRIu64, (uintmax_t)offset,
           write_gen);
 

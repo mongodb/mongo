@@ -61,21 +61,29 @@ wts_checkpoints(void)
 WT_THREAD_RET
 checkpoint(void *arg)
 {
+    SAP sap;
     WT_CONNECTION *conn;
     WT_DECL_RET;
     WT_SESSION *session;
-    u_int secs;
+    u_int counter, secs;
     char config_buf[64];
-    const char *ckpt_config;
-    bool backup_locked, named_checkpoints;
+    const char *ckpt_config, *ckpt_vrfy_name;
+    bool backup_locked, flush_tier, named_checkpoints;
 
     (void)arg;
 
     conn = g.wts_conn;
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
-    named_checkpoints = !g.lsm_config;
+    counter = 0;
 
-    for (secs = mmrand(NULL, 1, 10); !g.workers_finished;) {
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
+
+    named_checkpoints = !g.lsm_config;
+    /* FIXME-WT-10771 Named checkpoints are not yet allowed with tiered storage. */
+    if (g.tiered_storage_config)
+        named_checkpoints = false;
+
+    for (secs = mmrand(&g.extra_rnd, 1, 10); !g.workers_finished;) {
         if (secs > 0) {
             __wt_sleep(1, 0);
             --secs;
@@ -89,21 +97,30 @@ checkpoint(void *arg)
          * when we can't drop the previous one.
          */
         ckpt_config = NULL;
+        ckpt_vrfy_name = "WiredTigerCheckpoint";
         backup_locked = false;
-        if (named_checkpoints)
-            switch (mmrand(NULL, 1, 20)) {
+
+        /*
+         * Use checkpoint with flush_tier as often as configured. Don't mix with named checkpoints,
+         * we're not interested in testing that combination.
+         */
+        flush_tier = (mmrand(&g.extra_rnd, 1, 100) <= GV(TIERED_STORAGE_FLUSH_FREQUENCY));
+        if (flush_tier)
+            ckpt_config = "flush_tier=(enabled)";
+        else if (named_checkpoints)
+            switch (mmrand(&g.extra_rnd, 1, 20)) {
             case 1:
                 /*
-                 * 5% create a named snapshot. Rotate between a
-                 * few names to test multiple named snapshots in
-                 * the system.
+                 * 5% create a named snapshot. Rotate between a few names to test multiple named
+                 * snapshots in the system.
                  */
                 ret = lock_try_writelock(session, &g.backup_lock);
                 if (ret == 0) {
                     backup_locked = true;
-                    testutil_check(__wt_snprintf(
-                      config_buf, sizeof(config_buf), "name=mine.%" PRIu32, mmrand(NULL, 1, 4)));
+                    testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
+                      "name=mine.%" PRIu32, mmrand(&g.extra_rnd, 1, 4)));
                     ckpt_config = config_buf;
+                    ckpt_vrfy_name = config_buf + strlen("name=");
                 } else if (ret != EBUSY)
                     testutil_check(ret);
                 break;
@@ -120,14 +137,27 @@ checkpoint(void *arg)
                 break;
             }
 
+        if (ckpt_config == NULL)
+            trace_msg(session, "Checkpoint #%u start", ++counter);
+        else
+            trace_msg(session, "Checkpoint #%u start (%s)", ++counter, ckpt_config);
+
         testutil_check(session->checkpoint(session, ckpt_config));
+
+        if (ckpt_config == NULL)
+            trace_msg(session, "Checkpoint #%u stop", counter);
+        else
+            trace_msg(session, "Checkpoint #%u stop (%s)", counter, ckpt_config);
 
         if (backup_locked)
             lock_writeunlock(session, &g.backup_lock);
 
-        secs = mmrand(NULL, 5, 40);
+        /* Verify the checkpoints. */
+        wts_verify_checkpoint(conn, ckpt_vrfy_name);
+
+        secs = mmrand(&g.extra_rnd, 5, 40);
     }
 
-    testutil_check(session->close(session, NULL));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
     return (WT_THREAD_RET_VALUE);
 }

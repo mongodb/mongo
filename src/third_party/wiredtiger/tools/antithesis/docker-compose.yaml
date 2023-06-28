@@ -1,0 +1,26 @@
+version: '3.0'
+
+services:
+        wiredtiger:
+                container_name: wiredtiger
+                hostname: wiredtiger
+                image: wt-test-format:wt-latest
+                command: /bin/bash /opt/bin/test.sh -c CONFIG.antithesis -h /data/RUNDIR
+                volumes:
+                  - ./data/wiredtiger:/data/
+                  - type: bind
+                    source: ./CONFIG.antithesis
+                    target: /opt/bin/test/format/CONFIG.antithesis
+                networks:
+                        antithesis-net:
+                                ipv4_address: 10.20.20.6
+                                # Set the an IPv4 with an address of 10.20.20.130 or higher
+                                # to be ignored by the fault injector
+
+
+networks:
+        antithesis-net:
+                driver: bridge
+                ipam:
+                        config:
+                        - subnet: 10.20.20.0/24

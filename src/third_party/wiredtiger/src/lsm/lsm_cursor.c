@@ -214,7 +214,9 @@ __clsm_enter(WT_CURSOR_LSM *clsm, bool reset, bool update)
                     switch_txn = clsm->chunks[i]->switch_txn;
                     if (WT_TXNID_LT(switch_txn, pinned_id))
                         break;
-                    WT_ASSERT(session, !__wt_txn_visible_all(session, switch_txn, WT_TS_NONE));
+                    WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_TXN_VISIBILITY,
+                      !__wt_txn_visible_all(session, switch_txn, WT_TS_NONE),
+                      "Switch transaction is not globally visible");
                 }
             }
         }
@@ -452,7 +454,7 @@ __clsm_open_cursors(WT_CURSOR_LSM *clsm, bool update, u_int start_chunk, uint32_
         return (0);
 
     ckpt_cfg[0] = WT_CONFIG_BASE(session, WT_SESSION_open_cursor);
-    ckpt_cfg[1] = "checkpoint=" WT_CHECKPOINT ",raw";
+    ckpt_cfg[1] = "checkpoint=" WT_CHECKPOINT ",raw,checkpoint_use_history=false";
     ckpt_cfg[2] = NULL;
 
     /*
@@ -663,38 +665,42 @@ retry:
     clsm->dsk_gen = lsm_tree->dsk_gen;
 
 err:
-#ifdef HAVE_DIAGNOSTIC
-    /* Check that all cursors are open as expected. */
-    if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
-        for (i = 0; i != clsm->nchunks; i++) {
-            cursor = clsm->chunks[i]->cursor;
-            chunk = lsm_tree->chunk[i + start_chunk];
+    if (EXTRA_DIAGNOSTICS_ENABLED(session, WT_DIAGNOSTIC_CURSOR_CHECK)) {
+        /* Check that all cursors are open as expected. */
+        if (ret == 0 && F_ISSET(clsm, WT_CLSM_OPEN_READ)) {
+            for (i = 0; i != clsm->nchunks; i++) {
+                cursor = clsm->chunks[i]->cursor;
+                chunk = lsm_tree->chunk[i + start_chunk];
 
-            /* Make sure the first cursor is open. */
-            WT_ASSERT(session, cursor != NULL);
+                /* Make sure the first cursor is open. */
+                WT_ASSERT_ALWAYS(
+                  session, cursor != NULL, "Failed to open cursors for all LSM chunks");
 
-            /* Easy case: the URIs should match. */
-            WT_ASSERT(session, strcmp(cursor->uri, chunk->uri) == 0);
+                /* Easy case: the URIs should match. */
+                WT_ASSERT_ALWAYS(session, strcmp(cursor->uri, chunk->uri) == 0,
+                  "Cursor URI does not match the LSM tree URI");
 
-            /*
-             * Make sure the checkpoint config matches when not using a custom data source.
-             */
-            if (lsm_tree->custom_generation == 0 ||
-              chunk->generation < lsm_tree->custom_generation) {
-                checkpoint = ((WT_CURSOR_BTREE *)cursor)->dhandle->checkpoint;
-                WT_ASSERT(session,
-                  (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ? checkpoint != NULL :
-                                                                           checkpoint == NULL);
+                /*
+                 * Make sure the checkpoint config matches when not using a custom data source.
+                 */
+                if (lsm_tree->custom_generation == 0 ||
+                  chunk->generation < lsm_tree->custom_generation) {
+                    checkpoint = ((WT_CURSOR_BTREE *)cursor)->dhandle->checkpoint;
+                    WT_ASSERT_ALWAYS(session,
+                      (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK) && !chunk->empty) ? checkpoint != NULL :
+                                                                               checkpoint == NULL,
+                      "LSM tree checkpoint config does not match");
+                }
+
+                /* Make sure the Bloom config matches. */
+                WT_ASSERT_ALWAYS(session,
+                  (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) && !F_ISSET(clsm, WT_CLSM_MERGE)) ?
+                    clsm->chunks[i]->bloom != NULL :
+                    clsm->chunks[i]->bloom == NULL,
+                  "LSM Bloom config does not match");
             }
-
-            /* Make sure the Bloom config matches. */
-            WT_ASSERT(session,
-              (F_ISSET(chunk, WT_LSM_CHUNK_BLOOM) && !F_ISSET(clsm, WT_CLSM_MERGE)) ?
-                clsm->chunks[i]->bloom != NULL :
-                clsm->chunks[i]->bloom == NULL);
         }
     }
-#endif
     if (locked)
         __wt_lsm_tree_readunlock(session, lsm_tree);
     return (ret);
@@ -1403,7 +1409,8 @@ __clsm_put(WT_SESSION_IMPL *session, WT_CURSOR_LSM *clsm, const WT_ITEM *key, co
 
     for (i = 0, slot = clsm->nchunks - 1; i < clsm->nupdates; i++, slot--) {
         /* Check if we need to keep updating old chunks. */
-        if (i > 0 && __wt_txn_visible(session, clsm->chunks[slot]->switch_txn, WT_TS_NONE)) {
+        if (i > 0 &&
+          __wt_txn_visible(session, clsm->chunks[slot]->switch_txn, WT_TS_NONE, WT_TS_NONE)) {
             clsm->nupdates = i;
             break;
         }
@@ -1574,9 +1581,9 @@ __clsm_remove(WT_CURSOR *cursor)
     WT_ERR(__clsm_put(session, clsm, &cursor->key, &__tombstone, true, false));
 
     /*
-     * If the cursor was positioned, it stays positioned with a key but no no value, otherwise,
-     * there's no position, key or value. This isn't just cosmetic, without a reset, iteration on
-     * this cursor won't start at the beginning/end of the table.
+     * If the cursor was positioned, it stays positioned with a key but no value, otherwise, there's
+     * no position, key or value. This isn't just cosmetic, without a reset, iteration on this
+     * cursor won't start at the beginning/end of the table.
      */
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
     if (positioned)
@@ -1675,6 +1682,7 @@ __wt_clsm_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, cons
     WT_CONFIG_ITEM cval;
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value,                  /* get-value */
       __wt_cursor_set_key,                            /* set-key */
       __wt_cursor_set_value,                          /* set-value */
       __clsm_compare,                                 /* compare */
@@ -1691,8 +1699,10 @@ __wt_clsm_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, cons
       __clsm_reserve,                                 /* reserve */
       __wt_cursor_reconfigure,                        /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __wt_cursor_config_notsup,                      /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __wt_clsm_close);                               /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_LSM *clsm;

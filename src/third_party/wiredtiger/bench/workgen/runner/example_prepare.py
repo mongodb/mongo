@@ -48,16 +48,17 @@ op = Operation(Operation.OP_INSERT, table)
 thread = Thread(op * 5000)
 pop_workload = Workload(context, thread)
 print('populate:')
-pop_workload.run(conn)
+ret = pop_workload.run(conn)
+assert ret == 0, ret
 
 opread = Operation(Operation.OP_SEARCH, table)
-read_txn = txn(opread * 5, 'read_timestamp')
+read_txn = txn(opread, 'read_timestamp')
 # read_timestamp_lag is the lag to the read_timestamp from current time
 read_txn.transaction.read_timestamp_lag = 2
 treader = Thread(read_txn)
 
 opwrite = Operation(Operation.OP_INSERT, table)
-write_txn = txn(opwrite * 5, 'isolation=snapshot')
+write_txn = txn(opwrite, 'isolation=snapshot')
 # use_prepare_timestamp - Commit the transaction with stable_timestamp.
 write_txn.transaction.use_prepare_timestamp = True
 twriter = Thread(write_txn)
@@ -65,7 +66,7 @@ twriter = Thread(write_txn)
 twriter.options.session_config="isolation=snapshot"
 
 opupdate = Operation(Operation.OP_UPDATE, table)
-update_txn = txn(opupdate * 5, 'isolation=snapshot')
+update_txn = txn(opupdate, 'isolation=snapshot')
 # use_commit_timestamp - Commit the transaction with commit_timestamp.
 update_txn.transaction.use_commit_timestamp = True
 tupdate = Thread(update_txn)
@@ -82,7 +83,8 @@ workload.options.stable_timestamp_lag=10
 # timestamp_advance is the number of seconds to wait before moving oldest and stable timestamp.
 workload.options.timestamp_advance=1
 print('transactional prepare workload:')
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret
 
 end_time = time.time()
 run_time = end_time - start_time

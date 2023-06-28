@@ -538,7 +538,7 @@ __curjoin_extract_insert(WT_CURSOR *cursor)
     WT_ASSERT(session, ikey.size > 0);
     --ikey.size;
 
-    ret = __curjoin_entry_in_range(session, cextract->entry, &ikey, false);
+    ret = __curjoin_entry_in_range(session, cextract->entry, &ikey, NULL);
     if (ret == WT_NOTFOUND)
         ret = 0;
     else if (ret == 0)
@@ -561,6 +561,7 @@ __curjoin_entry_member(
     WT_CURSOR *c;
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value,                  /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __wt_cursor_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                     /* compare */
@@ -575,10 +576,12 @@ __curjoin_entry_member(
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __wt_cursor_config_notsup,                      /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __wt_cursor_notsup);                            /* close */
     WT_DECL_RET;
     WT_INDEX *idx;
@@ -1208,6 +1211,7 @@ __wt_curjoin_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
 {
     WT_CURSOR_STATIC_INIT(iface, __curjoin_get_key, /* get-key */
       __curjoin_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,         /* get-raw-key-value */
       __wt_cursor_set_key_notsup,                   /* set-key */
       __wt_cursor_set_value_notsup,                 /* set-value */
       __wt_cursor_compare_notsup,                   /* compare */
@@ -1222,10 +1226,12 @@ __wt_curjoin_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, c
       __wt_cursor_notsup,                           /* update */
       __wt_cursor_notsup,                           /* remove */
       __wt_cursor_notsup,                           /* reserve */
-      __wt_cursor_reconfigure_notsup,               /* reconfigure */
+      __wt_cursor_config_notsup,                    /* reconfigure */
       __wt_cursor_notsup,                           /* largest_key */
+      __wt_cursor_config_notsup,                    /* bound */
       __wt_cursor_notsup,                           /* cache */
       __wt_cursor_reopen_notsup,                    /* reopen */
+      __wt_cursor_checkpoint_id,                    /* checkpoint ID */
       __curjoin_close);                             /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_JOIN *cjoin;

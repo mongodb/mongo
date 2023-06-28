@@ -26,7 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 import wiredtiger, wttest
 from wtscenario import make_scenarios
 
@@ -36,7 +36,7 @@ class test_create_excl(TieredConfigMixin, wttest.WiredTigerTestCase):
         ('file', dict(type = 'file:')),
         ('table', dict(type = 'table:')),
     ]
-
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, types)
 
     def test_create_excl(self):

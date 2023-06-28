@@ -13,14 +13,18 @@
 #include <string>
 #include "wt_internal.h"
 
+#ifdef _WIN32
+#include "windows_shim.h"
+#endif
+
 /*
  * Prefer a "real" class over a mock class when you need a fully fleshed-out connection or session.
  * There's a speed cost to this, since it will write a bunch of files to disk during the test, which
  * also need to be removed.
  */
 class ConnectionWrapper {
-    public:
-    ConnectionWrapper(const std::string &db_home);
+public:
+    ConnectionWrapper(const std::string &db_home, const char *cfg_str = "create");
     ~ConnectionWrapper();
 
     /*
@@ -28,15 +32,16 @@ class ConnectionWrapper {
      * cleaned up when that connection is closed. Neither this class nor its users need to clean it
      * up.
      */
-    WT_SESSION_IMPL *createSession();
+    WT_SESSION_IMPL *createSession(std::string cfg_str = "");
 
     WT_CONNECTION_IMPL *getWtConnectionImpl() const;
     WT_CONNECTION *getWtConnection() const;
 
-    private:
+private:
     WT_CONNECTION_IMPL *_conn_impl;
     WT_CONNECTION *_conn;
     std::string _db_home;
+    const char *_cfg_str;
 };
 
 #endif // WT_CONNECTION_WRAPPER_H

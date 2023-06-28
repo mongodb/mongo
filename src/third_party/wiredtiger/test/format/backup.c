@@ -37,7 +37,6 @@ check_copy(void)
 {
     WT_CONNECTION *conn;
     WT_DECL_RET;
-    WT_SESSION *session;
     size_t len;
     char *path;
 
@@ -65,12 +64,12 @@ check_copy(void)
 
     /* Now setup and open the path for real. */
     testutil_check(__wt_snprintf(path, len, "%s/BACKUP", g.home));
-    wts_open(path, &conn, &session, false);
+    wts_open(path, &conn, false);
 
     /* Verify the objects. */
-    tables_apply(wts_verify, conn);
+    wts_verify(conn, true);
 
-    wts_close(&conn, &session);
+    wts_close(&conn);
 
     free(path);
 }
@@ -250,6 +249,9 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
     while ((ret = incr_cur->next(incr_cur)) == 0) {
         testutil_check(incr_cur->get_key(incr_cur, &offset, &size, &type));
         if (type == WT_BACKUP_RANGE) {
+            trace_msg(session,
+              "Backup file %s type WT_BACKUP_RANGE offset %" PRIu64 " length %" PRIu64, name,
+              offset, size);
             /*
              * Since we are using system calls below instead of a WiredTiger function, we have to
              * prepend the home directory to the file names ourselves.
@@ -312,6 +314,7 @@ copy_blocks(WT_SESSION *session, WT_CURSOR *bkup_c, const char *name)
             testutil_assert(first_pass == true);
             testutil_assert(rfd == -1);
 
+            trace_msg(session, "Backup file %s type WT_BACKUP_FILE", name);
             /*
              * These operations are using a WiredTiger function so it will prepend the home
              * directory to the name for us.
@@ -455,6 +458,36 @@ save_backup_info(ACTIVE_FILES *active, uint64_t id)
 }
 
 /*
+ * copy_format_files --
+ *     Copies over format-specific files to the BACKUP.copy directory. These include CONFIG and any
+ *     CONFIG.keylen* files.
+ */
+static void
+copy_format_files(WT_SESSION *session)
+{
+    size_t file_len;
+    u_int i;
+    char *filename;
+
+    /* The CONFIG file should always exist, copy it over. */
+    testutil_copy_file(session, "CONFIG");
+
+    /* Copy over any CONFIG.keylen* files if they exist. */
+    if (ntables == 0)
+        testutil_copy_if_exists(session, "CONFIG.keylen");
+    else {
+        file_len = strlen("CONFIG.keylen.") + 10;
+        filename = dmalloc(file_len);
+
+        for (i = 1; i <= ntables; ++i) {
+            testutil_check(__wt_snprintf(filename, file_len, "CONFIG.keylen.%u", i));
+            testutil_copy_if_exists(session, filename);
+        }
+        free(filename);
+    }
+}
+
+/*
  * backup --
  *     Periodically do a backup and verify it.
  */
@@ -462,11 +495,12 @@ WT_THREAD_RET
 backup(void *arg)
 {
     ACTIVE_FILES active[2], *active_now, *active_prev;
+    SAP sap;
     WT_CONNECTION *conn;
     WT_CURSOR *backup_cursor;
     WT_DECL_RET;
     WT_SESSION *session;
-    u_int incremental, period;
+    u_int counter, incremental, num_yield, period;
     uint64_t src_id, this_id;
     const char *config, *key;
     char cfg[512];
@@ -475,15 +509,17 @@ backup(void *arg)
     (void)(arg);
 
     conn = g.wts_conn;
+
     /* Open a session. */
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
 
     __wt_seconds(NULL, &g.backup_id);
     active_files_init(&active[0]);
     active_files_init(&active[1]);
     active_now = active_prev = NULL;
     incr_full = true;
-    incremental = 0;
+    counter = incremental = 0;
     /*
      * If we're reopening an existing database and doing incremental backup we reset the initialized
      * variables based on whatever they were at the end of the previous run. We want to make sure
@@ -503,7 +539,7 @@ backup(void *arg)
      * larger intervals, optionally do incremental backups between full backups.
      */
     this_id = 0;
-    for (period = mmrand(NULL, 1, 10);; period = mmrand(NULL, 20, 45)) {
+    for (period = mmrand(&g.extra_rnd, 1, 10);; period = mmrand(&g.extra_rnd, 20, 45)) {
         /* Sleep for short periods so we don't make the run wait. */
         while (period > 0 && !g.workers_finished) {
             --period;
@@ -548,7 +584,7 @@ backup(void *arg)
                   src_id, g.backup_id));
                 /* Restart a full incremental every once in a while. */
                 full = false;
-                incr_full = mmrand(NULL, 1, 8) == 1;
+                incr_full = mmrand(&g.extra_rnd, 1, 8) == 1;
             }
             this_id = g.backup_id++;
             config = cfg;
@@ -564,7 +600,7 @@ backup(void *arg)
                 config = cfg;
                 full = false;
                 /* Restart a full incremental every once in a while. */
-                incr_full = mmrand(NULL, 1, 8) == 1;
+                incr_full = mmrand(&g.extra_rnd, 1, 8) == 1;
             }
         } else {
             config = NULL;
@@ -574,19 +610,35 @@ backup(void *arg)
         /* If we're taking a full backup, create the backup directories. */
         if (full || incremental == 0) {
             testutil_create_backup_directory(g.home);
+
+            /*
+             * Copy format-specific files into the backup directories so that test/format can be run
+             * on the BACKUP.copy database for verification.
+             */
+            copy_format_files(session);
         }
 
         /*
          * open_cursor can return EBUSY if concurrent with a metadata operation, retry in that case.
          */
+        if (config == NULL)
+            trace_msg(session, "Backup #%u start", ++counter);
+        else
+            trace_msg(session, "Backup #%u start: (%s)", ++counter, config);
+
+        num_yield = 0;
         while (
-          (ret = session->open_cursor(session, "backup:", NULL, config, &backup_cursor)) == EBUSY)
+          (ret = session->open_cursor(session, "backup:", NULL, config, &backup_cursor)) == EBUSY) {
+            ++num_yield;
             __wt_yield();
+        }
         if (ret != 0)
             testutil_die(ret, "session.open_cursor: backup");
+        trace_msg(session, "Backup #%u cursor opened. Yielded %u times", counter, num_yield);
 
         while ((ret = backup_cursor->next(backup_cursor)) == 0) {
             testutil_check(backup_cursor->get_key(backup_cursor, &key));
+            trace_msg(session, "Backup #%u copy file %s start", counter, key);
             if (g.backup_incr_flag == INCREMENTAL_BLOCK) {
                 if (full)
                     testutil_copy_file(session, key);
@@ -595,6 +647,7 @@ backup(void *arg)
 
             } else
                 testutil_copy_file(session, key);
+            trace_msg(session, "Backup #%u copy file %s stop", counter, key);
             active_files_add(active_now, key);
         }
         if (ret != WT_NOTFOUND)
@@ -605,6 +658,11 @@ backup(void *arg)
             testutil_check(session->truncate(session, "log:", backup_cursor, NULL, NULL));
 
         testutil_check(backup_cursor->close(backup_cursor));
+        if (config == NULL)
+            trace_msg(session, "Backup #%u stop", counter);
+        else
+            trace_msg(session, "Backup #%u stop: (%s)", counter, config);
+
         lock_writeunlock(session, &g.backup_lock);
         active_files_sort(active_now);
         active_files_remove_missing(active_prev, active_now);
@@ -621,9 +679,9 @@ backup(void *arg)
         if (full) {
             incremental = 1;
             if (g.backup_incr_flag == INCREMENTAL_LOG)
-                incremental = GV(LOGGING_REMOVE) ? 1 : mmrand(NULL, 1, 8);
+                incremental = GV(LOGGING_REMOVE) ? 1 : mmrand(&g.extra_rnd, 1, 8);
             else if (g.backup_incr_flag == INCREMENTAL_BLOCK)
-                incremental = mmrand(NULL, 1, 8);
+                incremental = mmrand(&g.extra_rnd, 1, 8);
         }
         if (--incremental == 0) {
             check_copy();
@@ -637,7 +695,7 @@ backup(void *arg)
 
     active_files_free(&active[0]);
     active_files_free(&active[1]);
-    testutil_check(session->close(session, NULL));
+    wt_wrap_close_session(session);
 
     return (WT_THREAD_RET_VALUE);
 }

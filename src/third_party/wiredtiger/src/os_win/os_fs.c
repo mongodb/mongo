@@ -23,7 +23,7 @@
                           " It will attempt a few more times. You should confirm" \
                           " no other processes, such as virus scanners, are"      \
                           " accessing the WiredTiger files");                     \
-                    __wt_sleep(0L, 50000L);                                       \
+                    __wt_sleep(0L, 50L * WT_THOUSAND);                            \
                     continue;                                                     \
                 }                                                                 \
             }                                                                     \

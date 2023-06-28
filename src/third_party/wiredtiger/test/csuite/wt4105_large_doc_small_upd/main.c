@@ -74,7 +74,7 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
     return (0);
 }
 
-static WT_EVENT_HANDLER event_handler = {handle_error, NULL, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {handle_error, NULL, NULL, NULL, NULL};
 
 /*
  * main --
@@ -98,7 +98,9 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(wiredtiger_open(opts->home, &event_handler,
-      "create,cache_size=1G,statistics_log=(json,wait=1)", &opts->conn));
+      "create,cache_size=1G,statistics_log=(json,wait=1),statistics=(all),statistics_log=(json,on_"
+      "close,wait=1)",
+      &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(__wt_snprintf(tableconf, sizeof(tableconf),

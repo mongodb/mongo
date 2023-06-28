@@ -28,6 +28,8 @@
 
 #include "test_checkpoint.h"
 
+#define SHARED_PARSE_OPTIONS "b:P:h:"
+
 GLOBAL g;
 
 static int handle_error(WT_EVENT_HANDLER *, WT_SESSION *, int, const char *);
@@ -35,7 +37,7 @@ static int handle_message(WT_EVENT_HANDLER *, WT_SESSION *, const char *);
 static void onint(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void cleanup(bool);
 static int usage(void);
-static int wt_connect(const char *);
+static void wt_connect(const char *);
 static int wt_shutdown(void);
 
 extern int __wt_optind;
@@ -50,7 +52,6 @@ main(int argc, char *argv[])
 {
     table_type ttype;
     int ch, cnt, i, ret, runs;
-    char *working_dir;
     const char *config_open;
     bool verify_only;
 
@@ -58,25 +59,28 @@ main(int argc, char *argv[])
 
     config_open = NULL;
     ret = 0;
-    working_dir = NULL;
     ttype = MIX;
     g.checkpoint_name = "WiredTigerCheckpoint";
     g.debug_mode = false;
     g.home = dmalloc(512);
-    g.nkeys = 10000;
-    g.nops = 100000;
+    g.nkeys = 10 * WT_THOUSAND;
+    g.nops = 100 * WT_THOUSAND;
     g.ntables = 3;
     g.nworkers = 1;
+    g.evict_reposition_timing_stress = false;
     g.sweep_stress = g.use_timestamps = false;
     g.failpoint_eviction_fail_after_reconciliation = false;
     g.failpoint_hs_delete_key_from_ts = false;
-    g.hs_checkpoint_timing_stress = g.reserved_txnid_timing_stress = false;
+    g.hs_checkpoint_timing_stress = false;
     g.checkpoint_slow_timing_stress = false;
-    g.mixed_mode_deletes = false;
+    g.no_ts_deletes = false;
     runs = 1;
     verify_only = false;
 
-    while ((ch = __wt_getopt(progname, argc, argv, "C:c:Dh:k:l:mn:pr:s:T:t:vW:xX")) != EOF)
+    testutil_parse_begin_opt(argc, argv, SHARED_PARSE_OPTIONS, &g.opts);
+
+    while ((ch = __wt_getopt(
+              progname, argc, argv, "C:c:Dk:l:mn:pr:s:T:t:vW:xX" SHARED_PARSE_OPTIONS)) != EOF)
         switch (ch) {
         case 'c':
             g.checkpoint_name = __wt_optarg;
@@ -86,9 +90,6 @@ main(int argc, char *argv[])
             break;
         case 'D':
             g.debug_mode = true;
-            break;
-        case 'h': /* wiredtiger_open config */
-            working_dir = __wt_optarg;
             break;
         case 'k': /* rows */
             g.nkeys = (u_int)atoi(__wt_optarg);
@@ -100,7 +101,7 @@ main(int argc, char *argv[])
             }
             break;
         case 'm':
-            g.mixed_mode_deletes = true;
+            g.no_ts_deletes = true;
             break;
         case 'n': /* operations */
             g.nops = (u_int)atoi(__wt_optarg);
@@ -122,11 +123,11 @@ main(int argc, char *argv[])
             case '3':
                 g.hs_checkpoint_timing_stress = true;
                 break;
-            case '4':
-                g.reserved_txnid_timing_stress = true;
-                break;
             case '5':
                 g.checkpoint_slow_timing_stress = true;
+                break;
+            case '6':
+                g.evict_reposition_timing_stress = true;
                 break;
             case '7':
                 g.failpoint_eviction_fail_after_reconciliation = true;
@@ -172,20 +173,24 @@ main(int argc, char *argv[])
             g.use_timestamps = g.race_timestamps = true;
             break;
         default:
-            return (usage());
+            /* The option is either one that we're asking testutil to support, or illegal. */
+            if (testutil_parse_single_opt(&g.opts, ch) != 0)
+                return (usage());
         }
 
     argc -= __wt_optind;
     if (argc != 0)
         return (usage());
 
+    testutil_parse_end_opt(&g.opts);
     /* Clean up on signal. */
     (void)signal(SIGINT, onint);
 
-    testutil_work_dir_from_path(g.home, 512, working_dir);
+    testutil_work_dir_from_path(g.home, 512, (&g.opts)->home);
 
     /* Start time at 1 since 0 is not a valid timestamp. */
     g.ts_stable = 1;
+    g.ts_oldest = 1;
 
     printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
     for (cnt = 1; (runs == 0 || cnt <= runs) && g.status == 0; ++cnt) {
@@ -201,20 +206,20 @@ main(int argc, char *argv[])
 
         for (i = 0; i < g.ntables; ++i) {
             g.cookies[i].id = i;
-            if (ttype == MIX)
+            if (ttype == MIX) {
                 g.cookies[i].type = (table_type)((i % MAX_TABLE_TYPE) + 1);
-            else
+                /* LSM is not supported with tiered storage. Just use ROW. */
+                if (g.opts.tiered_storage && g.cookies[i].type == LSM)
+                    g.cookies[i].type = ROW;
+            } else
                 g.cookies[i].type = ttype;
             testutil_check(__wt_snprintf(
               g.cookies[i].uri, sizeof(g.cookies[i].uri), "%s%04d", URI_BASE, g.cookies[i].id));
         }
 
-        g.running = 1;
+        g.opts.running = true;
 
-        if ((ret = wt_connect(config_open)) != 0) {
-            (void)log_print_err("Connection failed", ret, 1);
-            break;
-        }
+        wt_connect(config_open);
 
         if (verify_only) {
             WT_SESSION *session;
@@ -224,18 +229,18 @@ main(int argc, char *argv[])
                 break;
             }
 
-            verify_consistency(session, WT_TS_NONE);
+            verify_consistency(session, WT_TS_NONE, false);
             goto run_complete;
         }
 
-        start_checkpoints();
-        if ((ret = start_workers()) != 0) {
+        start_threads();
+        ret = start_workers();
+        g.opts.running = false;
+        end_threads();
+        if (ret != 0) {
             (void)log_print_err("Start workers failed", ret, 1);
             break;
         }
-
-        g.running = 0;
-        end_checkpoints();
 
 run_complete:
         free(g.cookies);
@@ -244,6 +249,7 @@ run_complete:
             (void)log_print_err("Shutdown failed", ret, 1);
             break;
         }
+        g.opts.conn = NULL;
     }
     if (g.logfp != NULL)
         (void)fclose(g.logfp);
@@ -255,37 +261,21 @@ run_complete:
 }
 
 #define DEBUG_MODE_CFG ",debug_mode=(eviction=true,table_logging=true),verbose=(recovery)"
+#define SWEEP_CFG ",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
+
 /*
  * wt_connect --
  *     Configure the WiredTiger connection.
  */
-static int
+static void
 wt_connect(const char *config_open)
 {
-    static WT_EVENT_HANDLER event_handler = {
-      handle_error, handle_message, NULL, NULL /* Close handler. */
-    };
+    static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
     WT_RAND_STATE rnd;
-    int ret;
-    char config[512];
-    char timing_stress_config[512];
-    bool fast_eviction, timing_stress;
+    char buf[512], config[1024];
+    bool fast_eviction;
 
     fast_eviction = false;
-    timing_stress = false;
-    if (g.sweep_stress || g.failpoint_hs_delete_key_from_ts || g.hs_checkpoint_timing_stress ||
-      g.reserved_txnid_timing_stress || g.checkpoint_slow_timing_stress) {
-        timing_stress = true;
-        testutil_check(__wt_snprintf(timing_stress_config, sizeof(timing_stress_config),
-          ",timing_stress_for_test=[%s%s%s%s%s%s]", g.sweep_stress ? "aggressive_sweep" : "",
-          g.failpoint_eviction_fail_after_reconciliation ?
-            "failpoint_eviction_fail_after_reconciliation" :
-            "",
-          g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
-          g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
-          g.reserved_txnid_timing_stress ? "checkpoint_reserved_txnid_delay" : "",
-          g.checkpoint_slow_timing_stress ? "checkpoint_slow" : ""));
-    }
 
     /*
      * Randomly decide on the eviction rate (fast or default).
@@ -294,34 +284,56 @@ wt_connect(const char *config_open)
     if ((__wt_random(&rnd) % 15) % 2 == 0)
         fast_eviction = true;
 
+    /* Set up the basic configuration string first. */
+    testutil_check(__wt_snprintf(config, sizeof(config),
+      "create,cache_cursors=false,statistics=(all),statistics_log=(json,on_close,wait=1),log=("
+      "enabled),"
+      "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
+      "eviction_dirty_target=%i,%s%s%s",
+      progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, g.debug_mode ? DEBUG_MODE_CFG : "",
+      config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
+
+    if (g.evict_reposition_timing_stress || g.sweep_stress ||
+      g.failpoint_eviction_fail_after_reconciliation || g.failpoint_hs_delete_key_from_ts ||
+      g.hs_checkpoint_timing_stress || g.checkpoint_slow_timing_stress) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), ",timing_stress_for_test=[%s%s%s%s%s%s]",
+          g.checkpoint_slow_timing_stress ? "checkpoint_slow" : "",
+          g.evict_reposition_timing_stress ? "evict_reposition" : "",
+          g.failpoint_eviction_fail_after_reconciliation ?
+            "failpoint_eviction_fail_after_reconciliation" :
+            "",
+          g.failpoint_hs_delete_key_from_ts ? "failpoint_history_store_delete_key_from_ts" : "",
+          g.hs_checkpoint_timing_stress ? "history_store_checkpoint_delay" : "",
+          g.sweep_stress ? "aggressive_sweep" : ""));
+        strcat(config, buf);
+    }
+
     /*
      * If we want to stress sweep, we have a lot of additional configuration settings to set.
      */
     if (g.sweep_stress)
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),error_"
-          "prefix="
-          "\"%s\",file_manager=(close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
-          ","
-          "log=(enabled),cache_size=1GB, eviction_dirty_trigger=%i, "
-          "eviction_dirty_target=%i,%s%s%s%s",
-          progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5, timing_stress_config,
-          g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
-          config_open == NULL ? "" : config_open));
-    else
-        testutil_check(__wt_snprintf(config, sizeof(config),
-          "create,cache_cursors=false,statistics=(fast),statistics_log=(json,wait=1),log=("
-          "enabled),"
-          "error_prefix=\"%s\",cache_size=1G, eviction_dirty_trigger=%i, "
-          "eviction_dirty_target=%i,%s%s%s%s",
-          progname, fast_eviction ? 5 : 20, fast_eviction ? 1 : 5,
-          g.debug_mode ? DEBUG_MODE_CFG : "", config_open == NULL ? "" : ",",
-          config_open == NULL ? "" : config_open, timing_stress ? timing_stress_config : ""));
+        strcat(config, SWEEP_CFG);
+
+    /*
+     * If we are using tiered add in the extension and tiered storage configuration.
+     */
+    if (g.opts.tiered_storage) {
+        testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/bucket", g.home));
+        testutil_make_work_dir(buf);
+    }
 
     printf("WT open config: %s\n", config);
-    if ((ret = wiredtiger_open(g.home, &event_handler, config, &g.conn)) != 0)
-        return (log_print_err("wiredtiger_open", ret, 1));
-    return (0);
+    fflush(stdout);
+    testutil_wiredtiger_open(&g.opts, g.home, config, &event_handler, &g.conn, false, false);
+
+    if (g.opts.tiered_storage) {
+        /* testutil_tiered_begin needs the connection. */
+        g.opts.conn = g.conn;
+
+        /* Set up a random delay for the first flush. */
+        set_flush_tier_delay(&rnd);
+        testutil_tiered_begin(&g.opts);
+    }
 }
 
 /*
@@ -337,6 +349,7 @@ wt_shutdown(void)
         return (0);
 
     printf("Closing connection\n");
+    fflush(stdout);
     ret = g.conn->close(g.conn, NULL);
     g.conn = NULL;
     if (ret != 0)
@@ -351,9 +364,8 @@ wt_shutdown(void)
 static void
 cleanup(bool remove_dir)
 {
-    g.running = 0;
+    g.opts.running = false;
     g.ntables_created = 0;
-    g.ts_oldest = 0;
 
     if (remove_dir)
         testutil_make_work_dir(g.home);
@@ -366,11 +378,15 @@ cleanup(bool remove_dir)
 static int
 handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const char *errmsg)
 {
+    int ret;
+
     WT_UNUSED(handler);
     WT_UNUSED(session);
     WT_UNUSED(error);
 
-    return (fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0);
+    ret = fprintf(stderr, "%s\n", errmsg) < 0 ? -1 : 0;
+    fflush(stderr);
+    return (ret);
 }
 
 /*
@@ -380,13 +396,17 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
 static int
 handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, const char *message)
 {
+    int ret;
+
     WT_UNUSED(handler);
     WT_UNUSED(session);
 
     if (g.logfp != NULL)
         return (fprintf(g.logfp, "%s\n", message) < 0 ? -1 : 0);
 
-    return (printf("%s\n", message) < 0 ? -1 : 0);
+    ret = printf("%s\n", message) < 0 ? -1 : 0;
+    fflush(stdout);
+    return (ret);
 }
 
 /*
@@ -412,10 +432,11 @@ int
 log_print_err_worker(const char *func, int line, const char *m, int e, int fatal)
 {
     if (fatal) {
-        g.running = 0;
+        g.opts.running = false;
         g.status = e;
     }
     fprintf(stderr, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));
+    fflush(stderr);
     if (g.logfp != NULL)
         fprintf(g.logfp, "%s: %s,%d: %s: %s\n", progname, func, line, m, wiredtiger_strerror(e));
     return (e);
@@ -515,7 +536,7 @@ flcs_modify(WT_MODIFY *entries, int nentries, uint8_t oldval)
 
     if (oldval == FLCS_NONE) {
         offset = 0;
-        digit = 0;
+        digit = '\0';
     } else
         flcs_decode_value(oldval, &offset, &digit);
 
@@ -579,8 +600,9 @@ static int
 usage(void)
 {
     fprintf(stderr,
-      "usage: %s [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys]\n\t[-l log] [-m] "
-      "[-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v]\n\t[-W workers]\n",
+      "usage: %s\n"
+      "    [-DmpvXx] [-C wiredtiger-config] [-c checkpoint] [-h home] [-k keys] [-l log]\n"
+      "    [-n ops] [-r runs] [-s 1|2|3|4|5] [-T table-config] [-t f|r|v] [-W workers]\n",
       progname);
     fprintf(stderr, "%s",
       "\t-C specify wiredtiger_open configuration arguments\n"
@@ -589,7 +611,7 @@ usage(void)
       "\t-h set a database home directory\n"
       "\t-k set number of keys to load\n"
       "\t-l specify a log file\n"
-      "\t-m run with mixed mode delete operations\n"
+      "\t-m perform delete operations without timestamps\n"
       "\t-n set number of operations each thread does\n"
       "\t-p use prepare\n"
       "\t-r set number of runs (0 for continuous)\n"
@@ -597,7 +619,6 @@ usage(void)
       "\t\t1: sweep_stress\n"
       "\t\t2: failpoint_hs_delete_key_from_ts\n"
       "\t\t3: hs_checkpoint_timing_stress\n"
-      "\t\t4: reserved_txnid_timing_stress\n"
       "\t\t5: checkpoint_slow_timing_stress\n"
       "\t\t6: evict_reposition_timing_stress\n"
       "\t\t7: failpoint_eviction_fail_after_reconciliation\n"
@@ -605,7 +626,7 @@ usage(void)
       "\t-t set a file type ( col | mix | row | lsm )\n"
       "\t-v verify only\n"
       "\t-W set number of worker threads\n"
-      "\t-x use timestamps\n"
-      "\t-X race timestamp updates with checkpoints\n");
+      "\t-X race timestamp updates with checkpoints\n"
+      "\t-x use timestamps\n");
     return (EXIT_FAILURE);
 }

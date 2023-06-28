@@ -145,7 +145,7 @@ class test_hs21(wttest.WiredTigerTestCase):
             # Check that all updates at timestamp 2 are seen.
             self.check(session_read, value1, ds.uri, self.nrows // 2)
 
-        # Perform a series of updates over over files at a later timestamp. Checking the history store data is consistent
+        # Perform a series of updates over files at a later timestamp. Checking the history store data is consistent
         # with old and new timestamps.
         for (_, ds) in active_files:
             # Load more data with a later timestamp.

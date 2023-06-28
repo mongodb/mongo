@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from rollback_to_stable_util import verify_rts_logs
 import wiredtiger, wttest
 from wtscenario import make_scenarios, filter_scenarios
 
@@ -64,7 +65,13 @@ def keys_of_write(write):
         return [2 + my_rle_size - 1]
 
 class test_rollback_to_stable25(wttest.WiredTigerTestCase):
-    conn_config = 'in_memory=false'
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
+
+    def conn_config(self):
+        return 'in_memory=false,verbose=(rts:5)'
 
     write_10_values = [
         ('10u', dict(write_10='u')),

@@ -55,6 +55,21 @@
             WT_DHANDLE_ACQUIRE(dhandle);                                                   \
     } while (0)
 
+#define WT_DHANDLE_IS_CHECKPOINT(dhandle) ((dhandle)->checkpoint != NULL)
+
+/*
+ * WT_WITH_DHANDLE_WRITE_LOCK_NOWAIT --
+ *	Try to acquire write lock for the session's current dhandle, perform an operation, drop the
+ *  lock.
+ */
+#define WT_WITH_DHANDLE_WRITE_LOCK_NOWAIT(session, ret, op)               \
+    do {                                                                  \
+        if (((ret) = __wt_session_dhandle_try_writelock(session)) == 0) { \
+            op;                                                           \
+            __wt_session_dhandle_writeunlock(session);                    \
+        }                                                                 \
+    } while (0)
+
 /*
  * WT_DATA_HANDLE --
  *	A handle for a generic named data source.
@@ -64,12 +79,13 @@ struct __wt_data_handle {
     TAILQ_ENTRY(__wt_data_handle) q;
     TAILQ_ENTRY(__wt_data_handle) hashq;
 
-    const char *name;        /* Object name as a URI */
-    uint64_t name_hash;      /* Hash of name */
-    const char *checkpoint;  /* Checkpoint name (or NULL) */
-    const char **cfg;        /* Configuration information */
-    const char *meta_base;   /* Base metadata configuration */
-    size_t meta_base_length; /* Base metadata length */
+    const char *name;         /* Object name as a URI */
+    uint64_t name_hash;       /* Hash of name */
+    const char *checkpoint;   /* Checkpoint name (or NULL) */
+    int64_t checkpoint_order; /* Checkpoint order number, when applicable */
+    const char **cfg;         /* Configuration information */
+    const char *meta_base;    /* Base metadata configuration */
+    size_t meta_base_length;  /* Base metadata length */
 #ifdef HAVE_DIAGNOSTIC
     const char *orig_meta_base; /* Copy of the base metadata configuration */
 #endif
@@ -129,12 +145,15 @@ struct __wt_data_handle {
     uint32_t flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_DHANDLE_TS_ASSERT_READ_ALWAYS 0x01u /* Assert read always checking. */
-#define WT_DHANDLE_TS_ASSERT_READ_NEVER 0x02u  /* Assert read never checking. */
-#define WT_DHANDLE_TS_ASSERT_WRITE 0x04u       /* Assert write checking. */
-#define WT_DHANDLE_TS_MIXED_MODE 0x08u         /* Handle using mixed mode timestamps checking. */
-#define WT_DHANDLE_TS_NEVER 0x10u              /* Handle never using timestamps checking. */
-#define WT_DHANDLE_TS_ORDERED 0x20u            /* Handle using ordered timestamps checking. */
-                                               /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t ts_flags;
+#define WT_DHANDLE_TS_ASSERT_READ_ALWAYS 0x1u /* Assert read always checking. */
+#define WT_DHANDLE_TS_ASSERT_READ_NEVER 0x2u  /* Assert read never checking. */
+#define WT_DHANDLE_TS_NEVER 0x4u              /* Handle never using timestamps checking. */
+#define WT_DHANDLE_TS_ORDERED 0x8u            /* Handle using ordered timestamps checking. */
+                                              /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t ts_flags;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_DHANDLE_LOCK_WRITE 0x1u /* Write lock is acquired. */
+                                   /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t lock_flags;
 };

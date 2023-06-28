@@ -75,7 +75,7 @@ main(int argc, char *argv[])
 
     testutil_check(pthread_rwlock_init(&single, NULL));
 
-    nops = 1000;
+    nops = WT_THOUSAND;
     nthreads = 10;
     runs = 1;
     use_txn = false;
@@ -147,16 +147,15 @@ main(int argc, char *argv[])
 static void
 wt_startup(char *config_open)
 {
-    static WT_EVENT_HANDLER event_handler = {
-      handle_error, handle_message, NULL, NULL /* Close handler. */
-    };
-    char config_buf[128];
+    static WT_EVENT_HANDLER event_handler = {handle_error, handle_message, NULL, NULL, NULL};
+    char config_buf[512];
 
     testutil_make_work_dir(home);
 
     testutil_check(__wt_snprintf(config_buf, sizeof(config_buf),
-      "create,error_prefix=\"%s\",cache_size=5MB%s%s,operation_tracking=(enabled=false)", progname,
-      config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
+      "create,error_prefix=\"%s\",cache_size=5MB%s%s,operation_tracking=(enabled=false),statistics="
+      "(all),statistics_log=(json,on_close,wait=1)",
+      progname, config_open == NULL ? "" : ",", config_open == NULL ? "" : config_open));
     testutil_check(wiredtiger_open(home, &event_handler, config_buf, &conn));
 }
 

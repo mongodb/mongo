@@ -45,16 +45,16 @@ __wt_version_cmp(WT_VERSION v, WT_VERSION other)
         v.patch = other.patch = 0;
 
     if (v.major == other.major && v.minor == other.minor && v.patch == other.patch)
-        return 0;
+        return (0);
 
     if (v.major > other.major)
-        return 1;
+        return (1);
     if (v.major == other.major && v.minor > other.minor)
-        return 1;
+        return (1);
     if (v.major == other.major && v.minor == other.minor && v.patch > other.patch)
-        return 1;
+        return (1);
 
-    return -1;
+    return (-1);
 }
 
 /*
@@ -65,7 +65,7 @@ __wt_version_cmp(WT_VERSION v, WT_VERSION other)
 static inline bool
 __wt_version_defined(WT_VERSION v)
 {
-    return v.major != WT_NO_VALUE && v.minor != WT_NO_VALUE;
+    return (v.major != WT_NO_VALUE && v.minor != WT_NO_VALUE);
 }
 
 /*
@@ -75,7 +75,7 @@ __wt_version_defined(WT_VERSION v)
 static inline bool
 __wt_version_eq(WT_VERSION v, WT_VERSION other)
 {
-    return __wt_version_cmp(v, other) == 0;
+    return (__wt_version_cmp(v, other) == 0);
 }
 
 /*
@@ -85,7 +85,7 @@ __wt_version_eq(WT_VERSION v, WT_VERSION other)
 static inline bool
 __wt_version_gt(WT_VERSION v, WT_VERSION other)
 {
-    return __wt_version_cmp(v, other) == 1;
+    return (__wt_version_cmp(v, other) == 1);
 }
 
 /*
@@ -95,7 +95,7 @@ __wt_version_gt(WT_VERSION v, WT_VERSION other)
 static inline bool
 __wt_version_gte(WT_VERSION v, WT_VERSION other)
 {
-    return __wt_version_cmp(v, other) != -1;
+    return (__wt_version_cmp(v, other) != -1);
 }
 
 /*
@@ -105,7 +105,7 @@ __wt_version_gte(WT_VERSION v, WT_VERSION other)
 static inline bool
 __wt_version_lt(WT_VERSION v, WT_VERSION other)
 {
-    return __wt_version_cmp(v, other) == -1;
+    return (__wt_version_cmp(v, other) == -1);
 }
 
 /*
@@ -115,5 +115,5 @@ __wt_version_lt(WT_VERSION v, WT_VERSION other)
 static inline bool
 __wt_version_lte(WT_VERSION v, WT_VERSION other)
 {
-    return __wt_version_cmp(v, other) != 1;
+    return (__wt_version_cmp(v, other) != 1);
 }

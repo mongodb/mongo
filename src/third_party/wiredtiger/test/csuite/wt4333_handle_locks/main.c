@@ -29,7 +29,7 @@
 
 #include <signal.h>
 
-#define MAXKEY 10000
+#define MAXKEY (10 * WT_THOUSAND)
 #define PERIOD 60
 #define HOME_LEN 256
 
@@ -120,14 +120,9 @@ op(WT_SESSION *session, WT_RAND_STATE *rnd, WT_CURSOR **cpp)
 
     /* Loop to open an object handle. */
     for (i = __wt_random(rnd) % uris; !done; __wt_yield()) {
-        /*
-         * Use a checkpoint handle for 50% of reads.
-         *
-         * FIXME-WT-5927: Checkpoint cursors are known to have issues in durable history so we've
-         * removing the use of checkpoint handles in this test. As part of WT-5927, we should either
-         * re-enable the testing of checkpoint cursors or remove this comment.
-         */
-        ret = session->open_cursor(session, uri_list[i], NULL, NULL, &cursor);
+        /* Use a checkpoint handle for 50% of reads. */
+        ret = session->open_cursor(session, uri_list[i], NULL,
+          readonly && (i % 2 == 0) ? "checkpoint=WiredTigerCheckpoint" : NULL, &cursor);
         if (ret != EBUSY) {
             testutil_check(ret);
             break;
@@ -299,7 +294,8 @@ runone(bool config_cache)
       "close_handle_minimum=1,close_idle_time=1,close_scan_interval=1)"
       ", mmap=true"
       ", session_max=%u"
-      ", statistics=(all)",
+      ", statistics=(all)"
+      ", statistics_log=(json,on_close,wait=1)",
       config_cache ? "true" : "false", workers + 100));
     testutil_check(wiredtiger_open(home, NULL, buf, &conn));
 

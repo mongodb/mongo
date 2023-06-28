@@ -107,7 +107,7 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create", &conn));
+    testutil_check(wiredtiger_open(opts->home, NULL, "create,statistics=(all)", &conn));
     opts->conn = conn;
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
@@ -131,7 +131,7 @@ main(int argc, char *argv[])
     key = 10;
     val[0] = 20;
     val[1] = 30;
-    for (i = 0; i < 100000; ++i) {
+    for (i = 0; i < 100 * WT_THOUSAND; ++i) {
         key += i;
         val[0] += i;
         val[1] += i;
@@ -156,7 +156,7 @@ main(int argc, char *argv[])
     testutil_check(session->join(session, jcursor, cursor1, "compare=gt"));
     testutil_check(session->join(session, jcursor, cursor2, "compare=gt"));
 
-    while ((ret = jcursor->next(jcursor)) == 0) // leak
+    while ((ret = jcursor->next(jcursor)) == 0) /* leak */
         ;
     testutil_assert(ret == WT_NOTFOUND);
 

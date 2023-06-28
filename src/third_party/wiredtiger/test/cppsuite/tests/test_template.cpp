@@ -26,45 +26,99 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
+#include "src/common/constants.h"
+#include "src/common/logger.h"
+#include "src/main/test.h"
+
+namespace test_harness {
+/* Defines what data is written to the tracking table for use in custom validation. */
+class operation_tracker_template : public operation_tracker {
+
+public:
+    operation_tracker_template(
+      configuration *config, const bool use_compression, timestamp_manager &tsm)
+        : operation_tracker(config, use_compression, tsm)
+    {
+    }
+
+    void
+    set_tracking_cursor(WT_SESSION *session, const tracking_operation &operation,
+      const uint64_t &collection_id, const std::string &key, const std::string &value,
+      wt_timestamp_t ts, scoped_cursor &op_track_cursor) override final
+    {
+        /* You can replace this call to define your own tracking table contents. */
+        operation_tracker::set_tracking_cursor(
+          session, operation, collection_id, key, value, ts, op_track_cursor);
+    }
+};
 
 /*
  * Class that defines operations that do nothing as an example. This shows how database operations
  * can be overridden and customized.
  */
-class test_template : public test_harness::test {
-    public:
-    test_template(const test_harness::test_args &args) : test(args) {}
+class test_template : public test {
+public:
+    test_template(const test_args &args) : test(args)
+    {
+        init_operation_tracker(
+          new operation_tracker_template(_config->get_subconfig(OPERATION_TRACKER),
+            _config->get_bool(COMPRESSION_ENABLED), *_timestamp_manager));
+    }
 
     void
     run() override final
     {
-        /* You can remove the call to the base class to fully customized your test. */
+        /* You can remove the call to the base class to fully customize your test. */
         test::run();
     }
 
     void
-    populate(test_harness::database &, test_harness::timestamp_manager *,
-      test_harness::configuration *, test_harness::workload_tracking *) override final
+    populate(database &, timestamp_manager *, configuration *, operation_tracker *) override final
     {
-        std::cout << "populate: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "populate: nothing done");
     }
 
     void
-    insert_operation(test_harness::thread_context *) override final
+    checkpoint_operation(thread_worker *) override final
     {
-        std::cout << "insert_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "checkpoint_operation: nothing done");
     }
 
     void
-    read_operation(test_harness::thread_context *) override final
+    custom_operation(thread_worker *) override final
     {
-        std::cout << "read_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "custom_operation: nothing done");
     }
 
     void
-    update_operation(test_harness::thread_context *) override final
+    insert_operation(thread_worker *) override final
     {
-        std::cout << "update_operation: nothing done." << std::endl;
+        logger::log_msg(LOG_WARN, "insert_operation: nothing done");
+    }
+
+    void
+    read_operation(thread_worker *) override final
+    {
+        logger::log_msg(LOG_WARN, "read_operation: nothing done");
+    }
+
+    void
+    remove_operation(thread_worker *) override final
+    {
+        logger::log_msg(LOG_WARN, "remove_operation: nothing done");
+    }
+
+    void
+    update_operation(thread_worker *) override final
+    {
+        logger::log_msg(LOG_WARN, "update_operation: nothing done");
+    }
+
+    void
+    validate(const std::string &, const std::string &, database &) override final
+    {
+        logger::log_msg(LOG_WARN, "validate: nothing done");
     }
 };
+
+} // namespace test_harness

@@ -26,14 +26,18 @@ typedef struct {
 #define WT_VRFY_DUMP(vs) \
     ((vs)->dump_address || (vs)->dump_blocks || (vs)->dump_layout || (vs)->dump_pages)
     bool dump_address; /* Configure: dump special */
+    bool dump_app_data;
     bool dump_blocks;
     bool dump_layout;
     bool dump_pages;
+    bool read_corrupt;
 
     /* Page layout information. */
     uint64_t depth, depth_internal[100], depth_leaf[100];
 
     WT_ITEM *tmp1, *tmp2, *tmp3, *tmp4; /* Temporary buffers */
+
+    int verify_err;
 } WT_VSTUFF;
 
 static void __verify_checkpoint_reset(WT_VSTUFF *);
@@ -69,6 +73,9 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
     WT_RET(__wt_config_gets(session, cfg, "dump_address", &cval));
     vs->dump_address = cval.val != 0;
 
+    WT_RET(__wt_config_gets(session, cfg, "dump_app_data", &cval));
+    vs->dump_app_data = cval.val != 0;
+
     WT_RET(__wt_config_gets(session, cfg, "dump_blocks", &cval));
     vs->dump_blocks = cval.val != 0;
 
@@ -77,6 +84,10 @@ __verify_config(WT_SESSION_IMPL *session, const char *cfg[], WT_VSTUFF *vs)
 
     WT_RET(__wt_config_gets(session, cfg, "dump_pages", &cval));
     vs->dump_pages = cval.val != 0;
+
+    WT_RET(__wt_config_gets(session, cfg, "read_corrupt", &cval));
+    vs->read_corrupt = cval.val != 0;
+    vs->verify_err = 0;
 
     WT_RET(__wt_config_gets(session, cfg, "stable_timestamp", &cval));
     vs->stable_timestamp = WT_TS_NONE; /* Ignored unless a value has been set */
@@ -176,13 +187,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     size_t root_addr_size;
     uint8_t root_addr[WT_BTREE_MAX_ADDR_COOKIE];
     const char *name;
-    bool bm_start, quit;
+    bool bm_start, quit, skip_hs;
 
     btree = S2BT(session);
     bm = btree->bm;
     ckptbase = NULL;
     name = session->dhandle->name;
-    bm_start = false;
+    bm_start = quit = skip_hs = false;
 
     WT_CLEAR(_vstuff);
     vs = &_vstuff;
@@ -214,6 +225,13 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
     /* Inform the underlying block manager we're verifying. */
     WT_ERR(bm->verify_start(bm, session, ckptbase, cfg));
     bm_start = true;
+
+    /*
+     * Skip the history store explicit call if we're performing a metadata verification. The
+     * metadata file is verified before we verify the history store, and it makes no sense to verify
+     * the history store against itself.
+     */
+    skip_hs = strcmp(name, WT_METAFILE_URI) == 0 || strcmp(name, WT_HS_URI) == 0;
 
     /* Loop through the file's checkpoints, verifying each one. */
     WT_CKPT_FOREACH (ckptbase, ckpt) {
@@ -258,6 +276,28 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
             /* Verify the tree. */
             WT_WITH_PAGE_INDEX(
               session, ret = __verify_tree(session, &btree->root, &addr_unpack, vs));
+
+/* FIXME-WT-10927 */
+#if 0
+            /*
+             * The checkpoints are in time-order, so the last one in the list is the most recent. If
+             * this is the most recent checkpoint, verify the history store against it.
+             */
+            if (ret == 0 && (ckpt + 1)->name == NULL && !skip_hs) {
+                WT_TRET(__wt_hs_verify_one(session, btree->id));
+                /*
+                 * We cannot error out here. If we got an error verifying the history store, we need
+                 * to follow through with reacquiring the exclusive call below. We'll error out
+                 * after that and unloading this checkpoint.
+                 */
+            }
+#endif
+            /*
+             * If the read_corrupt mode was turned on, we may have continued traversing and
+             * verifying the pages of the tree despite encountering an error. Set the error.
+             */
+            if (vs->verify_err != 0)
+                ret = vs->verify_err;
 
             /*
              * We have an exclusive lock on the handle, but we're swapping root pages in-and-out of
@@ -381,13 +421,15 @@ __verify_tree(
   WT_SESSION_IMPL *session, WT_REF *ref, WT_CELL_UNPACK_ADDR *addr_unpack, WT_VSTUFF *vs)
 {
     WT_BM *bm;
+    WT_BTREE *btree;
     WT_CELL_UNPACK_ADDR *unpack, _unpack;
     WT_DECL_RET;
     WT_PAGE *page;
     WT_REF *child_ref;
     uint32_t entry;
 
-    bm = S2BT(session)->bm;
+    btree = S2BT(session);
+    bm = btree->bm;
     unpack = &_unpack;
     page = ref->page;
 
@@ -429,20 +471,52 @@ __verify_tree(
 #ifdef HAVE_DIAGNOSTIC
     /* Optionally dump the blocks or page in debugging mode. */
     if (vs->dump_blocks)
-        WT_RET(__wt_debug_disk(session, page->dsk, NULL));
+        WT_RET(__wt_debug_disk(session, page->dsk, NULL, vs->dump_app_data));
     if (vs->dump_pages)
-        WT_RET(__wt_debug_page(session, NULL, ref, NULL));
+        WT_RET(__wt_debug_page(session, NULL, ref, NULL, vs->dump_app_data));
 #endif
+
+    /* Make sure the page we got belongs in this kind of tree. */
+    switch (btree->type) {
+    case BTREE_COL_FIX:
+        if (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_COL_FIX)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s is a %s, which does not belong in a fixed-length column-store tree",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
+        break;
+    case BTREE_COL_VAR:
+        if (page->type != WT_PAGE_COL_INT && page->type != WT_PAGE_COL_VAR)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s is a %s, which does not belong in a variable-length column-store tree",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
+        break;
+    case BTREE_ROW:
+        if (page->type != WT_PAGE_ROW_INT && page->type != WT_PAGE_ROW_LEAF)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s is a %s, which does not belong in a row-store tree",
+              __verify_addr_string(session, ref, vs->tmp1), __wt_page_type_string(page->type));
+        break;
+    }
 
     /* Column-store key order checks: check the page's record number. */
     switch (page->type) {
     case WT_PAGE_COL_FIX:
     case WT_PAGE_COL_INT:
     case WT_PAGE_COL_VAR:
-        if (ref->ref_recno != vs->records_so_far + 1)
+        /*
+         * FLCS trees can have WT_PAGE_COL_INT or WT_PAGE_COL_FIX pages, and gaps in the namespace
+         * are not allowed; VLCS trees can have WT_PAGE_COL_INT or WT_PAGE_COL_VAR pages, and gaps
+         * in the namespace *are* allowed. Use the tree type to pick the check logic.
+         */
+        if (btree->type == BTREE_COL_FIX && ref->ref_recno != vs->records_so_far + 1)
             WT_RET_MSG(session, WT_ERROR,
               "page at %s has a starting record of %" PRIu64
               " when the expected starting record is %" PRIu64,
+              __verify_addr_string(session, ref, vs->tmp1), ref->ref_recno, vs->records_so_far + 1);
+        else if (btree->type == BTREE_COL_VAR && ref->ref_recno < vs->records_so_far + 1)
+            WT_RET_MSG(session, WT_ERROR,
+              "page at %s has a starting record of %" PRIu64
+              " when the expected starting record is at least %" PRIu64,
               __verify_addr_string(session, ref, vs->tmp1), ref->ref_recno, vs->records_so_far + 1);
         break;
     }
@@ -484,9 +558,6 @@ __verify_tree(
             goto celltype_err;
         break;
     case WT_PAGE_COL_VAR:
-        if (addr_unpack->raw != WT_CELL_ADDR_LEAF && addr_unpack->raw != WT_CELL_ADDR_LEAF_NO)
-            goto celltype_err;
-        break;
     case WT_PAGE_ROW_LEAF:
         if (addr_unpack->raw != WT_CELL_ADDR_DEL && addr_unpack->raw != WT_CELL_ADDR_LEAF &&
           addr_unpack->raw != WT_CELL_ADDR_LEAF_NO)
@@ -511,16 +582,41 @@ celltype_err:
         WT_INTL_FOREACH_BEGIN (session, page, child_ref) {
             /*
              * It's a depth-first traversal: this entry's starting record number should be 1 more
-             * than the total records reviewed to this point.
+             * than the total records reviewed to this point. However, for VLCS fast-truncate can
+             * introduce gaps; allow a gap but not overlapping ranges. For FLCS, gaps are not
+             * permitted.
              */
             ++entry;
-            if (child_ref->ref_recno != vs->records_so_far + 1) {
+            if (btree->type == BTREE_COL_FIX && child_ref->ref_recno != vs->records_so_far + 1) {
                 WT_RET_MSG(session, WT_ERROR,
                   "the starting record number in entry %" PRIu32
                   " of the column internal page at %s is %" PRIu64
                   " and the expected starting record number is %" PRIu64,
                   entry, __verify_addr_string(session, child_ref, vs->tmp1), child_ref->ref_recno,
                   vs->records_so_far + 1);
+            } else if (btree->type == BTREE_COL_VAR &&
+              child_ref->ref_recno < vs->records_so_far + 1) {
+                WT_RET_MSG(session, WT_ERROR,
+                  "the starting record number in entry %" PRIu32
+                  " of the column internal page at %s is %" PRIu64
+                  " and the expected starting record number is at least %" PRIu64,
+                  entry, __verify_addr_string(session, child_ref, vs->tmp1), child_ref->ref_recno,
+                  vs->records_so_far + 1);
+            }
+
+            /*
+             * If there is no address, it should be the first entry in the page. This is the case
+             * where inmem inserts a blank page to fill a namespace gap on the left-hand side of the
+             * tree. If the situation is what we expect, go to the next entry; otherwise complain.
+             */
+            if (child_ref->addr == NULL) {
+                /* The entry number has already been incremented above, so 1 is the first. */
+                if (entry == 1)
+                    continue;
+                WT_RET_MSG(session, WT_ERROR,
+                  "found a page with no address in entry %" PRIu32
+                  " of the column internal page at %s",
+                  entry, __verify_addr_string(session, child_ref, vs->tmp1));
             }
 
             /* Unpack the address block and check timestamps */
@@ -529,7 +625,18 @@ celltype_err:
 
             /* Verify the subtree. */
             ++vs->depth;
-            WT_RET(__wt_page_in(session, child_ref, 0));
+            ret = __wt_page_in(session, child_ref, 0);
+
+            /*
+             * If configured, continue traversing through the pages of the tree even after
+             * encountering errors reading in the page.
+             */
+            if (vs->read_corrupt && ret != 0) {
+                if (vs->verify_err == 0)
+                    vs->verify_err = ret;
+                continue;
+            } else
+                WT_RET(ret);
             ret = __verify_tree(session, child_ref, unpack, vs);
             WT_TRET(__wt_page_release(session, child_ref, 0));
             --vs->depth;
@@ -559,7 +666,18 @@ celltype_err:
 
             /* Verify the subtree. */
             ++vs->depth;
-            WT_RET(__wt_page_in(session, child_ref, 0));
+            ret = __wt_page_in(session, child_ref, 0);
+
+            /*
+             * If configured, continue traversing through the pages of the tree even after
+             * encountering errors reading in the page.
+             */
+            if (vs->read_corrupt && ret != 0) {
+                if (vs->verify_err == 0)
+                    vs->verify_err = ret;
+                continue;
+            } else
+                WT_RET(ret);
             ret = __verify_tree(session, child_ref, unpack, vs);
             WT_TRET(__wt_page_release(session, child_ref, 0));
             --vs->depth;
@@ -747,6 +865,7 @@ static int
 __verify_key_hs(
   WT_SESSION_IMPL *session, WT_ITEM *tmp1, wt_timestamp_t newer_start_ts, WT_VSTUFF *vs)
 {
+/* FIXME-WT-10779 - Enable the history store validation. */
 #ifdef WT_VERIFY_VALIDATE_HISTORY_STORE
     WT_BTREE *btree;
     WT_CURSOR *hs_cursor;

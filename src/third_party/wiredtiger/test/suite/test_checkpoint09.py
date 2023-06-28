@@ -86,6 +86,7 @@ class test_checkpoint09(wttest.WiredTigerTestCase):
         s.rollback_transaction()
         evict_cursor.close()
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_checkpoint09(self):
         uri = 'table:ckpt09'
         nrows = 1000

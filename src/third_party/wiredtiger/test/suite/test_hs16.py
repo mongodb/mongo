@@ -79,7 +79,7 @@ class test_hs16(wttest.WiredTigerTestCase):
         cursor[self.create_key(2)] = valuea
 
         # Update an update without timestamp
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = valuec
         self.session.commit_transaction()
 

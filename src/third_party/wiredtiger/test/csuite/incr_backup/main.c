@@ -40,7 +40,7 @@
 #define MAX_NTABLES 100
 
 #define MAX_KEY_SIZE 100
-#define MAX_VALUE_SIZE 10000
+#define MAX_VALUE_SIZE (10 * WT_THOUSAND)
 #define MAX_MODIFY_ENTRIES 10
 #define MAX_MODIFY_DIFF 500
 
@@ -49,7 +49,9 @@
 #define KEY_FORMAT "key-%d-%d"
 #define TABLE_FORMAT "key_format=S,value_format=u"
 
-#define CONN_CONFIG_COMMON "timing_stress_for_test=[backup_rename]"
+#define CONN_CONFIG_COMMON                                                                        \
+    "timing_stress_for_test=[backup_rename],statistics=(all),statistics_log=(json,on_close,wait=" \
+    "1)"
 
 #define NUM_ALLOC 5
 static const char *alloc_sizes[] = {"512B", "8K", "64K", "1M", "16M"};
@@ -128,7 +130,7 @@ typedef enum { INSERT, MODIFY, REMOVE, UPDATE, _OPERATION_TYPE_COUNT } OPERATION
  * Having a predictable cycle makes it easy on the checking side (knowing how many total changes
  * have been made) to check the state of the table.
  */
-#define KEYS_PER_TABLE 10000
+#define KEYS_PER_TABLE (10 * WT_THOUSAND)
 #define CHANGES_PER_CYCLE (KEYS_PER_TABLE * _OPERATION_TYPE_COUNT)
 
 /*
@@ -378,7 +380,7 @@ table_changes(WT_SESSION *session, TABLE *table)
     if (__wt_random(&table->rand) % 2 == 0) {
         value = dcalloc(1, table->max_value_size);
         value2 = dcalloc(1, table->max_value_size);
-        nrecords = __wt_random(&table->rand) % 1000;
+        nrecords = __wt_random(&table->rand) % WT_THOUSAND;
         VERBOSE(4, "changing %" PRIu32 " records in %s\n", nrecords, table->name);
         testutil_check(session->open_cursor(session, table->name, NULL, NULL, &cur));
         for (i = 0; i < nrecords; i++) {
@@ -659,6 +661,8 @@ incr_backup(WT_CONNECTION *conn, const char *home, const char *backup_home, TABL
                 testutil_check(file_cursor->get_key(file_cursor, &offset, &size, &type));
                 testutil_assert(type == WT_BACKUP_FILE || type == WT_BACKUP_RANGE);
                 if (type == WT_BACKUP_RANGE) {
+                    VERBOSE(3, "RANGE: %s: offset %" PRIu64 " size %" PRIu64 "\n", filename, offset,
+                      size);
                     nrange++;
                     tmp = dcalloc(1, size);
 
@@ -765,7 +769,7 @@ check_table(WT_SESSION *session, TABLE *table)
         else if (op_type == UPDATE || (op_type == MODIFY && change_count < boundary))
             change_count += KEYS_PER_TABLE;
         else if (op_type == MODIFY || (op_type == REMOVE && change_count < boundary))
-            change_count += 20000;
+            change_count += 20 * WT_THOUSAND;
         else
             testutil_assert(false);
         key_value(change_count, key, sizeof(key), &item, &op_type);
@@ -825,7 +829,8 @@ main(int argc, char *argv[])
     uint32_t file_max, iter, max_value_size, next_checkpoint, rough_size, slot;
     int ch, ncheckpoints, nreopens, status;
     const char *backup_verbose, *working_dir;
-    char conf[1024], home[1024], backup_check[1024], backup_dir[1024], command[4096];
+    char backup_check[1024], backup_dir[1024], backup_src[1024], command[4096], conf[1024],
+      home[1024];
     bool preserve;
 
     preserve = false;
@@ -865,8 +870,10 @@ main(int argc, char *argv[])
         rnd.v = seed;
 
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
-    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "../%s.BACKUP", home));
-    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "../%s.CHECK", home));
+    /* Put the backup directories as the same level as the home directory. */
+    testutil_check(__wt_snprintf(backup_check, sizeof(backup_check), "./%s.CHECK", home));
+    testutil_check(__wt_snprintf(backup_dir, sizeof(backup_dir), "./%s.BACKUP", home));
+    testutil_check(__wt_snprintf(backup_src, sizeof(backup_src), "./%s.BACKUP.SRC", home));
     printf("Seed: %" PRIu64 "\n", seed);
 
     testutil_check(
@@ -892,9 +899,9 @@ main(int argc, char *argv[])
     if (rough_size == 0)
         file_max = 100 + __wt_random(&rnd) % 100; /* small log files, min 100K */
     else if (rough_size == 1)
-        file_max = 200 + __wt_random(&rnd) % 1000; /* 200K to ~1M */
+        file_max = 200 + __wt_random(&rnd) % WT_THOUSAND; /* 200K to ~1M */
     else
-        file_max = 1000 + __wt_random(&rnd) % 20000; /* 1M to ~20M */
+        file_max = WT_THOUSAND + __wt_random(&rnd) % (20 * WT_THOUSAND); /* 1M to ~20M */
     testutil_check(
       __wt_snprintf(conf, sizeof(conf), "%s,create,%s,log=(enabled=true,file_max=%" PRIu32 "K)",
         CONN_CONFIG_COMMON, backup_verbose, file_max));
@@ -953,11 +960,20 @@ main(int argc, char *argv[])
         }
 
         /* Close and reopen the connection once in a while. */
-        if (__wt_random(&rnd) % 10 == 0) {
+        if (iter != 0 && __wt_random(&rnd) % 5 == 0) {
             VERBOSE(2, "Close and reopen the connection %d\n", nreopens);
             testutil_check(conn->close(conn, NULL));
+            /* Check the source bitmap after restart. Copy while closed. */
+            testutil_check(__wt_snprintf(command, sizeof(command),
+              "rm -rf %s; mkdir %s; cp -rp %s/* %s", backup_src, backup_src, home, backup_src));
+            if ((status = system(command)) < 0)
+                testutil_die(status, "system: %s", command);
+
             testutil_check(wiredtiger_open(home, NULL, conf, &conn));
             testutil_check(conn->open_session(conn, NULL, NULL, &session));
+
+            /* Test against the copied directory. */
+            testutil_verify_src_backup(conn, backup_src, home, NULL);
             nreopens++;
         }
 

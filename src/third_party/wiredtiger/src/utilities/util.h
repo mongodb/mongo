@@ -24,6 +24,7 @@ extern int __wt_opterr;   /* if error message should be printed */
 extern int __wt_optind;   /* index into parent argv vector */
 extern int __wt_optopt;   /* character checked for validity */
 extern int __wt_optreset; /* reset getopt */
+extern int __wt_optwt;    /* enable WT-specific behavior, e.g., using WT_* return codes */
 extern char *__wt_optarg; /* argument associated with option */
 
 int util_alter(WT_SESSION *, int, char *[]);

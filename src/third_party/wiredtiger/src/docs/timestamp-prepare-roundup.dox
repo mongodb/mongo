@@ -22,7 +22,7 @@ replaying prepared transactions at the same time impossible.
 The setting <code>roundup_timestamps=(prepared=true)</code> is provided to
 handle this problem. It disables the normal restriction that the prepare
 timestamp must be greater than the stable timestamp. In addition, the
-prepare timestamp is rounded up to the <i>oldest</i> timestamp (not the
+prepare timestamp is rounded up to the <b>oldest</b> timestamp (not the
 stable timestamp) if necessary and then the commit timestamp is rounded up
 to the prepare timestamp. The rounding provides some measure of safety by
 disallowing operations before oldest.
@@ -35,7 +35,7 @@ before any ordinary operations are allowed. Using this setting to prepare
 and/or commit before the current stable timestamp for any other purpose
 can lead to data inconsistency. Likewise, replaying anything other than the
 exact transaction that successfully prepared before the crash can lead to
-subtle inconsistencies. If in any doubt, it is far safer to either abort the
+subtle inconsistencies. If in any doubt, it is safer to globally abort the
 transaction (this requires no further action in WiredTiger) or not allow the
 stable timestamp to advance past the commit timestamp of a transaction that
 has been prepared.

@@ -4,7 +4,7 @@ set -o errexit  # Exit the script with error if any of the commands fail
 # CMake version we fallback to and download when cmake doesn't exist on the
 # host system.
 CMAKE_MAJOR_VER=3
-CMAKE_MINOR_VER=11
+CMAKE_MINOR_VER=13
 CMAKE_PATCH_VER=0
 CMAKE_VERSION=$CMAKE_MAJOR_VER.$CMAKE_MINOR_VER.$CMAKE_PATCH_VER
 
@@ -12,14 +12,21 @@ CMAKE_VERSION=$CMAKE_MAJOR_VER.$CMAKE_MINOR_VER.$CMAKE_PATCH_VER
 #   https://github.com/mongodb/mongo-c-driver/blob/master/.evergreen/find-cmake.sh
 find_cmake ()
 {
-    if [ ! -z "$CMAKE" ]; then
+    if [ -n "$CMAKE" ]; then
         return 0
+    elif [ -f "/opt/mongodbtoolchain/v4/bin/cmake" ]; then
+        CMAKE="/opt/mongodbtoolchain/v4/bin/cmake"
+        CTEST="/opt/mongodbtoolchain/v4/bin/ctest"
     elif [ -f "/Applications/CMake.app/Contents/bin/cmake" ]; then
         CMAKE="/Applications/CMake.app/Contents/bin/cmake"
         CTEST="/Applications/CMake.app/Contents/bin/ctest"
     elif [ -f "/opt/cmake/bin/cmake" ]; then
         CMAKE="/opt/cmake/bin/cmake"
         CTEST="/opt/cmake/bin/ctest"
+    # Newer package system can be kept separate from the older "cmake".
+    elif [ -f "/usr/bin/cmake3" ]; then
+        CMAKE=/usr/bin/cmake3
+        CTEST=/usr/bin/ctest3
     elif command -v cmake 2>/dev/null; then
         CMAKE=cmake
         CTEST=ctest

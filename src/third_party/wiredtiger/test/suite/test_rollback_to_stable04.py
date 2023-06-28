@@ -29,7 +29,7 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 def mod_val(value, char, location, nbytes=1):
     return value[0:location] + char + value[location+nbytes:]
@@ -55,10 +55,15 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    dryrun_values = [
+        ('no_dryrun', dict(dryrun=False)),
+        ('dryrun', dict(dryrun=True))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
 
     def conn_config(self):
-        config = 'cache_size=500MB,statistics=(all)'
+        config = 'cache_size=500MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config
@@ -146,32 +151,44 @@ class test_rollback_to_stable04(test_rollback_to_stable_base):
         # Checkpoint to ensure the data is flushed, then rollback to the stable timestamp.
         if not self.in_memory:
             self.session.checkpoint()
-        self.conn.rollback_to_stable()
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
 
         # Check that the correct data is seen at and after the stable timestamp.
         self.check(value_modQ, uri, nrows, None, 30)
-        self.check(value_modQ, uri, nrows, None, 150)
-        self.check(value_a, uri, nrows, None, 20)
+        if self.dryrun:
+            self.check(value_modZ, uri, nrows, None, 150)
+            self.check(value_a, uri, nrows, None, 20)
+        else:
+            self.check(value_modQ, uri, nrows, None, 150)
+            self.check(value_a, uri, nrows, None, 20)
 
         stat_cursor = self.session.open_cursor('statistics:', None, None)
         calls = stat_cursor[stat.conn.txn_rts][2]
         hs_removed = stat_cursor[stat.conn.txn_rts_hs_removed][2]
+        hs_removed_dryrun = stat_cursor[stat.conn.txn_rts_hs_removed_dryrun][2]
         hs_sweep = stat_cursor[stat.conn.txn_rts_sweep_hs_keys][2]
+        hs_sweep_dryrun = stat_cursor[stat.conn.txn_rts_sweep_hs_keys_dryrun][2]
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
         upd_aborted = stat_cursor[stat.conn.txn_rts_upd_aborted][2]
+        upd_aborted_dryrun = stat_cursor[stat.conn.txn_rts_upd_aborted_dryrun][2]
         stat_cursor.close()
 
         self.assertEqual(calls, 1)
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-        if self.in_memory:
+        if self.dryrun:
+            self.assertEqual(upd_aborted + hs_removed + hs_sweep, 0)
+            self.assertGreaterEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, nrows * 11)
+        elif self.in_memory:
             self.assertEqual(upd_aborted, nrows * 11)
             self.assertEqual(hs_removed + hs_sweep, 0)
+            self.assertEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, 0)
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + hs_sweep, nrows * 11)
+            self.assertEqual(upd_aborted_dryrun + hs_removed_dryrun + hs_sweep_dryrun, 0)
 
 if __name__ == '__main__':
     wttest.run()

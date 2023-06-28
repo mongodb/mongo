@@ -21,6 +21,31 @@ __wt_block_manager_drop(WT_SESSION_IMPL *session, const char *filename, bool dur
 }
 
 /*
+ * __wt_block_manager_drop_object --
+ *     Drop a shared object file from the bucket directory and the cache directory.
+ */
+int
+__wt_block_manager_drop_object(
+  WT_SESSION_IMPL *session, WT_BUCKET_STORAGE *bstorage, const char *filename, bool durable)
+{
+    WT_DECL_ITEM(tmp);
+    WT_DECL_RET;
+
+    WT_UNUSED(durable);
+
+    WT_RET(__wt_scr_alloc(session, 0, &tmp));
+
+    /* Generate the name of the shared object file with the bucket prefix. */
+    WT_ERR(__wt_buf_fmt(session, tmp, "%s%s", bstorage->bucket_prefix, filename));
+    WT_WITH_BUCKET_STORAGE(bstorage, session, ret = __wt_fs_remove(session, tmp->data, false));
+    WT_ERR(ret);
+
+err:
+    __wt_scr_free(session, &tmp);
+    return (ret);
+}
+
+/*
  * __wt_block_manager_create --
  *     Create a file.
  */
@@ -107,7 +132,6 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
     }
 
     __wt_free(session, block->name);
-    __wt_free(session, block->related);
 
     WT_TRET(__wt_close(session, &block->fh));
 
@@ -378,7 +402,10 @@ __desc_read(WT_SESSION_IMPL *session, uint32_t allocsize, WT_BLOCK *block)
      */
     if (desc->magic != WT_BLOCK_MAGIC || !checksum_matched) {
         if (strcmp(block->name, WT_METAFILE) == 0 || strcmp(block->name, WT_HS_FILE) == 0)
-            WT_ERR_MSG(session, WT_TRY_SALVAGE, "%s is corrupted", block->name);
+            WT_ERR_MSG(session, WT_TRY_SALVAGE,
+              "%s is corrupted: calculated block checksum of %#" PRIx32
+              " doesn't match expected checksum of %#" PRIx32,
+              block->name, __wt_checksum(desc, allocsize), checksum_tmp);
         /*
          * If we're doing an import, we can't expect to be able to verify checksums since we don't
          * know the allocation size being used. This isn't an error so we should just return success

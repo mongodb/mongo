@@ -412,6 +412,7 @@ __wt_conn_reconfig(WT_SESSION_IMPL *session, const char **cfg)
     WT_ERR(__wt_capacity_server_create(session, cfg));
     WT_ERR(__wt_checkpoint_server_create(session, cfg));
     WT_ERR(__wt_debug_mode_config(session, cfg));
+    WT_ERR(__wt_extra_diagnostics_config(session, cfg));
     WT_ERR(__wt_hs_config(session, cfg));
     WT_ERR(__wt_logmgr_reconfig(session, cfg));
     WT_ERR(__wt_lsm_manager_reconfig(session, cfg));

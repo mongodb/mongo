@@ -113,6 +113,8 @@ struct __wt_cell_unpack_kv;
 typedef struct __wt_cell_unpack_kv WT_CELL_UNPACK_KV;
 struct __wt_ckpt;
 typedef struct __wt_ckpt WT_CKPT;
+struct __wt_ckpt_snapshot;
+typedef struct __wt_ckpt_snapshot WT_CKPT_SNAPSHOT;
 struct __wt_col;
 typedef struct __wt_col WT_COL;
 struct __wt_col_fix_auxiliary_header;
@@ -145,6 +147,8 @@ struct __wt_connection_stats;
 typedef struct __wt_connection_stats WT_CONNECTION_STATS;
 struct __wt_cursor_backup;
 typedef struct __wt_cursor_backup WT_CURSOR_BACKUP;
+struct __wt_cursor_bounds_state;
+typedef struct __wt_cursor_bounds_state WT_CURSOR_BOUNDS_STATE;
 struct __wt_cursor_btree;
 typedef struct __wt_cursor_btree WT_CURSOR_BTREE;
 struct __wt_cursor_bulk;
@@ -195,6 +199,8 @@ struct __wt_evict_entry;
 typedef struct __wt_evict_entry WT_EVICT_ENTRY;
 struct __wt_evict_queue;
 typedef struct __wt_evict_queue WT_EVICT_QUEUE;
+struct __wt_evict_timeline;
+typedef struct __wt_evict_timeline WT_EVICT_TIMELINE;
 struct __wt_ext;
 typedef struct __wt_ext WT_EXT;
 struct __wt_extlist;
@@ -213,6 +219,10 @@ struct __wt_hazard;
 typedef struct __wt_hazard WT_HAZARD;
 struct __wt_ikey;
 typedef struct __wt_ikey WT_IKEY;
+struct __wt_import_entry;
+typedef struct __wt_import_entry WT_IMPORT_ENTRY;
+struct __wt_import_list;
+typedef struct __wt_import_list WT_IMPORT_LIST;
 struct __wt_index;
 typedef struct __wt_index WT_INDEX;
 struct __wt_insert;
@@ -299,10 +309,14 @@ struct __wt_rec_kv;
 typedef struct __wt_rec_kv WT_REC_KV;
 struct __wt_reconcile;
 typedef struct __wt_reconcile WT_RECONCILE;
+struct __wt_reconcile_timeline;
+typedef struct __wt_reconcile_timeline WT_RECONCILE_TIMELINE;
 struct __wt_ref;
 typedef struct __wt_ref WT_REF;
 struct __wt_ref_hist;
 typedef struct __wt_ref_hist WT_REF_HIST;
+struct __wt_rollback_to_stable;
+typedef struct __wt_rollback_to_stable WT_ROLLBACK_TO_STABLE;
 struct __wt_row;
 typedef struct __wt_row WT_ROW;
 struct __wt_rwlock;
@@ -333,8 +347,6 @@ struct __wt_thread_group;
 typedef struct __wt_thread_group WT_THREAD_GROUP;
 struct __wt_tiered;
 typedef struct __wt_tiered WT_TIERED;
-struct __wt_tiered_manager;
-typedef struct __wt_tiered_manager WT_TIERED_MANAGER;
 struct __wt_tiered_object;
 typedef struct __wt_tiered_object WT_TIERED_OBJECT;
 struct __wt_tiered_tiers;
@@ -365,6 +377,8 @@ struct __wt_update_vector;
 typedef struct __wt_update_vector WT_UPDATE_VECTOR;
 struct __wt_verbose_multi_category;
 typedef struct __wt_verbose_multi_category WT_VERBOSE_MULTI_CATEGORY;
+struct __wt_verify_info;
+typedef struct __wt_verify_info WT_VERIFY_INFO;
 struct __wt_version;
 typedef struct __wt_version WT_VERSION;
 union __wt_lsn;
@@ -382,9 +396,7 @@ typedef uint64_t wt_timestamp_t;
 /*******************************************
  * WiredTiger internal include files.
  *******************************************/
-#if defined(_lint)
-#include "lint.h"
-#elif defined(__GNUC__)
+#if defined(__GNUC__)
 #include "gcc.h"
 #elif defined(_MSC_VER)
 #include "msvc.h"
@@ -437,6 +449,7 @@ typedef uint64_t wt_timestamp_t;
 #include "optrack.h"
 #include "os.h"
 #include "reconcile.h"
+#include "rollback_to_stable.h"
 #include "schema.h"
 #include "thread_group.h"
 #include "tiered.h"
@@ -479,6 +492,7 @@ typedef uint64_t wt_timestamp_t;
 #include "packing_inline.h"
 #include "reconcile_inline.h"
 #include "serial_inline.h"
+#include "str_inline.h"
 #include "time_inline.h"
 
 #if defined(__cplusplus)

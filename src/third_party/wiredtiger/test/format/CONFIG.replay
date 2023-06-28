@@ -1,0 +1,26 @@
+############################################
+#  RUN PARAMETERS: V3
+############################################
+# A configuration for predictable replay.
+# Some things are locked down at the moment.
+backup=0
+btree.huffman_value=0
+cache.minimum=20
+format.abort=0
+format.independent_thread_rng=1
+import=0
+ops.alter=0
+ops.compaction=0
+ops.truncate=0
+ops.salvage=0
+quiet=0
+runs.in_memory=0
+runs.mirror=0
+runs.predictable_replay=1
+runs.rows=100000:500000
+runs.tables=3:10
+runs.threads=4:32
+runs.timer=6:30
+runs.timer=30
+transaction.implicit=0
+transaction.timestamps=1

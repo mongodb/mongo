@@ -14,6 +14,7 @@ endif()
 add_library(wt::lz4 SHARED IMPORTED GLOBAL)
 set_target_properties(wt::lz4 PROPERTIES
     IMPORTED_LOCATION ${HAVE_LIBLZ4}
+    IMPORTED_IMPLIB ${HAVE_LIBLZ4}
 )
 if (HAVE_LIBLZ4_INCLUDES)
     set_target_properties(wt::lz4 PROPERTIES

@@ -25,6 +25,12 @@ effects may be discarded by calling WT_SESSION::rollback_transaction. If
 WT_SESSION::commit_transaction returns any error, the transaction was rolled
 back, not committed.
 
+Schema changing operations are not generally transactional in WiredTiger, they
+can't be grouped together within the scope of a transaction and atomically
+committed or aborted. Think of them as one-shot transactions where the operation
+will either succeed or fail. Examples of schema changing operations are table
+create, drop and rename.
+
 A data operation executed within a transaction can fail if it conflicts with an
 operation in another concurrently running transaction.  (A conflict occurs
 between two operations when letting both of them continue would lead to a
@@ -63,10 +69,16 @@ other writes, although concurrent transactions updating the same value will fail
 synchronization to avoid repeated attempts to update and then roll back the same
 value.
 
+Transactions hold resources, such as cache space, that may be in high demand.
 Both read and write transactions may fail with the ::WT_ROLLBACK error if a
 resource cannot be allocated. For example, if cache resources cannot be
 allocated to hold the data required to satisfy transactional readers, operations
 may fail and return ::WT_ROLLBACK.
+
+\warning
+A thread with an active transaction should avoid pausing or blocking. This may delay
+other transactions that require the same resources, leading to performance problems that
+are hard to diagnose.
 
 \warning
 As read transactions rarely fail, application developers may neglect to correctly

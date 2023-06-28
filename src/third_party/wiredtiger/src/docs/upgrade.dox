@@ -74,7 +74,7 @@ compatible with earlier binaries.
 <br><br>
 - Applications concerned with downgrading should configure the
 ::wiredtiger_open \c config_base value to \c false, so WiredTiger does
-not write the base configuration file file when creating databases.
+not write the base configuration file when creating databases.
 Because the base configuration file is written using a current version
 of the WiredTiger API, writing this file could cause applications using
 previous versions of the WiredTiger API to fail. See @ref config_base

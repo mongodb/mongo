@@ -26,6 +26,7 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+from rollback_to_stable_util import verify_rts_logs
 import wiredtiger, wttest
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
@@ -40,6 +41,16 @@ class test_rollback_to_stable30(wttest.WiredTigerTestCase):
         ('table-r-complex', dict(keyfmt='r', valfmt=None, dataset=ComplexDataSet)),
         ('table-S-complex', dict(keyfmt='S', valfmt=None, dataset=ComplexDataSet)),
     ])
+
+    # Don't raise errors for these, the expectation is that the RTS verifier will
+    # run on the test output.
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ignoreStdoutPattern('WT_VERB_RTS')
+        self.addTearDownAction(verify_rts_logs)
+
+    def conn_config(self):
+        return 'verbose=(rts:5)'
 
     def prepare_resolve(self, resolve):
         ds = self.dataset(self, "table:rts30", 10, key_format=self.keyfmt, value_format=self.valfmt)

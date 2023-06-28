@@ -24,11 +24,10 @@
  *     Lexicographic comparison routine. Returns: < 0 if user_item is lexicographically < tree_item,
  *     = 0 if user_item is lexicographically = tree_item, > 0 if user_item is lexicographically >
  *     tree_item. We use the names "user" and "tree" so it's clear in the btree code which the
- *     application is looking at when we call its comparison function. If prefix is specified, 0 can
- *     be returned when the user_item is equal to the tree_item for the minimum size.
+ *     application is looking at when we call its comparison function.
  */
 static inline int
-__wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item, bool prefix)
+__wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item)
 {
     size_t len, usz, tsz;
     const uint8_t *userp, *treep;
@@ -88,28 +87,12 @@ __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree_item, bool prefix
     /*
      * Use the non-vectorized version for the remaining bytes and for the small key sizes.
      */
-    for (; len > 0; --len, ++userp, ++treep) {
-        /*
-         * When prefix is enabled and we are performing lexicographic comparison on schema formats s
-         * or S, we only want to compare the characters before either of them reach a NUL character.
-         * For format S, a NUL character is always at the end of the string, while for the format s,
-         * NUL characters are set for the remaining unused bytes. If we are at the end of the user
-         * item (which is the prefix here), there is a prefix match. Otherwise, the tree item is
-         * lexicographically smaller than the prefix.
-         */
-        if (prefix && (*userp == '\0' || *treep == '\0'))
-            return (*userp == '\0' ? 0 : 1);
+    for (; len > 0; --len, ++userp, ++treep)
         if (*userp != *treep)
             return (*userp < *treep ? -1 : 1);
-    }
 
-    /*
-     * Contents are equal up to the smallest length. In the case of a prefix match, we consider the
-     * tree item and the prefix equal only if the tree item is bigger in size.
-     */
-    if (usz == tsz || (prefix && usz < tsz))
-        return (0);
-    return ((usz < tsz) ? -1 : 1);
+    /* Contents are equal up to the smallest length. */
+    return ((usz == tsz) ? 0 : (usz < tsz) ? -1 : 1);
 }
 
 /*
@@ -121,20 +104,64 @@ __wt_compare(WT_SESSION_IMPL *session, WT_COLLATOR *collator, const WT_ITEM *use
   const WT_ITEM *tree_item, int *cmpp)
 {
     if (collator == NULL) {
-        *cmpp = __wt_lex_compare(user_item, tree_item, false);
+        *cmpp = __wt_lex_compare(user_item, tree_item);
         return (0);
     }
     return (collator->compare(collator, &session->iface, user_item, tree_item, cmpp));
 }
 
 /*
- * __wt_prefix_match --
- *     Check if the prefix item is equal to the leading bytes of the tree item.
+ * __wt_compare_bounds --
+ *     Return if the cursor key is within the bounded range. If upper is True, this indicates a next
+ *     call and the key is checked against the upper bound. If upper is False, this indicates a prev
+ *     call and the key is then checked against the lower bound.
  */
 static inline int
-__wt_prefix_match(const WT_ITEM *prefix, const WT_ITEM *tree_item)
+__wt_compare_bounds(WT_SESSION_IMPL *session, WT_CURSOR *cursor, WT_ITEM *key, uint64_t recno,
+  bool upper, bool *key_out_of_bounds)
 {
-    return (__wt_lex_compare(prefix, tree_item, true));
+    uint64_t recno_bound;
+    int cmpp;
+
+    cmpp = 0;
+    recno_bound = 0;
+
+    WT_STAT_CONN_DATA_INCR(session, cursor_bounds_comparisons);
+
+    if (upper) {
+        WT_ASSERT(session, WT_DATA_IN_ITEM(&cursor->upper_bound));
+        if (CUR2BT(cursor)->type == BTREE_ROW)
+            WT_RET(
+              __wt_compare(session, CUR2BT(cursor)->collator, key, &cursor->upper_bound, &cmpp));
+        else
+            /* Unpack the raw recno buffer into integer variable. */
+            WT_RET(__wt_struct_unpack(
+              session, cursor->upper_bound.data, cursor->upper_bound.size, "q", &recno_bound));
+
+        if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE))
+            *key_out_of_bounds =
+              CUR2BT(cursor)->type == BTREE_ROW ? (cmpp > 0) : (recno > recno_bound);
+        else
+            *key_out_of_bounds =
+              CUR2BT(cursor)->type == BTREE_ROW ? (cmpp >= 0) : (recno >= recno_bound);
+    } else {
+        WT_ASSERT(session, WT_DATA_IN_ITEM(&cursor->lower_bound));
+        if (CUR2BT(cursor)->type == BTREE_ROW)
+            WT_RET(
+              __wt_compare(session, CUR2BT(cursor)->collator, key, &cursor->lower_bound, &cmpp));
+        else
+            /* Unpack the raw recno buffer into integer variable. */
+            WT_RET(__wt_struct_unpack(
+              session, cursor->lower_bound.data, cursor->lower_bound.size, "q", &recno_bound));
+
+        if (F_ISSET(cursor, WT_CURSTD_BOUND_LOWER_INCLUSIVE))
+            *key_out_of_bounds =
+              CUR2BT(cursor)->type == BTREE_ROW ? (cmpp < 0) : (recno < recno_bound);
+        else
+            *key_out_of_bounds =
+              CUR2BT(cursor)->type == BTREE_ROW ? (cmpp <= 0) : (recno <= recno_bound);
+    }
+    return (0);
 }
 
 /*

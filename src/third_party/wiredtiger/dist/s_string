@@ -11,72 +11,87 @@ export LC_ALL
 
 # If aspell has not been installed, quit
 type aspell > /dev/null 2>&1 || {
-	echo "$0 skipped: aspell not found"
-	exit 0
+    echo "$0 skipped: aspell not found"
+    exit 0
 }
 
 # replace:
-#	Create a replacement list of spelling words. This is here because the
+#    Create a replacement list of spelling words. This is here because the
 # words we ignore changes over time and it's worth periodically collapsing
 # the list. Don't it too often, the list is correct for many different aspell
 # catalogs and generating a shorter list on any single system will break other
 # systems.
 replace() {
-	aspell --mode=ccpp --lang=en_US list < ../$1 |
-	sort -u |
-	comm -12 /dev/stdin s_string.ok
+    aspell --mode=ccpp --lang=en_US list < ../$1 |
+    sort -u |
+    comm -12 /dev/stdin s_string.ok
 }
 
 # check:
-#	Check the spelling of an individual file.
+#    Check the spelling of an individual file.
 check() {
-	# Strip out git hashes, which are seven character hex strings.
-	# Strip out double quote char literals ('"'), they confuse aspell.
-	# Strip out calls to __wt_getopt so the option lists don't have to be spelling words.
-	# Strip out C-style hex constants.
-	sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$2 |
-	aspell --lang=en_US $1 list |
-	sort -u |
-	comm -23 /dev/stdin s_string.ok > $t
-	test -s $t && {
-		echo "==== $2"
-		cat $t
-	}
+    # Strip out git hashes, which are seven character hex strings.
+    # Strip out double quote char literals ('"'), they confuse aspell.
+    # Strip out calls to __wt_getopt so the option lists don't have to be spelling words.
+    # Strip out C-style hex constants.
+    sed -e 's/ [0-9a-f]\{7\} / /g' -e "s/'\"'//g" -e 's/__wt_getopt([^()]*)//' -e 's/0x[[:xdigit:]]\{1,\}/ /g' ../$2 |
+    aspell --lang=en_US $1 list |
+    sort -u |
+    comm -23 /dev/stdin s_string.ok > $t
+    test -s $t && {
+        echo "==== $2"
+        cat $t
+    }
 }
 
 # List of files to spellchk.
-l=`(cd .. &&
+l=$(cd .. &&
     find bench examples ext src test -name '*.[chsy]' &&
-    find src -name '*.in' && find test -name '*.cxx' && find test -name '*.cpp')`
+    find src -name '*.in' &&
+    find test -name '*.cpp')
 
 usage()
 {
-	echo 'usage: s_string [-r]' >&2
-	exit 1
+    echo 'usage: s_string [-r]' >&2
+    exit 1
 }
+
+exit_val=0
 while :
-	do case "$1" in
-	-r)			# -r builds replacement list of OK words
-		for f in $l; do
-			replace $f
-		done | sort -u > $t
-		cp $t s_string.ok
-		shift;;
-	*)
-		test "$#" -eq 0 || usage
-		break;;
-	esac
+    do case "$1" in
+    -r)            # -r builds replacement list of OK words
+        for f in $l; do
+            replace $f
+        done | sort -u > $t
+
+        # Between aspell versions 0.60.7-20110707 and 0.60.8 the following program names have been
+        # added to the dictionary and are no longer considered spelling errors. This means
+        # that building a replacement list of words with the newer version of aspell will omit them
+        # from s_string.ok, and subsequently running s_string with older aspell version will
+        # report spelling errors. Manually whitelist these names to address this.
+        prog_names="AWS AWS's MongoDB MONGODB PostgreSQL sanitizer sanitizers"
+        for name in $prog_names; do
+            echo $name >> $t
+        done
+        sort -u -o $t $t
+
+	if ! diff $t s_string.ok >/dev/null 2>&1; then
+            echo "The string.ok list will be updated."
+            cp $t s_string.ok
+            exit_val=1
+        else
+            echo "No need to update the string.ok list."
+        fi
+        shift;;
+    *)
+        test "$#" -eq 0 || usage
+        break;;
+    esac
 done
 
 # Check source files.
 for f in $l; do
-	check "--mode=ccpp" $f
+    check "--mode=ccpp" $f
 done
 
-l="NEWS"
-# Check other files.
-for f in $l; do
-	check "" $f
-done
-
-exit 0
+exit $exit_val

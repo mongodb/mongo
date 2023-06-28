@@ -161,8 +161,15 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         ckpt = checkpoint_thread(self.conn, done)
         try:
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
+
             session1.commit_transaction()
 
         finally:
@@ -215,8 +222,15 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         ckpt = checkpoint_thread(self.conn, done)
         try:
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
+
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
+
             session1.commit_transaction()
 
         finally:
@@ -272,8 +286,15 @@ class test_checkpoint_snapshot02(wttest.WiredTigerTestCase):
         ckpt = checkpoint_thread(self.conn, done)
         try:
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
+            
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
+
             session2.commit_transaction()
 
         finally:

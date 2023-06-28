@@ -114,8 +114,9 @@ __wt_lsm_get_chunk_to_flush(
         chunk = (evict_chunk != NULL) ? evict_chunk : flush_chunk;
 
     if (chunk != NULL) {
-        __wt_verbose(session, WT_VERB_LSM, "Flush%s: return chunk %" PRIu32 " of %" PRIu32 ": %s",
-          force ? " w/ force" : "", i, lsm_tree->nchunks, chunk->uri);
+        __wt_verbose_debug2(session, WT_VERB_LSM,
+          "Flush%s: return chunk %" PRIu32 " of %" PRIu32 ": %s", force ? " w/ force" : "", i,
+          lsm_tree->nchunks, chunk->uri);
 
         (void)__wt_atomic_add32(&chunk->refcnt, 1);
     }
@@ -364,7 +365,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
             WT_RET_MSG(session, ret, "discard handle");
     }
     if (F_ISSET(chunk, WT_LSM_CHUNK_ONDISK)) {
-        __wt_verbose(session, WT_VERB_LSM, "LSM worker %s already on disk", chunk->uri);
+        __wt_verbose_debug2(session, WT_VERB_LSM, "LSM worker %s already on disk", chunk->uri);
         return (0);
     }
 
@@ -378,7 +379,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
         if (__wt_eviction_needed(session, false, false, NULL))
             WT_ERR(__wt_lsm_manager_push_entry(session, WT_LSM_WORK_ENABLE_EVICT, 0, lsm_tree));
 
-        __wt_verbose(
+        __wt_verbose_debug2(
           session, WT_VERB_LSM, "LSM worker %s: running transaction, return", chunk->uri);
         return (0);
     }
@@ -386,7 +387,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
         return (0);
     flush_set = true;
 
-    __wt_verbose(session, WT_VERB_LSM, "LSM worker flushing %s", chunk->uri);
+    __wt_verbose_debug2(session, WT_VERB_LSM, "LSM worker flushing %s", chunk->uri);
 
     /*
      * Flush the file before checkpointing: this is the expensive part in
@@ -409,7 +410,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
     session->txn->isolation = saved_isolation;
     WT_ERR(ret);
 
-    __wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointing %s", chunk->uri);
+    __wt_verbose_debug2(session, WT_VERB_LSM, "LSM worker checkpointing %s", chunk->uri);
 
     /*
      * Ensure we don't race with a running checkpoint: the checkpoint lock protects against us
@@ -454,7 +455,7 @@ __wt_lsm_checkpoint_chunk(WT_SESSION_IMPL *session, WT_LSM_TREE *lsm_tree, WT_LS
     /* Make sure we aren't pinning a transaction ID. */
     __wt_txn_release_snapshot(session);
 
-    __wt_verbose(session, WT_VERB_LSM, "LSM worker checkpointed %s", chunk->uri);
+    __wt_verbose_debug2(session, WT_VERB_LSM, "LSM worker checkpointed %s", chunk->uri);
 
     /* Schedule a bloom filter create for our newly flushed chunk. */
     if (!FLD_ISSET(lsm_tree->bloom, WT_LSM_BLOOM_OFF))

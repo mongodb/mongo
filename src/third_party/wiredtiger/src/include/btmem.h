@@ -77,6 +77,7 @@ struct __wt_page_header {
 #define WT_PAGE_EMPTY_V_NONE 0x04u /* Page has no zero-length values */
 #define WT_PAGE_ENCRYPTED 0x08u    /* Page is encrypted on disk */
 #define WT_PAGE_UNUSED 0x10u       /* Historic lookaside store page updates, no longer used */
+#define WT_PAGE_FT_UPDATE 0x20u    /* Page contains updated fast-truncate information */
     uint8_t flags;                 /* 25: flags */
 
     /* A byte of padding, positioned to be added to the flags. */
@@ -146,20 +147,6 @@ struct __wt_addr {
      * correctly (not free'd on error, for example).
      */
     uint8_t reuse;
-};
-
-/*
- * WT_ADDR_COPY --
- *	We have to lock the WT_REF to look at a WT_ADDR: a structure we can use to quickly get a
- * copy of the WT_REF address information.
- */
-struct __wt_addr_copy {
-    WT_TIME_AGGREGATE ta;
-
-    uint8_t type;
-
-    uint8_t addr[255 /* WT_BTREE_MAX_ADDR_COOKIE */];
-    uint8_t size;
 };
 
 /*
@@ -413,8 +400,9 @@ struct __wt_page_modify {
 #define mod_root_split u2.intl.root_split
         struct {
             /*
-             * Appended items to column-stores: there is only a single one of these active at a time
-             * per column-store tree.
+             * Appended items to column-stores. Actual appends to the tree only happen on the last
+             * page, but gaps created in the namespace by truncate operations can result in the
+             * append lists of other pages becoming populated.
              */
             WT_INSERT_HEAD **append;
 
@@ -428,9 +416,10 @@ struct __wt_page_modify {
             WT_INSERT_HEAD **update;
 
             /*
-             * Split-saved last column-store page record. If a column-store page is split, we save
-             * the first record number moved so that during reconciliation we know the page's last
-             * record and can write any implicitly created deleted records for the page.
+             * Split-saved last column-store page record. If a fixed-length column-store page is
+             * split, we save the first record number moved so that during reconciliation we know
+             * the page's last record and can write any implicitly created deleted records for the
+             * page. No longer used by VLCS.
              */
             uint64_t split_recno;
         } column_leaf;
@@ -455,6 +444,16 @@ struct __wt_page_modify {
 
     /* Overflow record tracking for reconciliation. */
     WT_OVFL_TRACK *ovfl_track;
+
+    /*
+     * Page-delete information for newly instantiated deleted pages. The instantiated flag remains
+     * set until the page is reconciled successfully; this indicates that the page_del information
+     * in the ref remains valid. The update list remains set (if set at all) until the transaction
+     * that deleted the page is resolved. These transitions are independent; that is, the first
+     * reconciliation can happen either before or after the delete transaction resolves.
+     */
+    bool instantiated;        /* True if this is a newly instantiated page. */
+    WT_UPDATE **inst_updates; /* Update list for instantiated page with unresolved truncate. */
 
 #define WT_PAGE_LOCK(s, p) __wt_spin_lock((s), &(p)->modify->page_lock)
 #define WT_PAGE_TRYLOCK(s, p) __wt_spin_trylock((s), &(p)->modify->page_lock)
@@ -485,6 +484,13 @@ struct __wt_page_modify {
 
 #define WT_PAGE_RS_RESTORED 0x1
     uint8_t restore_state; /* Created by restoring updates */
+
+/* Additional diagnostics fields to catch invalid updates to page_state, even in release builds. */
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_PAGE_MODIFY_EXCLUSIVE 0x1u
+#define WT_PAGE_MODIFY_RECONCILING 0x2u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
+    uint8_t flags;
 };
 
 /*
@@ -698,10 +704,11 @@ struct __wt_page {
 #define WT_PAGE_DISK_ALLOC 0x004u         /* Disk image in allocated memory */
 #define WT_PAGE_DISK_MAPPED 0x008u        /* Disk image in mapped memory */
 #define WT_PAGE_EVICT_LRU 0x010u          /* Page is on the LRU queue */
-#define WT_PAGE_EVICT_NO_PROGRESS 0x020u  /* Eviction doesn't count as progress */
-#define WT_PAGE_INTL_OVERFLOW_KEYS 0x040u /* Internal page has overflow keys (historic only) */
-#define WT_PAGE_SPLIT_INSERT 0x080u       /* A leaf page was split for append */
-#define WT_PAGE_UPDATE_IGNORE 0x100u      /* Ignore updates on page discard */
+#define WT_PAGE_EVICT_LRU_URGENT 0x020u   /* Page is in the urgent queue */
+#define WT_PAGE_EVICT_NO_PROGRESS 0x040u  /* Eviction doesn't count as progress */
+#define WT_PAGE_INTL_OVERFLOW_KEYS 0x080u /* Internal page has overflow keys (historic only) */
+#define WT_PAGE_SPLIT_INSERT 0x100u       /* A leaf page was split for append */
+#define WT_PAGE_UPDATE_IGNORE 0x200u      /* Ignore updates on page discard */
                                           /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
     uint16_t flags_atomic;                /* Atomic flags, use F_*_ATOMIC_16 */
 
@@ -792,10 +799,9 @@ struct __wt_page {
  * 	Prepare state will not be updated during rollback and will continue to
  * 	have the state as INPROGRESS.
  */
-#define WT_PREPARE_INIT              \
-    0 /* Must be 0, as structures    \
-         will be default initialized \
-         with 0. */
+
+/* Must be 0, as structures will be default initialized with 0. */
+#define WT_PREPARE_INIT 0
 #define WT_PREPARE_INPROGRESS 1
 #define WT_PREPARE_LOCKED 2
 #define WT_PREPARE_RESOLVED 3
@@ -814,16 +820,17 @@ struct __wt_page {
  *
  * WT_REF_DELETED:
  *	The page is on disk, but has been deleted from the tree; we can delete
- *	row-store leaf pages without reading them if they don't reference
- *	overflow items.
+ *	row-store and VLCS leaf pages without reading them if they don't
+ *	reference overflow items.
  *
  * WT_REF_LOCKED:
  *	Locked for exclusive access.  In eviction, this page or a parent has
  *	been selected for eviction; once hazard pointers are checked, the page
  *	will be evicted.  When reading a page that was previously deleted, it
- *	is locked until the page is in memory with records marked deleted.  The
- *	thread that set the page to WT_REF_LOCKED has exclusive access, no
- *	other thread may use the WT_REF until the state is changed.
+ *	is locked until the page is in memory and the deletion has been
+ *      instantiated with tombstone updates. The thread that set the page to
+ *      WT_REF_LOCKED has exclusive access; no other thread may use the WT_REF
+ *      until the state is changed.
  *
  * WT_REF_MEM:
  *	Set by a reading thread once the page has been read from disk; the page
@@ -854,23 +861,45 @@ struct __wt_page {
 
 /*
  * WT_PAGE_DELETED --
- *	Related information for truncated pages.
+ *	Information about how they got deleted for deleted pages. This structure records the
+ *      transaction that deleted the page, plus the state the ref was in when the deletion happened.
+ *      This structure is akin to an update but applies to a whole page.
  */
 struct __wt_page_deleted {
+    /*
+     * Transaction IDs are set when updates are created (before they become visible) and only change
+     * when marked with WT_TXN_ABORTED. Transaction ID readers expect to copy a transaction ID into
+     * a local variable and see a stable value. In case a compiler might re-read the transaction ID
+     * from memory rather than using the local variable, mark the shared transaction IDs volatile to
+     * prevent unexpected repeated/reordered reads.
+     */
     volatile uint64_t txnid; /* Transaction ID */
 
     wt_timestamp_t timestamp; /* Timestamps */
     wt_timestamp_t durable_timestamp;
 
     /*
-     * The state is used for transaction prepare to manage visibility and inheriting prepare state
-     * to update_list.
+     * The prepare state is used for transaction prepare to manage visibility and propagating the
+     * prepare state to the updates generated at instantiation time.
      */
-    volatile uint8_t prepare_state; /* Prepare state. */
+    volatile uint8_t prepare_state;
 
-    uint8_t previous_state; /* Previous state */
+    /*
+     * The previous state of the WT_REF; if the fast-truncate transaction is rolled back without the
+     * page first being instantiated, this is the state to which the WT_REF returns.
+     */
+    uint8_t previous_ref_state;
 
-    uint8_t committed; /* Committed */
+    /*
+     * If the fast-truncate transaction has committed. If we're forced to instantiate the page, and
+     * the committed flag isn't set, we have to create an update structure list for the transaction
+     * to resolve in a subsequent commit. (This is tricky: if the transaction is rolled back, the
+     * entire structure is discarded, that is, the flag is set only on commit and not on rollback.)
+     */
+    bool committed;
+
+    /* Flag to indicate fast-truncate is written to disk. */
+    bool selected_for_write;
 };
 
 /*
@@ -942,29 +971,127 @@ struct __wt_ref {
 #define ref_ikey key.ikey
 
     /*
-     * Fast-truncate information. When a WT_REF is included in a fast-truncate operation, WT_REF.del
-     * is allocated and initialized. If the page must be instantiated before the truncate becomes
-     * globally visible, WT_UPDATE structures are created for the page entries, the transaction
-     * information from WT_REF.del is migrated to those WT_UPDATE structures, and the WT_REF.del
-     * field is freed and replaced by the WT_REF.update array (needed for subsequent transaction
-     * commit/abort). Doing anything other than testing if WT_REF.del/update is non-NULL (which
-     * eviction does), requires the WT_REF be locked. If the locked WT_REF's previous state was
-     * WT_REF_DELETED, WT_REF.del is valid, if the WT_REF's previous state was an in-memory state,
-     * then WT_REF.update is valid.
+     * Page deletion information, written-to/read-from disk as necessary in the internal page's
+     * address cell. (Deleted-address cells are also referred to as "proxy cells".) When a WT_REF
+     * first becomes part of a fast-truncate operation, the page_del field is allocated and
+     * initialized; it is similar to an update and holds information about the transaction that
+     * performed the truncate. It can be discarded and set to NULL when that transaction reaches
+     * global visibility.
+     *
+     * Operations other than truncate that produce deleted pages (checkpoint cleanup, reconciliation
+     * as empty, etc.) leave the page_del field NULL as in these cases the deletion is already
+     * globally visible.
+     *
+     * Once the deletion is globally visible, the original on-disk page is no longer needed and can
+     * be discarded; this happens the next time the parent page is reconciled, either by eviction or
+     * by a checkpoint. The ref remains, however, and still occupies the same key space in the table
+     * that it always did.
+     *
+     * Deleted refs (and thus chunks of the tree namespace) are only discarded at two points: when
+     * the parent page is discarded after being evicted, or in the course of internal page splits
+     * and reverse splits. Until this happens, the "same" page can be brought back to life by
+     * writing to its portion of the key space.
+     *
+     * A deleted page needs to be "instantiated" (read in from disk and converted to an in-memory
+     * page where every item on the page has been individually deleted) if we need to position a
+     * cursor on the page, or if we need to visit it for other reasons. Logic exists to avoid that
+     * in various common cases (see: __wt_btcur_skip_page, __wt_delete_page_skip) but in many less
+     * common situations we proceed with instantiation anyway to avoid multiplying the number of
+     * special cases in the system.
+     *
+     * Common triggers for instantiation include: another thread reading from the page before a
+     * truncate commits; an older reader visiting a page after a truncate commits; a thread reading
+     * the page via a checkpoint cursor if the truncation wasn't yet globally visible at checkpoint
+     * time; a thread reading the page after shutdown and restart under similar circumstances; RTS
+     * needing to roll back a committed but unstable truncation (and possibly also updates that
+     * occurred before the truncation); and a thread writing to the truncated portion of the table
+     * space after the truncation but before the page is completely discarded.
+     *
+     * If the page must be instantiated for any reason: (1) for each entry on the page a WT_UPDATE
+     * is created; (2) the transaction information from page_del is copied to those WT_UPDATE
+     * structures (making them a match for the truncate operation), and (3) the WT_REF state
+     * switches to WT_REF_MEM.
+     *
+     * If the fast-truncate operation has not yet committed, an array of references to the WT_UPDATE
+     * structures is placed in modify->inst_updates. This is used to find the updates when the
+     * operation subsequently resolves. (The page can split, so there needs to be some way to find
+     * all of the update structures.)
+     *
+     * After instantiation, the page_del structure is kept until the instantiated page is next
+     * reconciled. This is because in some cases reconciliation of the parent internal page may need
+     * to write out a reference to the pre-instantiated on-disk page, at which point the page_del
+     * information is needed to build the correct reference.
+     *
+     * If the ref is in WT_REF_DELETED state, all actions besides checking whether page_del is NULL
+     * require that the WT_REF be locked. There are two reasons for this: first, the page might be
+     * instantiated at any time, and it is important to not see a partly-completed instantiation;
+     * and second, the page_del structure is discarded opportunistically if its transaction is found
+     * to be globally visible, so accessing it without locking the ref is unsafe.
+     *
+     * If the ref is in WT_REF_MEM state because it has been instantiated, the safety requirements
+     * are somewhat looser. Checking for an instantiated page by examining modify->instantiated does
+     * not require locking. Checking if modify->inst_updates is non-NULL (which means that the
+     * truncation isn't committed) also doesn't require locking. In general the page_del structure
+     * should not be used after instantiation; exceptions are (a) it is still updated by transaction
+     * prepare, commit, and rollback (so that it remains correct) and (b) it is used by internal
+     * page reconciliation if that occurs before the instantiated child is itself reconciled. (The
+     * latter can only happen if the child is evicted in a fairly narrow time window during a
+     * checkpoint.) This still requires locking the ref.
+     *
+     * It is vital to consider all the possible cases when touching a deleted or instantiated page.
+     *
+     * There are two major groups of states:
+     *
+     * 1. The WT_REF state is WT_REF_DELETED. This means the page is deleted and not in memory.
+     *    - If the page has no disk address, the ref is a placeholder in the key space and may in
+     *      general be discarded at the next opportunity. (Some restrictions apply in VLCS.)
+     *    - If the page has a disk address, page_del may be NULL. In this case, the deletion of the
+     *      page is globally visible and the on-disk page can be discarded at the next opportunity.
+     *    - If the page has a disk address and page_del is not NULL, page_del contains information
+     *      about the transaction that deleted the page. It is necessary to lock the ref to read
+     *      page_del; at that point (if the state hasn't changed while getting the lock)
+     *      page_del->committed can be used to check if the transaction is committed or not.
+     *
+     * 2. The WT_REF state is WT_REF_MEM. The page is either an ordinary page or an instantiated
+     * deleted page.
+     *    - If ref->page->modify is NULL, the page is ordinary.
+     *    - If ref->page->modify->instantiated is false and ref->page->modify->inst_updates is NULL,
+     *      the page is ordinary.
+     *    - If ref->page->modify->instantiated is true, the page is instantiated and has not yet
+     *      been reconciled. ref->page_del is either NULL (meaning the deletion is globally visible)
+     *      or contains information about the transaction that deleted the page. This information is
+     *      only meaningful either (a) in relation to the existing on-disk page rather than the in-
+     *      memory page (this can be needed to reconcile the parent internal page) or (b) if the
+     *      page is clean.
+     *    - If ref->page->modify->inst_updates is not NULL, the page is instantiated and the
+     *      transaction that deleted it has not resolved yet. The update list is used during commit
+     *      or rollback to find the updates created during instantiation.
+     *
+     * The last two points of group (2) are orthogonal; that is, after instantiation the
+     * instantiated flag and page_del structure (on the one hand) and the update list (on the other)
+     * are used and discarded independently. The former persists only until the page is first
+     * successfully reconciled; the latter persists until the transaction resolves. These events may
+     * occur in either order.
+     *
+     * As described above, in any state in group (1) an access to the page may require it be read
+     * into memory, at which point it moves into group (2). Instantiation always sets the
+     * instantiated flag to true; the updates list is only created if the transaction has not yet
+     * resolved at the point instantiation happens. (The ref is locked in both transaction
+     * resolution and instantiation to make sure these events happen in a well-defined order.)
+     *
+     * Because internal pages with uncommitted (including prepared) deletions are not written to
+     * disk, a page instantiated after its parent was read from disk will always have inst_updates
+     * set to NULL.
      */
-    union {
-        WT_PAGE_DELETED *del; /* Page not instantiated, page-deleted structure */
-        WT_UPDATE **update;   /* Page instantiated, update list for subsequent commit/abort */
-    } ft_info;
+    WT_PAGE_DELETED *page_del; /* Page-delete information for a deleted page. */
 
+#ifdef HAVE_REF_TRACK
 /*
- * In DIAGNOSTIC mode we overwrite the WT_REF on free to force failures. Don't clear the history in
- * that case.
+ * In DIAGNOSTIC mode we overwrite the WT_REF on free to force failures, but we want to retain ref
+ * state history. Don't overwrite these fields.
  */
 #define WT_REF_CLEAR_SIZE (offsetof(WT_REF, hist))
-
 #define WT_REF_SAVE_STATE_MAX 3
-#ifdef HAVE_DIAGNOSTIC
     /* Capture history of ref state changes. */
     WT_REF_HIST hist[WT_REF_SAVE_STATE_MAX];
     uint64_t histoff;
@@ -984,6 +1111,7 @@ struct __wt_ref {
         WT_PUBLISH((ref)->state, s);                              \
     } while (0)
 #else
+#define WT_REF_CLEAR_SIZE (sizeof(WT_REF))
 #define WT_REF_SET_STATE(ref, s) WT_PUBLISH((ref)->state, s)
 #endif
 };
@@ -992,7 +1120,7 @@ struct __wt_ref {
  * WT_REF_SIZE is the expected structure size -- we verify the build to ensure the compiler hasn't
  * inserted padding which would break the world.
  */
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_REF_TRACK
 #define WT_REF_SIZE (48 + WT_REF_SAVE_STATE_MAX * sizeof(WT_REF_HIST) + 8)
 #else
 #define WT_REF_SIZE 48
@@ -1135,6 +1263,13 @@ struct __wt_ikey {
  * WT_UPDATE structures are formed into a forward-linked list.
  */
 struct __wt_update {
+    /*
+     * Transaction IDs are set when updates are created (before they become visible) and only change
+     * when marked with WT_TXN_ABORTED. Transaction ID readers expect to copy a transaction ID into
+     * a local variable and see a stable value. In case a compiler might re-read the transaction ID
+     * from memory rather than using the local variable, mark the shared transaction IDs volatile to
+     * prevent unexpected repeated/reordered reads.
+     */
     volatile uint64_t txnid; /* transaction ID */
 
     wt_timestamp_t durable_ts; /* timestamps */
@@ -1170,13 +1305,12 @@ struct __wt_update {
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_UPDATE_DS 0x01u                       /* Update has been written to the data store. */
-#define WT_UPDATE_FIXED_HS 0x02u                 /* Update that fixed the history store. */
-#define WT_UPDATE_HS 0x04u                       /* Update has been written to history store. */
-#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x08u /* Prepared update restored from data store. */
-#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x10u   /* Fast truncate instantiation */
-#define WT_UPDATE_RESTORED_FROM_DS 0x20u         /* Update restored from data store. */
-#define WT_UPDATE_RESTORED_FROM_HS 0x40u         /* Update restored from history store. */
-#define WT_UPDATE_TO_DELETE_FROM_HS 0x80u        /* Update needs to be deleted from history store */
+#define WT_UPDATE_HS 0x02u                       /* Update has been written to history store. */
+#define WT_UPDATE_PREPARE_RESTORED_FROM_DS 0x04u /* Prepared update restored from data store. */
+#define WT_UPDATE_RESTORED_FAST_TRUNCATE 0x08u   /* Fast truncate instantiation */
+#define WT_UPDATE_RESTORED_FROM_DS 0x10u         /* Update restored from data store. */
+#define WT_UPDATE_RESTORED_FROM_HS 0x20u         /* Update restored from history store. */
+#define WT_UPDATE_TO_DELETE_FROM_HS 0x40u        /* Update needs to be deleted from history store */
                                                  /* AUTOMATIC FLAG VALUE GENERATION STOP 8 */
     uint8_t flags;
 
@@ -1459,19 +1593,49 @@ struct __wt_col_fix_auxiliary_header {
  * examining an index, we don't want the oldest split generation to move forward and potentially
  * free it.
  */
-#define WT_ENTER_PAGE_INDEX(session)                                         \
-    do {                                                                     \
-        uint64_t __prev_split_gen = __wt_session_gen(session, WT_GEN_SPLIT); \
-        if (__prev_split_gen == 0)                                           \
-            __wt_session_gen_enter(session, WT_GEN_SPLIT);
+#define WT_ENTER_PAGE_INDEX(session) WT_ENTER_GENERATION((session), WT_GEN_SPLIT);
 
-#define WT_LEAVE_PAGE_INDEX(session)                   \
-    if (__prev_split_gen == 0)                         \
-        __wt_session_gen_leave(session, WT_GEN_SPLIT); \
-    }                                                  \
-    while (0)
+#define WT_LEAVE_PAGE_INDEX(session) WT_LEAVE_GENERATION((session), WT_GEN_SPLIT);
 
 #define WT_WITH_PAGE_INDEX(session, e) \
     WT_ENTER_PAGE_INDEX(session);      \
     (e);                               \
     WT_LEAVE_PAGE_INDEX(session)
+
+/*
+ * Manage the given generation number with support for re-entry. Re-entry is allowed as the previous
+ * generation as it must be as low as the current generation.
+ */
+#define WT_ENTER_GENERATION(session, generation)              \
+    do {                                                      \
+        bool __entered_##generation = false;                  \
+        if (__wt_session_gen((session), (generation)) == 0) { \
+            __wt_session_gen_enter((session), (generation));  \
+            __entered_##generation = true;                    \
+        }
+
+#define WT_LEAVE_GENERATION(session, generation)         \
+    if (__entered_##generation)                          \
+        __wt_session_gen_leave((session), (generation)); \
+    }                                                    \
+    while (0)
+
+/*
+ * WT_VERIFY_INFO -- A structure to hold all the information related to a verify operation.
+ */
+struct __wt_verify_info {
+    WT_SESSION_IMPL *session;
+
+    const char *tag;           /* Identifier included in error messages */
+    const WT_PAGE_HEADER *dsk; /* The disk header for the page being verified */
+    WT_ADDR *page_addr;        /* An item representing a page entry being verified */
+    size_t page_size;
+    uint32_t cell_num; /* The current cell offset being verified */
+    uint64_t recno;    /* The current record number in a column store page */
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_VRFY_DISK_CONTINUE_ON_FAILURE 0x1u
+#define WT_VRFY_DISK_EMPTY_PAGE_OK 0x2u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t flags;
+};

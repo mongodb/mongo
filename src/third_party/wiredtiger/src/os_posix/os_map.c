@@ -13,8 +13,8 @@
  *     Map a file into memory.
  */
 int
-__wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *mapped_regionp, size_t *lenp,
-  void *mapped_cookiep)
+__wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void **mapped_regionp, size_t *lenp,
+  void **mapped_cookiep)
 {
     WT_FILE_HANDLE_POSIX *pfh;
     WT_SESSION_IMPL *session;
@@ -52,7 +52,7 @@ __wt_posix_map(WT_FILE_HANDLE *fh, WT_SESSION *wt_session, void *mapped_regionp,
            pfh->fd, (wt_off_t)0)) == MAP_FAILED)
         WT_RET_MSG(session, __wt_errno(), "%s: memory-map: mmap", fh->name);
 
-    *(void **)mapped_regionp = map;
+    *mapped_regionp = map;
     *lenp = len;
     return (0);
 }

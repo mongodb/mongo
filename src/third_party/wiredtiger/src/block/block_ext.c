@@ -571,7 +571,15 @@ __wt_block_free(WT_SESSION_IMPL *session, WT_BLOCK *block, const uint8_t *addr, 
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    /* We can't reuse free space in an object. */
+    /*
+     * Freeing blocks in a previous object isn't possible in the current architecture. We'd like to
+     * know when a previous object is either completely rewritten (or more likely, empty enough that
+     * rewriting remaining blocks is worth doing). Just knowing which blocks are no longer in use
+     * isn't enough to remove them (because the internal pages have to be rewritten and we don't
+     * know where they are); the simplest solution is probably to keep a count of freed bytes from
+     * each object in the metadata, and when enough of the object is no longer in use, perform a
+     * compaction like process to do any remaining cleanup.
+     */
     if (objectid != block->objectid)
         return (0);
 
@@ -877,7 +885,7 @@ __wt_block_extlist_merge(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *
     WT_EXTLIST tmp;
     u_int i;
 
-    __wt_verbose(session, WT_VERB_BLOCK, "merging %s into %s", a->name, b->name);
+    __wt_verbose_debug2(session, WT_VERB_BLOCK, "merging %s into %s", a->name, b->name);
 
     /*
      * Sometimes the list we are merging is much bigger than the other: if so, swap the lists around
@@ -1007,8 +1015,8 @@ __block_merge(
             after = NULL;
     }
     if (before == NULL && after == NULL) {
-        __wt_verbose(session, WT_VERB_BLOCK, "%s: insert range %" PRIdMAX "-%" PRIdMAX, el->name,
-          (intmax_t)off, (intmax_t)(off + size));
+        __wt_verbose_debug2(session, WT_VERB_BLOCK, "%s: insert range %" PRIdMAX "-%" PRIdMAX,
+          el->name, (intmax_t)off, (intmax_t)(off + size));
 
         return (__block_off_insert(session, el, off, size));
     }
@@ -1022,7 +1030,7 @@ __block_merge(
     if (before == NULL) {
         WT_RET(__block_off_remove(session, block, el, after->off, &ext));
 
-        __wt_verbose(session, WT_VERB_BLOCK,
+        __wt_verbose_debug2(session, WT_VERB_BLOCK,
           "%s: range grows from %" PRIdMAX "-%" PRIdMAX ", to %" PRIdMAX "-%" PRIdMAX, el->name,
           (intmax_t)ext->off, (intmax_t)(ext->off + ext->size), (intmax_t)off,
           (intmax_t)(off + ext->size + size));
@@ -1036,7 +1044,7 @@ __block_merge(
         }
         WT_RET(__block_off_remove(session, block, el, before->off, &ext));
 
-        __wt_verbose(session, WT_VERB_BLOCK,
+        __wt_verbose_debug2(session, WT_VERB_BLOCK,
           "%s: range grows from %" PRIdMAX "-%" PRIdMAX ", to %" PRIdMAX "-%" PRIdMAX, el->name,
           (intmax_t)ext->off, (intmax_t)(ext->off + ext->size), (intmax_t)ext->off,
           (intmax_t)(ext->off + ext->size + size));
@@ -1099,6 +1107,8 @@ __wt_block_extlist_read(
     wt_off_t off, size;
     const uint8_t *p;
     int (*func)(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *, wt_off_t, wt_off_t);
+
+    off = size = 0;
 
     /* If there isn't a list, we're done. */
     if (el->offset == WT_BLOCK_INVALID_OFFSET)
@@ -1336,14 +1346,15 @@ __block_extlist_dump(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el, 
     u_int i;
     const char *sep;
 
-    if (!block->verify_layout && !WT_VERBOSE_ISSET(session, WT_VERB_BLOCK))
+    if (!block->verify_layout &&
+      !WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_BLOCK, WT_VERBOSE_DEBUG_2))
         return (0);
 
     WT_ERR(__wt_scr_alloc(session, 0, &t1));
     if (block->verify_layout)
         level = WT_VERBOSE_NOTICE;
     else
-        level = WT_VERBOSE_DEBUG;
+        level = WT_VERBOSE_DEBUG_2;
     __wt_verbose_level(session, WT_VERB_BLOCK, level,
       "%s extent list %s, %" PRIu32 " entries, %s bytes", tag, el->name, el->entries,
       __wt_buf_set_size(session, el->bytes, true, t1));

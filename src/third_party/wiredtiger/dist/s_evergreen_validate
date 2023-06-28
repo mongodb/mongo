@@ -1,0 +1,47 @@
+#!/bin/sh
+
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+fast=false
+exit1=0
+exit2=0
+case "$1" in
+    -F) # Run fast.
+        fast=true
+        shift;;
+    *)
+        if test $# -gt 1 ; then
+            echo "Usage: $0 [-F]"
+            echo "-F only run validation commands if evergreen yml files have been modified"
+        fi
+        break;;
+esac
+
+if [ $(command -v evergreen) ] && [ -f ~/.evergreen.yml ]; then
+    if $fast ; then
+        # Check the evergreen.yml files for modifications.
+        search=`git diff --name-only $(git merge-base --fork-point develop) | grep -E 'evergreen.*\.yml$'`
+        # If we didn't find any files then exit.
+        if test -z $search; then
+            exit 0
+        fi
+    fi
+    cd ..
+    echo "Validating evergreen.yml " > dist/$t
+    evergreen validate -p wiredtiger test/evergreen.yml >> dist/$t 2>&1
+    exit1=$?
+    echo "=-=-=-=-=-=-=-=-=-=-=" >> dist/$t
+    echo "Validating evergreen_develop.yml" >> dist/$t
+    evergreen validate -p wiredtiger test/evergreen_develop.yml >> dist/$t 2>&1
+    exit2=$?
+    cd dist
+fi
+
+if [ "$exit1" -ne  0 -o "$exit2" -ne 0 ]; then
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "$0 failed with output:"
+    cat $t
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+fi
+exit 0

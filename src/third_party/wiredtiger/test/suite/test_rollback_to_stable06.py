@@ -29,7 +29,7 @@
 from wiredtiger import stat
 from wtdataset import SimpleDataSet
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable06.py
 # Test that rollback to stable removes all keys when the stable timestamp is earlier than
@@ -55,7 +55,7 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
     scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=50MB,statistics=(all)'
+        config = 'cache_size=50MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config
@@ -128,6 +128,21 @@ class test_rollback_to_stable06(test_rollback_to_stable_base):
             self.assertEqual(hs_removed, 0)
         else:
             self.assertGreaterEqual(upd_aborted + hs_removed + keys_removed, nrows * 4)
+
+        if not self.in_memory and self.key_format == 'i':
+            # FIXME-WT-10017: WT-9846 is a temporary fix only for row store and a 
+            # more complete fix including column store will be made in WT-10017.
+            # Once delivered the key_format == 'i' check is no longer needed.
+            # 
+            # Reinsert the same updates with the same timestamps and flush to disk.
+            # If the updates have not been correctly removed by RTS WiredTiger will 
+            # see the key already exists in the history store and abort. 
+            self.large_updates(uri, value_a, ds, nrows, self.prepare, 20)
+            self.large_updates(uri, value_b, ds, nrows, self.prepare, 30)
+            self.large_updates(uri, value_c, ds, nrows, self.prepare, 40)
+            self.large_updates(uri, value_d, ds, nrows, self.prepare, 50)
+
+            self.session.checkpoint()
 
 if __name__ == '__main__':
     wttest.run()

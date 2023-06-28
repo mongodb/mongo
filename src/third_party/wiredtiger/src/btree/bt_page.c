@@ -9,7 +9,7 @@
 #include "wt_internal.h"
 
 static int __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *, bool *, size_t *);
-static void __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
+static int __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *, uint64_t);
 static int __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, bool *, size_t *);
 static int __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 static int __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, bool *);
@@ -132,6 +132,7 @@ __page_inmem_prepare_update(WT_SESSION_IMPL *session, WT_ITEM *value, WT_CELL_UN
     WT_UPDATE *upd, *tombstone;
     size_t size, total_size;
 
+    size = 0;
     *sizep = 0;
 
     tombstone = upd = NULL;
@@ -200,11 +201,7 @@ __page_inmem_prepare_update_col(WT_SESSION_IMPL *session, WT_REF *ref, WT_CURSOR
 
     /* Search the page and apply the modification. */
     WT_RET(__wt_col_search(cbt, recno, ref, true, NULL));
-#ifdef HAVE_DIAGNOSTIC
     WT_RET(__wt_col_modify(cbt, recno, NULL, *updp, WT_UPDATE_INVALID, true, true));
-#else
-    WT_RET(__wt_col_modify(cbt, recno, NULL, *updp, WT_UPDATE_INVALID, true));
-#endif
     return (0);
 }
 
@@ -256,7 +253,9 @@ __wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
             }
 
             /* Get the value. */
-            WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
+            WT_ERR(__wt_page_cell_data_ref_kv(session, page, &unpack, value));
+            WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
+              "Should never read an overflow removed value for a prepared update");
 
             /* For each record, create an update to resolve the prepare. */
             for (; rle > 0; --rle, ++recno) {
@@ -300,17 +299,15 @@ __wt_page_inmem_prepare(WT_SESSION_IMPL *session, WT_REF *ref)
 
             /* Get the key/value pair and create an update to resolve the prepare. */
             WT_ERR(__wt_row_leaf_key(session, page, rip, key, false));
-            WT_ERR(__wt_page_cell_data_ref(session, page, &unpack, value));
+            WT_ERR(__wt_page_cell_data_ref_kv(session, page, &unpack, value));
+            WT_ASSERT_ALWAYS(session, __wt_cell_type_raw(unpack.cell) != WT_CELL_VALUE_OVFL_RM,
+              "Should never read an overflow removed value for a prepared update");
             WT_ERR(__page_inmem_prepare_update(session, value, &unpack, &upd, &size));
             total_size += size;
 
             /* Search the page and apply the modification. */
             WT_ERR(__wt_row_search(&cbt, key, true, ref, true, NULL));
-#ifdef HAVE_DIAGNOSTIC
             WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true, true));
-#else
-            WT_ERR(__wt_row_modify(&cbt, key, NULL, upd, WT_UPDATE_INVALID, true));
-#endif
             upd = NULL;
         }
     }
@@ -335,6 +332,7 @@ int
 __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32_t flags,
   WT_PAGE **pagep, bool *preparedp)
 {
+    WT_CELL_UNPACK_ADDR unpack_addr;
     WT_DECL_RET;
     WT_PAGE *page;
     const WT_PAGE_HEADER *dsk;
@@ -355,17 +353,29 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
      */
     switch (dsk->type) {
     case WT_PAGE_COL_FIX:
-    case WT_PAGE_COL_INT:
     case WT_PAGE_COL_VAR:
         /*
          * Column-store leaf page entries map one-to-one to the number of physical entries on the
          * page (each physical entry is a value item). Note this value isn't necessarily correct, we
          * may skip values when reading the disk image.
-         *
-         * Column-store internal page entries map one-to-one to the number of physical entries on
-         * the page (each entry is a location cookie).
          */
         alloc_entries = dsk->u.entries;
+        break;
+    case WT_PAGE_COL_INT:
+        /*
+         * Column-store internal page entries map one-to-one to the number of physical entries on
+         * the page (each entry is a location cookie), but in some cases we need to allocate one
+         * extra slot. This arises if there's a gap between the page's own start recno and the first
+         * child's start recno; we need to insert a blank (deleted) page to cover that chunk of the
+         * namespace. Examine the first cell on the page to decide.
+         */
+        alloc_entries = dsk->u.entries;
+        WT_CELL_FOREACH_ADDR (session, dsk, unpack_addr) {
+            if (unpack_addr.v != dsk->recno)
+                alloc_entries++;
+            break;
+        }
+        WT_CELL_FOREACH_END;
         break;
     case WT_PAGE_ROW_INT:
         /*
@@ -413,7 +423,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session, WT_REF *ref, const void *image, uint32
         WT_ERR(__inmem_col_fix(session, page, preparedp, &size));
         break;
     case WT_PAGE_COL_INT:
-        __inmem_col_int(session, page);
+        WT_ERR(__inmem_col_int(session, page, dsk->recno));
         break;
     case WT_PAGE_COL_VAR:
         WT_ERR(__inmem_col_var(session, page, dsk->recno, preparedp, &size));
@@ -535,6 +545,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp, size_t
 
     btree = S2BT(session);
     dsk = page->dsk;
+    tmp = 0;
     prepare = false;
 
     page->pg_fix_bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
@@ -593,13 +604,13 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp, size_t
             page->pg_fix_numtws = entry_num;
 
         /*
-         * If we skipped "quite a few" entries (threshold is arbitrary), mark the page dirty so it
-         * gets rewritten without them.
+         * If we skipped "quite a few" entries (threshold is arbitrary), and the tree is already
+         * dirty and so will be written, mark the page dirty so it gets rewritten without them.
          */
-        if (!F_ISSET(btree, WT_BTREE_READONLY) && skipped >= auxhdr.entries / 4 &&
-          skipped >= dsk->u.entries / 100 && skipped > 4) {
+        if (btree->modified && skipped >= auxhdr.entries / 4 && skipped >= dsk->u.entries / 100 &&
+          skipped > 4) {
             WT_RET(__wt_page_modify_init(session, page));
-            __wt_page_modify_set(session, page);
+            __wt_page_only_modify_set(session, page);
         }
 
         break;
@@ -613,16 +624,65 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, bool *preparedp, size_t
 }
 
 /*
+ * __inmem_col_int_init_ref --
+ *     Initialize one ref in a column-store internal page.
+ */
+static int
+__inmem_col_int_init_ref(WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *home, uint32_t hint,
+  void *addr, uint64_t recno, bool internal, bool deleted, WT_PAGE_DELETED *page_del)
+{
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+
+    ref->home = home;
+    ref->pindex_hint = hint;
+    ref->addr = addr;
+    ref->ref_recno = recno;
+    F_SET(ref, internal ? WT_REF_FLAG_INTERNAL : WT_REF_FLAG_LEAF);
+    if (deleted) {
+        /*
+         * If a page was deleted without being read (fast truncate), and the delete committed, but
+         * older transactions in the system required the previous version of the page to remain
+         * available or the delete can still be rolled back by RTS, a deleted-address type cell is
+         * type written. We'll see that cell on a page if we read from a checkpoint including a
+         * deleted cell or if we crash/recover and start off from such a checkpoint. Recreate the
+         * fast-delete state for the page.
+         */
+        if (page_del != NULL && F_ISSET(home->dsk, WT_PAGE_FT_UPDATE)) {
+            WT_RET(__wt_calloc_one(session, &ref->page_del));
+            *ref->page_del = *page_del;
+        }
+        WT_REF_SET_STATE(ref, WT_REF_DELETED);
+
+        /*
+         * If the tree is already dirty and so will be written, mark the page dirty. (We want to
+         * free the deleted pages, but if the handle is read-only or if the application never
+         * modifies the tree, we're not able to do so.)
+         */
+        if (btree->modified) {
+            WT_RET(__wt_page_modify_init(session, home));
+            __wt_page_only_modify_set(session, home);
+        }
+    }
+
+    return (0);
+}
+
+/*
  * __inmem_col_int --
  *     Build in-memory index for column-store internal pages.
  */
-static void
-__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+static int
+__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t page_recno)
 {
     WT_CELL_UNPACK_ADDR unpack;
     WT_PAGE_INDEX *pindex;
     WT_REF **refp, *ref;
     uint32_t hint;
+    bool first;
+
+    first = true;
 
     /*
      * Walk the page, building references: the page contains value items. The value items are
@@ -633,14 +693,34 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
     hint = 0;
     WT_CELL_FOREACH_ADDR (session, page->dsk, unpack) {
         ref = *refp++;
-        ref->home = page;
-        ref->pindex_hint = hint++;
-        ref->addr = unpack.cell;
-        ref->ref_recno = unpack.v;
 
-        F_SET(ref, unpack.type == WT_CELL_ADDR_INT ? WT_REF_FLAG_INTERNAL : WT_REF_FLAG_LEAF);
+        if (first && unpack.v != page_recno) {
+            /*
+             * There's a gap in the namespace. Create a deleted leaf page (with no address) to cover
+             * that gap. We allocated an extra slot in the array in __wt_page_alloc to make room for
+             * this case. (Note that this doesn't result in all gaps being covered, just ones on the
+             * left side of the tree where we need to be able to search to them. Other gaps end up
+             * covered by the insert list of the preceding leaf page.)
+             */
+
+            /* Assert that we allocated enough space for the extra ref. */
+            WT_ASSERT(session, pindex->entries == page->dsk->u.entries + 1);
+
+            /* Fill it in. */
+            WT_RET(__inmem_col_int_init_ref(
+              session, ref, page, hint++, NULL, page_recno, false, true, NULL));
+
+            /* Get the next ref. */
+            ref = *refp++;
+        }
+        first = false;
+
+        WT_RET(__inmem_col_int_init_ref(session, ref, page, hint++, unpack.cell, unpack.v,
+          unpack.type == WT_CELL_ADDR_INT, unpack.type == WT_CELL_ADDR_DEL, &unpack.page_del));
     }
     WT_CELL_FOREACH_END;
+
+    return (0);
 }
 
 /*
@@ -787,7 +867,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
              * Instantiate any overflow keys; WiredTiger depends on this, assuming any overflow key
              * is instantiated, and any keys that aren't instantiated cannot be overflow items.
              */
-            WT_ERR(__wt_dsk_cell_data_ref(session, page->type, &unpack, current));
+            WT_ERR(__wt_dsk_cell_data_ref_addr(session, page->type, &unpack, current));
 
             WT_ERR(__wt_row_ikey_incr(session, page, WT_PAGE_DISK_OFFSET(page, unpack.cell),
               current->data, current->size, ref));
@@ -797,22 +877,18 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
             break;
         case WT_CELL_ADDR_DEL:
             /*
-             * A cell may reference a deleted leaf page: if a leaf page was deleted without being
-             * read (fast truncate), and the deletion committed, but older transactions in the
-             * system required the previous version of the page to remain available, a special
-             * deleted-address type cell is written. We'll see that cell on a page if we read from a
-             * checkpoint including a deleted cell or if we crash/recover and start off from such a
-             * checkpoint (absent running recovery, a version of the page without the deleted cell
-             * would eventually have been written). If we crash and recover to a page with a
-             * deleted-address cell, we want to discard the page from the backing store (it was
-             * never discarded), and, of course, by definition no earlier transaction will ever need
-             * it.
-             *
-             * Re-create the state of a deleted page.
+             * If a page was deleted without being read (fast truncate), and the delete committed,
+             * but older transactions in the system required the previous version of the page to
+             * remain available or the delete can still be rolled back by RTS, a deleted-address
+             * type cell is written. We'll see that cell on a page if we read from a checkpoint
+             * including a deleted cell or if we crash/recover and start off from such a checkpoint.
+             * Recreate the fast-delete state for the page.
              */
-            ref->addr = unpack.cell;
+            if (F_ISSET(page->dsk, WT_PAGE_FT_UPDATE)) {
+                WT_ERR(__wt_calloc_one(session, &ref->page_del));
+                *ref->page_del = unpack.page_del;
+            }
             WT_REF_SET_STATE(ref, WT_REF_DELETED);
-            ++refp;
 
             /*
              * If the tree is already dirty and so will be written, mark the page dirty. (We want to
@@ -821,8 +897,11 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *sizep)
              */
             if (btree->modified) {
                 WT_ERR(__wt_page_modify_init(session, page));
-                __wt_page_modify_set(session, page);
+                __wt_page_only_modify_set(session, page);
             }
+
+            ref->addr = unpack.cell;
+            ++refp;
             break;
         case WT_CELL_ADDR_INT:
         case WT_CELL_ADDR_LEAF:

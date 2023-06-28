@@ -234,6 +234,13 @@ my_cursor_remove(WT_CURSOR *wtcursor)
     return (0);
 }
 static int
+my_cursor_bound(WT_CURSOR *wtcursor, const char *config)
+{
+    (void)wtcursor;
+    (void)config;
+    return (0);
+}
+static int
 my_cursor_close(WT_CURSOR *wtcursor)
 {
     (void)wtcursor;
@@ -271,7 +278,7 @@ my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session, const char *uri, WT_CO
     cursor->wtcursor.update = my_cursor_update;
     cursor->wtcursor.remove = my_cursor_remove;
     cursor->wtcursor.close = my_cursor_close;
-
+    cursor->wtcursor.bound = my_cursor_bound;
     /*
      * Configure local cursor information.
      */

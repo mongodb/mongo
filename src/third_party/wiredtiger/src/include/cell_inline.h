@@ -195,7 +195,7 @@ __cell_pack_addr_validity(WT_SESSION_IMPL *session, uint8_t **pp, WT_TIME_AGGREG
  */
 static inline size_t
 __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, uint64_t recno,
-  WT_TIME_AGGREGATE *ta, size_t size)
+  WT_PAGE_DELETED *page_del, WT_TIME_AGGREGATE *ta, size_t size)
 {
     uint8_t *p;
 
@@ -205,6 +205,18 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
 
     __cell_pack_addr_validity(session, &p, ta);
 
+    /*
+     * If passed fast-delete information, append the fast-delete information after the aggregated
+     * timestamp information.
+     */
+    if (page_del != NULL && __wt_process.fast_truncate_2022) {
+        WT_ASSERT(session, cell_type == WT_CELL_ADDR_DEL);
+
+        WT_IGNORE_RET(__wt_vpack_uint(&p, 0, page_del->txnid));
+        WT_IGNORE_RET(__wt_vpack_uint(&p, 0, page_del->timestamp));
+        WT_IGNORE_RET(__wt_vpack_uint(&p, 0, page_del->durable_timestamp));
+    }
+
     if (recno == WT_RECNO_OOB)
         cell->__chunk[0] |= (uint8_t)cell_type; /* Type */
     else {
@@ -212,6 +224,7 @@ __wt_cell_pack_addr(WT_SESSION_IMPL *session, WT_CELL *cell, u_int cell_type, ui
         /* Record number */
         WT_IGNORE_RET(__wt_vpack_uint(&p, 0, recno));
     }
+
     /* Length */
     WT_IGNORE_RET(__wt_vpack_uint(&p, 0, (uint64_t)size));
     return (WT_PTRDIFF(p, cell));
@@ -649,11 +662,12 @@ __wt_cell_leaf_value_parse(WT_PAGE *page, WT_CELL *cell)
  * case, make sure all reads are inside the page image. If an error occurs, return an error code but
  * don't output messages, our caller handles that.
  */
-#define WT_CELL_LEN_CHK(t, len)                                                             \
-    do {                                                                                    \
-        if (end != NULL &&                                                                  \
-          ((uint8_t *)(t) < (uint8_t *)dsk || (((uint8_t *)(t)) + (len)) > (uint8_t *)end)) \
-            return (WT_ERROR);                                                              \
+#define WT_CELL_LEN_CHK(start, len, dsk, end)                   \
+    do {                                                        \
+        if ((end) != NULL &&                                    \
+          ((uint8_t *)(start) < (uint8_t *)(dsk) ||             \
+            (((uint8_t *)(start)) + (len)) > (uint8_t *)(end))) \
+            return (WT_ERROR);                                  \
     } while (0)
 
 /*
@@ -670,6 +684,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
         WT_TIME_WINDOW tw;
     } copy;
     WT_CELL_UNPACK_COMMON *unpack;
+    WT_PAGE_DELETED *page_del;
     WT_TIME_AGGREGATE *ta;
     WT_TIME_WINDOW *tw;
     uint64_t v;
@@ -703,7 +718,7 @@ __wt_cell_unpack_safe(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CE
     unpack->cell = cell;
 
 copy_cell_restart:
-    WT_CELL_LEN_CHK(cell, 0);
+    WT_CELL_LEN_CHK(cell, 0, dsk, end);
 
     /*
      * This path is performance critical for read-only trees, we're parsing on-page structures. For
@@ -723,7 +738,7 @@ copy_cell_restart:
      */
     switch (unpack->raw) {
     case WT_CELL_KEY_SHORT_PFX:
-        WT_CELL_LEN_CHK(cell, 1); /* skip prefix */
+        WT_CELL_LEN_CHK(cell, 1, dsk, end); /* skip prefix */
         unpack->prefix = cell->__chunk[1];
         unpack->data = cell->__chunk + 2;
         unpack->size = cell->__chunk[0] >> WT_CELL_SHORT_SHIFT;
@@ -751,7 +766,7 @@ copy_cell_restart:
      */
     if (unpack->raw == WT_CELL_KEY_PFX) {
         unpack->prefix = *p++; /* skip prefix */
-        WT_CELL_LEN_CHK(p, 0);
+        WT_CELL_LEN_CHK(p, 0, dsk, end);
     }
 
     /* Check for a validity window. */
@@ -767,6 +782,7 @@ copy_cell_restart:
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
         flags = *p++; /* skip second descriptor byte */
+        WT_CELL_LEN_CHK(p, 0, dsk, end);
 
         if (LF_ISSET(WT_CELL_PREPARE))
             ta->prepare = 1;
@@ -810,6 +826,7 @@ copy_cell_restart:
         if ((cell->__chunk[0] & WT_CELL_SECOND_DESC) == 0)
             break;
         flags = *p++; /* skip second descriptor byte */
+        WT_CELL_LEN_CHK(p, 0, dsk, end);
 
         if (LF_ISSET(WT_CELL_PREPARE))
             tw->prepare = 1;
@@ -843,6 +860,20 @@ copy_cell_restart:
 
         WT_RET(__cell_check_value_validity(session, tw, end != NULL));
         break;
+    }
+
+    /* Unpack any fast-truncate information. */
+    if (unpack->raw == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
+        page_del = &unpack_addr->page_del;
+        WT_RET(__wt_vunpack_uint(
+          &p, end == NULL ? 0 : WT_PTRDIFF(end, p), (uint64_t *)&page_del->txnid));
+        WT_RET(__wt_vunpack_uint(&p, end == NULL ? 0 : WT_PTRDIFF(end, p), &page_del->timestamp));
+        WT_RET(__wt_vunpack_uint(
+          &p, end == NULL ? 0 : WT_PTRDIFF(end, p), &page_del->durable_timestamp));
+        page_del->prepare_state = 0;                /* No prepare can have been in progress. */
+        page_del->previous_ref_state = WT_REF_DISK; /* The leaf page is on disk. */
+        page_del->committed = true;                 /* There is no running transaction. */
+        page_del->selected_for_write = true;
     }
 
     /*
@@ -935,8 +966,32 @@ done:
      * Check the original cell against the full cell length (this is a diagnostic as well, we may be
      * copying the cell from the page and we need the right length).
      */
-    WT_CELL_LEN_CHK(cell, unpack->__len);
+    WT_CELL_LEN_CHK(cell, unpack->__len, dsk, end);
     return (0);
+}
+
+/*
+ * __cell_page_del_window_cleanup --
+ *     Clean up a page_del structure loaded from a previous run.
+ */
+static inline void
+__cell_page_del_window_cleanup(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool *clearedp)
+{
+    /*
+     * The fast-truncate times are a stop time for the whole page; this code should match the stop
+     * txn and stop time logic for KV cells.
+     */
+    if (page_del->txnid != WT_TXN_MAX) {
+        if (clearedp != NULL)
+            *clearedp = true;
+        page_del->txnid = WT_TXN_NONE;
+        /* As above, only for non-timestamped tables. */
+        if (page_del->timestamp == WT_TS_MAX) {
+            page_del->timestamp = WT_TS_NONE;
+            WT_ASSERT(session, page_del->durable_timestamp == WT_TS_NONE);
+        }
+    } else
+        WT_ASSERT(session, page_del->timestamp == WT_TS_MAX);
 }
 
 /*
@@ -944,9 +999,13 @@ done:
  *     Clean up addr cells loaded from a previous run.
  */
 static inline void
-__cell_addr_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *unpack_addr)
+__cell_addr_window_cleanup(
+  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_CELL_UNPACK_ADDR *unpack_addr)
 {
     WT_TIME_AGGREGATE *ta;
+    bool cleared;
+
+    cleared = false;
 
     /* Tell reconciliation we cleared the transaction ids and the cell needs to be rebuilt. */
     if (unpack_addr != NULL) {
@@ -971,6 +1030,13 @@ __cell_addr_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_ADDR *unpack
             }
         } else
             WT_ASSERT(session, ta->newest_stop_ts == WT_TS_MAX);
+
+        /* Also handle any fast-truncate information. */
+        if (unpack_addr->raw == WT_CELL_ADDR_DEL && F_ISSET(dsk, WT_PAGE_FT_UPDATE)) {
+            __cell_page_del_window_cleanup(session, &unpack_addr->page_del, &cleared);
+            if (cleared)
+                F_SET(unpack_addr, WT_CELL_UNPACK_TIME_WINDOW_CLEARED);
+        }
     }
 }
 
@@ -1009,6 +1075,32 @@ __cell_kv_window_cleanup(WT_SESSION_IMPL *session, WT_CELL_UNPACK_KV *unpack_kv)
 }
 
 /*
+ * __cell_redo_page_del_cleanup --
+ *     Redo the window cleanup logic on a page_del structure after the write generations have been
+ *     bumped. Note: the name of this function is abusive (there are no cells involved) but as the
+ *     logic is a copy of __cell_unpack_window_cleanup it seems worthwhile to keep the two together.
+ */
+static inline void
+__cell_redo_page_del_cleanup(
+  WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk, WT_PAGE_DELETED *page_del)
+{
+    uint64_t write_gen;
+
+    WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
+
+    write_gen = S2BT(session)->base_write_gen;
+
+    WT_ASSERT(session, dsk->write_gen != 0);
+    if (dsk->write_gen > write_gen)
+        return;
+
+    if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
+        return;
+
+    __cell_page_del_window_cleanup(session, page_del, NULL);
+}
+
+/*
  * __cell_unpack_window_cleanup --
  *     Clean up cells loaded from a previous run.
  */
@@ -1016,6 +1108,8 @@ static inline void
 __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk,
   WT_CELL_UNPACK_ADDR *unpack_addr, WT_CELL_UNPACK_KV *unpack_kv)
 {
+    uint64_t write_gen;
+
     /*
      * If the page came from a previous run, reset the transaction ids to "none" and timestamps to 0
      * as appropriate. Transaction ids shouldn't persist between runs so these are always set to
@@ -1035,14 +1129,29 @@ __cell_unpack_window_cleanup(WT_SESSION_IMPL *session, const WT_PAGE_HEADER *dsk
      * No delete              txnid=MAX, ts=MAX,            txnid=MAX, ts=MAX,
      *                        durable_ts=NONE               durable_ts=NONE
      */
+
+    if (WT_READING_CHECKPOINT(session) && session->checkpoint_write_gen != 0) {
+        /*
+         * When reading a checkpoint, override the tree's base write generation with the write
+         * generation from the global metadata, which might be newer. This comes into play if the
+         * tree checkpoint is from an older database run than the global checkpoint, which can
+         * happen if checkpointing skips the tree at the right points. Bypass this logic if the
+         * checkpoint write generation isn't set because the checkpoint is from an older version of
+         * WiredTiger; in that case we use the tree's write generation and hope for the best.
+         */
+        write_gen = session->checkpoint_write_gen;
+        WT_ASSERT(session, write_gen >= S2BT(session)->base_write_gen);
+    } else
+        write_gen = S2BT(session)->base_write_gen;
+
     WT_ASSERT(session, dsk->write_gen != 0);
-    if (dsk->write_gen > S2BT(session)->base_write_gen)
+    if (dsk->write_gen > write_gen)
         return;
 
     if (F_ISSET(session, WT_SESSION_DEBUG_DO_NOT_CLEAR_TXN_ID))
         return;
 
-    __cell_addr_window_cleanup(session, unpack_addr);
+    __cell_addr_window_cleanup(session, dsk, unpack_addr);
     __cell_kv_window_cleanup(session, unpack_kv);
 }
 
@@ -1126,6 +1235,11 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
             return (0);
         break;
     case WT_CELL_VALUE_OVFL:
+        /*
+         * Encourage checkpoint to race with reading the onpage value. If we have an overflow item,
+         * it may be removed by checkpoint concurrently.
+         */
+        __wt_timing_stress(session, WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE, NULL);
         WT_RET(__wt_ovfl_read(session, page, unpack, store, &decoded));
         if (decoded)
             return (0);
@@ -1141,34 +1255,44 @@ __cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, int page_type,
 }
 
 /*
- * __wt_dsk_cell_data_ref --
- *     Set a buffer to reference the data from an unpacked cell. There are two versions because of
- *     WT_CELL_VALUE_OVFL_RM type cells. When an overflow item is deleted, its backing blocks are
- *     removed; if there are still running transactions that might need to see the overflow item, we
- *     cache a copy of the item and reset the item's cell to WT_CELL_VALUE_OVFL_RM. If we find a
- *     WT_CELL_VALUE_OVFL_RM cell when reading an overflow item, we use the page reference to look
- *     aside into the cache. So, calling the "dsk" version of the function declares the cell cannot
- *     be of type WT_CELL_VALUE_OVFL_RM, and calling the "page" version means it might be.
+ * __wt_dsk_cell_data_ref_addr --
+ *     Set a buffer to reference the data from an unpacked address cell.
  */
 static inline int
-__wt_dsk_cell_data_ref(WT_SESSION_IMPL *session, int page_type, void *unpack_arg, WT_ITEM *store)
+__wt_dsk_cell_data_ref_addr(
+  WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_ADDR *unpack, WT_ITEM *store)
 {
-    WT_CELL_UNPACK_COMMON *unpack;
-
-    unpack = (WT_CELL_UNPACK_COMMON *)unpack_arg;
-
-    WT_ASSERT(session, __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
-    return (__cell_data_ref(session, NULL, page_type, unpack, store));
+    return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*
- * __wt_page_cell_data_ref --
- *     Set a buffer to reference the data from an unpacked cell.
+ * __wt_dsk_cell_data_ref_kv --
+ *     Set a buffer to reference the data from an unpacked key value cell. There are two versions
+ *     because of WT_CELL_VALUE_OVFL_RM type cells. When an overflow item is deleted, its backing
+ *     blocks are removed; if there are still running transactions that might need to see the
+ *     overflow item, we cache a copy of the item and reset the item's cell to
+ *     WT_CELL_VALUE_OVFL_RM. If we find a WT_CELL_VALUE_OVFL_RM cell when reading an overflow item,
+ *     we use the page reference to look aside into the cache. So, calling the "dsk" version of the
+ *     function declares the cell cannot be of type WT_CELL_VALUE_OVFL_RM, and calling the "page"
+ *     version means it might be.
  */
 static inline int
-__wt_page_cell_data_ref(WT_SESSION_IMPL *session, WT_PAGE *page, void *unpack_arg, WT_ITEM *store)
+__wt_dsk_cell_data_ref_kv(
+  WT_SESSION_IMPL *session, int page_type, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
 {
-    return (__cell_data_ref(session, page, page->type, (WT_CELL_UNPACK_COMMON *)unpack_arg, store));
+    WT_ASSERT(session, __wt_cell_type_raw(unpack->cell) != WT_CELL_VALUE_OVFL_RM);
+    return (__cell_data_ref(session, NULL, page_type, (WT_CELL_UNPACK_COMMON *)unpack, store));
+}
+
+/*
+ * __wt_page_cell_data_ref_kv --
+ *     Set a buffer to reference the data from an unpacked key value cell.
+ */
+static inline int
+__wt_page_cell_data_ref_kv(
+  WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK_KV *unpack, WT_ITEM *store)
+{
+    return (__cell_data_ref(session, page, page->type, (WT_CELL_UNPACK_COMMON *)unpack, store));
 }
 
 /*

@@ -139,7 +139,6 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
                 cursor1.set_value(self.valueb)
             else:
                 cursor1.set_value(self.valueb + str(i))
-            cursor1.set_value(self.valueb)
             self.assertEqual(cursor1.update(), 0)
 
         # Create a checkpoint thread
@@ -147,8 +146,15 @@ class test_checkpoint_snapshot05(wttest.WiredTigerTestCase):
         ckpt = checkpoint_thread(self.conn, done)
         try:
             ckpt.start()
-            # Sleep for sometime so that checkpoint starts before committing last transaction.
-            time.sleep(2)
+            
+            # Wait for checkpoint to start before committing.
+            ckpt_started = 0
+            while not ckpt_started:
+                stat_cursor = self.session.open_cursor('statistics:', None, None)
+                ckpt_started = stat_cursor[stat.conn.txn_checkpoint_running][2]
+                stat_cursor.close()
+                time.sleep(1)
+
             session1.commit_transaction()
             self.evict(self.uri, ds, self.nrows)
         finally:

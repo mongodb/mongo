@@ -39,16 +39,24 @@
 // Mapping the desired WiredTiger extension verbosity level to a rough equivalent AWS
 // SDK verbosity level.
 static const std::map<int32_t, Aws::Utils::Logging::LogLevel> verbosityMapping = {
-  {-3, Aws::Utils::Logging::LogLevel::Error}, {-2, Aws::Utils::Logging::LogLevel::Warn},
-  {-1, Aws::Utils::Logging::LogLevel::Info}, {0, Aws::Utils::Logging::LogLevel::Info},
-  {1, Aws::Utils::Logging::LogLevel::Debug}};
+  {WT_VERBOSE_ERROR, Aws::Utils::Logging::LogLevel::Fatal},
+  {WT_VERBOSE_WARNING, Aws::Utils::Logging::LogLevel::Error},
+  {WT_VERBOSE_WARNING, Aws::Utils::Logging::LogLevel::Warn},
+  {WT_VERBOSE_INFO, Aws::Utils::Logging::LogLevel::Info},
+  {WT_VERBOSE_DEBUG_1, Aws::Utils::Logging::LogLevel::Debug},
+  {WT_VERBOSE_DEBUG_2, Aws::Utils::Logging::LogLevel::Debug},
+  {WT_VERBOSE_DEBUG_3, Aws::Utils::Logging::LogLevel::Debug},
+  {WT_VERBOSE_DEBUG_4, Aws::Utils::Logging::LogLevel::Debug},
+  {WT_VERBOSE_DEBUG_5, Aws::Utils::Logging::LogLevel::Trace}};
 
-// Provides the S3 Store with a logger implementation that redirects the generated logs to
-// WiredTiger's logging streams. This class implements AWS's LogSystemInterface class, an interface
-// for logging implementations. Functions are derived from the interface to incorporate the
-// logging with WiredTiger's logging system.
+/*
+ * Provides the S3 Store with a logger implementation that redirects the generated logs to
+ * WiredTiger's logging streams. This class implements AWS's LogSystemInterface class, an interface
+ * for logging implementations. Functions are derived from the interface to incorporate the logging
+ * with WiredTiger's logging system.
+ */
 class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
-    public:
+public:
     S3LogSystem(WT_EXTENSION_API *wtApi, uint32_t wtVerbosityLevel);
     Aws::Utils::Logging::LogLevel
     GetLogLevel(void) const override
@@ -71,7 +79,7 @@ class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
     void
     LogDebugMessage(const std::string &message) const
     {
-        LogVerboseMessage(WT_VERBOSE_DEBUG, message);
+        LogVerboseMessage(WT_VERBOSE_DEBUG_1, message);
     }
 
     // Sets the WiredTiger Extension's verbosity level and matches the AWS log levels
@@ -80,11 +88,11 @@ class S3LogSystem : public Aws::Utils::Logging::LogSystemInterface {
 
     // Inherited from AWS LogSystemInterface and is not used.
     void
-    Flush()
+    Flush() override final
     {
     }
 
-    private:
+private:
     void LogAwsMessage(const char *tag, const std::string &message) const;
     void LogVerboseMessage(int32_t verbosityLevel, const std::string &message) const;
     std::atomic<Aws::Utils::Logging::LogLevel> _awsLogLevel;

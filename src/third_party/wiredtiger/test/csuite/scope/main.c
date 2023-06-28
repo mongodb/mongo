@@ -53,7 +53,7 @@ handle_error(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const ch
     return (0);
 }
 
-static WT_EVENT_HANDLER event_handler = {handle_error, NULL, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {handle_error, NULL, NULL, NULL, NULL};
 
 #define SET_KEY                                   \
     do {                                          \
@@ -374,7 +374,8 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
 
-    testutil_check(wiredtiger_open(opts->home, &event_handler, "create", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, &event_handler,
+      "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
 
     run(opts->conn, "file:file.SS", "key_format=S,value_format=S");
     run(opts->conn, "file:file.Su", "key_format=S,value_format=u");

@@ -253,6 +253,7 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value_notsup,                   /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,           /* get-raw-key-value */
       __wt_cursor_set_key_notsup,                     /* set-key */
       __wt_cursor_set_value_notsup,                   /* set-value */
       __wt_cursor_compare_notsup,                     /* compare */
@@ -267,10 +268,12 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __wt_cursor_config_notsup,                      /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __curbackup_close);                             /* close */
     WT_CURSOR *cursor;
     WT_CURSOR_BACKUP *cb, *othercb;
@@ -291,13 +294,15 @@ __wt_curbackup_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other,
         WT_CURSOR_BACKUP_CHECK_STOP(othercb);
 
     /* Special backup cursor to query incremental IDs. */
-    if (strcmp(uri, "backup:query_id") == 0) {
+    if (WT_STRING_MATCH("backup:query_id", uri, strlen("backup:query_id"))) {
         /* Top level cursor code does not allow a URI and cursor. We don't need to check here. */
         WT_ASSERT(session, othercb == NULL);
         if (!F_ISSET(S2C(session), WT_CONN_INCR_BACKUP))
             WT_RET_MSG(session, EINVAL, "Incremental backup is not configured");
         F_SET(cb, WT_CURBACKUP_QUERYID);
-    }
+    } else if (WT_STRING_MATCH("backup:export", uri, strlen("backup:export")))
+        /* Special backup cursor for export operation. */
+        F_SET(cb, WT_CURBACKUP_EXPORT);
 
     /*
      * Start the backup and fill in the cursor's list. Acquire the schema lock, we need a consistent
@@ -338,10 +343,11 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
         blk = &conn->incr_backups[i];
         /* If it isn't already in use, we can use it. */
         if (!F_ISSET(blk, WT_BLKINCR_INUSE)) {
-            __wt_verbose(session, WT_VERB_BACKUP, "Free blk[%u] entry", i);
+            __wt_verbose_debug2(session, WT_VERB_BACKUP, "Free blk[%u] entry", i);
             break;
         }
-        __wt_verbose(session, WT_VERB_BACKUP, "Entry blk[%u] has flags 0x%" PRIx64, i, blk->flags);
+        __wt_verbose_debug2(
+          session, WT_VERB_BACKUP, "Entry blk[%u] has flags 0x%" PRIx8, i, blk->flags);
     }
     /*
      * We didn't find an entry. This should not happen.
@@ -351,7 +357,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
 
     /* Use the slot. */
     if (blk->id_str != NULL)
-        __wt_verbose(
+        __wt_verbose_debug2(
           session, WT_VERB_BACKUP, "Freeing and reusing backup slot with old id %s", blk->id_str);
     /* Free anything that was there. */
     __wt_free(session, blk->id_str);
@@ -360,7 +366,7 @@ __backup_add_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval)
      * Get the most recent checkpoint name. For now just use the one that is part of the metadata.
      * We only care whether or not a checkpoint exists, so immediately free it.
      */
-    ret = __wt_meta_checkpoint_last_name(session, WT_METAFILE_URI, &ckpt);
+    ret = __wt_meta_checkpoint_last_name(session, WT_METAFILE_URI, &ckpt, NULL, NULL);
     __wt_free(session, ckpt);
     WT_ERR_NOTFOUND_OK(ret, true);
     if (ret == WT_NOTFOUND) {
@@ -406,12 +412,13 @@ __backup_find_id(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *cval, WT_BLKINCR **in
                 WT_RET_MSG(session, EINVAL, "Incremental backup structure already in use");
             if (incrp != NULL)
                 *incrp = blk;
-            __wt_verbose(
+            __wt_verbose_debug2(
               session, WT_VERB_BACKUP, "Found src id %s at backup slot %u", blk->id_str, i);
             return (0);
         }
     }
-    __wt_verbose(session, WT_VERB_BACKUP, "Search %.*s not found", (int)cval->len, cval->str);
+    __wt_verbose_debug2(
+      session, WT_VERB_BACKUP, "Search %.*s not found", (int)cval->len, cval->str);
     return (WT_NOTFOUND);
 }
 
@@ -789,7 +796,7 @@ __backup_start(
         WT_ERR(__wt_fopen(session, WT_LOGINCR_SRC, WT_FS_OPEN_CREATE, WT_STREAM_WRITE, &srcfs));
         WT_ERR(__backup_list_append(session, cb, dest));
     } else {
-        dest = WT_METADATA_BACKUP;
+        dest = F_ISSET(cb, WT_CURBACKUP_EXPORT) ? WT_EXPORT_BACKUP : WT_METADATA_BACKUP;
         WT_ERR(__backup_list_append(session, cb, dest));
         WT_ERR(__wt_fs_exist(session, WT_BASECONFIG, &exist));
         if (exist)
@@ -849,6 +856,9 @@ __backup_stop(WT_SESSION_IMPL *session, WT_CURSOR_BACKUP *cb)
     /* Remove any backup specific file. */
     WT_TRET(__wt_backup_file_remove(session));
 
+    /* Remove the export file only when we close the backup cursor. */
+    WT_TRET(__wt_remove_if_exists(session, WT_EXPORT_BACKUP, true));
+
     /* Checkpoint deletion and next hot backup can proceed. */
     WT_WITH_HOTBACKUP_WRITE_LOCK(session, conn->hot_backup_start = 0);
     F_CLR(session, WT_SESSION_BACKUP_CURSOR);
@@ -890,7 +900,8 @@ __backup_list_uri_append(WT_SESSION_IMPL *session, const char *name, bool *skip)
      */
     if (!WT_PREFIX_MATCH(name, "file:") && !WT_PREFIX_MATCH(name, "colgroup:") &&
       !WT_PREFIX_MATCH(name, "index:") && !WT_PREFIX_MATCH(name, "lsm:") &&
-      !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) && !WT_PREFIX_MATCH(name, "table:") &&
+      !WT_PREFIX_MATCH(name, "object:") && !WT_PREFIX_MATCH(name, WT_SYSTEM_PREFIX) &&
+      !WT_PREFIX_MATCH(name, "table:") && !WT_PREFIX_MATCH(name, "tier:") &&
       !WT_PREFIX_MATCH(name, "tiered:"))
         WT_RET_MSG(session, ENOTSUP, "hot backup is not supported for objects of type %s", name);
 

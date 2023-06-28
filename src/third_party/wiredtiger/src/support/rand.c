@@ -29,9 +29,8 @@
 #include "wt_internal.h"
 
 /*
- * This is an implementation of George Marsaglia's multiply-with-carry pseudo- random number
- * generator. Computationally fast, with reasonable randomness properties, and a claimed period of >
- * 2^60.
+ * An implementation of George Marsaglia's multiply-with-carry pseudo-random number generator.
+ * Computationally fast, with reasonable randomness properties, and a claimed period of > 2^60.
  *
  * Be very careful about races here. Multiple threads can call __wt_random concurrently, and it is
  * okay if those concurrent calls get the same return value. What is *not* okay is if
@@ -39,11 +38,16 @@
  * result in a stored value of zero, in which case they will be stuck on zero forever. Take a local
  * copy of the values to avoid that, and read/write in atomic, 8B chunks.
  */
+#undef M_V
+#define M_V(r) r.v
 #undef M_W
 #define M_W(r) r.x.w
 #undef M_Z
 #define M_Z(r) r.x.z
 
+#ifdef ENABLE_ANTITHESIS
+#include "instrumentation.h"
+#endif
 /*
  * __wt_random_init --
  *     Initialize return of a 32-bit pseudo-random number.
@@ -59,10 +63,22 @@ __wt_random_init(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visib
 }
 
 /*
+ * __wt_random_init_custom_seed --
+ *     Initialize the state of a 32-bit pseudo-random number with custom seed.
+ */
+void
+__wt_random_init_custom_seed(WT_RAND_STATE volatile *rnd_state, uint64_t v)
+  WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
+{
+    WT_RAND_STATE rnd;
+
+    M_V(rnd) = v;
+    *rnd_state = rnd;
+}
+
+/*
  * __wt_random_init_seed --
- *     Initialize the state of a 32-bit pseudo-random number. Use this, instead of __wt_random_init
- *     if we are running with multiple threads and we want each thread to initialize its own random
- *     state based on a different random seed.
+ *     Initialize the state of a 32-bit pseudo-random number.
  */
 void
 __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_state)
@@ -70,10 +86,25 @@ __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_stat
 {
     struct timespec ts;
     WT_RAND_STATE rnd;
+    uintmax_t threadid;
 
     __wt_epoch(session, &ts);
-    M_W(rnd) = (uint32_t)(ts.tv_nsec + 521288629);
-    M_Z(rnd) = (uint32_t)(ts.tv_nsec + 362436069);
+    __wt_thread_id(&threadid);
+
+    /*
+     * Use this, instead of __wt_random_init, to vary the initial state of the RNG. This is
+     * (currently) only used by test programs, where, for example, an initial set of test data is
+     * created by a single thread, and we want more variability in the initial state of the RNG.
+     *
+     * Take the seconds and nanoseconds from the clock together with the thread ID to generate a
+     * 64-bit seed, then smear that value using algorithm "xor" from Marsaglia, "Xorshift RNGs".
+     */
+    M_W(rnd) = (uint32_t)ts.tv_sec ^ 521288629;
+    M_Z(rnd) = (uint32_t)ts.tv_nsec ^ 362436069;
+    rnd.v ^= (uint64_t)threadid;
+    rnd.v ^= rnd.v << 13;
+    rnd.v ^= rnd.v >> 7;
+    rnd.v ^= rnd.v << 17;
 
     *rnd_state = rnd;
 }
@@ -85,14 +116,18 @@ __wt_random_init_seed(WT_SESSION_IMPL *session, WT_RAND_STATE volatile *rnd_stat
 uint32_t
 __wt_random(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visibility("default")))
 {
+#ifdef ENABLE_ANTITHESIS
+    return (uint32_t)(fuzz_get_random());
+#else
     WT_RAND_STATE rnd;
     uint32_t w, z;
 
     /*
-     * Take a copy of the random state so we can ensure that the calculation operates on the state
-     * consistently regardless of concurrent calls with the same random state.
+     * Generally, every thread should have their own RNG state, but it's not guaranteed. Take a copy
+     * of the random state so we can ensure that the calculation operates on the state consistently
+     * regardless of concurrent calls with the same random state.
      */
-    rnd = *rnd_state;
+    WT_ORDERED_READ(rnd, *rnd_state);
     w = M_W(rnd);
     z = M_Z(rnd);
 
@@ -112,4 +147,5 @@ __wt_random(WT_RAND_STATE volatile *rnd_state) WT_GCC_FUNC_ATTRIBUTE((visibility
     *rnd_state = rnd;
 
     return ((z << 16) + (w & 65535));
+#endif
 }

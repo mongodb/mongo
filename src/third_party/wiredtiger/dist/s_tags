@@ -8,22 +8,22 @@ test -n "$WT_RELEASE_BUILD" && exit 0
 
 # We have to be in the dist directory to run.
 test -f s_tags || {
-	echo "s_tags requires dist be the current working directory"
-	exit 1
+    echo "s_tags requires dist be the current working directory"
+    exit 1
 }
 
 # We require ctags which may not be installed.
 type ctags > /dev/null 2>&1 || {
-	echo "$0 skipped: ctags not found"
-	exit 0
+    echo "$0 skipped: ctags not found"
+    exit 0
 }
 
 # Test to see what flags this ctags binary supports.
 flags=""
 for i in -d -t -w --language-force=C '-I WT_GCC_FUNC_ATTRIBUTE+'; do
-	if ctags $i ../src/conn/api_strerror.c 2>/dev/null; then
-		flags="$i $flags"
-	fi
+    if ctags $i ../src/conn/api_strerror.c 2>/dev/null; then
+        flags="$i $flags"
+    fi
 done
 
 # If it exists, generate a tags file for the build directory. The user can have
@@ -42,17 +42,17 @@ ctags $flags ../include/*.in `find .. -name '*.[ch]'` 2>/dev/null)
 # at the right level.
 link_tag()
 {
-	if test -e ../include/tags; then
-		rm -f tags && ln -s ../include/tags .
-	fi
+    if test -e ../include/tags; then
+        rm -f tags && ln -s ../include/tags .
+    fi
 }
 
 # Link to the tags file from standard build and source directories.
 dirs="`python -c 'import dist; dist.print_source_dirs()'` ../src/os_win"
 for i in $dirs; do
-	expr "$i" : ".*/include" > /dev/null && continue
+    expr "$i" : ".*/include" > /dev/null && continue
 
-	(cd $i && link_tag)
+    (cd $i && link_tag)
 done
 
 exit 0

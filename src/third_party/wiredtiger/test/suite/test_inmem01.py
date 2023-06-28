@@ -63,7 +63,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
 
         # Figure out the last key we successfully inserted, and check all
         # previous inserts are still there.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         cursor.prev()
         last_key = int(cursor.get_key())
         ds = SimpleDataSet(self, self.uri, last_key, key_format=self.keyfmt,
@@ -81,13 +81,15 @@ class test_inmem01(wttest.WiredTigerTestCase):
 
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(1, 100):
             cursor.set_key(ds.key(i))
             self.assertEqual(cursor.remove(), 0)
 
     # Run queries after adding, removing and re-inserting data.
     # Try out keeping a cursor open while adding new data.
+
+    @wttest.skip_for_hook("timestamp", "removing timestamped items will not free space")
     def test_insert_over_delete_replace(self):
         msg = '/WT_CACHE_FULL.*/'
         ds = SimpleDataSet(self, self.uri, 10000000, key_format=self.keyfmt,
@@ -95,7 +97,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         self.assertRaisesHavingMessage(wiredtiger.WiredTigerError,
             ds.populate, msg)
 
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         cursor.prev()
         last_key = int(cursor.get_key())
 
@@ -141,7 +143,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
 
         # Now that the database contains as much data as will fit into
         # the configured cache, verify removes succeed.
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(1, last_key // 4, 1):
             cursor.set_key(ds.key(i))
             self.assertEqual(cursor.remove(), 0)
@@ -176,7 +178,7 @@ class test_inmem01(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, 0, key_format=self.keyfmt,
             value_format=self.valuefmt, config=self.table_config)
         ds.populate()
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
 
         run = 0
         start, last_key = -1000, 0

@@ -185,13 +185,13 @@ modify_run(TEST_OPTS *opts)
     cursor->value_format = "u";
     memset(&modtmp, 0, sizeof(modtmp));
 
-#define NRUNS 10000
+#define NRUNS (10 * WT_THOUSAND)
     for (i = 0; i < NRUNS; ++i) {
         /* Create an initial value. */
         len = (size_t)(__wt_random(&rnd) % MAX_REPL_BYTES);
         testutil_check(__wt_buf_set(session, localA, modify_repl, len));
 
-        for (j = 0; j < 1000; ++j) {
+        for (j = 0; j < WT_THOUSAND; ++j) {
             /* Make lower case so modifications are easy to see. */
             for (p = localA->mem; WT_PTRDIFF(p, localA->mem) < localA->size; p++)
                 *p = __wt_tolower(*p);
@@ -206,7 +206,7 @@ modify_run(TEST_OPTS *opts)
             modify_build();
             testutil_check(__wt_buf_set(session, &cursor->value, localA->data, localA->size));
             testutil_check(__wt_modify_apply_api(cursor, entries, nentries));
-            testutil_modify_apply(localA, &modtmp, entries, nentries);
+            testutil_modify_apply(localA, &modtmp, entries, nentries, '\0');
             compare(localB, localA, &cursor->value);
 
             /*
@@ -251,7 +251,8 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
-    testutil_check(wiredtiger_open(opts->home, NULL, "create", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &opts->session));
 
     /* Run the test. */

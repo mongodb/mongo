@@ -1,0 +1,8 @@
+# Similar to the stress config, with the addition of mirroring.
+btree.huffman_value=0
+cache.minimum=20
+runs.mirror=1
+runs.rows=1000000:5000000
+runs.tables=3:10
+runs.threads=4:32
+runs.timer=6:30

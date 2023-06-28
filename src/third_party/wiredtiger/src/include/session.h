@@ -31,7 +31,7 @@ struct __wt_hazard {
 };
 
 /* Get the connection implementation for a session */
-#define S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
+#define S2C(session) ((WT_CONNECTION_IMPL *)((WT_SESSION_IMPL *)(session))->iface.connection)
 
 /* Get the btree for a session */
 #define S2BT(session) ((WT_BTREE *)(session)->dhandle->handle)
@@ -47,11 +47,12 @@ typedef TAILQ_HEAD(__wt_cursor_list, __wt_cursor) WT_CURSOR_LIST;
 /* Number of cursors cached to trigger cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_COUNTDOWN 40
 
-/* Minimum number of buckets to visit during cursor sweep. */
+/* Minimum number of buckets to visit during a regular cursor sweep. */
 #define WT_SESSION_CURSOR_SWEEP_MIN 5
 
-/* Maximum number of buckets to visit during cursor sweep. */
-#define WT_SESSION_CURSOR_SWEEP_MAX 32
+/* Maximum number of buckets to visit during a regular cursor sweep. */
+#define WT_SESSION_CURSOR_SWEEP_MAX 64
+
 /*
  * WT_SESSION_IMPL --
  *	Implementation of WT_SESSION.
@@ -61,6 +62,9 @@ struct __wt_session_impl {
     WT_EVENT_HANDLER *event_handler; /* Application's event handlers */
 
     void *lang_private; /* Language specific private storage */
+
+    void (*format_private)(WT_CURSOR *, int, void *); /* Format test program private callback. */
+    void *format_private_arg;
 
     u_int active; /* Non-zero if the session is in-use */
 
@@ -79,8 +83,9 @@ struct __wt_session_impl {
     /*
      * Each session keeps a cache of data handles. The set of handles can grow quite large so we
      * maintain both a simple list and a hash table of lists. The hash table key is based on a hash
-     * of the data handle's URI. The hash table list is kept in allocated memory that lives across
-     * session close - so it is declared further down.
+     * of the data handle's URI. Though all hash entries are discarded on session close, the hash
+     * table list itself is kept in allocated memory that lives across session close - so it is
+     * declared further down.
      */
     /* Session handle reference list */
     TAILQ_HEAD(__dhandles, __wt_data_handle_cache) dhandles;
@@ -89,14 +94,19 @@ struct __wt_session_impl {
 
     WT_CURSOR_LIST cursors;          /* Cursors closed with the session */
     u_int ncursors;                  /* Count of active file cursors. */
-    uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
     uint32_t cursor_sweep_countdown; /* Countdown to cursor sweep */
-    uint64_t last_cursor_sweep;      /* Last sweep for dead cursors */
+    uint32_t cursor_sweep_position;  /* Position in cursor_cache for sweep */
+    uint64_t last_cursor_big_sweep;  /* Last big sweep for dead cursors */
+    uint64_t last_cursor_sweep;      /* Last regular sweep for dead cursors */
+    u_int sweep_warning_5min;        /* Whether the session was without sweep for 5 min. */
+    u_int sweep_warning_60min;       /* Whether the session was without sweep for 60 min. */
 
     WT_CURSOR_BACKUP *bkp_cursor; /* Hot backup cursor */
 
     WT_COMPACT_STATE *compact; /* Compaction information */
     enum { WT_COMPACT_NONE = 0, WT_COMPACT_RUNNING, WT_COMPACT_SUCCESS } compact_state;
+
+    WT_IMPORT_LIST *import_list; /* List of metadata entries to import from file. */
 
     u_int hs_cursor_counter; /* Number of open history store cursors */
 
@@ -133,6 +143,25 @@ struct __wt_session_impl {
     } * scratch_track;
 #endif
 
+    /* Record the important timestamps of each stage in an reconciliation. */
+    struct __wt_reconcile_timeline {
+        uint64_t reconcile_start;
+        uint64_t image_build_start;
+        uint64_t image_build_finish;
+        uint64_t hs_wrapup_start;
+        uint64_t hs_wrapup_finish;
+        uint64_t reconcile_finish;
+    } reconcile_timeline;
+
+    /*
+     * Record the important timestamps of each stage in an eviction. If an eviction takes a long
+     * time and times out, we can trace the time usage of each stage from this information.
+     */
+    struct __wt_evict_timeline {
+        uint64_t evict_start;
+        uint64_t evict_finish;
+    } evict_timeline;
+
     WT_ITEM err; /* Error buffer */
 
     WT_TXN_ISOLATION isolation;
@@ -141,10 +170,19 @@ struct __wt_session_impl {
     void *block_manager; /* Block-manager support */
     int (*block_manager_cleanup)(WT_SESSION_IMPL *);
 
+    const char *hs_checkpoint;     /* History store checkpoint name, during checkpoint cursor ops */
+    uint64_t checkpoint_write_gen; /* Write generation override, during checkpoint cursor ops */
+
     /* Checkpoint handles */
     WT_DATA_HANDLE **ckpt_handle; /* Handle list */
     u_int ckpt_handle_next;       /* Next empty slot */
     size_t ckpt_handle_allocated; /* Bytes allocated */
+
+    /* Named checkpoint drop list, during a checkpoint */
+    WT_ITEM *ckpt_drop_list;
+
+    /* Checkpoint time of current checkpoint, during a checkpoint */
+    uint64_t current_ckpt_sec;
 
     /*
      * Operations acting on handles.
@@ -170,6 +208,16 @@ struct __wt_session_impl {
 
 #ifdef HAVE_DIAGNOSTIC
     uint8_t dump_raw; /* Configure debugging page dump */
+#endif
+
+#ifdef HAVE_UNITTEST_ASSERTS
+/*
+ * Unit testing assertions requires overriding abort logic and instead capturing this information to
+ * be checked by the unit test.
+ */
+#define WT_SESSION_UNITTEST_BUF_LEN 100
+    bool unittest_assert_hit;
+    char unittest_assert_msg[WT_SESSION_UNITTEST_BUF_LEN];
 #endif
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
@@ -288,3 +336,8 @@ struct __wt_session_impl {
 
     WT_SESSION_STATS stats;
 };
+
+/* Consider moving this to session_inline.h if it ever appears. */
+#define WT_READING_CHECKPOINT(s)                                       \
+    ((s)->dhandle != NULL && F_ISSET((s)->dhandle, WT_DHANDLE_OPEN) && \
+      WT_DHANDLE_IS_CHECKPOINT((s)->dhandle))

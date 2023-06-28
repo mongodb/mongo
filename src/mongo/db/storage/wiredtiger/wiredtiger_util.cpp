@@ -602,7 +602,7 @@ logv2::LogSeverity getWTLOGV2SeverityLevel(const BSONObj& obj) {
             return logv2::LogSeverity::Info();
         case WT_VERBOSE_INFO:
             return logv2::LogSeverity::Log();
-        case WT_VERBOSE_DEBUG:
+        case WT_VERBOSE_DEBUG_1:
             return logv2::LogSeverity::Debug(1);
         default:
             return logv2::LogSeverity::Log();
@@ -1179,7 +1179,7 @@ std::string WiredTigerUtil::generateWTVerboseConfiguration() {
 
         int level;
         if (severity.toInt() >= logv2::LogSeverity::Debug(1).toInt())
-            level = WT_VERBOSE_DEBUG;
+            level = WT_VERBOSE_DEBUG_1;
         else
             level = WT_VERBOSE_INFO;
 

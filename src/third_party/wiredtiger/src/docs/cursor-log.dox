@@ -45,7 +45,7 @@ Here is an example of getting the log cursor's key:
 
 @snippet ex_log.c log cursor get_key
 
-The log cursor's value is comprised of six fields:
+The log cursor's value is composed of six fields:
 
 - a \c uint64_t transaction ID (set for commit records only, otherwise 0),
 - a \c uint32_t log record type

@@ -4,6 +4,7 @@
 ##############################################################################################
 
 set -e
+set -x
 
 #############################################################
 # bflag:
@@ -13,6 +14,7 @@ bflag()
 {
     # Return if the branch's format command takes the -B flag for backward compatibility.
     test "$1" = "develop" && echo "-B "
+    test "$1" = "mongodb-6.0" && echo "-B"
     test "$1" = "mongodb-5.0" && echo "-B "
     test "$1" = "mongodb-4.4" && echo "-B "
     return 0
@@ -49,9 +51,12 @@ pick_a_version()
     #     version 1.8.17 (installed on the build hosts). WT-7437 was introduced since 4.4.7.
     mapfile -t versions < <( git tag | grep $branch | grep -Ev "rc|alpha|4.4.[0-6]$" )
 
-    # Randomly pick a version from the array of patch versions
-    pv=${versions[$RANDOM % ${#versions[@]} ]}
-    echo "$pv"
+    len_versions=${#versions[@]}
+    if [ $len_versions != 0 ]; then
+        # Randomly pick a version from the array of patch versions
+        pv=${versions[$RANDOM % $len_versions ]}
+        echo "$pv"
+    fi
 }
 
 #############################################################
@@ -71,13 +76,30 @@ build_branch()
     fi
 
     cd "$1"
-    git checkout --quiet "$1"
+    # If the branch is in gittags, look up the required branch, tag or commit hash,
+    # Otherwise, use the branch itself for the checkout.
+    if [ "${gittags[$1]}" != "" ]; then
+        git_tag="${gittags[$1]}"
+    else
+        git_tag="$1"
+    fi
+    # Check out the required branch, tag or commit hash
+    git checkout --quiet "${git_tag}"
 
-    if [ "${build_sys[$1]}" == "cmake" ]; then
+    build_system=$(get_build_system $1)
+    if [ "$build_system" == "cmake" ]; then
         . ./test/evergreen/find_cmake.sh
         config=""
         config+="-DENABLE_SNAPPY=1 "
+        # Need to disable configs since WT-9455 enabled additional items by default.
+        # Old releases didn't have these enabled, need to make it consistent.
+        config+="-DENABLE_LZ4=0 -DENABLE_ZLIB=0 -DENABLE_ZSTD=0 "
         config+="-DWT_STANDALONE_BUILD=0 "
+        # Use the stable MongoDB toolchain for this build.
+        config+="-DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_v4_gcc.cmake "
+        # Disable cppsuite - not all versions build with the toolchain
+        config+="-DENABLE_CPPSUITE=0"
+
         (mkdir -p build && cd build &&
             $CMAKE $config ../. && make -j $(grep -c ^processor /proc/cpuinfo)) > /dev/null
     else
@@ -138,6 +160,9 @@ create_configs()
     echo "checkpoints=1"  >> $file_name             # Force periodic writes
     echo "compression=snappy"  >> $file_name        # We only built with snappy, force the choice
     echo "data_source=table" >> $file_name
+    echo "debug.cursor_reposition=0" >> $file_name  # WT-10594 - Not supported by older releases
+    echo "debug.log_retention=0" >> $file_name      # WT-10434 - Not supported by older releases
+    echo "debug.realloc_malloc=0" >> $file_name     # WT-10111 - Not supported by older releases
     echo "huffman_key=0" >> $file_name              # WT-6893 - Not supported by newer releases
     echo "in_memory=0" >> $file_name                # Interested in the on-disk format
     echo "leak_memory=1" >> $file_name              # Faster runs
@@ -145,6 +170,7 @@ create_configs()
     echo "logging_compression=snappy" >> $file_name # We only built with snappy, force the choice
     echo "rows=1000000" >> $file_name
     echo "salvage=0" >> $file_name                  # Faster runs
+    echo "stress.checkpoint=0" >> $file_name        # Faster runs
     echo "timer=4" >> $file_name
     echo "verify=1" >> $file_name                   # Faster runs
 
@@ -291,7 +317,8 @@ run_test_checkpoint()
 
     cd "$branch_name/build/test/checkpoint"
 
-    if [ "${build_sys[$branch_name]}" == "cmake" ]; then
+    build_system=$(get_build_system $branch_name)
+    if [ "$build_system" == "cmake" ]; then
         test_bin="test_checkpoint"
     else
         test_bin="t"
@@ -382,7 +409,8 @@ verify_test_checkpoint()
     top_dir=$PWD
     cd "$1/build/test/checkpoint"
 
-    if [ "${build_sys[$1]}" == "cmake" ]; then
+    build_system=$(get_build_system $1)
+    if [ "$build_system" == "cmake" ]; then
         test_bin="test_checkpoint"
     else
         test_bin="t"
@@ -429,9 +457,6 @@ upgrade_downgrade()
     echo "Upgrade/downgrade testing with \"$1\" and \"$2\""
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
 
-    cfg_file_branch1=$(get_config_file_name $1)
-    cfg_file_branch2=$(get_config_file_name $2)
-
     format_dir_branch1="$1/build/test/format"
     format_dir_branch2="$2/build/test/format"
 
@@ -443,12 +468,12 @@ upgrade_downgrade()
             echo "$1 format running on $2 access method $am..."
             cd "$top/$format_dir_branch1"
             flags="-1Rq $(bflag $1)"
-            ./t $flags -c "$top/$format_dir_branch2/${cfg_file_branch1}" -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
+            ./t $flags -h "$top/$format_dir_branch2/RUNDIR.$am" timer=2
 
             echo "$2 format running on $2 access method $am..."
             cd "$top/$format_dir_branch2"
             flags="-1Rq $(bflag $2)"
-            ./t $flags -c $cfg_file_branch2 -h "RUNDIR.$am" timer=2
+            ./t $flags -h "RUNDIR.$am" timer=2
         done
     done
 }
@@ -462,7 +487,8 @@ test_upgrade_to_branch()
 {
     cd $1/build/test/checkpoint
 
-    if [ "${build_sys[$1]}" == "cmake" ]; then
+    build_system=$(get_build_system $1)
+    if [ "$build_system" == "cmake" ]; then
         test_bin="test_checkpoint"
     else
         test_bin="t"
@@ -516,12 +542,143 @@ prepare_test_data_wt_8395()
     rm *.tar.gz; cd ../..
 }
 
+#############################################################
+# create_file:
+#       arg1: branch
+#       arg2: file
+#############################################################
+create_file()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Branch \"$1\" creating and populating \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
+    uri="file:$2"
+
+    # Make the home directory.
+    mkdir -p $test_dir
+
+    # Create the file and populate with a few key/values.
+    $wt_cmd -h $test_dir create -c "key_format=S,value_format=S" $uri
+    $wt_cmd -h $test_dir write $uri abc 123 def 456 hij 789
+}
+
+#############################################################
+# import_file:
+#       arg1: source branch
+#       arg2: dest branch
+#       arg3: file
+#############################################################
+import_file()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Importing file \"$3\" from \"$1\" to \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    wt_cmd="$2/build/wt"
+    test_dir="$2/build/WT_TEST/"
+    mkdir -p $test_dir
+
+    # Move the file across to the destination branch's home directory.
+    import_file="$1/build/WT_TEST/$3"
+    cp $import_file $test_dir
+
+    # Run import via the wt tool.
+    uri="file:$3"
+    $wt_cmd -h $test_dir create -c "import=(enabled,repair=true)" $uri
+}
+
+#############################################################
+# verify_file:
+#       arg1: branch
+#       arg2: file
+#############################################################
+verify_file()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Branch \"$1\" verifying \"$2\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    wt_cmd="$1/build/wt"
+    test_dir="$1/build/WT_TEST/"
+    uri="file:$2"
+
+    $wt_cmd -h $test_dir verify $uri
+}
+
+#############################################################
+# cleanup_branch:
+#       arg1: branch
+#############################################################
+cleanup_branch()
+{
+    test_dir="$1/build/WT_TEST/"
+    if [ -d $test_dir ]; then
+        rm -rf $test_dir
+    fi
+}
+
+#############################################################
+# import_compatibility_test:
+#       arg1: older branch
+#       arg2: newer branch
+#############################################################
+import_compatibility_test()
+{
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Testing import compatibility between \"$2\" and \"$1\""
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+
+    # Remove any leftover data files.
+    cleanup_branch $1
+    cleanup_branch $2
+
+    # Create a file in the older branch.
+    create_file $1 test_import
+
+    # Now import it into the newer branch and verify.
+    import_file $1 $2 test_import
+    verify_file $2 test_import
+
+    # Now downgrade by running wt from the older branch and dumping the table contents.
+    #
+    # Before trying this, we must remove the base configuration. The wt tool produces this file
+    # however MongoDB will not so we should emulate this.
+    rm $2/build/WT_TEST/WiredTiger.basecfg
+    $1/build/wt -h $2/build/WT_TEST/ dump file:test_import
+}
+
 # Only one of below flags will be set by the 1st argument of the script.
+import=false
 older=false
 newer=false
 wt_standalone=false
 patch_version=false
 upgrade_to_latest=false
+
+# Map branch names to Github branches, tags, or commit hashes
+# First define the standard values for each build branch
+# Note: If a branch name is not stored in gittags,
+# then the branch name itself will be used for the checkout
+declare -A gittags
+gittags['develop']="develop"
+gittags['mongodb-6.0']="mongodb-6.0"
+gittags['mongodb-5.0']="mongodb-5.0"
+gittags['mongodb-4.4']="mongodb-4.4"
+gittags['mongodb-4.2']="mongodb-4.2"
+# Then, optionally, replace one or more tags with a particular branch or commit hash where required for testing
+# For example, this set of commit hashes will reproduce the bug in WT-9795
+#gittags['develop']="d031f0af518c9b5f15dc586de4ae55d6867f423b"
+#gittags['mongodb-6.0']="58159b1a09bc045ab956b40675212e01d91fa7c0"
+#gittags['mongodb-5.0']="ce1d1e58ba35166710552e3aaa1c426ddba513fd"
+#gittags['mongodb-4.4']="ec742d6807b943cd6f2baf1a55853d296eb5b5c6"
+
+# This array is used to configure the release branches we'd like to use for testing the importing
+# of files created in previous versions of WiredTiger. Go all the way back to mongodb-4.2 since
+# that's the first release where we don't support live import.
+import_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2)
 
 # Branches in below 2 arrays should be put in newer-to-older order.
 #
@@ -530,8 +687,8 @@ upgrade_to_latest=false
 #
 # The 2 arrays should be adjusted over time when newer branches are created,
 # or older branches are EOL.
-newer_release_branches=(develop mongodb-5.0 mongodb-4.4 mongodb-4.2)
-older_release_branches=(mongodb-4.2 mongodb-4.0 mongodb-3.6)
+newer_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4 mongodb-4.2)
+older_release_branches=(mongodb-4.2 mongodb-4.0)
 
 # This array is used to generate compatible configuration files between releases, because
 # upgrade/downgrade test runs each build's format test program on the second build's
@@ -540,16 +697,17 @@ compatible_upgrade_downgrade_release_branches=(mongodb-4.4 mongodb-4.2)
 
 # This array is used to configure the release branches we'd like to run patch version
 # upgrade/downgrade test.
-patch_version_upgrade_downgrade_release_branches=(mongodb-5.0 mongodb-4.4)
+patch_version_upgrade_downgrade_release_branches=(mongodb-6.0 mongodb-5.0 mongodb-4.4)
 
 # This array is used to configure the release branches we'd like to run test checkpoint
 # upgrade/downgrade test.
-test_checkpoint_release_branches=(develop mongodb-5.0 mongodb-4.4)
+test_checkpoint_release_branches=(develop mongodb-6.0 mongodb-5.0 mongodb-4.4)
 
 # This array is used to configure the release branches we'd like to run upgrade to latest test.
-upgrade_to_latest_upgrade_downgrade_release_branches=(mongodb-5.0 mongodb-4.4)
+upgrade_to_latest_upgrade_downgrade_release_branches=(mongodb-6.0 mongodb-5.0 mongodb-4.4)
 
 declare -A scopes
+scopes[import]="import files from previous versions"
 scopes[newer]="newer stable release branches"
 scopes[older]="older stable release branches"
 scopes[patch_version]="patch versions of the same release branch"
@@ -557,24 +715,51 @@ scopes[upgrade_to_latest]="upgrade/downgrade databases to the latest versions of
 scopes[wt_standalone]="WiredTiger standalone releases"
 scopes[two_versions]="any two given versions"
 
-# The following associative array maps the 'official' build system to use for each branch.
-# CMake build support is reliably mature in newer release branches, whilst earlier revisions
-# primarily use Autoconf (note: some earlier branches may have CMake support, but these aren't
-# considered 'mature' versions.)
-declare -A build_sys
-build_sys['develop']="cmake"
-build_sys['mongodb-5.0']="autoconf"
-build_sys['mongodb-4.4']="autoconf"
-build_sys['mongodb-4.2']="autoconf"
-build_sys['mongodb-4.0']="autoconf"
-build_sys['mongodb-3.6']="autoconf"
+#############################################################
+# Retrieve the build system used by a particular release,
+# since WiredTiger switched from autoconf to cmake.
+#       arg1: branch name to check against
+#       output: string as name of build system
+#############################################################
+get_build_system()
+{
+    branch="$1"
+    # Default to cmake.
+    local build_system="cmake"
+
+    # As of MongoDB 6.0, WiredTiger standalone builds switched to CMake
+    if [[ $branch == mongodb-* ]]; then
+        major=`echo $branch | cut -d '-' -f 2 | cut -d '.' -f 1`
+        if [ $major -lt 6 ]; then
+            build_system="autoconf"
+        fi
+    fi
+    # Check for WiredTiger standalone branch names. They are of the form 10.0.0 - figure out
+    # if the first element is numerical, and use that to decide.
+    wt_version="false"
+    major=`echo $branch | cut -d '.' -f 1`
+    case $major in
+        ''|*[!0-9]*) wt_version="false" ;;
+        *) wt_version="true" ;;
+    esac
+
+    if [[ "$wt_version" == "true" ]]; then
+        # The 11.0.0 version of WiredTiger is where cmake became the default
+        if [ $major -lt 11 ]; then
+            build_system="autoconf"
+        fi
+    fi
+    echo $build_system
+
+}
 
 #############################################################
 # usage string
 #############################################################
 usage()
 {
-    echo -e "Usage: \tcompatibility_test_for_releases [-n|-o|-p|-u|-w|-v]"
+    echo -e "Usage: \tcompatibility_test_for_releases [-i|-n|-o|-p|-u|-w|-v]"
+    echo -e "\t-i\trun compatibility tests for ${scopes[import]}"
     echo -e "\t-n\trun compatibility tests for ${scopes[newer]}"
     echo -e "\t-o\trun compatibility tests for ${scopes[older]}"
     echo -e "\t-p\trun compatibility tests for ${scopes[patch_version]}"
@@ -590,6 +775,12 @@ fi
 
 # Script argument processing
 case $1 in
+"-i")
+    import=true
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo "Performing compatibility tests for ${scopes[import]}"
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+;;
 "-n")
     newer=true
     echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
@@ -637,6 +828,26 @@ esac
 top="test-compatibility-run"
 rm -rf "$top" && mkdir "$top"
 cd "$top"
+
+# Import compatibility testing.
+if [ "$import" = true ]; then
+    for b in ${import_release_branches[@]}; do
+        (build_branch $b)
+    done
+
+    for i in ${!import_release_branches[@]}; do
+        newer=${import_release_branches[$i]}
+
+        # MongoDB v4.2 doesn't support live import so it should only ever be used as the "older" branch
+        # that we're importing from.
+        if [ $newer = mongodb-4.2 ]; then
+            continue
+        fi
+
+        older=${import_release_branches[$i+1]}
+        import_compatibility_test $older $newer
+    done
+fi
 
 if [ "$upgrade_to_latest" = true ]; then
     test_root=$(pwd)
@@ -693,27 +904,33 @@ if [ "$patch_version" = true ]; then
         # Pick a patch version from the list of patch versions for the release branch
         cd $b; pv=$(pick_a_version $b); cd ..
 
-        (build_branch $pv)
-        rtn=$(is_test_checkpoint_recovery_supported $pv)
-        patch_fix_included=$(git log --oneline --grep=WT-8708 -b "$pv" --)
- 
-        # Only run verify if the picked version supports test checkpoint recovery
-        if [ $rtn == "no" ]; then
-            echo -e "\n\"$pv\" does not support test checkpoint with recovery, skipping ...\n"
-        # Apply patch fix from WT-8708 to already released compatible versions to avoid test/checkpoint setting commit timestamp less than stable timestamp
-        elif [ $rtn == "yes" ] && [ ! $patch_fix_included ]; then
-            cd $pv;
-
-            git format-patch -1 d4b0ad6cacb874fdc20bcc76311d789dd5a01441;
-            patch -p1 < 0001-WT-8708-Fix-timestamp-usage-error-in-test-checkpoint.patch;
-
-            cd ..;
+        # A null string from the $pv variable indicates the release branch (e.g. mongodb-6.0)
+        # has not yet got a GA version (e.g. 6.0.0, 6.0.1) tagged. Skip running and verifiying
+        # test checkpoint in that case.
+        if [ -n "$pv" ]; then
             (build_branch $pv)
+            rtn=$(is_test_checkpoint_recovery_supported $pv)
+            patch_fix_included=$(git log --format=%h -1 --grep=WT-8708 -b "$pv" --)
 
-            (run_test_checkpoint "$pv" "row")
-            # Use one version binary to verify data files generated by the other version
-            (verify_test_checkpoint "$b" "$pv" "row")
-            (verify_test_checkpoint "$pv" "$b" "row")
+            # Only run verify if the picked version supports test checkpoint recovery
+            if [ $rtn == "no" ]; then
+                echo -e "\n\"$pv\" does not support test checkpoint with recovery, skipping ...\n"
+            # Apply patch fix from WT-8708 to already released compatible versions to avoid
+            # test/checkpoint setting commit timestamp less than stable timestamp
+            elif [ $rtn == "yes" ] && [ -z $patch_fix_included ]; then
+                cd $pv;
+
+                git format-patch -1 d4b0ad6cacb874fdc20bcc76311d789dd5a01441;
+                patch -p1 < 0001-WT-8708-Fix-timestamp-usage-error-in-test-checkpoint.patch;
+
+                cd ..;
+                (build_branch $pv)
+
+                (run_test_checkpoint "$pv" "row")
+                # Use one version binary to verify data files generated by the other version
+                (verify_test_checkpoint "$b" "$pv" "row")
+                (verify_test_checkpoint "$pv" "$b" "row")
+            fi
         fi
     done
 
@@ -810,10 +1027,6 @@ if [ "$newer" = true ]; then
     for i in ${!newer_release_branches[@]}; do
         [[ $((i+1)) < ${#newer_release_branches[@]} ]] && \
         (verify_test_format ${newer_release_branches[$((i+1))]} ${newer_release_branches[$i]} "row" false)
-    done
-    for i in ${!test_checkpoint_release_branches[@]}; do
-        [[ $((i+1)) < ${#test_checkpoint_release_branches[@]} ]] && \
-        (verify_test_checkpoint ${test_checkpoint_release_branches[$((i+1))]} ${test_checkpoint_release_branches[$i]} "row")
     done
 fi
 

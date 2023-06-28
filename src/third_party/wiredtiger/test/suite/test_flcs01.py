@@ -41,8 +41,8 @@ class test_flcs01(wttest.WiredTigerTestCase):
     conn_config = 'in_memory=false'
 
     # Evict the page to force reconciliation.
-    def evict(self, uri, key, check_value):
-        evict_cursor = self.session.open_cursor(uri, None, "debug=(release_evict)")
+    def evict(self, ds, uri, key, check_value):
+        evict_cursor = ds.open_cursor(uri, None, "debug=(release_evict)")
         self.session.begin_transaction()
         v = evict_cursor[key]
         self.assertEqual(v, check_value)
@@ -105,6 +105,7 @@ class test_flcs01(wttest.WiredTigerTestCase):
         self.check_prev(cursor, k, 0)
         self.session.rollback_transaction()
 
+    @wttest.skip_for_hook("timestamp", "crashes in evict function, during cursor reset")  # FIXME-WT-9809
     def test_flcs(self):
         uri = "table:test_flcs01"
         nrows = 44
@@ -120,7 +121,7 @@ class test_flcs01(wttest.WiredTigerTestCase):
         appendkey2 = nrows + 17
 
         # Write a few records.
-        cursor = self.session.open_cursor(uri)
+        cursor = ds.open_cursor(uri)
         self.session.begin_transaction()
         for i in range(1, nrows + 1):
             cursor[i] = i
@@ -186,7 +187,7 @@ class test_flcs01(wttest.WiredTigerTestCase):
         self.session.rollback_transaction()
 
         # Evict the page to force reconciliation.
-        self.evict(uri, 1, 1)
+        self.evict(ds, uri, 1, 1)
 
         # The committed zeros should still be there.
         self.session.begin_transaction()

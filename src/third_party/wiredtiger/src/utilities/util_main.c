@@ -11,7 +11,7 @@
 const char *home = "."; /* Home directory */
 const char *progname;   /* Program name */
                         /* Global arguments */
-const char *usage_prefix = "[-LmRrSVv] [-C config] [-E secretkey] [-h home]";
+const char *usage_prefix = "[-BLmRrSVv] [-C config] [-E secretkey] [-h home]";
 bool verbose = false; /* Verbose flag */
 
 static const char *command; /* Command name */
@@ -50,7 +50,7 @@ usage(void)
       "-R", "run recovery (if recovery configured)", "-r",
       "access the database via a readonly connection", "-S",
       "run salvage recovery (if recovery configured)", "-V", "display library version and exit",
-      "-v", "verbose", NULL, NULL};
+      "-v", "verbose", "-?", "show this message", NULL, NULL};
     static const char *commands[] = {"alter", "alter an object", "backup", "database backup",
       "compact", "compact an object", "copyright", "display copyright information", "create",
       "create an object", "downgrade", "downgrade a database", "drop", "drop an object", "dump",
@@ -112,7 +112,8 @@ main(int argc, char *argv[])
     rec_config = REC_ERROR;
     backward_compatible = logoff = meta_verify = readonly = recover = salvage = false;
     /* Check for standard options. */
-    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:LmRrSVv")) != EOF)
+    __wt_optwt = 1; /* enable WT-specific behavior */
+    while ((ch = __wt_getopt(progname, argc, argv, "BC:E:h:LmRrSVv?")) != EOF)
         switch (ch) {
         case 'B': /* backward compatibility */
             backward_compatible = true;
@@ -160,6 +161,8 @@ main(int argc, char *argv[])
             verbose = true;
             break;
         case '?':
+            usage();
+            goto done;
         default:
             usage();
             goto err;

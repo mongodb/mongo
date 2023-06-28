@@ -62,12 +62,13 @@ class test_cursor06(wttest.WiredTigerTestCase):
         cursor.set_key(self.ds.key(10))
         cursor.set_value(self.ds.value(10))
 
+    @wttest.skip_for_hook("timestamp", "crashes on final connection close")  # FIXME-WT-9809
     def test_reconfigure_overwrite(self):
         uri = self.type + self.name
         for open_config in (None, "overwrite=0", "overwrite=1"):
             self.session.drop(uri, "force")
             self.populate(uri)
-            cursor = self.session.open_cursor(uri, None, open_config)
+            cursor = self.ds.open_cursor(uri, None, open_config)
             if open_config != "overwrite=0":
                 self.set_kv(cursor)
                 cursor.insert()
@@ -86,7 +87,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
         for open_config in (None, "readonly=0", "readonly=1"):
             self.session.drop(uri, "force")
             self.populate(uri)
-            cursor = self.session.open_cursor(uri, None, open_config)
+            cursor = self.ds.open_cursor(uri, None, open_config)
             msg = '/Unsupported cursor/'
             if open_config == "readonly=1":
                 self.set_kv(cursor)
@@ -100,7 +101,7 @@ class test_cursor06(wttest.WiredTigerTestCase):
     def test_reconfigure_invalid(self):
         uri = self.type + self.name
         self.populate(uri)
-        c = self.session.open_cursor(uri, None, None)
+        c = self.ds.open_cursor(uri, None, None)
         c.reconfigure("overwrite=1")
         msg = '/Invalid argument/'
         self.assertRaisesWithMessage(wiredtiger.WiredTigerError,

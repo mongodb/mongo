@@ -102,10 +102,10 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         self.assertEqual(count, expected)
 
     # Open a cursor in a new session and confirm how many records it sees.
-    def outside_count(self, isolation, expected):
+    def outside_count(self, ds, isolation, expected):
         s = self.conn.open_session()
         s.begin_transaction(isolation)
-        cursor = s.open_cursor(self.type + self.name, None)
+        cursor = ds.open_cursor(self.type + self.name, None, session=s)
         self.cursor_count(cursor, expected)
         s.close()
 
@@ -130,7 +130,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # Optionally add a few overflow records so we block fast delete on
         # those pages.
         if self.overflow:
-            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+            cursor = ds.open_cursor(uri, None, 'overwrite=false')
             for i in range(1, self.nentries, 3123):
                 cursor.set_key(ds.key(i))
                 cursor.set_value(ds.value(i))
@@ -142,7 +142,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
 
         # Optionally read/write a few rows before truncation.
         if self.readbefore or self.writebefore:
-            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+            cursor = ds.open_cursor(uri, None, 'overwrite=false')
             if self.readbefore:
                     for i in range(1, self.nentries, 737):
                         cursor.set_key(ds.key(i))
@@ -156,17 +156,17 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
 
         # Begin a transaction, and truncate a big range of rows.
         self.session.begin_transaction(None)
-        start = self.session.open_cursor(uri, None)
+        start = ds.open_cursor(uri, None)
         start.set_key(ds.key(10))
-        end = self.session.open_cursor(uri, None)
+        end = ds.open_cursor(uri, None)
         end.set_key(ds.key(self.nentries - 10))
-        self.session.truncate(None, start, end, None)
+        ds.truncate(None, start, end, None)
         start.close()
         end.close()
 
         # Optionally read/write a few rows after truncation.
         if self.readafter or self.writeafter:
-            cursor = self.session.open_cursor(uri, None, 'overwrite=false')
+            cursor = ds.open_cursor(uri, None, 'overwrite=false')
             if self.readafter:
                     for i in range(1, self.nentries, 1123):
                         cursor.set_key(ds.key(i))
@@ -182,15 +182,15 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
         # The number 19 comes from deleting row 10 (inclusive), to row N - 10,
         # exclusive, or 9 + 10 == 19.
         remaining = 19
-        cursor = self.session.open_cursor(uri, None)
+        cursor = ds.open_cursor(uri, None)
         self.cursor_count(cursor, remaining)
         cursor.close()
 
         # A separate, read_committed cursor should not see the deleted records.
-        self.outside_count("isolation=read-committed", self.nentries)
+        self.outside_count(ds, "isolation=read-committed", self.nentries)
 
         # A separate, read_uncommitted cursor should see the deleted records.
-        self.outside_count("isolation=read-uncommitted", remaining)
+        self.outside_count(ds, "isolation=read-uncommitted", remaining)
 
         # Commit/rollback the transaction.
         if self.commit:
@@ -199,7 +199,7 @@ class test_truncate_fast_delete(wttest.WiredTigerTestCase):
                 self.session.rollback_transaction()
 
         # Check a read_committed cursor sees the right records.
-        cursor = self.session.open_cursor(uri, None)
+        cursor = ds.open_cursor(uri, None)
         if self.commit:
                 self.cursor_count(cursor, remaining)
         else:

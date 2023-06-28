@@ -86,7 +86,12 @@ __posix_sync(WT_SESSION_IMPL *session, int fd, const char *name, const char *fun
         WT_RET_PANIC(session, ret, "%s: %s: fcntl(F_FULLFSYNC)", name, func);
     }
 #endif
-#if defined(HAVE_FDATASYNC)
+/*
+ * Use fsync in case we run on BSD systems that don't flush file size changes as part of fdatasync.
+ * This is for extra safety and is not a guarantee that we are providing full support for these
+ * systems and/or other non POSIX 1003.1 Unix systems.
+ */
+#if defined(HAVE_FDATASYNC) && !defined(BSD)
     /* See comment in __posix_sync(): sync cannot be retried or fail. */
     WT_SYSCALL(fdatasync(fd), ret);
     if (ret == 0)
@@ -411,8 +416,9 @@ __posix_file_read(
     session = (WT_SESSION_IMPL *)wt_session;
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-    __wt_verbose(session, WT_VERB_READ, "read: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT,
-      file_handle->name, pfh->fd, offset, len);
+    __wt_verbose_debug2(session, WT_VERB_READ,
+      "read: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT, file_handle->name, pfh->fd, offset,
+      len);
 
     /* Assert direct I/O is aligned and a multiple of the alignment. */
     WT_ASSERT(session,
@@ -456,7 +462,7 @@ __posix_file_read_mmap(
     if (!pfh->mmap_file_mappable || pfh->mmap_resizing)
         return (__posix_file_read(file_handle, wt_session, offset, len, buf));
 
-    __wt_verbose(session, WT_VERB_READ,
+    __wt_verbose_debug2(session, WT_VERB_READ,
       "read-mmap: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT
       ", mapped buffer: %p, mapped size = %" PRId64,
       file_handle->name, pfh->fd, offset, len, (void *)pfh->mmap_buf, pfh->mmap_size);
@@ -564,7 +570,7 @@ __posix_file_truncate(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, wt_of
     session = (WT_SESSION_IMPL *)wt_session;
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-    __wt_verbose(session, WT_VERB_FILEOPS,
+    __wt_verbose_debug2(session, WT_VERB_FILEOPS,
       "%s, file-truncate: size=%" PRId64 ", mapped size=%" PRId64, file_handle->name, len,
       pfh->mmap_size);
 
@@ -602,8 +608,9 @@ __posix_file_write(
     session = (WT_SESSION_IMPL *)wt_session;
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-    __wt_verbose(session, WT_VERB_WRITE, "write: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT,
-      file_handle->name, pfh->fd, offset, len);
+    __wt_verbose_debug2(session, WT_VERB_WRITE,
+      "write: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT, file_handle->name, pfh->fd,
+      offset, len);
 
     /* Assert direct I/O is aligned and a multiple of the alignment. */
     WT_ASSERT(session,
@@ -640,7 +647,7 @@ __posix_file_write_mmap(
     session = (WT_SESSION_IMPL *)wt_session;
     pfh = (WT_FILE_HANDLE_POSIX *)file_handle;
 
-    __wt_verbose(session, WT_VERB_WRITE,
+    __wt_verbose_debug2(session, WT_VERB_WRITE,
       "write-mmap: %s, fd=%d, offset=%" PRId64 ", len=%" WT_SIZET_FMT
       ", mapped buffer: %p, mapped size = %" PRId64,
       file_handle->name, pfh->fd, offset, len, (void *)pfh->mmap_buf, pfh->mmap_size);

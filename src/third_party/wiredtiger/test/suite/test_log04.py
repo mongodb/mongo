@@ -51,6 +51,7 @@ class test_log04(wttest.WiredTigerTestCase):
         self.assertEqual(cursor[key], value)
         self.session.rollback_transaction()
 
+    @wttest.prevent(["timestamp"])  # prevent the use of hooks that manage timestamps
     def test_logts(self):
         # Create logged and non-logged objects. The non-logged objects are in two versions, one is
         # updated with a commit timestamp and one is not. Update the logged and non-logged timestamp

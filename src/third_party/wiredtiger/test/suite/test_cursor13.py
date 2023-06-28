@@ -469,7 +469,7 @@ class test_cursor13_big(test_cursor13_big_base):
 
         # At this point, we'll randomly open/close lots of cursors, keeping
         # track of how many of each. As long as we don't have more than [deep]
-        # cursors open for each uri, we should always be taking then from
+        # cursors open for each uri, we should always be taking them from
         # the set of cached cursors.
         while self.opencount < self.nopens:
             self.open_or_close(uri_map, rand, 0, self.nuris)

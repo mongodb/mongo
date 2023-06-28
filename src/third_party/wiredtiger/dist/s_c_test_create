@@ -15,8 +15,8 @@ tmp=__a
 trap 'rm -f $tmp' 0 1 2 3 13 15
 
 if [ "x$1" = "x" ]; then
-	echo "Usage: $0 test_name"
-	exit 1
+    echo "Usage: $0 test_name"
+    exit 1
 fi
 CSUITE_DIRECTORY=../test/csuite
 MAKEFILE_NAME=$CSUITE_DIRECTORY/Makefile.am
@@ -26,8 +26,8 @@ TEST_NAME=$1
 exists=`grep $TEST_NAME $MAKEFILE_NAME`
 
 if [ "x$exists" != "x" ]; then
-	echo "Test with requested name already exists. Try another name."
-	exit 1
+    echo "Test with requested name already exists. Try another name."
+    exit 1
 fi
 
 # Create a subdirectory and stub for the new test
@@ -74,20 +74,20 @@ void (*custom_die)(void) = NULL;
 int
 main(int argc, char *argv[])
 {
-	TEST_OPTS *opts, _opts;
+    TEST_OPTS *opts, _opts;
 
-	opts = &_opts;
-	memset(opts, 0, sizeof(*opts));
-	testutil_check(testutil_parse_opts(argc, argv, opts));
-	testutil_make_work_dir(opts->home);
+    opts = &_opts;
+    memset(opts, 0, sizeof(*opts));
+    testutil_check(testutil_parse_opts(argc, argv, opts));
+    testutil_make_work_dir(opts->home);
 
-	/*
-	 * Insert test implementation here.
-	 */
+    /*
+     * Insert test implementation here.
+     */
 
-	testutil_cleanup(opts);
+    testutil_cleanup(opts);
 
-	return (0);
+    return (0);
 }
 EOF
 ) > $CSUITE_DIRECTORY/$TEST_NAME/main.c

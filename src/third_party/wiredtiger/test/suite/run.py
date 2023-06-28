@@ -121,14 +121,17 @@ Options:\n\
   -h      | --help               show this message\n\
           | --hook name[=arg]    set up hooks from hook_<name>.py, with optional arg\n\
   -j N    | --parallel N         run all tests in parallel using N processes\n\
-  -l      | --long               run the entire test suite\n\
+  -l      | --long               run nearly the entire test suite except tests tagged extralongtest\n\
+  -xl     | --extra-long         run the entire test suite\n\
           | --noremove           do not remove WT_TEST or -D target before run\n\
   -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
   -r N    | --random-sample N    randomly sort scenarios to be run, then\n\
                                  execute every Nth (2<=N<=1000) scenario.\n\
   -s N    | --scenario N         use scenario N (N can be symbolic, number, or\n\
-                                 list of numbers and ranges in the form 1,3-5,7)\n\
+                                 list of numbers and ranges in the form 1,3-5,7),\n\
+                                 and -1 matches tests with no scenarios.\n\
   -t      | --timestamp          name WT_TEST according to timestamp\n\
+            --timeout N          have any test that exceeds N seconds throw an error.\n\
   -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
   -i      | --ignore-stdout      dont fail on unexpected stdout or stderr\n\
   -R      | --randomseed         run with random seeds for generates random numbers\n\
@@ -188,7 +191,13 @@ def parse_int_list(str):
             scenario = int(bounds[0])
             ret[scenario] = True
             continue
-        if len(bounds) == 2 and bounds[0].isdigit() and bounds[1].isdigit():
+        elif len(bounds) == 2 and len(bounds[0]) == 0 and bounds[1].isdigit():
+            # It's a negative number.  We indicate "has no scenarios" by -1, anything else is not allowed.
+            if r == '-1':
+                scenario = -1
+                ret[scenario] = True
+                continue
+        elif len(bounds) == 2 and bounds[0].isdigit() and bounds[1].isdigit():
             # It's two numbers separated by a dash.
             for scenario in range(int(bounds[0]), int(bounds[1]) + 1):
                 ret[scenario] = True
@@ -198,13 +207,19 @@ def parse_int_list(str):
     return ret
 
 def restrictScenario(testcases, restrict):
+    # Inner function to see if test case matches a scenario list
+    def scenarioMatch(testcase, scenario_list):
+        matchint = -1
+        if hasattr(testcase, 'scenario_number'):
+            matchint = int(testcase.scenario_number)
+        return matchint in scenario_list
+
     if restrict == '':
         return testcases
     else:
         scenarios = parse_int_list(restrict)
         if scenarios is not None:
-            return [t for t in testcases
-                if hasattr(t, 'scenario_number') and t.scenario_number in scenarios]
+            return [t for t in testcases if scenarioMatch(t, scenarios)]
         else:
             return [t for t in testcases
                 if hasattr(t, 'scenario_name') and t.scenario_name == restrict]
@@ -333,7 +348,7 @@ def error(exitval, prefix, msg):
 
 if __name__ == '__main__':
     # Turn numbers and ranges into test module names
-    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = False
+    preserve = timestamp = debug = dryRun = gdbSub = lldbSub = longtest = zstdtest = ignoreStdout = extralongtest = False
     removeAtStart = True
     asan = False
     parallel = 0
@@ -348,6 +363,11 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     testargs = []
     hook_names = []
+    timeout = 0
+    # Generate a random string to use as a prefix for the tiered test objects to group them under
+    # the same test run.
+    ss_random_prefix = str(random.randrange(1, 2147483646))
+
     while len(args) > 0:
         arg = args.pop(0)
         from unittest import defaultTestLoader as loader
@@ -406,6 +426,10 @@ if __name__ == '__main__':
             if option == '-long' or option == 'l':
                 longtest = True
                 continue
+            if option == '-extra-long' or option == 'xl':
+                longtest = True
+                extralongtest = True
+                continue
             if option == '-zstd' or option == 'z':
                 zstdtest = True
                 continue
@@ -438,6 +462,12 @@ if __name__ == '__main__':
                 continue
             if option == '-timestamp' or option == 't':
                 timestamp = True
+                continue
+            if option == '-timeout':
+                if timeout != 0 or len(args) == 0:
+                    usage()
+                    sys.exit(2)
+                timeout = int(args.pop(0))
                 continue
             if option == '-verbose' or option == 'v':
                 if len(args) == 0:
@@ -566,16 +596,12 @@ if __name__ == '__main__':
     # All global variables should be set before any test classes are loaded.
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, removeAtStart, timestamp, gdbSub, lldbSub,
-                                          verbose, wt_builddir, dirarg, longtest, zstdtest,
-                                          ignoreStdout, seedw, seedz, hookmgr)
+                                          verbose, wt_builddir, dirarg, longtest, extralongtest, 
+                                          zstdtest, ignoreStdout, seedw, seedz, hookmgr, 
+                                          ss_random_prefix, timeout)
 
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
-        if scenario != '':
-            sys.stderr.write(
-                'run.py: specifying a scenario requires a test name\n')
-            usage()
-            sys.exit(2)
         from discover import defaultTestLoader as loader
         suites = loader.discover(suitedir)
 
@@ -595,12 +621,13 @@ if __name__ == '__main__':
         suites = sorted(suites, key=lambda c: str(list(c)[0]))
         if configfile != None:
             suites = configApply(suites, configfile, configwrite)
-        tests.addTests(restrictScenario(generate_scenarios(suites), ''))
+        tests.addTests(restrictScenario(generate_scenarios(suites), scenario))
     else:
         for arg in testargs:
             testsFromArg(tests, loader, arg, scenario)
 
     tests = hookmgr.filter_tests(tests)
+
     # Shuffle the tests and create a new suite containing every Nth test from
     # the original suite
     if random_sample > 0:
@@ -629,10 +656,10 @@ if __name__ == '__main__':
                     hugetests.add(name)    # warn for too many scenarios
             return (s, test.simpleName())  # sort by scenario number first
         all_tests = sorted(tests, key = get_sort_keys)
-        if not longtest:
+        if not (longtest or extralongtest):
             for name in hugetests:
                 print("WARNING: huge test " + name + " has > 1000 scenarios.\n" +
-                      "That is only appropriate when using the --long option.\n" +
+                      "That is only appropriate when using the --long or --extra-long option.\n" +
                       "The number of scenarios for the test should be pruned")
 
         # At this point we have an ordered list of all the tests.

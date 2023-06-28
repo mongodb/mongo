@@ -115,6 +115,12 @@ class DemoHookCreator(wthooks.WiredTigerHookCreator):
         print('Filtering: ' + str(tests))
         return tests
 
+    # If the hook wants to override some implementation of the test framework,
+    # it would need to subclass wthooks.WiredTigerHookPlatformAPI and return
+    # an object of that type here.
+    def get_platform_api(self):
+        return None
+
     def setup_hooks(self):
         tty('>> SETUP HOOKS RUN')
         orig_session_create = self.Session['create']     # gets original function

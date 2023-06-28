@@ -9,16 +9,16 @@ To use the builtin support for Yann Collet's
 <a href="https://github.com/Cyan4973/lz4">LZ4</a>
 compression, first check that LZ4 is installed in include and library
 directories searched by the compiler.  Once LZ4 is installed, you can
-enable LZ4 using the \c --enable-lz4 option to configure.
+enable LZ4 using the \c -DENABLE_LZ4=1 option to cmake.
 
 If LZ4 is installed in a location not normally searched by the
-compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
+compiler toolchain, you'll need to modify the include and library paths
 to indicate these locations.  For example, with the LZ4 includes and
 libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-would run configure with the following additional arguments:
+would run cmake with the following additional arguments:
 
 @code
---enable-lz4 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+-DENABLE_LZ4=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
 @endcode
 
 When opening the WiredTiger database, load the LZ4 shared library as
@@ -38,16 +38,16 @@ To use the builtin support for
 <a href="http://code.google.com/p/snappy/">Google's snappy</a>
 compression, first check that snappy is installed in include and library
 directories searched by the compiler.  Once snappy is installed, you can
-enable snappy using the \c --enable-snappy option to configure.
+enable snappy using the \c -DENABLE_SNAPPY=1 option to cmake.
 
 If snappy is installed in a location not normally searched by the
-compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
+compiler toolchain, you'll need to modify the include and library paths
 to indicate these locations.  For example, with the snappy includes and
 libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-would run configure with the following additional arguments:
+would run cmake with the following additional arguments:
 
 @code
---enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+-DENABLE_SNAPPY=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
 @endcode
 
 When opening the WiredTiger database, load the snappy shared library as
@@ -67,16 +67,16 @@ To use the builtin support for Greg Roelofs' and Mark Adler's
 <a href="http://www.zlib.net/">zlib</a>
 compression, first check that zlib is installed in include and library
 directories searched by the compiler.  Once zlib is installed, you can
-enable zlib using the \c --enable-zlib option to configure.
+enable zlib using the \c -DENABLE_ZLIB=1 option to cmake.
 
 If zlib is installed in a location not normally searched by the compiler
-toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS to
+toolchain, you'll need to modify the include and library paths to
 indicate these locations.  For example, with the zlib includes and
 libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-would run configure with the following additional arguments:
+would run cmake with the following additional arguments:
 
 @code
---enable-zlib CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+-DENABLE_ZLIB=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
 @endcode
 
 When opening the WiredTiger database, load the zlib shared library as
@@ -97,25 +97,25 @@ to \c zlib:
 
 @snippet ex_all.c Create a zlib compressed table
 
-@section compression_zstd Using Zstd compression
+@section compression_zstd Using zstd compression
 
 To use the builtin support for Facebook's
-<a href="https://github.com/facebook/zstd">Zstd</a>
-compression, first check that Zstd is installed in include and library
-directories searched by the compiler.  Once Zstd is installed, you can
-enable Zstd using the \c --enable-zstd option to configure.
+<a href="https://github.com/facebook/zstd">zstd</a>
+compression, first check that zstd is installed in include and library
+directories searched by the compiler.  Once zstd is installed, you can
+enable zstd using the \c -DENABLE_ZSTD=1 option to cmake.
 
-If Zstd is installed in a location not normally searched by the
-compiler toolchain, you'll need to modify the \c CPPFLAGS and \c LDFLAGS
-to indicate these locations.  For example, with the Zstd includes and
+If zstd is installed in a location not normally searched by the
+compiler toolchain, you'll need to modify the include and library paths
+to indicate these locations.  For example, with the zstd includes and
 libraries installed in \c /usr/local/include and \c /usr/local/lib, you
-would run configure with the following additional arguments:
+would run cmake with the following additional arguments:
 
 @code
---enable-zstd CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+-DENABLE_ZSTD=1 -DCMAKE_INCLUDE_PATH=/usr/local/include -DCMAKE_LIBRARY_PATH=/usr/local/lib
 @endcode
 
-When opening the WiredTiger database, load the Zstd shared library as
+When opening the WiredTiger database, load the zstd shared library as
 an extension.  For example, with the WiredTiger library installed in
 \c /usr/local/lib, you would use the following extension:
 

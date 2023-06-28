@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, shutil
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from suite_subprocess import suite_subprocess
 import wttest
 from wtscenario import make_scenarios
@@ -60,6 +60,7 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
         ('no_ckpt', dict(ckpt=False)),
         ('with_ckpt', dict(ckpt=True)),
     ]
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, types, ops, ckpt)
     count = 0
     lsns = []
@@ -71,9 +72,9 @@ class test_schema08(TieredConfigMixin, wttest.WiredTigerTestCase, suite_subproce
 
     def do_alter(self, uri, suburi):
         alter_param = 'cache_resident=true'
-        self.alter(uri, alter_param)
+        self.session.alter(uri, alter_param)
         if suburi != None:
-            self.alter(suburi, alter_param)
+            self.session.alter(suburi, alter_param)
 
     def do_ops(self, uri, suburi):
         if (self.schema_ops == 'none'):

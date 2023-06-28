@@ -73,6 +73,7 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         return statDict
 
     # Test compaction.
+    @wttest.skip_for_hook("timestamp", "removing timestamped items will not free space")
     def test_compact(self):
         # Populate an object
         uri = self.type + self.name
@@ -88,11 +89,11 @@ class test_compact(wttest.WiredTigerTestCase, suite_subprocess):
         stat_cursor.close()
 
         # Remove most of the object.
-        c1 = self.session.open_cursor(uri, None)
+        c1 = ds.open_cursor(uri, None)
         c1.set_key(ds.key(5))
-        c2 = self.session.open_cursor(uri, None)
+        c2 = ds.open_cursor(uri, None)
         c2.set_key(ds.key(self.nentries - 5))
-        self.session.truncate(None, c1, c2, None)
+        ds.truncate(None, c1, c2, None)
         c1.close()
         c2.close()
 

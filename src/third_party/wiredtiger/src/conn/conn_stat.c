@@ -494,17 +494,19 @@ __statlog_log_one(WT_SESSION_IMPL *session, WT_ITEM *path, WT_ITEM *tmp)
 
     /*
      * Lock the schema and walk the list of open handles, dumping any that match the list of object
-     * sources.
+     * sources. Statistics logging starts before recovery is run. Only walk the handles after the
+     * connection completes recovery.
      */
-    if (conn->stat_sources != NULL)
+    if (conn->stat_sources != NULL && F_ISSET(conn, WT_CONN_RECOVERY_COMPLETE))
         WT_RET(__wt_conn_btree_apply(session, NULL, __statlog_apply, NULL, NULL));
 
     /*
-     * Walk the list of open LSM trees, dumping any that match the list of object sources.
+     * Walk the list of open LSM trees, dumping any that match the list of object sources. Only walk
+     * handles after the connection after completes recovery.
      *
      * XXX This code should be removed when LSM objects are converted to data handles.
      */
-    if (conn->stat_sources != NULL)
+    if (conn->stat_sources != NULL && F_ISSET(conn, WT_CONN_RECOVERY_COMPLETE))
         WT_RET(__statlog_lsm_apply(session));
     WT_RET(__statlog_print_footer(session));
 

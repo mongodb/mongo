@@ -72,7 +72,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor()
 
         c.set_key(ds.key(25))
         self.assertEquals(c.search(), 0)
@@ -94,7 +94,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor()
 
         c.set_key(ds.key(25))
         c.remove()
@@ -115,7 +115,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor()
 
         c.set_key(ds.key(25))
         self.assertEquals(c.search(), 0)
@@ -137,7 +137,7 @@ class test_cursor11(wttest.WiredTigerTestCase):
         ds = self.ds(self, uri, 50, key_format=self.keyfmt)
         ds.populate()
         s = self.conn.open_session()
-        c = s.open_cursor(uri, None)
+        c = ds.open_cursor()
 
         c.set_key(ds.key(25))
         c.set_value(ds.value(300))

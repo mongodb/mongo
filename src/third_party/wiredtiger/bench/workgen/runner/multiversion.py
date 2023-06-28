@@ -62,10 +62,12 @@ s.create(tname, 'key_format=S,value_format=S')
 ops = Operation(Operation.OP_INSERT, Table(tname), Key(Key.KEYGEN_APPEND, 10), Value(40))
 thread = Thread(ops)
 workload = Workload(context, thread)
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret
 show(tname, s)
 
 thread = Thread(ops * 5)
 workload = Workload(context, thread)
-workload.run(conn)
+ret = workload.run(conn)
+assert ret == 0, ret
 show(tname, s)

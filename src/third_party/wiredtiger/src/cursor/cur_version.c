@@ -20,7 +20,7 @@ __curversion_set_key(WT_CURSOR *cursor, ...)
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint32_t flags;
+    uint64_t flags;
     va_list ap;
 
     session = CUR2S(cursor);
@@ -51,7 +51,7 @@ __curversion_get_key(WT_CURSOR *cursor, ...)
     WT_CURSOR *file_cursor;
     WT_CURSOR_VERSION *version_cursor;
     WT_DECL_RET;
-    uint32_t flags;
+    uint64_t flags;
     va_list ap;
 
     version_cursor = (WT_CURSOR_VERSION *)cursor;
@@ -162,8 +162,7 @@ __curversion_next_int(WT_CURSOR *cursor)
     WT_TIME_WINDOW *twp;
     WT_UPDATE *first, *next_upd, *upd, *tombstone;
     wt_timestamp_t durable_start_ts, durable_stop_ts, stop_ts;
-    uint64_t stop_txn, hs_upd_type;
-    uint32_t raw;
+    uint64_t stop_txn, hs_upd_type, raw;
     uint8_t *p, version_prepare_state;
     bool upd_found;
 
@@ -308,32 +307,46 @@ __curversion_next_int(WT_CURSOR *cursor)
             WT_ERR(__wt_illegal_value(session, page->type));
         }
 
-        /* Get the ondisk value. */
-        WT_ERR(__wt_value_return_buf(cbt, cbt->ref, &cbt->upd_value->buf, &cbt->upd_value->tw));
+        /*
+         * Get the ondisk value. It is possible to see an overflow removed value if checkpoint has
+         * visited this page and freed the underlying overflow blocks. In this case, checkpoint
+         * reconciliation must have also appended the value to the update chain and moved it to the
+         * history store if it is not obsolete. Therefore, we should have either already returned it
+         * when walking the update chain if we are not racing with checkpoint removing the overflow
+         * value concurrently or we shall return it later when we scan the history store if we do
+         * race with checkpoint. If it is already obsolete, there is no need for us to return it as
+         * the version cursor only ensures to return values that are not obsolete. We can safely
+         * ignore the overflow removed value here.
+         */
+        WT_ERR_ERROR_OK(
+          __wt_value_return_buf(cbt, cbt->ref, &cbt->upd_value->buf, &cbt->upd_value->tw),
+          WT_RESTART, true);
+        if (ret == 0) {
+            if (!WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw)) {
+                durable_stop_ts = version_cursor->upd_durable_stop_ts;
+                stop_ts = version_cursor->upd_stop_ts;
+                stop_txn = version_cursor->upd_stop_txnid;
+            } else {
+                durable_stop_ts = cbt->upd_value->tw.durable_stop_ts;
+                stop_ts = cbt->upd_value->tw.stop_ts;
+                stop_txn = cbt->upd_value->tw.stop_txn;
+            }
 
-        if (!WT_TIME_WINDOW_HAS_STOP(&cbt->upd_value->tw)) {
-            durable_stop_ts = version_cursor->upd_durable_stop_ts;
-            stop_ts = version_cursor->upd_stop_ts;
-            stop_txn = version_cursor->upd_stop_txnid;
-        } else {
-            durable_stop_ts = cbt->upd_value->tw.durable_stop_ts;
-            stop_ts = cbt->upd_value->tw.stop_ts;
-            stop_txn = cbt->upd_value->tw.stop_txn;
-        }
+            if (tombstone != NULL &&
+              (tombstone->prepare_state == WT_PREPARE_INPROGRESS ||
+                tombstone->prepare_state == WT_PREPARE_LOCKED))
+                version_prepare_state = 1;
+            else
+                version_prepare_state = cbt->upd_value->tw.prepare;
 
-        if (tombstone != NULL &&
-          (tombstone->prepare_state == WT_PREPARE_INPROGRESS ||
-            tombstone->prepare_state == WT_PREPARE_LOCKED))
-            version_prepare_state = 1;
-        else
-            version_prepare_state = cbt->upd_value->tw.prepare;
+            WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
+              cbt->upd_value->tw.start_txn, cbt->upd_value->tw.start_ts,
+              cbt->upd_value->tw.durable_start_ts, stop_txn, stop_ts, durable_stop_ts,
+              WT_UPDATE_STANDARD, version_prepare_state, 0, WT_CURVERSION_DISK_IMAGE));
 
-        WT_ERR(__curversion_set_value_with_format(cursor, WT_CURVERSION_METADATA_FORMAT,
-          cbt->upd_value->tw.start_txn, cbt->upd_value->tw.start_ts,
-          cbt->upd_value->tw.durable_start_ts, stop_txn, stop_ts, durable_stop_ts,
-          WT_UPDATE_STANDARD, version_prepare_state, 0, WT_CURVERSION_DISK_IMAGE));
-
-        upd_found = true;
+            upd_found = true;
+        } else
+            ret = 0;
         F_SET(version_cursor, WT_CURVERSION_ON_DISK_EXHAUSTED);
     }
 
@@ -588,6 +601,7 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
 {
     WT_CURSOR_STATIC_INIT(iface, __curversion_get_key, /* get-key */
       __curversion_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,            /* get-raw-key-value */
       __curversion_set_key,                            /* set-key */
       __wt_cursor_set_value_notsup,                    /* set-value */
       __wt_cursor_compare_notsup,                      /* compare */
@@ -602,10 +616,12 @@ __wt_curversion_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner
       __wt_cursor_notsup,                              /* update */
       __wt_cursor_notsup,                              /* remove */
       __wt_cursor_notsup,                              /* reserve */
-      __wt_cursor_reconfigure_notsup,                  /* reconfigure */
+      __wt_cursor_config_notsup,                       /* reconfigure */
       __wt_cursor_notsup,                              /* largest_key */
+      __wt_cursor_config_notsup,                       /* bound */
       __wt_cursor_notsup,                              /* cache */
       __wt_cursor_reopen_notsup,                       /* reopen */
+      __wt_cursor_checkpoint_id,                       /* checkpoint ID */
       __curversion_close);                             /* close */
 
     WT_CURSOR *cursor;

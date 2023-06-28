@@ -239,14 +239,15 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
   WT_UPDATE **srch_upd, WT_UPDATE **updp, size_t upd_size, bool exclusive)
 {
     WT_DECL_RET;
-    WT_UPDATE *obsolete, *upd;
+    WT_UPDATE *upd;
     wt_timestamp_t obsolete_timestamp, prev_upd_ts;
     uint64_t txn;
 
     /* Clear references to memory we now own and must free on error. */
     upd = *updp;
     *updp = NULL;
-    prev_upd_ts = WT_TS_NONE;
+
+    WT_ASSERT(session, upd != NULL);
 
     prev_upd_ts = upd->prev_durable_ts;
 
@@ -258,8 +259,8 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
      * Check if our update is still permitted.
      */
     while (!__wt_atomic_cas_ptr(srch_upd, upd->next, upd)) {
-        if ((ret = __wt_txn_modify_check(session, cbt, upd->next = *srch_upd, &prev_upd_ts,
-               (upd == NULL) ? WT_UPDATE_INVALID : upd->type)) != 0) {
+        if ((ret = __wt_txn_modify_check(
+               session, cbt, upd->next = *srch_upd, &prev_upd_ts, upd->type)) != 0) {
             /* Free unused memory on error. */
             __wt_free(session, upd);
             return (ret);
@@ -299,7 +300,15 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
         obsolete_timestamp = page->modify->obsolete_check_timestamp;
         if (!__wt_txn_visible_all(session, txn, obsolete_timestamp)) {
             /* Try to move the oldest ID forward and re-check. */
-            WT_RET(__wt_txn_update_oldest(session, 0));
+            ret = __wt_txn_update_oldest(session, 0);
+            /*
+             * We cannot proceed if we fail here as we have inserted the updates to the update
+             * chain. Panic instead. Currently, we don't ever return any error from
+             * __wt_txn_visible_all. We can catch it if we start to do so in the future and properly
+             * handle it.
+             */
+            if (ret != 0)
+                WT_RET_PANIC(session, ret, "fail to update oldest after serializing the updates");
 
             if (!__wt_txn_visible_all(session, txn, obsolete_timestamp))
                 return (0);
@@ -308,15 +317,7 @@ __wt_update_serial(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_PAGE *page
         page->modify->obsolete_check_txn = WT_TXN_NONE;
     }
 
-    /* If we can't lock it, don't scan, that's okay. */
-    if (WT_PAGE_TRYLOCK(session, page) != 0)
-        return (0);
-
-    obsolete = __wt_update_obsolete_check(session, cbt, upd->next, true);
-
-    WT_PAGE_UNLOCK(session, page);
-
-    __wt_free_update_list(session, &obsolete);
+    __wt_update_obsolete_check(session, cbt, upd->next, true);
 
     return (0);
 }

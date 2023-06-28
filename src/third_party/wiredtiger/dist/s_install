@@ -8,22 +8,22 @@ f=../INSTALL
 
 force=no
 while :
-	do case "$1" in
-	-f)	# Force versions to be updated
-		force=yes
-		shift;;
-	*)
-		break;;
-	esac
+    do case "$1" in
+    -f)    # Force versions to be updated
+        force=yes
+        shift;;
+    *)
+        break;;
+    esac
 done
 
 # If the version hasn't changed and we aren't forcing the issue, we're done.
 # Don't generate a new INSTALL file just because the date changed unless forced:
 # that happens all the time.
 if test "$force" = no ; then
-	cnt=`(sed -e q < $f; echo "$WIREDTIGER_VERSION_STRING") |
-	    sed -e 's/:.*//' | sort -u | wc -l`
-	test $cnt -eq 1 && exit 0
+    cnt=`(sed -e q < $f; echo "$WIREDTIGER_VERSION_STRING") |
+        sed -e 's/:.*//' | sort -u | wc -l`
+    test $cnt -eq 1 && exit 0
 fi
 
 cat << END_TEXT > $t

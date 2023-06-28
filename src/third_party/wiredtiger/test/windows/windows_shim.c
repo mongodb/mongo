@@ -35,7 +35,7 @@
 int
 sleep(int seconds)
 {
-    Sleep(seconds * 1000);
+    Sleep(seconds * WT_THOUSAND);
     return (0);
 }
 
@@ -47,7 +47,7 @@ int
 usleep(useconds_t useconds)
 {
     uint32_t milli;
-    milli = useconds / 1000;
+    milli = useconds / WT_THOUSAND;
 
     if (milli == 0)
         milli++;
@@ -72,8 +72,8 @@ gettimeofday(struct timeval *tp, void *tzp)
     GetSystemTimeAsFileTime(&time);
 
     ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime) - 116444736000000000LL;
-    tp->tv_sec = ns100 / 10000000;
-    tp->tv_usec = (long)((ns100 % 10000000) / 10);
+    tp->tv_sec = ns100 / (10 * WT_MILLION);
+    tp->tv_usec = (long)((ns100 % (10 * WT_MILLION)) / 10);
 
     return (0);
 }

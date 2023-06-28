@@ -18,7 +18,6 @@ indexes
 isolation_levels
 log_files
 metadata
-mixed_mode_timestamps
 obsolete_data
 out_of_order_timestamps
 overflow_keys

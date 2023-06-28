@@ -218,7 +218,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         #       apply modifications in order,
         #       confirm the final state
         row = 10
-        c = self.session.open_cursor(self.uri, None)
+        c = ds.open_cursor()
         for i in self.list:
             c.set_key(ds.key(row))
             c.set_value(self.make_value(i['o']))
@@ -251,7 +251,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         # For each test in the list:
         #       confirm the final state is there.
         row = 10
-        c = self.session.open_cursor(self.uri, None)
+        c = ds.open_cursor()
         for i in self.list:
             c.set_key(ds.key(row))
             self.assertEquals(c.search(), 0)
@@ -268,7 +268,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         ds = SimpleDataSet(self, self.uri, 100, key_format=self.keyfmt, value_format=self.valuefmt)
         ds.populate()
 
-        c = self.session.open_cursor(self.uri, None)
+        c = ds.open_cursor()
         c.set_key(ds.key(10))
         msg = '/not supported/'
 
@@ -339,12 +339,13 @@ class test_cursor12(wttest.WiredTigerTestCase):
         self.modify_confirm(ds, False)
 
     # Check that we can perform a large number of modifications to a record.
+    @wttest.skip_for_hook("timestamp", "crashes on commit_transaction or connection close")  # FIXME-WT-9809
     def test_modify_many(self):
         ds = SimpleDataSet(self,
             self.uri, 20, key_format=self.keyfmt, value_format=self.valuefmt)
         ds.populate()
 
-        c = self.session.open_cursor(self.uri, None)
+        c = ds.open_cursor()
         self.session.begin_transaction("isolation=snapshot")
         c.set_key(ds.key(10))
         orig = self.make_value('abcdefghijklmnopqrstuvwxyz')
@@ -371,7 +372,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
             self.uri, 20, key_format=self.keyfmt, value_format=self.valuefmt)
         ds.populate()
 
-        c = self.session.open_cursor(self.uri, None)
+        c = ds.open_cursor()
         c.set_key(ds.key(10))
         self.assertEquals(c.remove(), 0)
 
@@ -396,7 +397,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
         self.session.begin_transaction("isolation=snapshot")
 
         # Insert a new record.
-        c = self.session.open_cursor(self.uri, None)
+        c = ds.open_cursor()
         c.set_key(ds.key(30))
         c.set_value(ds.value(30))
         self.assertEquals(c.insert(), 0)
@@ -411,7 +412,7 @@ class test_cursor12(wttest.WiredTigerTestCase):
 
         # Test that another transaction cannot modify our uncommitted record.
         xs = self.conn.open_session()
-        xc = xs.open_cursor(self.uri, None)
+        xc = ds.open_cursor(session = xs)
         xs.begin_transaction("isolation=snapshot")
         xc.set_key(ds.key(30))
         xc.set_value(ds.value(30))

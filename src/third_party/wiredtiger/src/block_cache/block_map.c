@@ -13,15 +13,15 @@
  *     Map a segment of the file in, if possible.
  */
 int
-__wt_blkcache_map(WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapped_regionp, size_t *lengthp,
-  void *mapped_cookiep)
+__wt_blkcache_map(WT_SESSION_IMPL *session, WT_BLOCK *block, void **mapped_regionp, size_t *lengthp,
+  void **mapped_cookiep)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE *handle;
 
-    *(void **)mapped_regionp = NULL;
+    *mapped_regionp = NULL;
     *lengthp = 0;
-    *(void **)mapped_cookiep = NULL;
+    *mapped_cookiep = NULL;
 
     /* Map support is configurable. */
     if (!S2C(session)->mmap)
@@ -54,7 +54,7 @@ __wt_blkcache_map(WT_SESSION_IMPL *session, WT_BLOCK *block, void *mapped_region
      */
     ret = handle->fh_map(handle, (WT_SESSION *)session, mapped_regionp, lengthp, mapped_cookiep);
     if (ret == EBUSY || ret == ENOTSUP) {
-        *(void **)mapped_regionp = NULL;
+        *mapped_regionp = NULL;
         ret = 0;
     }
 
@@ -103,9 +103,9 @@ __wt_blkcache_map_read(
     WT_RET(__wt_block_addr_unpack(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
-    /* Swap file handles if reading from a different object. */
+    /* Swap block handles if reading from a different object. */
     if (block->objectid != objectid)
-        WT_RET(__wt_blkcache_get_handle(session, block, objectid, &block));
+        WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
 
     /* Map the block if it's possible. */
     handle = block->fh->handle;

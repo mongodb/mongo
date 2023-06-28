@@ -111,7 +111,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.evict_key(uri)
 
         # Commit an update without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = value4
         self.session.commit_transaction()
 
@@ -179,7 +179,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.evict_key(uri)
 
         # Commit an update without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = value4
         self.session.commit_transaction()
 
@@ -198,7 +198,8 @@ class test_hs18(wttest.WiredTigerTestCase):
 
         # Check our value is still correct.
         self.check_value(cursor2, value1)
-        # Here our value will be wrong as we're reading with a timestamp, and can now see a newer value.
+        # Here our value will be wrong as we're reading with a timestamp, and can now see a newer
+        # value.
         self.check_value(cursor3, value2)
 
     # Test that forces us to ignore tombstone in order to not remove the first non timestamped updated.
@@ -252,7 +253,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.check_value(cursor2, value0)
 
         # Commit an update without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = value4
         self.session.commit_transaction()
 
@@ -311,7 +312,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.evict_key(uri)
 
         # Commit an update without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = values[3]
         self.session.commit_transaction()
 
@@ -334,7 +335,7 @@ class test_hs18(wttest.WiredTigerTestCase):
             self.assertEqual(cursors[i].get_value(), values[i])
             cursors[i].reset()
 
-    def test_multiple_older_readers_with_multiple_mixed_mode(self):
+    def test_multiple_older_readers_with_multiple_missing_ts(self):
         uri = 'table:test_multiple_older_readers'
         format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         self.session.create(uri, format)
@@ -381,7 +382,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.evict_key(uri)
 
         # Commit an update without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = values[3]
         self.session.commit_transaction()
 
@@ -424,7 +425,7 @@ class test_hs18(wttest.WiredTigerTestCase):
             cursors[i].reset()
 
         # Commit an update without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = values[7]
         self.session.commit_transaction()
 
@@ -507,7 +508,7 @@ class test_hs18(wttest.WiredTigerTestCase):
         self.evict_key(uri)
 
         # Commit a modify without a timestamp on our original key
-        self.session.begin_transaction()
+        self.session.begin_transaction('no_timestamp=true')
         cursor[self.create_key(1)] = values[3]
         self.session.commit_transaction()
 

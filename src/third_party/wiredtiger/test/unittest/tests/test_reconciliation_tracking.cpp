@@ -28,6 +28,7 @@ TEST_CASE("Reconciliation tracking: ovfl_track_init", "[reconciliation]")
 
     REQUIRE(__wt_ovfl_track_init(session, &p) == 0);
     REQUIRE(m.ovfl_track != nullptr);
+    __wt_free(session, m.ovfl_track);
 }
 
 TEST_CASE("Reconciliation tracking: ovfl_discard_verbose", "[reconciliation]")
@@ -37,7 +38,7 @@ TEST_CASE("Reconciliation tracking: ovfl_discard_verbose", "[reconciliation]")
 
     SECTION("handle null page and tag")
     {
-        REQUIRE(__ut_ovfl_discard_verbose(session, nullptr, nullptr, nullptr) == 0);
+        REQUIRE(__ut_ovfl_discard_verbose(session, nullptr, nullptr, nullptr) == EINVAL);
     }
 }
 
@@ -59,4 +60,6 @@ TEST_CASE("Reconciliation tracking: ovfl_discard_wrapup", "[reconciliation]")
     {
         REQUIRE(__ut_ovfl_discard_wrapup(session, &p) == 0);
     }
+
+    __wt_free(session, m.ovfl_track);
 }

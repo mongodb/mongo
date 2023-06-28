@@ -43,7 +43,7 @@ typedef struct __config_queue_entry {
 
 typedef struct { /* Option structure */
 #define OPT_DECLARE_STRUCT
-#include "wtperf_opt.i"
+#include "wtperf_opt_inline.h"
 #undef OPT_DECLARE_STRUCT
 
     /* Queue head to save a copy of the config to be output */

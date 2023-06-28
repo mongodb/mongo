@@ -168,7 +168,8 @@ __modify_apply_one(WT_SESSION_IMPL *session, WT_ITEM *value, WT_MODIFY *modify, 
      */
     if (value->size <= offset) {
         if (value->size < offset)
-            memset((uint8_t *)value->data + value->size, sformat ? ' ' : 0, offset - value->size);
+            memset((uint8_t *)value->data + value->size,
+              sformat ? ' ' : __wt_process.modify_pad_byte, offset - value->size);
         memcpy((uint8_t *)value->data + offset, data, data_size);
         value->size = offset + data_size;
         return (0);
@@ -246,7 +247,7 @@ __modify_fast_path(WT_ITEM *value, const size_t *p, int nentries, int *nappliedp
 
     /*
      * If the modifications are sorted and don't overlap in the old or new values, we can do a fast
-     * application of all the modifications modifications in a single pass.
+     * application of all the modifications in a single pass.
      *
      * The requirement for ordering is unfortunate, but modifications are performed in order, and
      * applications specify byte offsets based on that. In other words, byte offsets are cumulative,
@@ -442,25 +443,28 @@ err:
  */
 int
 __wt_modify_reconstruct_from_upd_list(
-  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *upd, WT_UPDATE_VALUE *upd_value)
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, WT_UPDATE *modify, WT_UPDATE_VALUE *upd_value)
 {
     WT_CURSOR *cursor;
     WT_DECL_RET;
     WT_TIME_WINDOW tw;
+    WT_UPDATE *upd;
     WT_UPDATE_VECTOR modifies;
+    bool onpage_retry;
 
-    WT_ASSERT(session, upd->type == WT_UPDATE_MODIFY);
+    WT_ASSERT(session, modify->type == WT_UPDATE_MODIFY);
 
     cursor = &cbt->iface;
-
     /* While we have a pointer to our original modify, grab this information. */
-    upd_value->tw.durable_start_ts = upd->durable_ts;
-    upd_value->tw.start_txn = upd->txnid;
+    upd_value->tw.durable_start_ts = modify->durable_ts;
+    upd_value->tw.start_txn = modify->txnid;
+    onpage_retry = true;
 
+retry:
     /* Construct full update */
     __wt_update_vector_init(session, &modifies);
     /* Find a complete update. */
-    for (; upd != NULL; upd = upd->next) {
+    for (upd = modify; upd != NULL; upd = upd->next) {
         if (upd->txnid == WT_TXN_ABORTED)
             continue;
 
@@ -483,7 +487,21 @@ __wt_modify_reconstruct_from_upd_list(
          */
         WT_ASSERT(session, cbt->slot != UINT32_MAX);
 
-        WT_ERR(__wt_value_return_buf(cbt, cbt->ref, &upd_value->buf, &tw));
+        WT_ERR_ERROR_OK(
+          __wt_value_return_buf(cbt, cbt->ref, &upd_value->buf, &tw), WT_RESTART, true);
+
+        /*
+         * We race with checkpoint reconciliation removing the overflow items. Retry the read as the
+         * value should now be appended to the update chain by checkpoint reconciliation.
+         */
+        if (onpage_retry && ret == WT_RESTART) {
+            onpage_retry = false;
+            goto retry;
+        }
+
+        /* We should not read overflow removed after retry. */
+        WT_ASSERT(session, ret == 0);
+
         /*
          * Applying modifies on top of a tombstone is invalid. So if we're using the onpage value,
          * the stop time point should be unset.

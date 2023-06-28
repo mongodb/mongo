@@ -31,9 +31,9 @@
 #   continue to generate more log files.
 #
 
-import fnmatch, os, shutil
+import fnmatch, os
 from suite_subprocess import suite_subprocess
-import wttest
+import helper, wttest
 
 class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
     t1 = 'table:test_txn16_1'
@@ -61,22 +61,6 @@ class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
             if i % 900 == 0:
                 self.session.checkpoint()
         c.close()
-
-    def copy_dir(self, olddir, newdir):
-        ''' Simulate a crash from olddir and restart in newdir. '''
-        # with the connection still open, copy files to new directory
-        shutil.rmtree(newdir, ignore_errors=True)
-        os.mkdir(newdir)
-        for fname in os.listdir(olddir):
-            fullname = os.path.join(olddir, fname)
-            # Skip lock file on Windows since it is locked
-            if os.path.isfile(fullname) and \
-                "WiredTiger.lock" not in fullname and \
-                "Tmplog" not in fullname and \
-                "Preplog" not in fullname:
-                shutil.copy(fullname, newdir)
-        # close the original connection.
-        self.close_conn()
 
     def run_toggle(self, homedir):
         loop = 0
@@ -132,7 +116,8 @@ class test_txn16(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate_table(self.t1)
         self.populate_table(self.t2)
         self.populate_table(self.t3)
-        self.copy_dir(".", "RESTART")
+        helper.copy_wiredtiger_home(self, '.', 'RESTART')
+        self.close_conn()
         self.run_toggle(".")
         self.run_toggle("RESTART")
 

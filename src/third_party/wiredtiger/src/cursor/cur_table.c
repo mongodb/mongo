@@ -74,7 +74,7 @@ __curextract_insert(WT_CURSOR *cursor)
     ret = cextract->f(cextract->idxc);
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_insert);
 }
 
 /*
@@ -87,6 +87,7 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_cursor_get_key, /* get-key */
       __wt_cursor_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value,                  /* get-raw-key-value */
       __wt_cursor_set_key,                            /* set-key */
       __wt_cursor_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                     /* compare */
@@ -101,10 +102,12 @@ __wt_apply_single_idx(WT_SESSION_IMPL *session, WT_INDEX *idx, WT_CURSOR *cur,
       __wt_cursor_notsup,                             /* update */
       __wt_cursor_notsup,                             /* remove */
       __wt_cursor_notsup,                             /* reserve */
-      __wt_cursor_reconfigure_notsup,                 /* reconfigure */
+      __wt_cursor_config_notsup,                      /* reconfigure */
       __wt_cursor_notsup,                             /* largest_key */
+      __wt_cursor_config_notsup,                      /* bound */
       __wt_cursor_notsup,                             /* cache */
       __wt_cursor_reopen_notsup,                      /* reopen */
+      __wt_cursor_checkpoint_id,                      /* checkpoint ID */
       __wt_cursor_notsup);                            /* close */
     WT_CURSOR_EXTRACTOR extract_cursor;
     WT_DECL_RET;
@@ -206,7 +209,7 @@ __wt_curtable_get_value(WT_CURSOR *cursor, ...)
     va_end(ap);
 
 err:
-    API_END_RET(session, ret);
+    API_END_RET_STAT(session, ret, cursor_get_value);
 }
 
 /*
@@ -361,9 +364,13 @@ __curtable_next(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, next, NULL);
+    API_RETRYABLE(session);
+    CURSOR_REPOSITION_ENTER(cursor, session);
     APPLY_CG(ctable, next);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -414,9 +421,13 @@ __curtable_prev(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, prev, NULL);
+    API_RETRYABLE(session);
+    CURSOR_REPOSITION_ENTER(cursor, session);
     APPLY_CG(ctable, prev);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -427,13 +438,28 @@ err:
 static int
 __curtable_reset(WT_CURSOR *cursor)
 {
+    WT_CURSOR **cp;
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
+    u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
+
     JOINABLE_CURSOR_API_CALL_PREPARE_ALLOWED(cursor, session, reset, NULL);
+
     APPLY_CG(ctable, reset);
+
+    /*
+     * The bounded cursor API clears bounds on external calls to cursor->reset. We determine this by
+     * guarding the call to cursor bound reset with the API_USER_ENTRY macro. Doing so prevents
+     * internal API calls from resetting cursor bounds unintentionally, e.g. cursor->remove. In the
+     * case of the table cursor we walk each cursor and directly reset the bounds on them without
+     * going through curfile_reset for that reason.
+     */
+    if (API_USER_ENTRY(session))
+        for (i = 0, cp = ctable->cg_cursors; i < WT_COLGROUPS(ctable->table); i++, cp++)
+            __wt_cursor_bound_reset(*cp);
 
 err:
     API_END_RET(session, ret);
@@ -452,9 +478,13 @@ __curtable_search(WT_CURSOR *cursor)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, search, NULL);
+    API_RETRYABLE(session);
+    CURSOR_REPOSITION_ENTER(cursor, session);
     APPLY_CG(ctable, search);
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -473,6 +503,9 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
 
     ctable = (WT_CURSOR_TABLE *)cursor;
     JOINABLE_CURSOR_API_CALL(cursor, session, search_near, NULL);
+    API_RETRYABLE(session);
+    CURSOR_REPOSITION_ENTER(cursor, session);
+
     cp = ctable->cg_cursors;
     primary = *cp;
     WT_ERR(primary->search_near(primary, exact));
@@ -486,6 +519,8 @@ __curtable_search_near(WT_CURSOR *cursor, int *exact)
     }
 
 err:
+    CURSOR_REPOSITION_END(cursor, session);
+    API_RETRYABLE_END(session, ret);
     API_END_RET(session, ret);
 }
 
@@ -500,7 +535,7 @@ __curtable_insert(WT_CURSOR *cursor)
     WT_CURSOR_TABLE *ctable;
     WT_DECL_RET;
     WT_SESSION_IMPL *session;
-    uint32_t flag_orig;
+    uint64_t flag_orig;
     u_int i;
 
     ctable = (WT_CURSOR_TABLE *)cursor;
@@ -810,6 +845,44 @@ err:
 }
 
 /*
+ * __curtable_bound --
+ *     WT_CURSOR->bound method for the table cursor type.
+ *
+ */
+static int
+__curtable_bound(WT_CURSOR *cursor, const char *config)
+{
+    WT_CURSOR **cp, *primary;
+    WT_CURSOR_BOUNDS_STATE saved_bounds;
+    WT_CURSOR_TABLE *ctable;
+    WT_DECL_RET;
+    WT_SESSION_IMPL *session;
+    u_int i;
+
+    WT_CLEAR(saved_bounds);
+    ctable = (WT_CURSOR_TABLE *)cursor;
+    primary = *ctable->cg_cursors;
+    JOINABLE_CURSOR_API_CALL(cursor, session, bound, NULL);
+
+    /* Save the current state of the bounds in case we fail to apply the new state. */
+    WT_ERR(__wt_cursor_bounds_save(session, primary, &saved_bounds));
+
+    /* Call bound function on all column groups. */
+    for (i = 0, cp = ctable->cg_cursors; i < WT_COLGROUPS(ctable->table); i++, cp++)
+        WT_ERR((*cp)->bound(*cp, config));
+err:
+    /* If applying bounds fails on one colgroup cursor, restore the previous state. */
+    if (ret != 0)
+        for (i = 0, cp = ctable->cg_cursors; i < WT_COLGROUPS(ctable->table); i++, cp++)
+            WT_TRET(__wt_cursor_bounds_restore(session, *cp, &saved_bounds));
+
+    __wt_scr_free(session, &saved_bounds.lower_bound);
+    __wt_scr_free(session, &saved_bounds.upper_bound);
+
+    API_END_RET(session, ret);
+}
+
+/*
  * __curtable_close --
  *     WT_CURSOR->close method for the table cursor type.
  */
@@ -974,6 +1047,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
 {
     WT_CURSOR_STATIC_INIT(iface, __wt_curtable_get_key, /* get-key */
       __wt_curtable_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,             /* get-raw-key-value */
       __wt_curtable_set_key,                            /* set-key */
       __wt_curtable_set_value,                          /* set-value */
       __curtable_compare,                               /* compare */
@@ -990,8 +1064,10 @@ __wt_curtable_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *owner, 
       __curtable_reserve,                               /* reserve */
       __wt_cursor_reconfigure,                          /* reconfigure */
       __curtable_largest_key,                           /* largest_key */
+      __curtable_bound,                                 /* bound */
       __wt_cursor_notsup,                               /* cache */
       __wt_cursor_reopen_notsup,                        /* reopen */
+      __wt_cursor_checkpoint_id,                        /* checkpoint ID */
       __curtable_close);                                /* close */
     WT_CONFIG_ITEM cval;
     WT_CURSOR *cursor;

@@ -99,6 +99,7 @@ config_event_handler(void)
     /* Set handlers to NULL to use the default handler. */
     event_handler.h.handle_progress = NULL;
     event_handler.h.handle_close = NULL;
+    event_handler.h.handle_general = NULL;
     event_handler.app_id = "example_event_handler";
 
     error_check(wiredtiger_open(home, (WT_EVENT_HANDLER *)&event_handler, "create", &conn));

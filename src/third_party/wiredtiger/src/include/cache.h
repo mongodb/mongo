@@ -16,9 +16,9 @@
  * Tuning constants: I hesitate to call this tuning, but we want to review some number of pages from
  * each file's in-memory tree for each page we evict.
  */
-#define WT_EVICT_MAX_TREES 1000 /* Maximum walk points */
-#define WT_EVICT_WALK_BASE 300  /* Pages tracked across file visits */
-#define WT_EVICT_WALK_INCR 100  /* Pages added each walk */
+#define WT_EVICT_MAX_TREES WT_THOUSAND /* Maximum walk points */
+#define WT_EVICT_WALK_BASE 300         /* Pages tracked across file visits */
+#define WT_EVICT_WALK_INCR 100         /* Pages added each walk */
 
 /*
  * WT_EVICT_ENTRY --
@@ -98,6 +98,7 @@ struct __wt_cache {
     uint64_t app_evicts; /* Pages evicted by user threads */
 
     uint64_t evict_max_page_size; /* Largest page seen at eviction */
+    uint64_t evict_max_seconds;   /* Longest seconds spent at a single eviction */
     struct timespec stuck_time;   /* Stuck time */
 
     /*
@@ -217,19 +218,18 @@ struct __wt_cache {
 #define WT_CACHE_POOL_MANAGER 0x1u /* The active cache pool manager */
 #define WT_CACHE_POOL_RUN 0x2u     /* Cache pool thread running */
                                    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
-    uint32_t pool_flags;           /* Cache pool flags */
+    uint16_t pool_flags_atomic;    /* Cache pool flags */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CACHE_EVICT_CLEAN 0x001u        /* Evict clean pages */
 #define WT_CACHE_EVICT_CLEAN_HARD 0x002u   /* Clean % blocking app threads */
-#define WT_CACHE_EVICT_DEBUG_MODE 0x004u   /* Aggressive debugging mode */
-#define WT_CACHE_EVICT_DIRTY 0x008u        /* Evict dirty pages */
-#define WT_CACHE_EVICT_DIRTY_HARD 0x010u   /* Dirty % blocking app threads */
-#define WT_CACHE_EVICT_NOKEEP 0x020u       /* Don't add read pages to cache */
-#define WT_CACHE_EVICT_SCRUB 0x040u        /* Scrub dirty pages */
-#define WT_CACHE_EVICT_UPDATES 0x080u      /* Evict pages with updates */
-#define WT_CACHE_EVICT_UPDATES_HARD 0x100u /* Update % blocking app threads */
-#define WT_CACHE_EVICT_URGENT 0x200u       /* Pages are in the urgent queue */
+#define WT_CACHE_EVICT_DIRTY 0x004u        /* Evict dirty pages */
+#define WT_CACHE_EVICT_DIRTY_HARD 0x008u   /* Dirty % blocking app threads */
+#define WT_CACHE_EVICT_NOKEEP 0x010u       /* Don't add read pages to cache */
+#define WT_CACHE_EVICT_SCRUB 0x020u        /* Scrub dirty pages */
+#define WT_CACHE_EVICT_UPDATES 0x040u      /* Evict pages with updates */
+#define WT_CACHE_EVICT_UPDATES_HARD 0x080u /* Update % blocking app threads */
+#define WT_CACHE_EVICT_URGENT 0x100u       /* Pages are in the urgent queue */
 /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
 #define WT_CACHE_EVICT_ALL (WT_CACHE_EVICT_CLEAN | WT_CACHE_EVICT_DIRTY | WT_CACHE_EVICT_UPDATES)
 #define WT_CACHE_EVICT_HARD \

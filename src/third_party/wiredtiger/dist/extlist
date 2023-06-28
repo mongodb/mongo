@@ -1,5 +1,5 @@
 # extlist --
-#	List of extension source files for WiredTiger library.
+#    List of extension source files for WiredTiger library.
 
 ext/collators/reverse/reverse_collator.c
 ext/compressors/nop/nop_compress.c

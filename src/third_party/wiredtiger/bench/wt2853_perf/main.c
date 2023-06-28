@@ -46,8 +46,8 @@ static void create_perf_json(bool, int, int);
 
 #define BLOOM false
 #define GAP_WARNINGS 3 /* Threshold for seconds of gap to be displayed */
-#define N_RECORDS 10000
-#define N_INSERT 1000000
+#define N_RECORDS (10 * WT_THOUSAND)
+#define N_INSERT WT_MILLION
 #define N_INSERT_THREAD 1
 #define N_GET_THREAD 1
 #define S64 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789::"
@@ -107,7 +107,8 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
     testutil_progress(opts, "start");
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create,cache_size=1G", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,cache_size=1G,statistics=(all),statistics_log=(json,on_close,wait=5)", &opts->conn));
     testutil_progress(opts, "wiredtiger_open");
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
@@ -253,7 +254,7 @@ thread_insert(void *arg)
         if (__wt_random(&rnd) % 2 == 0)
             post = 54321;
         else
-            post = i % 100000;
+            post = i % (100 * WT_THOUSAND);
         if (__wt_random(&rnd) % 2 == 0) {
             bal = -100;
             flag = 1;
@@ -270,8 +271,8 @@ thread_insert(void *arg)
         testutil_assert(ret == 0);
         testutil_check(maincur->reset(maincur));
         testutil_check(session->commit_transaction(session, NULL));
-        if (i % 1000 == 0 && i != 0) {
-            if (i % 10000 == 0)
+        if (i % WT_THOUSAND == 0 && i != 0) {
+            if (i % (10 * WT_THOUSAND) == 0)
                 fprintf(stderr, "*");
             else
                 fprintf(stderr, ".");

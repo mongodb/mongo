@@ -312,9 +312,10 @@ TEST_CASE("Extent Lists: block_off_srch", "[extent_list]")
 
         __ut_block_off_srch(&head[0], 2, &stack[0], true);
 
-        // For each level of the extent list, if the searched-for element was
-        // visible, we should point to it. otherwise, we should point to the
-        // next-largest item.
+        /*
+         * For each level of the extent list, if the searched-for element was visible, we should
+         * point to it. otherwise, we should point to the next-largest item.
+         */
         REQUIRE((*stack[0])->off == 2);
         REQUIRE((*stack[1])->off == 2);
         REQUIRE((*stack[2])->off == 3);

@@ -150,9 +150,9 @@ do_rotate(char *buf, size_t len, int rotn)
      */
     for (i = 0; i < len; i++) {
         if ('a' <= buf[i] && buf[i] <= 'z')
-            buf[i] = ((buf[i] - 'a') + rotn) % 26 + 'a';
+            buf[i] = (char)(((buf[i] - 'a') + rotn) % 26 + 'a');
         else if ('A' <= buf[i] && buf[i] <= 'Z')
-            buf[i] = ((buf[i] - 'A') + rotn) % 26 + 'A';
+            buf[i] = (char)(((buf[i] - 'A') + rotn) % 26 + 'A');
     }
 }
 

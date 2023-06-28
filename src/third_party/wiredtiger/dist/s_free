@@ -1,0 +1,18 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -f $t' 0 1 2 3 13 15
+
+# Complain if someone uses free in the library, other than the one call in
+# os_common/os_alloc.c:__wt_free_int. Strip out files in the 'utilities' directory.
+find ../src -name '*.c' -o -name '*_inline.h' | grep -v 'utilities' | xargs egrep ' free\(' > $t
+
+len=`cat $t | wc -l`
+test "$len" -ne "1" && {
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    echo 'Calls to the C library version of free. Only __wt_free_int allowed.'
+    echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+    cat $t
+    exit 1
+}
+exit 0

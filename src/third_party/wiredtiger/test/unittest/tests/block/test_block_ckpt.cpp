@@ -64,8 +64,10 @@ TEST_CASE("Block manager: __ckpt_add_blkmod_entry", "[block]")
     // Edge case, this should just fit in 256 bits
     test_ckpt_add_blkmod_entry(255, 1, 256);
 
-    // This case relies on the "+ 1" introduced in WT-6366 in __ckpt_add_blkmod_entry.
-    // Without it, this test would fail as it would only allocate 256 bits.
-    // We expect an extra 8 bytes (64 bits to be added), 256 + 64 = 320;
+    /*
+     * This case relies on the "+ 1" introduced in WT-6366 in __ckpt_add_blkmod_entry. Without it,
+     * this test would fail as it would only allocate 256 bits. We expect an extra 8 bytes (64 bits
+     * to be added), 256 + 64 = 320;
+     */
     test_ckpt_add_blkmod_entry(256, 1, 320);
 }

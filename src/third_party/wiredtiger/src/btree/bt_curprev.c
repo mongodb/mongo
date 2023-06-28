@@ -84,11 +84,12 @@ restart:
             cbt->next_stack[i] = NULL;
             /*
              * Compiler may replace the usage of the variable with another read in the following
-             * code.
+             * code. Here we don't need to worry about CPU reordering as we are reading a thread
+             * local value.
              *
              * Place a read barrier to avoid this issue.
              */
-            WT_ORDERED_READ(ins, cbt->ins_head->head[i]);
+            WT_ORDERED_READ_WEAK_MEMORDER(ins, cbt->ins_head->head[i]);
             if (ins != NULL && ins != current)
                 break;
         }
@@ -105,8 +106,8 @@ restart:
             goto restart;
         }
         /*
-         * CPU may reorder the read and return a stale value. This can lead us to wrongly skip a
-         * value in the lower levels of the skip list.
+         * CPUs with weak memory ordering may reorder the read and return a stale value. This can
+         * lead us to wrongly skip a value in the lower levels of the skip list.
          *
          * For example, if we have A -> C initially for both level 0 and level 1 and we concurrently
          * insert B into both level 0 and level 1. If B is visible on level 1 to this thread, it
@@ -114,15 +115,11 @@ restart:
          *
          * Place a read barrier to avoid this issue.
          */
-        WT_ORDERED_READ(next_ins, ins->next[i]);
+        WT_ORDERED_READ_WEAK_MEMORDER(next_ins, ins->next[i]);
         if (next_ins != current) /* Stay at this level */
             ins = next_ins;
         else { /* Drop down a level */
-            /*
-             * It is possible that we read an old value that is inconsistent to the higher levels of
-             * the skip list due to CPU read reordering. Add a read barrier to avoid this issue.
-             */
-            WT_ORDERED_READ(cbt->next_stack[i], ins->next[i]);
+            cbt->next_stack[i] = next_ins;
             cbt->ins_stack[i] = &ins->next[i];
             --i;
         }
@@ -288,7 +285,10 @@ restart_read:
         /* Check the update list. */
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
     if (cbt->upd_value->type == WT_UPDATE_INVALID)
-        /* Nope. Read the on-disk value and/or history. */
+        /*
+         * Read the on-disk value and/or history. Pass an update list: the update list may contain
+         * the base update for a modify chain after rollback-to-stable, required for correctness.
+         */
         WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins ? cbt->ins->upd : NULL));
     if (cbt->upd_value->type == WT_UPDATE_TOMBSTONE || cbt->upd_value->type == WT_UPDATE_INVALID) {
         /*
@@ -314,8 +314,10 @@ restart_read:
  *     Return the previous variable-length entry on the append list.
  */
 static inline int
-__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
+__cursor_var_append_prev(
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
+    WT_DECL_RET;
     WT_SESSION_IMPL *session;
 
     session = CUR2S(cbt);
@@ -342,6 +344,15 @@ new_page:
             return (0);
 
 restart_read:
+        /*
+         * If a lower bound has been set ensure that the key is within the range, otherwise early
+         * exit.
+         */
+        if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+          WT_NOTFOUND)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        WT_RET(ret);
+
         WT_RET(__wt_txn_read_upd_list(session, cbt, cbt->ins->upd));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
             ++*skippedp;
@@ -365,11 +376,13 @@ restart_read:
  *     Move to the previous, variable-length column-store item.
  */
 static inline int
-__cursor_var_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
+__cursor_var_prev(
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
     WT_CELL *cell;
     WT_CELL_UNPACK_KV unpack;
     WT_COL *cip;
+    WT_DECL_RET;
     WT_INSERT *ins;
     WT_PAGE *page;
     WT_SESSION_IMPL *session;
@@ -409,6 +422,19 @@ new_page:
             return (WT_NOTFOUND);
 
 restart_read:
+        /*
+         * If an lower bound has been set ensure that the key is within the range, otherwise early
+         * exit. In the case where there is a large set of RLE deleted records it is possible that
+         * calculated recno will be off the end of the page. We don't need to add an additional
+         * check for this case as the prev iteration, either on a page or append list will check the
+         * recno and early exit. It does present a potential optimization but to keep the bounded
+         * cursor logic simple we will forego it for now.
+         */
+        if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+          WT_NOTFOUND)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        WT_RET(ret);
+
         /* Find the matching WT_COL slot. */
         if ((cip = __col_var_search(cbt->ref, cbt->recno, &rle_start)) == NULL)
             return (WT_NOTFOUND);
@@ -488,6 +514,10 @@ restart_read:
         if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
             return (0);
 
+        /*
+         * Read the on-disk value and/or history. Pass an update list: the update list may contain
+         * the base update for a modify chain after rollback-to-stable, required for correctness.
+         */
         WT_RET(__wt_txn_read(session, cbt, NULL, cbt->recno, cbt->ins ? cbt->ins->upd : NULL));
         if (cbt->upd_value->type == WT_UPDATE_INVALID ||
           cbt->upd_value->type == WT_UPDATE_TOMBSTONE) {
@@ -532,9 +562,11 @@ restart_read:
  *     Move to the previous row-store item.
  */
 static inline int
-__cursor_row_prev(WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp)
+__cursor_row_prev(
+  WT_CURSOR_BTREE *cbt, bool newpage, bool restart, size_t *skippedp, bool *key_out_of_boundsp)
 {
     WT_CELL_UNPACK_KV kpack;
+    WT_DECL_RET;
     WT_INSERT *ins;
     WT_ITEM *key;
     WT_PAGE *page;
@@ -601,6 +633,15 @@ restart_read_insert:
             if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
                 return (0);
 
+            /*
+             * If a lower bound has been set ensure that the key is within the range, otherwise
+             * early exit.
+             */
+            if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+              WT_NOTFOUND)
+                WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+            WT_RET(ret);
+
             WT_RET(__wt_txn_read_upd_list(session, cbt, ins->upd));
             if (cbt->upd_value->type == WT_UPDATE_INVALID) {
                 ++*skippedp;
@@ -649,6 +690,19 @@ restart_read_page:
         if (F_ISSET(&cbt->iface, WT_CURSTD_KEY_ONLY))
             return (0);
 
+        /*
+         * If a lower bound has been set ensure that the key is within the range, otherwise early
+         * exit.
+         */
+        if ((ret = __wt_btcur_bounds_early_exit(session, cbt, false, key_out_of_boundsp)) ==
+          WT_NOTFOUND)
+            WT_STAT_CONN_DATA_INCR(session, cursor_bounds_prev_early_exit);
+        WT_RET(ret);
+
+        /*
+         * Read the on-disk value and/or history. Pass an update list: the update list may contain
+         * the base update for a modify chain after rollback-to-stable, required for correctness.
+         */
         WT_RET(
           __wt_txn_read(session, cbt, &cbt->iface.key, WT_RECNO_OOB, WT_ROW_UPDATE(page, rip)));
         if (cbt->upd_value->type == WT_UPDATE_INVALID) {
@@ -681,22 +735,43 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
     WT_SESSION_IMPL *session;
     size_t total_skipped, skipped;
     uint32_t flags;
-    bool newpage, restart;
+    bool key_out_of_bounds, newpage, restart, need_walk;
+#ifdef HAVE_DIAGNOSTIC
+    bool inclusive_set;
 
+    inclusive_set = false;
+#endif
     cursor = &cbt->iface;
+    key_out_of_bounds = false;
+    need_walk = false;
     session = CUR2S(cbt);
     total_skipped = 0;
 
     WT_STAT_CONN_DATA_INCR(session, cursor_prev);
 
-    flags = /* tree walk flags */
-      WT_READ_NO_SPLIT | WT_READ_PREV | WT_READ_SKIP_INTL;
+    /* tree walk flags */
+    flags = WT_READ_NO_SPLIT | WT_READ_PREV | WT_READ_SKIP_INTL;
     if (truncating)
         LF_SET(WT_READ_TRUNCATE);
 
     F_CLR(cursor, WT_CURSTD_KEY_SET | WT_CURSTD_VALUE_SET);
 
     WT_ERR(__wt_cursor_func_init(cbt, false));
+
+    /*
+     * If we have a bound set we should position our cursor appropriately if it isn't already
+     * positioned. It is possible that the positioning function can directly return the record. For
+     * that to happen, the cursor must be placed on a valid record and must be positioned on the
+     * first record within the bounds. If the record is not valid or is not positioned within the
+     * bounds, continue the prev traversal logic.
+     */
+    if (F_ISSET(cursor, WT_CURSTD_BOUND_UPPER) && !WT_CURSOR_IS_POSITIONED(cbt)) {
+        WT_ERR(__wt_btcur_bounds_position(session, cbt, false, &need_walk));
+        if (!need_walk) {
+            __wt_value_return(cbt, cbt->upd_value);
+            goto done;
+        }
+    }
 
     /*
      * If we aren't already iterating in the right direction, there's some setup to do.
@@ -731,7 +806,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
                 ret = __cursor_fix_append_prev(cbt, newpage, restart);
                 break;
             case WT_PAGE_COL_VAR:
-                ret = __cursor_var_append_prev(cbt, newpage, restart, &skipped);
+                ret = __cursor_var_append_prev(cbt, newpage, restart, &skipped, &key_out_of_bounds);
                 total_skipped += skipped;
                 break;
             default:
@@ -750,18 +825,12 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
                 ret = __cursor_fix_prev(cbt, newpage, restart);
                 break;
             case WT_PAGE_COL_VAR:
-                ret = __cursor_var_prev(cbt, newpage, restart, &skipped);
+                ret = __cursor_var_prev(cbt, newpage, restart, &skipped, &key_out_of_bounds);
                 total_skipped += skipped;
                 break;
             case WT_PAGE_ROW_LEAF:
-                ret = __cursor_row_prev(cbt, newpage, restart, &skipped);
+                ret = __cursor_row_prev(cbt, newpage, restart, &skipped, &key_out_of_bounds);
                 total_skipped += skipped;
-                /*
-                 * We can directly return WT_NOTFOUND here as the caller will reset the cursor for
-                 * us, this way we don't leave the cursor positioned after returning WT_NOTFOUND.
-                 */
-                if (ret == WT_NOTFOUND && F_ISSET(&cbt->iface, WT_CURSTD_PREFIX_SEARCH))
-                    return (WT_NOTFOUND);
                 break;
             default:
                 WT_ERR(__wt_illegal_value(session, page->type));
@@ -769,6 +838,16 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
             if (ret != WT_NOTFOUND)
                 break;
         }
+
+        /*
+         * If we are doing an operation with bounds set, we need to check if we have exited the prev
+         * function due to the key being out of bounds. If so, we break instead of walking onto the
+         * prev page. We're not directly returning here to allow the cursor to be reset first before
+         * we return WT_NOTFOUND.
+         */
+        if (key_out_of_bounds)
+            break;
+
         /*
          * If we saw a lot of deleted records on this page, or we went all the way through a page
          * and only saw deleted records, try to evict the page when we release it. Otherwise
@@ -810,11 +889,14 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt, bool truncating)
         WT_ERR_TEST(cbt->ref == NULL, WT_NOTFOUND, false);
     }
 
+done:
 err:
-    if (total_skipped < 100)
-        WT_STAT_CONN_DATA_INCR(session, cursor_prev_skip_lt_100);
-    else
-        WT_STAT_CONN_DATA_INCR(session, cursor_prev_skip_ge_100);
+    if (total_skipped != 0) {
+        if (total_skipped < 100)
+            WT_STAT_CONN_DATA_INCR(session, cursor_prev_skip_lt_100);
+        else
+            WT_STAT_CONN_DATA_INCR(session, cursor_prev_skip_ge_100);
+    }
 
     WT_STAT_CONN_DATA_INCRV(session, cursor_prev_skip_total, total_skipped);
 
@@ -836,6 +918,22 @@ err:
          */
         if (!F_ISSET(cbt, WT_CBT_ITERATE_RETRY_NEXT))
             ret = __wt_cursor_key_order_check(session, cbt, false);
+
+        if (need_walk) {
+            /*
+             * The bounds positioning code relies on the assumption that if we had to walk then we
+             * can't possibly have walked to the upper bound. We check that assumption here by
+             * comparing the upper bound with our current key or recno. Force inclusive to be false
+             * so we don't consider the bound itself.
+             */
+            inclusive_set = F_ISSET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+            F_CLR(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+            ret = __wt_compare_bounds(
+              session, cursor, &cbt->iface.key, cbt->recno, true, &key_out_of_bounds);
+            WT_ASSERT(session, ret == 0 && !key_out_of_bounds);
+            if (inclusive_set)
+                F_SET(cursor, WT_CURSTD_BOUND_UPPER_INCLUSIVE);
+        }
 #endif
         break;
     case WT_PREPARE_CONFLICT:
@@ -849,5 +947,9 @@ err:
         WT_TRET(__cursor_reset(cbt));
     }
     F_CLR(cbt, WT_CBT_ITERATE_RETRY_NEXT);
+
+    if (ret == 0)
+        WT_RET(__wt_btcur_evict_reposition(cbt));
+
     return (ret);
 }

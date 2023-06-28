@@ -54,34 +54,49 @@ the focus here will be on truncation for B-Tree data files (\c file: uri).
 
 @section btree_range_truncate_file Range Truncate On Files
 
+<!-- Caution: the long ref to the arch-fast-truncate page must stay on one line. -->
+
 To perform a truncate on a file, a start and stop cursor are positioned corresponding
 to the desired range provided by the user. The desired start and stop keys do not actually
 need to exist since the cursors are positioned by doing a search-near rather than a search.
 Once positioned, we do a page-by-page walk on the B-Tree, fast-truncating pages where
-possible. When a page is marked for fast-truncation, its \c WT_READ_TRUNCATE flag is set,
-and the code tries to delete the page without instantiating it into memory. If no errors
-are encountered, a page-deleted structure \c WT_PAGE_DELETED is allocated and initialized
-with the timestamp, transaction id and state information associated with the truncate.
-Finally, the page is published as deleted using the \c WT_REF_DELETED flag. Pages which are
-not eligible for fast truncation are pages where only part of it will be deleted (e.g. the
-first and last pages of the truncate range), pages with overflow items, or pages with
-prepared updates. These pages will have their records deleted individually.
+possible.
+See @ref ft_truncate for a detailed description, and see
+@ref arch-fast-truncate "the separate page on fast-truncate and deleted pages"
+for further description of other ways deleted pages appear and what happens to them after
+they are deleted.
 
 @section btree_truncate_interaction_with_other_operations Interaction With Other Operations
 
-Truncation differs from other operations in the sense that it does not have the same
-transactional semantics. If a range truncate is in progress and another transaction
-happens to insert a key into the same range, the behavior is not well-defined. A
-conflict may be detected, or both transaction may be permitted to commit. In the scenario
-that both commit, if the system crashes and recovery runs, the resulting state of the
-database may be different to what was in the cache had the crash not happened.
+Historically we have stated that truncation is not transactional: if a range truncate is in
+progress and another transaction happens to insert a key into the same range, the behavior is
+not well defined.
+This is a hedge for a pair of known bugs, both limited to logged trees.
+One is that if the truncation passes \c NULL instead of a cursor for the start and/or end
+point and that point changes concurrently, it is possible for log replay to find and use a
+different position for the start or end of the tree than occurred in the original
+transaction.
 
-@section btree_truncate_performing_reads_on_truncated_pages Performing Reads On Truncated Pages
+The other is a bit more complicated. However, to understand its
+behavior one must recognize that truncate is a read-write operation: it scans the tree from the
+start key to the end key and deletes every value it finds. Concurrent updates where the same
+scan and update done manually would report a conflict cause truncate to report a conflict.
+Concurrent updates that this scan would miss (for example, insertion of new rows in a
+row-store tree) will be skipped over by the truncate and not cause a conflict. (This is a
+form of <i>phantom</i> behavior and is a result of the isolation model, not a transaction
+bug.)
+The second logging bug is that these phantom writes, which should be left alone, are removed by log
+recovery if the transaction that created them commits before the truncate.
+The logging for truncate saves the endpoints of the truncate range, not the individual
+data items removed, and consequently when replayed with additional items visible it
+removes them as well.
 
-In some scenarios, a reader may want to read older values from a page from a point in time
-before the page got truncated. The page must first be re-instantiated into memory; the
-\c __wt_page_in_func (see \c bt_read.c) reads in a page from disk, and builds an
-in-memory version. Then as part of the page read process, we create a \c WT_UPDATE
-with a tombstone in the same transaction the truncate happened.
+Note that pages where conflicts (including prepare conflicts) are possible are always
+slow-truncated, and the slow truncate path uses the same update logic as all other updates;
+apart from possible logging issues it would be difficult for truncate to be
+non-transactional.
+
+For the time being, the hedge remains in the user documentation and no guarantees
+are made to users.
 
 */

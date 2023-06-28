@@ -14,6 +14,7 @@ endif()
 add_library(wt::zlib SHARED IMPORTED GLOBAL)
 set_target_properties(wt::zlib PROPERTIES
     IMPORTED_LOCATION ${HAVE_LIBZ}
+    IMPORTED_IMPLIB ${HAVE_LIBZ}
 )
 if (HAVE_LIBZ_INCLUDES)
     set_target_properties(wt::zlib PROPERTIES

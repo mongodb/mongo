@@ -345,7 +345,7 @@ Reduces the size requirement by storing any identical value only once per page.
 \n\n
 Dictionary configuration:
 \n
-Specified using the \c dictionary configuration configuration option to
+Specified using the \c dictionary configuration option to
 WT_SESSION::create, which specifies the maximum number of unique values
 remembered in the B-Tree row-store leaf page value dictionary. An example of
 such a configuration string is as follows:

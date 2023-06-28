@@ -28,7 +28,7 @@
 
 import wttest
 from wtscenario import make_scenarios
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 
 # test_alter01.py
 #    Smoke-test the session alter operations.
@@ -67,6 +67,7 @@ class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
     cache_alter=('', 'false', 'true')
 
     # Build all scenarios
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources, types, hints, resid, reopen)
 
     def verify_metadata(self, metastr):
@@ -163,7 +164,7 @@ class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
                     cache_str = 'cache_resident=%s' % c
                     alter_param += ',%s' % cache_str
                 if alter_param != '':
-                    self.alter(uri, alter_param)
+                    self.session.alter(uri, alter_param)
                     if self.reopen:
                         self.reopen_conn()
                     special = self.use_cg or self.use_index
@@ -171,7 +172,7 @@ class test_alter01(TieredConfigMixin, wttest.WiredTigerTestCase):
                         self.verify_metadata(access_str)
                         self.verify_metadata(cache_str)
                     else:
-                        self.alter(suburi, alter_param)
+                        self.session.alter(suburi, alter_param)
                         self.verify_metadata(access_str)
                         self.verify_metadata(cache_str)
 

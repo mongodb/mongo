@@ -52,7 +52,7 @@ static bool use_columns = false;
 #define ROW_KEY_FORMAT ("%010" PRIu64)
 
 #define MAX_CKPT_INVL 5 /* Maximum interval between checkpoints */
-#define MAX_DATA 1000
+#define MAX_DATA WT_THOUSAND
 #define MAX_TIME 40
 #define MIN_TIME 10
 
@@ -65,10 +65,8 @@ static const char *const ckpt_file = "checkpoint_done";
     "create,"                                                 \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(enabled,file_max=10M,remove=true),"                 \
-    "statistics=(fast),statistics_log=(wait=1,json=true),"    \
+    "statistics=(all),statistics_log=(json,on_close,wait=1)," \
     "timing_stress_for_test=[checkpoint_slow]"
-
-#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -367,16 +365,16 @@ main(int argc, char *argv[])
     printf("Open database and run recovery\n");
 
     /* Open the connection which forces recovery to be run. */
-    testutil_check(wiredtiger_open(NULL, NULL, ENV_CONFIG_REC, &conn));
+    testutil_check(wiredtiger_open(NULL, NULL, TESTUTIL_ENV_CONFIG_REC, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
 
     /* Get the stable timestamp from the stable timestamp of the last successful checkpoint. */
     testutil_check(conn->query_timestamp(conn, ts_string, "get=stable_timestamp"));
-    testutil_timestamp_parse(ts_string, &stable_ts);
+    stable_ts = testutil_timestamp_parse(ts_string);
 
     /* Get the oldest timestamp from the oldest timestamp of the last successful checkpoint. */
     testutil_check(conn->query_timestamp(conn, ts_string, "get=oldest_timestamp"));
-    testutil_timestamp_parse(ts_string, &oldest_ts);
+    oldest_ts = testutil_timestamp_parse(ts_string);
 
     printf("Verify data from oldest timestamp %" PRIu64 " to stable timestamp %" PRIu64 "\n",
       oldest_ts, stable_ts);

@@ -7,30 +7,36 @@ trap 'rm -f $t *.pyc __tmp __wt.* __s_all_tmp*' 0 1 2 3 13 15
 
 # We require python which may not be installed.
 type python > /dev/null 2>&1 || {
-	echo 's_all: python not found'
-	exit 1
+    echo 's_all: python not found'
+    exit 1
 }
 
 echo 'dist/s_all run started...'
 
+fast=""
 force=
 reconf=0
 errmode=0
 errfound=0
+
 while :
-	do case "$1" in
-	-A)	# Reconfigure the library build.
-		reconf=1
-		shift;;
-	-E)	# Return an error code on failure
-		errmode=1
-		shift;;
-	-f)	# Force versions to be updated
-		force="-f"
-		shift;;
-	*)
-		break;;
-	esac
+    do case "$1" in
+    -A)    # Reconfigure the library build.
+        reconf=1
+        shift;;
+    -E)    # Return an error code on failure
+        errmode=1
+        shift;;
+    -f)    # Force versions to be updated
+        force="-f"
+        shift;;
+    -F) # Run fast.
+        echo "dist/s_all running in fast mode..."
+        fast="-F"
+        shift;;
+    *)
+        break;;
+    esac
 done
 
 echo "Updating files that include the package version" &&
@@ -38,41 +44,30 @@ echo "Updating files that include the package version" &&
 
 errchk()
 {
-	if ! `test -s $2`; then
-		return
-	fi
+    if ! `test -s $2`; then
+        return
+    fi
 
-	# Return if evergreen validate runs sucessfully.
-	if echo "$1" | grep -q evergreen && [ "$(cat "$2")" = "../test/evergreen.yml is valid" ] ; then
-		rm -f "$2"
-		return
-	fi
+    echo "####################### MESSAGE ############################"
+    echo "s_all run of: \"$1\" resulted in:"
+    sed -e 's/^/    /' $2
+    echo "#######################"
 
-	echo "####################### MESSAGE ############################"
-	echo "s_all run of: \"$1\" resulted in:"
-	sed -e 's/^/    /' $2
-	echo "#######################"
+    # If the test was skipped or marked warning only, ignore the failure.
+    if [ ! `grep "$1.*skipped" $2 > /dev/null` ] && [ ! "$3" = "--warning-only" ] ; then
+        errfound=1;
+    fi
 
-	# If the test was skipped, ignore the failure.
-	if ! `grep "$1.*skipped" $2 > /dev/null`; then
-	    errfound=1;
-	fi
-
-	# Ignore errors if the script is marked warning-only
-	if [ "$3" = "--warning-only" ]; then
-		errfound=0;
-	fi
-
-	rm -f $2
+    rm -f $2
 }
 
 run()
 {
-	2>&1 $1 > $t
-	errchk "$1" $t "$2"
+    2>&1 $1 > $t
+    errchk "$1" $t "$2"
 }
 
-# Non parallelizable scripts The following scripts either modify files or
+# Non parallelizable scripts. The following scripts either modify files or
 # already parallelize internally.
 run "sh ./s_readme $force"
 run "sh ./s_install $force"
@@ -83,24 +78,23 @@ run "python log.py"
 run "python stat.py"
 run "python verbose.py"
 run "sh ./s_copyright"
-run "sh ./s_style"
-run "./s_clang-format"
+run "sh ./s_style ${fast}"
+run "./s_clang_format ${fast}"
 run "python prototypes.py"
 run "sh ./s_typedef -b"
 run "python test_tag.py"
 # The s_mentions script requires bash.
 run "./s_mentions" "--warning-only"
-if command -v evergreen > /dev/null; then
-	run "evergreen validate ../test/evergreen.yml"
-fi
 
 COMMANDS="
 2>&1 ./s_define > ${t_pfx}s_define
 2>&1 ./s_docs > ${t_pfx}s_docs
 2>&1 ./s_evergreen > ${t_pfx}s_evergreen
+2>&1 ./s_evergreen_validate ${fast} > ${t_pfx}s_evergreen_validate
 2>&1 ./s_export > ${t_pfx}s_export
+2>&1 ./s_free > ${t_pfx}s_free
 2>&1 ./s_funcs > ${t_pfx}s_funcs
-2>&1 ./s_function > ${t_pfx}s_function
+2>&1 ./s_function ${fast} > ${t_pfx}s_function
 2>&1 ./s_getopt > ${t_pfx}s_getopt
 2>&1 ./s_lang > ${t_pfx}s_lang
 2>&1 ./s_longlines > ${t_pfx}s_longlines
@@ -111,29 +105,34 @@ COMMANDS="
 2>&1 ./s_typedef -c > ${t_pfx}s_typedef_c
 2>&1 ./s_void > ${t_pfx}s_void
 2>&1 ./s_whitespace > ${t_pfx}s_whitespace
-2>&1 python function.py > ${t_pfx}py_function
-2>&1 python style.py > ${t_pfx}py_style"
+2>&1 python3 function.py > ${t_pfx}py_function
+2>&1 python3 style.py > ${t_pfx}py_style
+2>&1 python3 comment_style.py ${fast} > ${t_pfx}py_comment_style
+2>&1 python3 type_to_str.py > ${t_pfx}py_type_to_str
+" # the closing quote needs to be on a separate line, or the wrong command is run.
 
 # Parallelize if possible.
 xp=""
 echo date | xargs -P 20 >/dev/null 2>&1
 if test $? -eq 0; then
-	xp="-P 20"
+    xp="-P 20"
 fi
 echo "$COMMANDS" | xargs $xp -I{} /bin/sh -c {}
 
-for f in `find . -name ${t_pfx}\*`; do
-	if `test -s $f`; then
-		LOCAL_NAME=`basename $f`
-		# Find original command and trim redirect garbage
-		FAILED_CMD=`echo "$COMMANDS" | grep $LOCAL_NAME | \
-		    sed -e 's/ >.*//' -e 's/.* //'`
-		errchk "$FAILED_CMD" $f
-	fi
-done
+# For each command check if an output file has been generated. If it has, report the contents and
+# the command used to populate it.
+while read -r line ; do
+    outputfile=$(echo "$line" | sed -e 's/.* > //')
+    if test -s "$outputfile" ; then
+        check=$(echo "$line" | sed -e 's/ >.*//' -e 's/2>&1 //')
+        errchk "$check" "$outputfile"
+    fi
+done <<EOT
+"$COMMANDS"
+EOT
 
-echo 'dist/s_all run finished'
+echo "dist/s_all run finished. Error? $errfound"
 if test $errmode -ne 0; then
-	exit $errfound;
+    exit $errfound;
 fi
 exit 0

@@ -27,9 +27,9 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import inspect, os, wiredtiger, wttest
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
-from helper_tiered import generate_s3_prefix, get_auth_token
-from helper_tiered import get_bucket1_name, get_bucket2_name
+
 FileSystem = wiredtiger.FileSystem  # easy access to constants
 
 # test_tiered06.py
@@ -37,36 +37,17 @@ FileSystem = wiredtiger.FileSystem  # easy access to constants
 # by any WiredTiger application, these APIs are used internally.
 # However, it is useful to do tests of this API independently.
 
-class test_tiered06(wttest.WiredTigerTestCase):
-    storage_sources = [
-        ('dir_store', dict(auth_token = get_auth_token('dir_store'),
-            bucket1 = get_bucket1_name('dir_store'),
-            bucket2 = get_bucket2_name('dir_store'),
-            bucket_prefix_base = "pfx_",
-            ss_name = 'dir_store')),
-        ('s3', dict(auth_token = get_auth_token('s3_store'),
-            bucket1 = get_bucket1_name('s3_store'),
-            bucket2 = get_bucket2_name('s3_store'),
-            bucket_prefix_base = generate_s3_prefix(),
-            ss_name = 's3_store')),
-    ]
+class test_tiered06(wttest.WiredTigerTestCase, TieredConfigMixin):
+
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered06', tiered_only=True)
+
     # Make scenarios for different cloud service providers
     scenarios = make_scenarios(storage_sources)
 
     # Load the storage store extension.
     def conn_extensions(self, extlist):
-        config = ''
-        # S3 store is built as an optional loadable extension, not all test environments build S3.
-        if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
-            extlist.skip_if_missing = True
-        #if self.ss_name == 'dir_store':
-            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
-        # Windows doesn't support dynamically loaded extension libraries.
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.ss_name + config)
-
+        TieredConfigMixin.conn_extensions(self, extlist)
+  
     def breakpoint(self):
         import pdb, sys
         sys.stdin = open('/dev/tty', 'r')
@@ -94,32 +75,24 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         # Since this class has multiple tests, append test name to the prefix to
         # avoid namespace collison. 0th element on the stack is the current function.
-        prefix = self.bucket_prefix_base + inspect.stack()[0][3] + '/'
+        prefix = self.bucket_prefix + inspect.stack()[0][3] + '/'
 
         # The directory store needs the bucket created as a directory on the filesystem.
         if self.ss_name == 'dir_store':
-            os.mkdir(self.bucket1)
+            os.mkdir(self.bucket)
 
-        fs = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
+        fs = ss.ss_customize_file_system(session, self.bucket, self.auth_token,
             self.get_fs_config(prefix))
 
         # The object doesn't exist yet.
-        if self.ss_name == 's3_store':
-            with self.expectedStderrPattern('.*HTTP response code: 404.*'):
-                self.assertFalse(fs.fs_exist(session, 'foobar'))
-        else:
-            self.assertFalse(fs.fs_exist(session, 'foobar'))
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         # We cannot use the file system to create files, it is readonly.
         # So use python I/O to build up the file.
         f = open('foobar', 'wb')
 
         # The object still doesn't exist yet.
-        if self.ss_name == 's3_store':
-            with self.expectedStderrPattern('.*HTTP response code: 404.*'):
-                self.assertFalse(fs.fs_exist(session, 'foobar'))
-        else:
-            self.assertFalse(fs.fs_exist(session, 'foobar'))
+        self.assertFalse(fs.fs_exist(session, 'foobar'))
 
         outbytes = ('MORE THAN ENOUGH DATA\n'*100000).encode()
         f.write(outbytes)
@@ -150,17 +123,29 @@ class test_tiered06(wttest.WiredTigerTestCase):
         fh.fh_lock(session, False)
         fh.close(session)
 
+        # Attempt to open a file with incorrect name.
+        if self.ss_name == 's3_store':
+            msg = 'No such file or directory'
+            with self.expectedStderrPattern('.*request to S3 failed.*'):
+                self.assertRaisesException(wiredtiger.WiredTigerError, 
+                    lambda: fs.fs_open_file(session, 'foobar2', FileSystem.open_file_type_data, 
+                        FileSystem.open_readonly), msg)
+
         # Files that have been flushed cannot be manipulated.
         with self.expectedStderrPattern('foobar: rename of file not supported'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: fs.fs_rename(session, 'foobar', 'barfoo', 0))
         self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
 
-        # Files that have been flushed cannot be manipulated through the custom file system.
-        with self.expectedStderrPattern('foobar: remove of file not supported'):
-            self.assertRaisesException(wiredtiger.WiredTigerError,
-                lambda: fs.fs_remove(session, 'foobar', 0))
-        self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        if self.ss_name != 'dir_store':
+            # Files that have been flushed cannot be manipulated through the custom file system.
+            with self.expectedStderrPattern('foobar: remove of file not supported'):
+                self.assertRaisesException(wiredtiger.WiredTigerError,
+                    lambda: fs.fs_remove(session, 'foobar', 0))
+            self.assertEquals(fs.fs_directory_list(session, '', ''), ['foobar'])
+        else:
+            fs.fs_remove(session, 'foobar', 0)
+            self.assertEquals(fs.fs_directory_list(session, '', ''), [])
 
         fs.terminate(session)
         ss.terminate(session)
@@ -173,16 +158,17 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         # Since this class has multiple tests, append test name to the prefix to
         # avoid namespace collison. 0th element on the stack is the current function.
-        prefix = self.bucket_prefix_base + inspect.stack()[0][3] + '/'
+        prefix = self.bucket_prefix + inspect.stack()[0][3] + '/'
 
-        cachedir = self.bucket1 + '_cache'
-        os.mkdir(cachedir)
+        cachedir = self.bucket + '_cache'
+        if (self.has_cache):
+            os.mkdir(cachedir)
 
         # Directory store needs the bucket created as a directory on the filesystem.
         if self.ss_name == 'dir_store':
-            os.mkdir(self.bucket1)
+            os.mkdir(self.bucket)
         
-        fs = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
+        fs = ss.ss_customize_file_system(session, self.bucket, self.auth_token,
             self.get_fs_config(prefix, cachedir))
 
         # We call these 4K chunks of data "blocks" for this test, but that doesn't
@@ -247,7 +233,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
                 else:
                     self.assertEquals(in_block, a_block)
             fh.close(session)
-            os.remove(os.path.join(cachedir, 'abc'))
+            if (self.has_cache):
+                os.remove(os.path.join(cachedir, 'abc'))
 
         ss.terminate(session)
 
@@ -281,15 +268,15 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
     # Check that objects are "in the cloud" for the directory store after a flush.
     # Using the directory storage module, they are actually going to be in either
-    # bucket1 or bucket2.
+    # bucket or bucket1.
     def check_local_objects(self, expect1, expect2):
         if self.ss_name != 'dir_store':
             return
 
-        got = sorted(list(os.listdir(self.bucket1)))
+        got = sorted(list(os.listdir(self.bucket)))
         expect = sorted(self.suffix(expect1, 'wtobj'))
         self.assertEquals(got, expect)
-        got = sorted(list(os.listdir(self.bucket2)))
+        got = sorted(list(os.listdir(self.bucket1)))
         expect = sorted(self.suffix(expect2, 'wtobj'))
         self.assertEquals(got, expect)
 
@@ -314,12 +301,12 @@ class test_tiered06(wttest.WiredTigerTestCase):
 
         # Since this class has multiple tests, append test name to the prefix to
         # avoid namespace collison. 0th element on the stack is the current function.
-        prefix = self.bucket_prefix_base + inspect.stack()[0][3] + '/'
+        prefix = self.bucket_prefix + inspect.stack()[0][3] + '/'
 
         # Directory store needs the bucket created as a directory on the filesystem.
         if self.ss_name == 'dir_store':
+            os.mkdir(self.bucket)
             os.mkdir(self.bucket1)
-            os.mkdir(self.bucket2)
 
         os.mkdir(self.cachedir1)
         os.mkdir(self.cachedir2)
@@ -327,10 +314,11 @@ class test_tiered06(wttest.WiredTigerTestCase):
         bad_cachedir = '/BAD'
 
         # Create file system objects. First try some error cases.
-        errmsg = '/No such /'
-        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
-            lambda: ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
-                self.get_fs_config(prefix, bad_cachedir)), errmsg)
+        errmsg = '/No such|Invalid bucket name/'
+        if self.has_cache:
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: ss.ss_customize_file_system(session, self.bucket, self.auth_token,
+                    self.get_fs_config(prefix, bad_cachedir)), errmsg)
 
         # S3 store expects a region with the bucket
         if self.ss_name == 's3_store':
@@ -347,14 +335,14 @@ class test_tiered06(wttest.WiredTigerTestCase):
             errmsg = '/Invalid argument/'
             self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
                 lambda: ss.ss_customize_file_system(
-                    session, "some_file", self.auth_token, ',cache_directory=' + self.bucket1), errmsg)
+                    session, "some_file", self.auth_token, ',cache_directory=' + self.bucket), errmsg)
 
         # Now create some file systems that should succeed.
         # Use either different bucket directories or different prefixes,
         # so activity that happens in the various file systems should be independent.
-        fs1 = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
+        fs1 = ss.ss_customize_file_system(session, self.bucket, self.auth_token,
             self.get_fs_config(prefix, self.cachedir1))
-        fs2 = ss.ss_customize_file_system(session, self.bucket2, self.auth_token,
+        fs2 = ss.ss_customize_file_system(session, self.bucket1, self.auth_token,
             self.get_fs_config(prefix, self.cachedir2))
         
         # Create files in the wt home directory.
@@ -367,7 +355,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', [])
         self.check_dirlist(fs2, '', [])
-        self.check_caches([], [])
+        if (self.has_cache):
+            self.check_caches([], [])
         self.check_local_objects([], [])
 
         # A flush copies to the cloud, nothing is removed.
@@ -375,7 +364,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle'])
         self.check_dirlist(fs2, '', [])
-        self.check_caches([], [])
+        if (self.has_cache):
+            self.check_caches([], [])
         self.check_local_objects(['beagle'], [])
 
         # Bad file to flush.
@@ -388,7 +378,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle'])
         self.check_dirlist(fs2, '', [])
-        self.check_caches([], [])
+        if (self.has_cache):
+            self.check_caches([], [])
         self.check_local_objects(['beagle'], [])
 
         # When we flush_finish, the local file will be in both the local and cache directory.
@@ -396,7 +387,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle'])
         self.check_dirlist(fs2, '', [])
-        self.check_caches(['beagle'], [])
+        if (self.has_cache):
+            self.check_caches(['beagle'], [])
         self.check_local_objects(['beagle'], [])
 
         # Do a some more in each file system.
@@ -410,7 +402,8 @@ class test_tiered06(wttest.WiredTigerTestCase):
         self.check_home(['beagle', 'bird', 'bison', 'bat', 'cat', 'cougar', 'coyote', 'cub'])
         self.check_dirlist(fs1, '', ['beagle', 'bat', 'bison'])
         self.check_dirlist(fs2, '', ['cat', 'cub'])
-        self.check_caches(['beagle', 'bat'], ['cat'])
+        if (self.has_cache):
+            self.check_caches(['beagle', 'bat'], ['cat'])
         self.check_local_objects(['beagle', 'bat', 'bison'], ['cat', 'cub'])
 
         # Test directory listing prefixes.

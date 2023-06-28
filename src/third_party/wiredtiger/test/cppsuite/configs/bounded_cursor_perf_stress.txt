@@ -1,0 +1,20 @@
+# Configuration for bounded_cursor_perf stress test.
+# The test will repeatedly call next() and prev() operations and track performance of the operations
+# done with both range cursor and regular cursors.
+
+duration_seconds=1800,
+cache_size_mb=1000,
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=1,
+        key_count_per_collection=100000,
+        key_size=100,
+    ),
+    read_config=
+    (
+        op_rate=10ms,
+        thread_count=1
+    )
+),

@@ -422,7 +422,7 @@ __wt_cache_hs_dirty(WT_SESSION_IMPL *session)
     uint64_t bytes_max;
     conn = S2C(session);
     cache = conn->cache;
-    bytes_max = S2C(session)->cache_size;
+    bytes_max = conn->cache_size;
 
     return (__wt_cache_bytes_plus_overhead(cache, cache->bytes_hs_dirty) >=
       ((uint64_t)(cache->eviction_dirty_trigger * bytes_max) / 100));
@@ -449,6 +449,15 @@ __wt_cache_eviction_check(WT_SESSION_IMPL *session, bool busy, bool readonly, bo
 
     /* If the transaction is prepared don't evict. */
     if (F_ISSET(session->txn, WT_TXN_PREPARE))
+        return (0);
+
+    /*
+     * If the transaction is a checkpoint cursor transaction, don't try to evict. Because eviction
+     * keeps the current transaction snapshot, and the snapshot in a checkpoint cursor transaction
+     * can be (and likely is) very old, we won't be able to see anything current to evict and won't
+     * be able to accomplish anything useful.
+     */
+    if (F_ISSET(session->txn, WT_TXN_IS_CHECKPOINT))
         return (0);
 
     /*

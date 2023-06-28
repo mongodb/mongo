@@ -127,9 +127,9 @@ struct __wt_reconcile {
      * can delete the leaf page without reading it because we don't have to discard any overflow
      * items it might reference.
      *
-     * The test test is per-page reconciliation, that is, once we see an overflow item on the page,
-     * all subsequent leaf pages written for the page will not be leaf-no-overflow type, regardless
-     * of whether or not they contain overflow items. In other words, leaf-no-overflow is not
+     * The test is per-page reconciliation, that is, once we see an overflow item on the page, all
+     * subsequent leaf pages written for the page will not be leaf-no-overflow type, regardless of
+     * whether or not they contain overflow items. In other words, leaf-no-overflow is not
      * guaranteed to be set on every page that doesn't contain an overflow item, only that if it is
      * set, the page contains no overflow items. XXX This was originally done because raw
      * compression couldn't do better, now that raw compression has been removed, we should do
@@ -330,14 +330,14 @@ typedef struct {
 
     WT_TIME_WINDOW tw;
 
-    bool upd_saved;     /* An element on the row's update chain was saved */
-    bool ooo_tombstone; /* Out-of-order tombstone */
+    bool upd_saved;       /* An element on the row's update chain was saved */
+    bool no_ts_tombstone; /* Tombstone without a timestamp */
 } WT_UPDATE_SELECT;
 
 /*
  * WT_CHILD_RELEASE, WT_CHILD_RELEASE_ERR --
- *	Macros to clean up during internal-page reconciliation, releasing the
- *	hazard pointer we're holding on child pages.
+ *	Macros to clean up during internal-page reconciliation, releasing the hazard pointer we're
+ * holding on a child page.
  */
 #define WT_CHILD_RELEASE(session, hazard, ref)                          \
     do {                                                                \
@@ -352,12 +352,23 @@ typedef struct {
         WT_ERR(ret);                               \
     } while (0)
 
-typedef enum {
-    WT_CHILD_IGNORE,   /* Ignored child */
-    WT_CHILD_MODIFIED, /* Modified child */
-    WT_CHILD_ORIGINAL, /* Original child */
-    WT_CHILD_PROXY     /* Deleted child: proxy */
-} WT_CHILD_STATE;
+/*
+ * WT_CHILD_MODIFY_STATE --
+ *	We review child pages (while holding the child page's WT_REF lock), during internal-page
+ * reconciliation. This structure encapsulates the child page's returned information/state.
+ */
+typedef struct {
+    enum {
+        WT_CHILD_IGNORE,   /* Ignored child */
+        WT_CHILD_MODIFIED, /* Modified child */
+        WT_CHILD_ORIGINAL, /* Original child */
+        WT_CHILD_PROXY     /* Deleted child: proxy */
+    } state;               /* Returned child state */
+
+    WT_PAGE_DELETED del; /* WT_CHILD_PROXY state fast-truncate information */
+
+    bool hazard; /* If currently holding a child hazard pointer */
+} WT_CHILD_MODIFY_STATE;
 
 /*
  * Macros from fixed-length entries to/from bytes.
@@ -365,3 +376,12 @@ typedef enum {
 #define WT_COL_FIX_BYTES_TO_ENTRIES(btree, bytes) ((uint32_t)((((bytes)*8) / (btree)->bitcnt)))
 #define WT_COL_FIX_ENTRIES_TO_BYTES(btree, entries) \
     ((uint32_t)WT_ALIGN((entries) * (btree)->bitcnt, 8))
+
+#define WT_UPDATE_SELECT_INIT(upd_select)       \
+    do {                                        \
+        (upd_select)->upd = NULL;               \
+        (upd_select)->tombstone = NULL;         \
+        (upd_select)->upd_saved = false;        \
+        (upd_select)->no_ts_tombstone = false;  \
+        WT_TIME_WINDOW_INIT(&(upd_select)->tw); \
+    } while (0)

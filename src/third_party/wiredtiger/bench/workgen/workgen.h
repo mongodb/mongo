@@ -25,10 +25,10 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include <map>
 #include <ostream>
 #include <string>
 #include <vector>
-#include <map>
 
 // For convenience: A type exposed to Python that cannot be negative.
 typedef unsigned int uint_t;
@@ -44,51 +44,52 @@ struct Transaction;
 
 #ifndef SWIG
 struct OptionsList {
-    OptionsList();
+    OptionsList() = default;
     OptionsList(const OptionsList &other);
 
-    void add_int(const char *name, int default_value, const char *desc);
-    void add_bool(const char *name, bool default_value, const char *desc);
-    void add_double(const char *name, double default_value, const char *desc);
-    void add_string(const char *name, const std::string &default_value,
-      const char *desc);
+    void add_int(const std::string& name, int default_value, const std::string& desc);
+    void add_bool(const std::string& name, bool default_value, const std::string& desc);
+    void add_double(const std::string& name, double default_value, const std::string& desc);
+    void add_string(const std::string& name, const std::string &default_value,
+      const std::string& desc);
 
     std::string help() const;
-    std::string help_description(const char *option_name) const;
-    std::string help_type(const char *option_name) const;
+    std::string help_description(const std::string& option_name) const;
+    std::string help_type(const std::string& option_name) const;
 
 private:
-    void add_option(const char *name, const std::string typestr,
-      const char *desc);
+    void add_option(const std::string&name, const std::string typestr,
+      const std::string&desc);
     typedef std::pair<std::string, std::string> TypeDescPair;
     std::map<std::string, TypeDescPair> _option_map;
 };
 #endif
 
-// These classes are all exposed to Python via SWIG. While they may contain
-// data that is private to C++, such data must not prevent the objects from
-// being shared. Tables, Keys, Values, Operations and Threads can be shared: a
-// single Key object might appear in many operations; Operations may appear
-// multiple times in a Thread or in different Threads; the same Thread may
-// appear multiple times in a Workload list, etc.
-//
-// Certain kinds of state are allowed: A Table contains a unique pointer that
-// is used within the internal part of the Context.  Stats contain lots
-// of state, but is made available after a Workload.run().
-//
-// Python controls the lifetime of (nearly) all objects of these classes.
-// The exception is Stat/Track objects, which are also created/used
-// internally to calculate and show statistics during a run.
-//
+/*
+ * These classes are all exposed to Python via SWIG. While they may contain
+ * data that is private to C++, such data must not prevent the objects from
+ * being shared. Tables, Keys, Values, Operations and Threads can be shared: a
+ * single Key object might appear in many operations; Operations may appear
+ * multiple times in a Thread or in different Threads; the same Thread may
+ * appear multiple times in a Workload list, etc.
+ *
+ * Certain kinds of state are allowed: A Table contains a unique pointer that
+ * is used within the internal part of the Context.  Stats contain lots
+ * of state, but is made available after a Workload.run().
+ *
+ * Python controls the lifetime of (nearly) all objects of these classes.
+ * The exception is Stat/Track objects, which are also created/used
+ * internally to calculate and show statistics during a run.
+ */
 struct Track {
     // Threads maintain the total thread operation and total latency they've
     // experienced.
 
-    uint64_t ops_in_progress;           // Total operations not completed */
-    uint64_t ops;                       // Total operations completed */
-    uint64_t rollbacks;                 // Total operations rolled back */
+    uint64_t ops_in_progress;           // Total operations not completed
+    uint64_t ops;                       // Total operations completed
+    uint64_t rollbacks;                 // Total operations rolled back
     uint64_t latency_ops;               // Total ops sampled for latency
-    uint64_t latency;                   // Total latency */
+    uint64_t latency;                   // Total latency
     uint64_t bucket_ops;                // Computed for percentile_latency
 
     // Minimum/maximum latency, shared with the monitor thread, that is, the
@@ -137,7 +138,7 @@ struct Stats {
 
     Stats(bool latency = false);
     Stats(const Stats &other);
-    ~Stats();
+    ~Stats() = default;
 
     void add(Stats&, bool reset = false);
     void assign(const Stats&);
@@ -157,7 +158,6 @@ private:
 
 // A Context tracks the current record number for each uri, used
 // for key generation.
-//
 struct Context {
     bool _verbose;
     ContextInternal *_internal;
@@ -175,7 +175,6 @@ struct Context {
 
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
-//
 struct TableOptions {
     uint_t key_size;
     uint_t value_size;
@@ -185,7 +184,7 @@ struct TableOptions {
 
     TableOptions();
     TableOptions(const TableOptions &other);
-    ~TableOptions();
+    ~TableOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "key_size " << key_size;
@@ -195,9 +194,9 @@ struct TableOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
 private:
@@ -212,7 +211,7 @@ struct Table {
     /* XXX select table from range */
 
     Table();
-    Table(const char *tablename);
+    Table(const std::string& tablename);
     Table(const Table &other);
     ~Table();
 
@@ -229,7 +228,7 @@ struct ParetoOptions {
     double range_high;
     ParetoOptions(int param = 0);
     ParetoOptions(const ParetoOptions &other);
-    ~ParetoOptions();
+    ~ParetoOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "Pareto: parameter " << param;
@@ -239,9 +238,9 @@ struct ParetoOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
     static ParetoOptions DEFAULT;
@@ -301,13 +300,19 @@ struct Operation {
     std::vector<Operation> *_group;
     int _repeatgroup;
     double _timed;
+    // Indicates whether a table is selected randomly to be worked on.
+    bool _random_table;
+    // Maintain the random table being used by each thread running the operation.
+    std::vector<std::string> _tables;
 
     Operation();
     Operation(OpType optype, Table table, Key key, Value value);
     Operation(OpType optype, Table table, Key key);
     Operation(OpType optype, Table table);
+    // Operation working on random tables.
+    Operation(OpType optype, Key key, Value value);
     // Constructor with string applies to NOOP, SLEEP, CHECKPOINT
-    Operation(OpType optype, const char *config);
+    Operation(OpType optype, const std::string& config);
     Operation(const Operation &other);
     ~Operation();
 
@@ -332,7 +337,6 @@ struct Operation {
 
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
-//
 struct ThreadOptions {
     std::string name;
     std::string session_config;
@@ -342,7 +346,7 @@ struct ThreadOptions {
 
     ThreadOptions();
     ThreadOptions(const ThreadOptions &other);
-    ~ThreadOptions();
+    ~ThreadOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "throttle " << throttle;
@@ -352,21 +356,23 @@ struct ThreadOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
 private:
     OptionsList _options;
 };
 
-// This is a list of threads, which may be used in the Workload constructor.
-// It participates with ThreadList defined on the SWIG/Python side and
-// some Python operators added to Thread to allow Threads to be easily
-// composed using '+' and multiplied (by integer counts) using '*'.
-// Users of the workgen API in Python don't ever need to use
-// ThreadListWrapper or ThreadList.
+/*
+ * This is a list of threads, which may be used in the Workload constructor.
+ * It participates with ThreadList defined on the SWIG/Python side and
+ * some Python operators added to Thread to allow Threads to be easily
+ * composed using '+' and multiplied (by integer counts) using '*'.
+ * Users of the workgen API in Python don't ever need to use
+ * ThreadListWrapper or ThreadList.
+ */
 struct ThreadListWrapper {
     std::vector<Thread> _threads;
 
@@ -386,7 +392,7 @@ struct Thread {
     Thread();
     Thread(const Operation &op);
     Thread(const Thread &other);
-    ~Thread();
+    ~Thread() = default;
 
     void describe(std::ostream &os) const;
 };
@@ -428,9 +434,9 @@ struct Transaction {
 
 // To prevent silent errors, this class is set up in Python so that new
 // properties are prevented, only existing properties can be set.
-//
 struct WorkloadOptions {
     int max_latency;
+    bool report_enabled;
     std::string report_file;
     int report_interval;
     int run_time;
@@ -443,10 +449,23 @@ struct WorkloadOptions {
     double stable_timestamp_lag;
     double timestamp_advance;
     bool max_idle_table_cycle_fatal;
+    /* Dynamic create/drop options */
+    int create_count;
+    int create_interval;
+    std::string create_prefix;
+    int create_target;
+    int create_trigger;
+    int drop_count;
+    int drop_interval;
+    int drop_target;
+    int drop_trigger;
+    bool random_table_values;
+    bool mirror_tables;
+    std::string mirror_suffix;
 
     WorkloadOptions();
     WorkloadOptions(const WorkloadOptions &other);
-    ~WorkloadOptions();
+    ~WorkloadOptions() = default;
 
     void describe(std::ostream &os) const {
 	os << "run_time " << run_time;
@@ -454,9 +473,9 @@ struct WorkloadOptions {
     }
 
     std::string help() const { return _options.help(); }
-    std::string help_description(const char *option_name) const {
+    std::string help_description(const std::string& option_name) const {
 	return _options.help_description(option_name); }
-    std::string help_type(const char *option_name) const {
+    std::string help_type(const std::string& option_name) const {
 	return _options.help_type(option_name); }
 
 private:
@@ -472,7 +491,7 @@ struct Workload {
     Workload(Context *context, const ThreadListWrapper &threadlist);
     Workload(Context *context, const Thread &thread);
     Workload(const Workload &other);
-    ~Workload();
+    ~Workload() = default;
 
 #ifndef SWIG
     Workload& operator=(const Workload &other);

@@ -1,0 +1,20 @@
+In file included from src/block/block_write.c:9:
+In file included from ./src/include/wt_internal.h:439:
+./src/include/intpack_inline.h:193:7: warning: Assigned value is garbage or undefined
+    p = *pp;
+      ^ ~~~
+1 warning generated.
+src/btree/bt_delete.c:411:5: warning: Null pointer passed to 1st parameter expecting 'nonnull'
+    __wt_overwrite_and_free(session, ref->ft_info.del);
+    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./src/include/misc.h:141:13: note: expanded from macro '__wt_overwrite_and_free'
+            __wt_explicit_overwrite(p, sizeof(*(p))); \
+            ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./src/include/misc.h:135:42: note: expanded from macro '__wt_explicit_overwrite'
+#define __wt_explicit_overwrite(p, size) memset(p, WT_DEBUG_BYTE, size)
+                                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+src/conn/conn_capacity.c:289:5: warning: Value stored to 'capacity' is never read
+    capacity = steal_capacity = 0;
+    ^          ~~~~~~~~~~~~~~~~~~
+1 warning generated.

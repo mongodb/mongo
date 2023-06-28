@@ -76,7 +76,7 @@ class test_import02(test_import_base):
         # Import the file.
         # Since we need "file_metadata" without the "repair" option, we should expect an error here.
         with self.expectedStderrPattern(
-            'file:original_db_file: import requires that \'file_metadata\' is specified'):
+            'file:original_db_file: import requires that \'file_metadata\' or \'metadata_file\' is specified'):
             self.assertRaisesException(wiredtiger.WiredTigerError,
                 lambda: self.session.create(self.uri, import_config))
 

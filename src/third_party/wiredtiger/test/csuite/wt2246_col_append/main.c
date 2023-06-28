@@ -38,8 +38,6 @@
 /* Don't move into shared function there is a cross platform solution */
 #include <signal.h>
 
-#define MILLION 1000000
-
 /* Needs to be global for signal handling. */
 static TEST_OPTS *opts, _opts;
 
@@ -104,7 +102,7 @@ main(int argc, char *argv[])
     wt_thread_t idlist[100];
     clock_t ce, cs;
     uint64_t i, id;
-    char buf[100];
+    char buf[256];
 
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
@@ -115,7 +113,8 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
 
     testutil_check(__wt_snprintf(buf, sizeof(buf),
-      "create,cache_size=%s,eviction=(threads_max=5),statistics=(fast)",
+      "create,cache_size=%s,eviction=(threads_max=5),statistics=(all),"
+      "statistics_log=(json,on_close,wait=1)",
       opts->table_type == TABLE_FIX ? "500MB" : "2GB"));
     testutil_check(wiredtiger_open(opts->home, NULL, buf, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
@@ -129,7 +128,8 @@ main(int argc, char *argv[])
 
     /* Force to disk and re-open. */
     testutil_check(opts->conn->close(opts->conn, NULL));
-    testutil_check(wiredtiger_open(opts->home, NULL, NULL, &opts->conn));
+    testutil_check(wiredtiger_open(
+      opts->home, NULL, "statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
 
     (void)signal(SIGINT, onsig);
 
@@ -145,7 +145,7 @@ main(int argc, char *argv[])
         testutil_check(__wt_thread_join(NULL, &idlist[i]));
 
     ce = clock();
-    printf("%" PRIu64 "M records: %.2lf processor seconds\n", opts->max_inserted_id / MILLION,
+    printf("%" PRIu64 "M records: %.2lf processor seconds\n", opts->max_inserted_id / WT_MILLION,
       (ce - cs) / (double)CLOCKS_PER_SEC);
 
     testutil_cleanup(opts);

@@ -47,10 +47,14 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction(
             'commit_timestamp=' + self.timestamp_str(1))
 
-        # Can set a zero timestamp. These calls shouldn't raise any errors.
+        # Cannot set a zero timestamp.
         self.session.begin_transaction()
-        self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 0)
-        self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_READ, 0)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 0),
+            '/zero not permitted/')
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_READ, 0),
+            '/zero not permitted/')
         self.session.rollback_transaction()
 
         # In a single transaction it is illegal to set a commit timestamp
@@ -165,6 +169,11 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.begin_transaction()
         cur1[1] = 1
         self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 3)
+
+        # The all_durable timestamp should return 0 if there a no transactions that have committed 
+        # yet.
+        self.assertTimestampsEqual(
+            self.conn.query_timestamp('get=all_durable'), '0')
         self.session.commit_transaction()
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=all_durable'), '3')
@@ -242,6 +251,22 @@ class test_timestamp08(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.commit_transaction()
         self.assertTimestampsEqual(
             self.conn.query_timestamp('get=all_durable'), '8')
+
+        # After a checkpoint all_durable should return the checkpoint timestamp.
+        self.conn.set_timestamp('oldest_timestamp=9,stable_timestamp=9')
+        self.session.checkpoint()
+        self.reopen_conn()
+
+        self.session.begin_transaction()
+        self.session.timestamp_transaction_uint(wiredtiger.WT_TS_TXN_TYPE_COMMIT, 11)
+        
+        # Before any running transactions have committed all_durable should return the checkpoint
+        # timestamp.
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), self.timestamp_str(9))
+        self.session.commit_transaction()
+
+        # Now the all_durable reflect the last committed transaction.
+        self.assertTimestampsEqual(self.conn.query_timestamp('get=all_durable'), self.timestamp_str(11))
 
 if __name__ == '__main__':
     wttest.run()

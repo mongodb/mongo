@@ -57,7 +57,7 @@ class test_cursor09(wttest.WiredTigerTestCase):
         ds = self.dataset(self, uri, 100, key_format=self.keyfmt, value_format=self.valfmt)
         ds.populate()
 
-        cursor = self.session.open_cursor(uri, None, None)
+        cursor = ds.open_cursor(uri, None, None)
         cursor[ds.key(10)] = ds.value(10)
         msg = '/requires key be set/'
         self.assertRaisesWithMessage(

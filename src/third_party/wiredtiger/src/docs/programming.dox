@@ -40,6 +40,7 @@ each of which is ordered by one or more columns.
 <h2>Programming notes</h2>
 - @subpage message_handling
 - @subpage verbose_messaging
+- @subpage debugging
 - @subpage threads
 - @subpage namespace
 - @subpage readonly

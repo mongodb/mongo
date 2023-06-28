@@ -96,18 +96,36 @@ class test_hs06(wttest.WiredTigerTestCase):
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
         self.session.checkpoint()
 
-        # Check the checkpoint wrote the expected values.
-        #
-        # FIXME-WT-5927: Checkpoint cursors are known to have issues in durable history so we've
-        # removing the use of checkpoint handles in this test. As part of WT-5927, we should either
-        # re-enable the testing of checkpoint cursors or remove this comment.
-        #
-        # cursor2 = self.session.open_cursor(uri, None, 'checkpoint=WiredTigerCheckpoint')
-        cursor2 = self.session.open_cursor(uri)
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
+        # Check the checkpoint wrote the expected values. We should get the stable data by
+        # default. 
+        cursor2 = self.session.open_cursor(uri, None, 'checkpoint=WiredTigerCheckpoint')
         for key, value in cursor2:
             self.assertEqual(value, value1)
-        self.session.commit_transaction()
+        cursor2.close()
+
+        # Also check with an explicit read timestamp.
+        ckpt_ts = ',debug=(checkpoint_read_timestamp=' + self.timestamp_str(2) + ')'
+        cursor2 = self.session.open_cursor(uri, None, 'checkpoint=WiredTigerCheckpoint' + ckpt_ts)
+        for key, value in cursor2:
+            self.assertEqual(value, value1)
+        cursor2.close()
+
+        # At least for the moment, we can also read the unstable values out of the checkpoint
+        # if we ask for them.
+        ckpt_ts = ',debug=(checkpoint_read_timestamp=' + self.timestamp_str(3) + ')'
+        cursor2 = self.session.open_cursor(uri, None, 'checkpoint=WiredTigerCheckpoint' + ckpt_ts)
+        for key, value in cursor2:
+            self.assertEqual(value, value2)
+        cursor2.close()
+
+        # Check what happens if we explicitly read the checkpoint with no timestamp.
+        # Should get the most recent data.
+        # (A timestamp string of "0" is explicitly allowed here to override the checkpoint's
+        # own timestamp.)
+        ckpt_ts = ',debug=(checkpoint_read_timestamp=0)'
+        cursor2 = self.session.open_cursor(uri, None, 'checkpoint=WiredTigerCheckpoint' + ckpt_ts)
+        for key, value in cursor2:
+            self.assertEqual(value, value2)
         cursor2.close()
 
         start_usage = self.get_non_page_image_memory_usage()

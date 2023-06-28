@@ -26,13 +26,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-import wiredtiger, wttest
+import wiredtiger, wttest, sys
 from wtscenario import make_scenarios
 
 # test_hs20.py
 # Ensure we never reconstruct a reverse modify update in the history store based on the onpage overflow value
 class test_hs20(wttest.WiredTigerTestCase):
+    # This test purposely uses a small cache to force eviction to occur
+    # at certain points in its execution.
     conn_config = 'cache_size=50MB,eviction=(threads_max=1)'
+
+    # The small cache size of the test means that rollbacks will occur.
+    # Add more retries to make eventual success more likely.
+    rollbacks_allowed = 5
 
     # Return the k'th (0-based) key.
     def make_column_key(k):
@@ -60,46 +66,43 @@ class test_hs20(wttest.WiredTigerTestCase):
         value1 = 'a' * 500
         value2 = 'b' * 50
 
-        # FIXME-WT-9063 revisit the use of self.retry() throughout this file.
-
         # Insert a value that is larger than the maximum leaf value.
         for i in range(0, 10):
-            for retry in self.retry():
-                with retry.transaction(commit_timestamp = 2):
-                    cursor[self.make_key(i)] = value1
+            with self.transaction(commit_timestamp = 2):
+                cursor[self.make_key(i)] = value1
 
         # Do 2 modifies.
         for i in range(0, 10):
-            for retry in self.retry():
-                with retry.transaction(commit_timestamp = 3):
-                    cursor.set_key(self.make_key(i))
-                    mods = [wiredtiger.Modify('B', 500, 1)]
-                    self.assertEqual(cursor.modify(mods), 0)
+            with self.transaction(commit_timestamp = 3):
+                cursor.set_key(self.make_key(i))
+                mods = [wiredtiger.Modify('B', 500, 1)]
+                self.assertEqual(cursor.modify(mods), 0)
 
         for i in range(0, 10):
-            for retry in self.retry():
-                with retry.transaction(commit_timestamp = 4):
-                    cursor.set_key(self.make_key(i))
-                    mods = [wiredtiger.Modify('C', 501, 1)]
-                    self.assertEqual(cursor.modify(mods), 0)
+            with self.transaction(commit_timestamp = 4):
+                cursor.set_key(self.make_key(i))
+                mods = [wiredtiger.Modify('C', 501, 1)]
+                self.assertEqual(cursor.modify(mods), 0)
 
         # Insert more data to trigger eviction.
         for i in range(10, 100000):
-            for retry in self.retry():
-                with retry.transaction(commit_timestamp = 5):
-                    cursor[self.make_key(i)] = value2
+            with self.transaction(commit_timestamp = 5):
+                cursor[self.make_key(i)] = value2
 
         # Update the overflow values.
         for i in range(0, 10):
-            for retry in self.retry():
-                with retry.transaction(commit_timestamp = 5):
-                    cursor[self.make_key(i)] = value2
+            with self.transaction(commit_timestamp = 5):
+                cursor[self.make_key(i)] = value2
 
         # Do a checkpoint to move the overflow values to the history store but keep the current in memory disk image.
         self.session.checkpoint()
 
         # Search the first modifies.
         for i in range(0, 10):
-            for retry in self.retry():
-                with retry.transaction(read_timestamp = 3, rollback = True):
-                    self.assertEqual(cursor[self.make_key(i)], value1 + "B")
+            with self.transaction(read_timestamp = 3, rollback = True):
+                self.assertEqual(cursor[self.make_key(i)], value1 + "B")
+
+        if (sys.platform.startswith('darwin')):
+            # Ignore the eviction generation drain warning as it is possible for eviction to take 
+            # longer to evict pages due to overflow items on the page.
+            self.ignoreStdoutPatternIfExists('Eviction took more than 1 minute')

@@ -10,3 +10,11 @@ crafted and put into the Evergreen configuration file. We have a utility program
 'test/evergreen/evg_cfg.py' to help with identifying and auto-generating the
 Evergreen configuration for new or missing csuite tests. The program checking
 has been bound into developer workflow through 'dist/s_evergreen'. 
+
+Some csuite tests that check WiredTiger's failure recovery have LazyFS variants,
+which use LazyFS (a FUSE file system) to emulate losing the contents of the buffer
+cache, such as to test the system behavior in face of sudden reboots or power
+failures. To use these tests, you need to have FUSE 3 installed together with the
+development libraries, have 'user_allow_other' enabled in /etc/fuse.conf, and you
+need to also enable LazyFS in cmake via the '-DENABLE_LAZYFS=1' command-line
+option. The tests are not currently available in Evergreen and must be run manually.

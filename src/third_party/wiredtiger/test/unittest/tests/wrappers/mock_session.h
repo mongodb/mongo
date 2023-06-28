@@ -14,7 +14,7 @@
 #include "mock_connection.h"
 
 class MockSession {
-    public:
+public:
     ~MockSession();
     WT_SESSION_IMPL *
     getWtSessionImpl()
@@ -24,7 +24,7 @@ class MockSession {
 
     static std::shared_ptr<MockSession> buildTestMockSession();
 
-    private:
+private:
     explicit MockSession(
       WT_SESSION_IMPL *sessionImpl, std::shared_ptr<MockConnection> mockConnection = nullptr);
 

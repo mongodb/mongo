@@ -28,12 +28,11 @@
 
 #include "test_util.h"
 
-#include <assert.h>
-
 #define HOME "WT_TEST"
 #define DUMP "WT_TEST/__slvg.dump"   /* Dump file */
 #define LOAD "WT_TEST/__slvg.load"   /* Build file */
 #define LOAD_URI "file:__slvg.load"  /* Build URI */
+#define PREP "WT_TEST/__slvg.prep"   /* Prepare file */
 #define RSLT "WT_TEST/__slvg.result" /* Result file */
 #define SLVG "WT_TEST/__slvg.slvg"   /* Salvage file */
 #define SLVG_URI "file:__slvg.slvg"  /* Salvage URI */
@@ -178,9 +177,10 @@ run(int r)
     testutil_assert_errno((res_fp = fopen(RSLT, "w")) != NULL);
 
     /*
-     * Each run builds the LOAD file, and then appends the first page of the LOAD file into the SLVG
-     * file. The SLVG file is then salvaged, verified, and dumped into the DUMP file, which is
-     * compared to the results file, which are the expected results.
+     * Each run builds the LOAD file, and then appends the first page of the LOAD file into the PREP
+     * file. The PREP file is then copied to the SLVG file, which is salvaged, verified, and dumped
+     * into the DUMP file. The DUMP file is in turn compared to the results file, which are the
+     * expected results.
      */
     switch (r) {
     case 1:
@@ -519,7 +519,8 @@ build(int ikey, int ivalue, int cnt)
     /*
      * Disable logging: we're modifying files directly, we don't want to run recovery.
      */
-    testutil_check(wiredtiger_open(HOME, NULL, "create,log=(enabled=false)", &conn));
+    testutil_check(wiredtiger_open(HOME, NULL,
+      "create,log=(enabled=false),statistics=(all),statistics_log=(json,on_close,wait=1)", &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
     testutil_check(session->drop(session, LOAD_URI, "force"));
 
@@ -543,7 +544,7 @@ build(int ikey, int ivalue, int cnt)
           PSIZE, PSIZE, PSIZE, OSIZE, OSIZE));
         break;
     default:
-        assert(0);
+        testutil_assert(0);
     }
     testutil_check(session->create(session, LOAD_URI, config));
     testutil_check(session->open_cursor(session, LOAD_URI, NULL, "bulk,append", &cursor));
@@ -576,8 +577,8 @@ build(int ikey, int ivalue, int cnt)
     }
 
     /*
-     * The first time through this routine we create the salvage file and then remove it (all we
-     * want is the appropriate schema entry, we're creating the salvage file itself by hand).
+     * The first time through this routine we create the salvage file, sharing the config with the
+     * load file. This creates the schema entry; we don't care about the file contents.
      */
     new_slvg = !file_exists(SLVG);
     if (new_slvg) {
@@ -585,8 +586,6 @@ build(int ikey, int ivalue, int cnt)
         testutil_check(session->create(session, SLVG_URI, config));
     }
     testutil_check(conn->close(conn, 0));
-    if (new_slvg)
-        (void)remove(SLVG);
 }
 
 /*
@@ -609,10 +608,10 @@ copy(u_int gen, u_int recno)
      * If the salvage file doesn't exist, then we're creating it: copy the first sector (the file
      * description). Otherwise, we are appending to an existing file.
      */
-    if (file_exists(SLVG))
-        testutil_assert_errno((ofp = fopen(SLVG, "a")) != NULL);
+    if (file_exists(PREP))
+        testutil_assert_errno((ofp = fopen(PREP, "a")) != NULL);
     else {
-        testutil_assert_errno((ofp = fopen(SLVG, "w")) != NULL);
+        testutil_assert_errno((ofp = fopen(PREP, "w")) != NULL);
         testutil_assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
         testutil_assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
     }
@@ -654,6 +653,30 @@ copy(u_int gen, u_int recno)
 }
 
 /*
+ * copy_file --
+ *     Copy one file over another.
+ */
+static void
+copy_file(const char *src, const char *dst)
+{
+    FILE *srcfp, *dstfp;
+    size_t rsz, wsz;
+    char buf[PSIZE];
+
+    testutil_assert_errno((srcfp = fopen(src, "r")) != NULL);
+    testutil_assert_errno((dstfp = fopen(dst, "w")) != NULL);
+    while ((rsz = fread(buf, 1, sizeof(buf), srcfp)) != 0) {
+        testutil_check(ferror(srcfp));
+        wsz = fwrite(buf, 1, rsz, dstfp);
+        testutil_check(ferror(dstfp));
+        testutil_assert(wsz == rsz);
+    }
+    testutil_check(ferror(srcfp));
+    testutil_check(fclose(srcfp));
+    testutil_check(fclose(dstfp));
+}
+
+/*
  * process --
  *     Salvage, verify and dump the created file.
  */
@@ -667,11 +690,22 @@ process(void)
     char config[100];
     const char *key, *value;
 
+    /*
+     * Remove the salvage file and replace it with the file we've built. It would be simpler to just
+     * rename the prep file over the salvage file, but this way the original unchanged file is
+     * available for reference if things go south, and we might want to run on a platform where a
+     * suitable rename isn't available.
+     */
+    (void)remove(SLVG);
+    copy_file(PREP, SLVG);
+
     /* Salvage. */
     config[0] = '\0';
     if (verbose)
-        testutil_check(__wt_snprintf(
-          config, sizeof(config), "error_prefix=\"%s\",verbose=[salvage,verify],", progname));
+        testutil_check(__wt_snprintf(config, sizeof(config),
+          "error_prefix=\"%s\",verbose=[salvage,verify],statistics=(all),statistics_log=(json,on_"
+          "close,wait=1),",
+          progname));
     strcat(config, "log=(enabled=false),");
 
     testutil_check(wiredtiger_open(HOME, NULL, config, &conn));

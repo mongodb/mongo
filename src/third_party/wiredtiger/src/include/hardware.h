@@ -26,30 +26,47 @@
     } while (0)
 
 /*
+ * In some architectures with weak memory ordering, the CPU can reorder the reads across full
+ * barriers in other threads. Guarantee that subsequent reads do not see any earlier state in those
+ * architectures.
+ *
+ * !!! This is a temporary solution to avoid a performance regression in x86. Do not use this macro
+ * and we will revisit it later.
+ */
+#define WT_ORDERED_READ_WEAK_MEMORDER(v, val) \
+    do {                                      \
+        (v) = (val);                          \
+        WT_READ_BARRIER_WEAK_MEMORDER();      \
+    } while (0)
+
+/*
  * Atomic versions of the flag set/clear macros.
  */
+#define FLD_ISSET_ATOMIC_16(field, mask) ((field) & (uint16_t)(mask))
 
-#define F_ISSET_ATOMIC_16(p, mask) ((p)->flags_atomic & (uint16_t)(mask))
-
-#define F_SET_ATOMIC_16(p, mask)                                                             \
-    do {                                                                                     \
-        uint16_t __orig;                                                                     \
-        if (F_ISSET_ATOMIC_16(p, mask))                                                      \
-            break;                                                                           \
-        do {                                                                                 \
-            __orig = (p)->flags_atomic;                                                      \
-        } while (!__wt_atomic_cas16(&(p)->flags_atomic, __orig, __orig | (uint16_t)(mask))); \
+#define FLD_SET_ATOMIC_16(field, mask)                                             \
+    do {                                                                           \
+        uint16_t __orig;                                                           \
+        if (FLD_ISSET_ATOMIC_16((field), (mask)))                                  \
+            break;                                                                 \
+        do {                                                                       \
+            __orig = (field);                                                      \
+        } while (!__wt_atomic_cas16(&(field), __orig, __orig | (uint16_t)(mask))); \
     } while (0)
 
-#define F_CLR_ATOMIC_16(p, mask)                                                                \
-    do {                                                                                        \
-        uint16_t __orig;                                                                        \
-        if (!F_ISSET_ATOMIC_16(p, mask))                                                        \
-            break;                                                                              \
-        do {                                                                                    \
-            __orig = (p)->flags_atomic;                                                         \
-        } while (!__wt_atomic_cas16(&(p)->flags_atomic, __orig, __orig & (uint16_t)(~(mask)))); \
+#define FLD_CLR_ATOMIC_16(field, mask)                                                \
+    do {                                                                              \
+        uint16_t __orig;                                                              \
+        if (!FLD_ISSET_ATOMIC_16((field), (mask)))                                    \
+            break;                                                                    \
+        do {                                                                          \
+            __orig = (field);                                                         \
+        } while (!__wt_atomic_cas16(&(field), __orig, __orig & (uint16_t)(~(mask)))); \
     } while (0)
+
+#define F_ISSET_ATOMIC_16(p, mask) FLD_ISSET_ATOMIC_16((p)->flags_atomic, mask)
+#define F_CLR_ATOMIC_16(p, mask) FLD_CLR_ATOMIC_16((p)->flags_atomic, mask)
+#define F_SET_ATOMIC_16(p, mask) FLD_SET_ATOMIC_16((p)->flags_atomic, mask)
 
 /*
  * Cache line alignment.

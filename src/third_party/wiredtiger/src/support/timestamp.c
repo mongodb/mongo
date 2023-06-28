@@ -30,7 +30,7 @@ __wt_time_point_to_string(
 {
     char ts_string[WT_TS_INT_STRING_SIZE];
 
-    WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TP_STRING_SIZE, "%s/%s/%" PRIu64,
+    WT_IGNORE_RET(__wt_snprintf(tp_string, WT_TIME_STRING_SIZE, "%s/%s/%" PRIu64,
       __wt_timestamp_to_string(ts, ts_string), __wt_timestamp_to_string(durable_ts, ts_string),
       txn_id));
     return (tp_string);
@@ -270,9 +270,9 @@ __wt_time_aggregate_validate(
           __wt_time_aggregate_to_string(ta, time_string[0]));
 
     /*
-     * In the case of out of order timestamps, we assign the start point to the stop point and
-     * newest start durable timestamp may be larger than newest stop timestamp. Check whether start
-     * and stop are equal first.
+     * In the case of missing timestamps, we assign the start point to the stop point and newest
+     * start durable timestamp may be larger than newest stop timestamp. Check whether start and
+     * stop are equal first.
      */
     if (ta->newest_start_durable_ts != ta->newest_stop_durable_ts &&
       ta->newest_start_durable_ts > ta->newest_stop_ts)
@@ -391,7 +391,7 @@ __time_value_validate_parent(
 
     if (tw->prepare && !parent->prepare)
         WT_TIME_VALIDATE_RET(session,
-          "aggregate time window is prepared but its parent is not; time aggregate %s, parent %s",
+          "value time window is prepared but its parent is not; time window %s, parent %s",
           __wt_time_window_to_string(tw, time_string[0]),
           __wt_time_aggregate_to_string(parent, time_string[1]));
 
@@ -429,9 +429,9 @@ __wt_time_value_validate(
           __wt_time_window_to_string(tw, time_string[0]));
 
     /*
-     * In the case of out of order timestamps, we assign start time point to the stop point and
-     * durable start timestamp may be larger than stop timestamp. Check whether start and stop are
-     * equal first.
+     * In the case of missing timestamps, we assign start time point to the stop point and durable
+     * start timestamp may be larger than stop timestamp. Check whether start and stop are equal
+     * first.
      */
     if (tw->durable_start_ts != tw->durable_stop_ts && tw->durable_start_ts > tw->stop_ts)
         WT_TIME_VALIDATE_RET(session,

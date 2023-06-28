@@ -8,8 +8,8 @@ To build with CMake we **require** the following dependencies:
   * `gcc` : Version 8.5 or later, or 
   * `clang`: Version 7.01 or later, or
   * `Visual Studio 2017`: If compiling on Windows
-* `cmake` : Official CMake install instructions found here: https://cmake.org/install/
-  * *WiredTiger supports CMake 3.10+*
+  * `cmake` : Official CMake install instructions found here: https://cmake.org/install/ (*WiredTiger supports CMake 3.10+*)
+  * `python` : Version 3 or later for building the Python API or running the tests
 
 We also suggest the following dependencies are also installed (for improved build times):
 
@@ -92,16 +92,16 @@ $ make
 There are a number of additional configuration options you can pass to the CMake configuration step. A summary of some important options you will come to know:
 
 * `-DENABLE_STATIC=1` : Compile WiredTiger as a static library
-* `-DENABLE_LZ4=1` : Build the lz4 compressor extension
-* `-DENABLE_SNAPPY=1` : Build the snappy compressor extension
-* `-DENABLE_ZLIB=1` : Build the zlib compressor extension
-* `-DENABLE_ZSTD=1` : Build the libzstd compressor extension
+* `-DENABLE_LZ4=1` : Build the lz4 compressor extension (enabled by default if the LZ4 library is present)
+* `-DENABLE_SNAPPY=1` : Build the snappy compressor extension (enabled by default if the SNAPPY library is present)
+* `-DENABLE_ZLIB=1` : Build the zlib compressor extension (enabled by default if the ZLIB library is present)
+* `-DENABLE_ZSTD=1` : Build the libzstd compressor extension (enabled by default if the ZSTD library is present)
 * `-DENABLE_SODIUM=1` : Build the libsodium encryptor extension
-* `-DHAVE_DIAGNOSTIC=1` : Enable WiredTiger diagnostics
-* `-DHAVE_UNITTEST=1` : Enable WiredTiger unit tests
+* `-DHAVE_DIAGNOSTIC=1` : Enable WiredTiger diagnostics (enabled by default for non Release build types)
+* `-DHAVE_REF_TRACK=1` : Enable WiredTiger to track recent state transitions for WT_REF structures (always enabled in diagnostic build)
+* `-DHAVE_UNITTEST=1` : Enable WiredTiger C++ Catch2 based unit tests
 * `-DHAVE_ATTACH=1` : Enable to pause for debugger attach on failure
-* `-DENABLE_STRICT=1` : Compile with strict compiler warnings enabled
-* `-DENABLE_PYTHON=1` : Compile the python API
+* `-DENABLE_PYTHON=1` : Compile the python API (enabled by default if python is available)
 * `-DCMAKE_INSTALL_PREFIX=<path-to-install-directory>` : Path to install directory
 
 ---
@@ -109,7 +109,7 @@ There are a number of additional configuration options you can pass to the CMake
 An example of using the above configuration options during the configuration step:
 
 ```bash
-$ cmake -DENABLE_STATIC=1 -DENABLE_LZ4=1 -DENABLE_SNAPPY=1 -DENABLE_ZLIB=1 -DENABLE_ZSTD=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_ATTACH=1 -DENABLE_STRICT=1 -G Ninja ../.
+$ cmake -DENABLE_STATIC=1 -DHAVE_DIAGNOSTIC=1 -DHAVE_ATTACH=1 -G Ninja ../.
 ```
 
 ---

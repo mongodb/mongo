@@ -106,7 +106,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
         k = 0
         sleep = 0
         max = 60
-        final_nfile = 4
+        final_nfile = 5
         while sleep < max:
             self.session.checkpoint()
             k = k+1
@@ -192,7 +192,7 @@ class test_sweep01(wttest.WiredTigerTestCase, suite_subprocess):
             print("XX: nfile1: " + str(nfile1) + " nfile2: " + str(nfile2))
         self.assertEqual(nfile2 < nfile1, True)
         # The only files that should be left are the metadata, the history store
-        # file, the lock file, and the active file.
+        # file, the lock file, the active file and the statistics file.
         if (nfile2 != final_nfile):
             print("close1: " + str(close1) + " close2: " + str(close2))
             print("remove1: " + str(remove1) + " remove2: " + str(remove2))

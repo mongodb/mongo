@@ -33,7 +33,8 @@ from helper import simulate_crash_restart
 from wtscenario import make_scenarios
 
 # test_hs24.py
-# Test that out of order timestamp fix racing with checkpointing the history store doesn't create inconsistent checkpoint.
+# Test that missing timestamp fix racing with checkpointing the history store doesn't create
+# inconsistent checkpoint.
 class test_hs24(wttest.WiredTigerTestCase):
     format_values = [
         ('column', dict(key_format='r', value_format='S')),
@@ -55,7 +56,7 @@ class test_hs24(wttest.WiredTigerTestCase):
     numrows = 2000
 
     def moresetup(self):
-        self.format = 'key_format={},value_format={}'. format(self.key_format, self.value_format)
+        self.format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
         if self.value_format == '8t':
             self.value1 = 97
             self.value2 = 98
@@ -67,7 +68,7 @@ class test_hs24(wttest.WiredTigerTestCase):
             self.value3 = 'c' * 500
             self.value4 = 'd' * 500
 
-    def test_zero_ts(self):
+    def test_missing_ts(self):
         self.moresetup()
         self.session.create(self.uri, self.format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -81,7 +82,7 @@ class test_hs24(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
         cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(5))
-        thread = threading.Thread(target=self.zero_ts_deletes)
+        thread = threading.Thread(target=self.missing_ts_deletes)
         thread.start()
         # Give the thread a chance to get going. Otherwise typically none of the deletions
         # appear in the checkpoint and we lose the ability to test that anything interesting
@@ -122,18 +123,18 @@ class test_hs24(wttest.WiredTigerTestCase):
         session2.rollback_transaction()
         self.session.rollback_transaction()
 
-    def zero_ts_deletes(self):
+    def missing_ts_deletes(self):
         session = self.setUpSessionOpen(self.conn)
         cursor = session.open_cursor(self.uri)
         for i in range(1, self.numrows + 1):
-            session.begin_transaction()
+            session.begin_transaction('no_timestamp=true')
             cursor.set_key(i)
             cursor.remove()
             session.commit_transaction()
         cursor.close()
         session.close()
 
-    def test_zero_commit(self):
+    def test_missing_commit(self):
         self.moresetup()
         self.session.create(self.uri, self.format)
         self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
@@ -147,15 +148,15 @@ class test_hs24(wttest.WiredTigerTestCase):
             self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(5))
         cursor.close()
         self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(4))
-        thread = threading.Thread(target=self.zero_ts_commits)
+        thread = threading.Thread(target=self.missing_ts_commits)
         thread.start()
         self.session.checkpoint()
         thread.join()
         simulate_crash_restart(self, '.', "RESTART")
         cursor = self.session.open_cursor(self.uri)
         self.session.begin_transaction('read_timestamp=' + self.timestamp_str(4))
-        # Check we can only see the version committed by the zero timestamp
-        # commit thread before the checkpoint starts or value1.
+        # Check we can only see the version committed by the no timestamp commit thread before
+        # the checkpoint starts or value1.
         newer_data_visible = False
         for i in range(1, self.numrows + 1):
             value = cursor[i]
@@ -167,60 +168,12 @@ class test_hs24(wttest.WiredTigerTestCase):
                 self.assertEquals(value, self.value3)
         self.session.rollback_transaction()
 
-    def zero_ts_commits(self):
+    def missing_ts_commits(self):
         session = self.setUpSessionOpen(self.conn)
         cursor = session.open_cursor(self.uri)
         for i in range(1, self.numrows + 1):
-            session.begin_transaction()
+            session.begin_transaction('no_timestamp=true')
             cursor[i] = self.value3
             session.commit_transaction()
-        cursor.close()
-        session.close()
-
-    def test_out_of_order_ts(self):
-        self.moresetup()
-        self.session.create(self.uri, self.format)
-        self.conn.set_timestamp('oldest_timestamp=' + self.timestamp_str(1))
-        cursor = self.session.open_cursor(self.uri)
-        for i in range(1, self.numrows + 1):
-            self.session.begin_transaction()
-            cursor[i] = self.value1
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(2))
-            self.session.begin_transaction()
-            cursor[i] = self.value2
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(3))
-        self.conn.set_timestamp('stable_timestamp=' + self.timestamp_str(2))
-        for i in range(1, self.numrows + 1):
-            self.session.begin_transaction()
-            cursor[i] = self.value3
-            self.session.commit_transaction('commit_timestamp=' + self.timestamp_str(6))
-        cursor.close()
-        thread = threading.Thread(target=self.out_of_order_ts_commits)
-        thread.start()
-        self.session.checkpoint()
-        thread.join()
-        simulate_crash_restart(self, '.', "RESTART")
-        cursor = self.session.open_cursor(self.uri)
-        self.session.begin_transaction('read_timestamp=' + self.timestamp_str(2))
-        # Check we can only see the version at timestamp 2, it's either committed by the out of
-        # order timestamp commit thread before the checkpoint starts or value1.
-        newer_data_visible = False
-        for i in range(1, self.numrows + 1):
-            value = cursor[i]
-            if not newer_data_visible:
-                newer_data_visible = value != self.value4
-            if newer_data_visible:
-                self.assertEquals(value, self.value1)
-            else:
-                self.assertEquals(value, self.value4)
-        self.session.rollback_transaction()
-
-    def out_of_order_ts_commits(self):
-        session = self.setUpSessionOpen(self.conn)
-        cursor = session.open_cursor(self.uri)
-        for i in range(1, self.numrows + 1):
-            session.begin_transaction()
-            cursor[i] = self.value4
-            session.commit_transaction('commit_timestamp=' + self.timestamp_str(4))
         cursor.close()
         session.close()

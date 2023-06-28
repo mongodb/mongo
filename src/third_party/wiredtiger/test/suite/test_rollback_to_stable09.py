@@ -29,7 +29,7 @@
 import os
 import wiredtiger
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable09.py
 # Test that rollback to stable does not abort schema operations that are done
@@ -60,7 +60,7 @@ class test_rollback_to_stable09(test_rollback_to_stable_base):
     scenarios = make_scenarios(colstore_values, in_memory_values, prepare_values)
 
     def conn_config(self):
-        config = 'cache_size=250MB'
+        config = 'cache_size=250MB,verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config

@@ -27,60 +27,30 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os, wttest
-from helper_tiered import generate_s3_prefix, get_auth_token, get_bucket1_name
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtdataset import SimpleDataSet, ComplexDataSet
 from wtscenario import make_scenarios
 
 # test_tiered02.py
 #    Test tiered tree
-class test_tiered02(wttest.WiredTigerTestCase):
-    storage_sources = [
-        ('dirstore', dict(auth_token = get_auth_token('dir_store'),
-            bucket = get_bucket1_name('dir_store'),
-            bucket_prefix = "pfx_",
-            ss_name = 'dir_store')),
-        ('s3', dict(auth_token = get_auth_token('s3_store'),
-            bucket = get_bucket1_name('s3_store'),
-            bucket_prefix = generate_s3_prefix(),
-            ss_name = 's3_store')),
-    ]
-
+class test_tiered02(wttest.WiredTigerTestCase, TieredConfigMixin):
     complex_dataset = [
         ('simple_ds', dict(complex_dataset=False)),
-        
-        # Commented out compplex dataset that tests column groups and indexes because it crashes
-        # in the middle of the test. FIXME: WT-9001
-        #('complex_ds', dict(complex_dataset=True)),
+        ('complex_ds', dict(complex_dataset=True)),
     ]
 
     # Make scenarios for different cloud service providers
+    storage_sources = gen_tiered_storage_sources(wttest.getss_random_prefix(), 'test_tiered02', tiered_only=True)
     scenarios = make_scenarios(storage_sources, complex_dataset)
 
     uri = "table:test_tiered02"
 
     def conn_config(self):
-        if self.ss_name == 'dir_store' and not os.path.exists(self.bucket):
-            os.mkdir(self.bucket)
-        return \
-          'debug_mode=(flush_checkpoint=true),' + \
-          'tiered_storage=(auth_token=%s,' % self.auth_token + \
-          'bucket=%s,' % self.bucket + \
-          'bucket_prefix=%s,' % self.bucket_prefix + \
-          'name=%s),tiered_manager=(wait=0)' % self.ss_name
+        return TieredConfigMixin.conn_config(self)
 
     # Load the storage store extension.
     def conn_extensions(self, extlist):
-        config = ''
-        # S3 store is built as an optional loadable extension, not all test environments build S3.
-        if self.ss_name == 's3_store':
-            #config = '=(config=\"(verbose=1)\")'
-            extlist.skip_if_missing = True
-        #if self.ss_name == 'dir_store':
-            #config = '=(config=\"(verbose=1,delay_ms=200,force_delay=3)\")'
-        # Windows doesn't support dynamically loaded extension libraries.
-        if os.name == 'nt':
-            extlist.skip_if_missing = True
-        extlist.extension('storage_sources', self.ss_name + config)
+        TieredConfigMixin.conn_extensions(self, extlist)
 
     def progress(self, s):
         self.verbose(3, s)
@@ -136,7 +106,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('checkpoint')
         self.session.checkpoint()
         self.progress('flush_tier')
-        self.session.flush_tier(None)
+        self.session.checkpoint('flush_tier=(enabled)')
         self.confirm_flush()
         ds.check()
 
@@ -150,7 +120,10 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('Create simple data set (50)')
         ds = self.get_dataset(50)
         self.progress('populate')
-        ds.populate()
+        # Don't (re)create any of the tables or indices from here on out.
+        # We will keep a cursor open on the table, and creation requires
+        # exclusive access.
+        ds.populate(create=False)
         ds.check()
         self.progress('open extra cursor on ' + self.uri)
         cursor = self.session.open_cursor(self.uri, None, None)
@@ -158,25 +131,25 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.session.checkpoint()
 
         self.progress('flush_tier')
-        self.session.flush_tier(None)
+        self.session.checkpoint('flush_tier=(enabled)')
         self.progress('flush_tier complete')
         self.confirm_flush()
 
         self.progress('Create simple data set (100)')
         ds = self.get_dataset(100)
         self.progress('populate')
-        ds.populate()
+        ds.populate(create=False)
         ds.check()
         self.progress('checkpoint')
         self.session.checkpoint()
         self.progress('flush_tier')
-        self.session.flush_tier(None)
+        self.session.checkpoint('flush_tier=(enabled)')
         self.confirm_flush()
 
         self.progress('Create simple data set (200)')
         ds = self.get_dataset(200)
         self.progress('populate')
-        ds.populate()
+        ds.populate(create=False)
         ds.check()
         cursor.close()
         self.progress('close_conn')
@@ -193,7 +166,7 @@ class test_tiered02(wttest.WiredTigerTestCase):
         self.progress('Create simple data set (300)')
         ds = self.get_dataset(300)
         self.progress('populate')
-        ds.populate()
+        ds.populate(create=False)
         ds.check()
 
         # We haven't done a flush so there should be

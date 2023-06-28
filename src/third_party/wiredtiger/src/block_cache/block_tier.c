@@ -96,42 +96,73 @@ err:
 }
 
 /*
- * __wt_blkcache_get_handle --
- *     Get a block handle for an object, creating it if it doesn't exist, optionally cache a
- *     reference.
+ * __blkcache_find_open_handle --
+ *     If the block manager's handle array already has an entry for the given object, return it.
  */
-int
-__wt_blkcache_get_handle(
-  WT_SESSION_IMPL *session, WT_BLOCK *orig, uint32_t objectid, WT_BLOCK **blockp)
+static void
+__blkcache_find_open_handle(WT_BM *bm, uint32_t objectid, WT_BLOCK **blockp)
 {
     u_int i;
 
     *blockp = NULL;
 
-    /* We should never be looking for our own object. */
-    WT_ASSERT(session, orig == NULL || orig->objectid != objectid);
+    for (i = 0; i < bm->handle_array_next; i++)
+        if (bm->handle_array[i]->objectid == objectid) {
+            *blockp = bm->handle_array[i];
+            break;
+        }
+}
+
+/*
+ * __wt_blkcache_get_handle --
+ *     Get a cached block handle for an object, creating it if it doesn't exist.
+ */
+int
+__wt_blkcache_get_handle(WT_SESSION_IMPL *session, WT_BM *bm, uint32_t objectid, WT_BLOCK **blockp)
+{
+    WT_BLOCK *new_handle;
+    WT_DECL_RET;
+
+    *blockp = NULL;
+
+    /* We should never be looking for the current active file. */
+    WT_ASSERT(session, bm->block->objectid != objectid);
 
     /*
-     * Check the local cache for the object. We don't have to check the name because we can only
-     * reference objects in our name space.
+     * Check the block handle array for the object. We don't have to check the name because we can
+     * only reference objects in our name space.
      */
-    if (orig != NULL) {
-        for (i = 0; i < orig->related_next; ++i)
-            if (orig->related[i]->objectid == objectid) {
-                *blockp = orig->related[i];
-                return (0);
-            }
+    __wt_readlock(session, &bm->handle_array_lock);
+    __blkcache_find_open_handle(bm, objectid, blockp);
+    __wt_readunlock(session, &bm->handle_array_lock);
 
-        /* Allocate space to store a reference (do first for less complicated cleanup). */
-        WT_RET(__wt_realloc_def(
-          session, &orig->related_allocated, orig->related_next + 1, &orig->related));
+    if (*blockp != NULL)
+        return (0);
+
+    /* Open a handle for the object. */
+    WT_RET(__wt_blkcache_tiered_open(session, NULL, objectid, &new_handle));
+
+    /* We need a write lock to add a new entry to the handle array. */
+    __wt_writelock(session, &bm->handle_array_lock);
+
+    /* Check to see if the object was added while we opened it. */
+    __blkcache_find_open_handle(bm, objectid, blockp);
+
+    if (*blockp == NULL) {
+        /* Allocate space to store the new handle and insert it in the array. */
+        WT_ERR(__wt_realloc_def(
+          session, &bm->handle_array_allocated, bm->handle_array_next + 1, &bm->handle_array));
+
+        bm->handle_array[bm->handle_array_next++] = new_handle;
+        *blockp = new_handle;
+        new_handle = NULL;
     }
 
-    /* Get a reference to the object, opening it as necessary. */
-    WT_RET(__wt_blkcache_tiered_open(session, NULL, objectid, blockp));
+err:
+    __wt_writeunlock(session, &bm->handle_array_lock);
 
-    /* Save a reference in the block in which we started for fast subsequent access. */
-    if (orig != NULL)
-        orig->related[orig->related_next++] = *blockp;
-    return (0);
+    if (new_handle != NULL)
+        WT_TRET(__wt_bm_close_block(session, new_handle));
+
+    return (ret);
 }

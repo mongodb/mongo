@@ -37,7 +37,7 @@
  * expecting to and vice versa.
  */
 
-#define NUM_KEYS 2000
+#define NUM_KEYS (2 * WT_THOUSAND)
 
 /*
  * This is a global flag that should be set before running test_hs_workload. It lets the child
@@ -76,7 +76,7 @@ handle_message(WT_EVENT_HANDLER *handler, WT_SESSION *session, int error, const 
     return (0);
 }
 
-static WT_EVENT_HANDLER event_handler = {handle_message, NULL, NULL, NULL};
+static WT_EVENT_HANDLER event_handler = {handle_message, NULL, NULL, NULL, NULL};
 
 /*
  * hs_workload --
@@ -97,7 +97,9 @@ hs_workload(TEST_OPTS *opts, const char *hs_file_max)
     testutil_make_work_dir(opts->home);
 
     testutil_check(__wt_snprintf(open_config, sizeof(open_config),
-      "create,cache_size=50MB,history_store=(file_max=%s)", hs_file_max));
+      "create,cache_size=50MB,history_store=(file_max=%s),statistics=(all),statistics_log=(json,on_"
+      "close,wait=1)",
+      hs_file_max));
 
     testutil_check(wiredtiger_open(opts->home, &event_handler, open_config, &opts->conn));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));

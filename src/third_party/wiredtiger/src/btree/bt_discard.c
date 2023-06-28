@@ -37,7 +37,9 @@ __wt_ref_out(WT_SESSION_IMPL *session, WT_REF *ref)
      * state, so our check can race with readers without indicating a real problem. If we find a
      * hazard pointer, wait for it to be cleared.
      */
-    WT_ASSERT(session, __wt_hazard_check_assert(session, ref, true));
+    WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_EVICTION_CHECK,
+      __wt_hazard_check_assert(session, ref, true),
+      "Attempted to free a page with active hazard pointers");
 
     /* Check we are not evicting an accessible internal page with an active split generation. */
     WT_ASSERT(session,
@@ -73,9 +75,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE **pagep)
     if (F_ISSET(session->dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING))
         __wt_page_modify_clear(session, page);
 
-    /* Assert we never discard a dirty page or a page queue for eviction. */
-    WT_ASSERT(session, !__wt_page_is_modified(page));
-    WT_ASSERT(session, !F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU));
+    WT_ASSERT_ALWAYS(session, !__wt_page_is_modified(page), "Attempting to discard dirty page");
+    WT_ASSERT_ALWAYS(
+      session, !__wt_page_is_reconciling(page), "Attempting to discard page being reconciled");
+    WT_ASSERT_ALWAYS(session, !F_ISSET_ATOMIC_16(page, WT_PAGE_EVICT_LRU),
+      "Attempting to discard page queued for eviction");
 
     /*
      * If a root page split, there may be one or more pages linked from the page; walk the list,
@@ -230,6 +234,7 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
     __wt_ovfl_discard_free(session, page);
 
     __wt_free(session, page->modify->ovfl_track);
+    __wt_free(session, page->modify->inst_updates);
     __wt_spin_destroy(session, &page->modify->page_lock);
 
     __wt_free(session, page->modify);
@@ -242,20 +247,39 @@ __free_page_modify(WT_SESSION_IMPL *session, WT_PAGE *page)
 void
 __wt_ref_addr_free(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+    WT_PAGE *home;
     void *ref_addr;
 
     /*
-     * The page being discarded may be the child of a page being split, where the WT_REF.addr field
-     * is being instantiated (as it can no longer reference the on-disk image). Loop until we read
-     * and clear the address without a race, then free the read address as necessary.
+     * In order to free the WT_REF.addr field we need to read and clear the address without a race.
+     * The WT_REF may be a child of a page being split, in which case the addr field could be
+     * instantiated concurrently which changes the addr field. Once we swap in NULL we effectively
+     * own the addr. Then provided the addr is off page we can free the memory.
+     *
+     * However as we could be the child of a page being split the ref->home pointer which tells us
+     * whether the addr is on or off page could change concurrently. To avoid this we save the home
+     * pointer before we do the compare and swap. While the second ordered read should be sufficient
+     * we use an ordered read on the ref->home pointer as that is the standard mechanism to
+     * guarantee we read the current value.
+     *
+     * We don't reread this value inside loop as if it was to change then we would be pointing at a
+     * new parent, which would mean that our ref->addr must have been instantiated and thus we are
+     * safe to free it at the end of this function.
      */
+    WT_ORDERED_READ(home, ref->home);
     do {
         WT_ORDERED_READ(ref_addr, ref->addr);
         if (ref_addr == NULL)
             return;
     } while (!__wt_atomic_cas_ptr(&ref->addr, ref_addr, NULL));
 
-    if (ref->home == NULL || __wt_off_page(ref->home, ref_addr)) {
+    /* Encourage races. */
+    if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_SPLIT_8)) {
+        __wt_yield();
+        __wt_yield();
+    }
+
+    if (home == NULL || __wt_off_page(home, ref_addr)) {
         __wt_free(session, ((WT_ADDR *)ref_addr)->addr);
         __wt_free(session, ref_addr);
     }
@@ -286,6 +310,8 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
      * clean explicitly.)
      */
     if (free_pages && ref->page != NULL) {
+        WT_ASSERT_ALWAYS(session, !__wt_page_is_reconciling(ref->page),
+          "Attempting to discard ref to a page being reconciled");
         __wt_page_modify_clear(session, ref->page);
         __wt_page_out(session, &ref->page);
     }
@@ -309,7 +335,7 @@ __wt_free_ref(WT_SESSION_IMPL *session, WT_REF *ref, int page_type, bool free_pa
     __wt_ref_addr_free(session, ref);
 
     /* Free any backing fast-truncate memory. */
-    __wt_free(session, ref->ft_info.del);
+    __wt_free(session, ref->page_del);
 
     __wt_overwrite_and_free_len(session, ref, WT_REF_CLEAR_SIZE);
 }
@@ -343,6 +369,9 @@ __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pind
     if (pindex == NULL)
         return;
 
+    WT_ASSERT_ALWAYS(session, !__wt_page_is_reconciling(page),
+      "Attempting to discard ref to a page being reconciled");
+
     for (i = 0; i < pindex->entries; ++i) {
         ref = pindex->index[i];
 
@@ -350,7 +379,9 @@ __wt_free_ref_index(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_INDEX *pind
          * Used when unrolling splits and other error paths where there should never have been a
          * hazard pointer taken.
          */
-        WT_ASSERT(session, __wt_hazard_check_assert(session, ref, false));
+        WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_EVICTION_CHECK,
+          __wt_hazard_check_assert(session, ref, false),
+          "Attempting to discard ref to a page with hazard pointers");
 
         __wt_free_ref(session, ref, page->type, free_pages);
     }

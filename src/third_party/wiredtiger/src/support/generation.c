@@ -107,9 +107,8 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
     struct timespec start, stop;
     WT_CONNECTION_IMPL *conn;
     WT_SESSION_IMPL *s;
-    uint64_t time_diff_ms, v;
+    uint64_t minutes, time_diff_ms, v;
     uint32_t i, session_cnt;
-    u_int minutes;
     int pause_cnt;
     bool verbose_timeout_flags;
 
@@ -169,7 +168,7 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
 #define WT_GEN_DRAIN_TIMEOUT_MIN 4
                 if (time_diff_ms > minutes * WT_MINUTE * WT_THOUSAND) {
                     __wt_verbose_notice(session, WT_VERB_GENERATION,
-                      "%s generation drain waited %u minutes", __gen_name(which), minutes);
+                      "%s generation drain waited %" PRIu64 " minutes", __gen_name(which), minutes);
                     ++minutes;
                     WT_ASSERT(session, minutes < WT_GEN_DRAIN_TIMEOUT_MIN);
                 }
@@ -177,14 +176,15 @@ __wt_gen_drain(WT_SESSION_IMPL *session, int which, uint64_t generation)
                 else if (!verbose_timeout_flags &&
                   time_diff_ms > (WT_GEN_DRAIN_TIMEOUT_MIN * WT_MINUTE * WT_THOUSAND - 20)) {
                     if (which == WT_GEN_EVICT) {
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT, WT_VERBOSE_DEBUG);
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG);
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG);
+                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT, WT_VERBOSE_DEBUG_1);
+                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICTSERVER, WT_VERBOSE_DEBUG_1);
+                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_EVICT_STUCK, WT_VERBOSE_DEBUG_1);
                     } else if (which == WT_GEN_CHECKPOINT) {
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG);
-                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_CHECKPOINT_CLEANUP, WT_VERBOSE_DEBUG);
+                        WT_SET_VERBOSE_LEVEL(session, WT_VERB_CHECKPOINT, WT_VERBOSE_DEBUG_1);
                         WT_SET_VERBOSE_LEVEL(
-                          session, WT_VERB_CHECKPOINT_PROGRESS, WT_VERBOSE_DEBUG);
+                          session, WT_VERB_CHECKPOINT_CLEANUP, WT_VERBOSE_DEBUG_1);
+                        WT_SET_VERBOSE_LEVEL(
+                          session, WT_VERB_CHECKPOINT_PROGRESS, WT_VERBOSE_DEBUG_1);
                     }
                     verbose_timeout_flags = true;
                 }
@@ -260,12 +260,8 @@ __wt_gen_active(WT_SESSION_IMPL *session, int which, uint64_t generation)
             return (true);
     }
 
-#ifdef HAVE_DIAGNOSTIC
-    {
-        uint64_t oldest = __gen_oldest(session, which);
-        WT_ASSERT(session, generation < oldest);
-    }
-#endif
+    WT_ASSERT_OPTIONAL(session, WT_DIAGNOSTIC_GENERATION_CHECK,
+      generation < __gen_oldest(session, which), "Generation is older than gen_oldest");
     return (false);
 }
 

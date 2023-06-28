@@ -27,7 +27,6 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 # [TEST_TAGS]
-# transactions:mixed_mode_timestamps
 # verify:prepare
 # [END_TAGS]
 #
@@ -94,11 +93,13 @@ class test_timestamp18(wttest.WiredTigerTestCase):
         # accidentally destroy content from an adjacent key.
         for i in range(1, 10000):
             if i % 2 == 0:
+                self.session.begin_transaction('no_timestamp=true')
                 if self.delete:
                     cursor.set_key(self.get_key(i))
                     cursor.remove()
                 else:
                     cursor[self.get_key(i)] = value4
+                self.session.commit_transaction()
 
         self.session.checkpoint()
 

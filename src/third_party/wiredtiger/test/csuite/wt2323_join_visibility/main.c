@@ -52,8 +52,8 @@
  * of inserts set low as a default.
  */
 
-#define N_RECORDS 10000
-#define N_INSERT 500000
+#define N_RECORDS (10 * WT_THOUSAND)
+#define N_INSERT (500 * WT_THOUSAND)
 #define N_INSERT_THREAD 2
 #define N_JOIN_THREAD 2
 #define S64 "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789::"
@@ -116,7 +116,8 @@ main(int argc, char *argv[])
     testutil_check(
       __wt_snprintf(sharedopts->joinuri, sizeof(sharedopts->joinuri), "join:%s", opts->uri));
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create,cache_size=1G", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,cache_size=1G,statistics=(all),statistics_log=(json,on_close,wait=1)", &opts->conn));
 
     test_join(opts, sharedopts, true, true);
     test_join(opts, sharedopts, true, false);
@@ -248,13 +249,9 @@ thread_insert(void *arg)
          */
         key = (int)(__wt_random(&rnd) % N_RECORDS);
         maincur->set_key(maincur, key);
-/* FIXME-WT-6180: disable lower isolation levels. */
-#if 0
-        if (sharedopts->remove)
-            testutil_check(session->begin_transaction(session, "isolation=snapshot"));
-#else
+
         testutil_check(session->begin_transaction(session, "isolation=snapshot"));
-#endif
+
         if (sharedopts->remove && __wt_random(&rnd) % 5 == 0 && maincur->search(maincur) == 0) {
             /*
              * Another thread can be removing at the same time, or we can remove twice in a row.
@@ -271,12 +268,12 @@ thread_insert(void *arg)
             if (__wt_random(&rnd) % 2 == 0)
                 post = 54321;
             else
-                post = i % 100000;
+                post = i % (100 * WT_THOUSAND);
             if (__wt_random(&rnd) % 2 == 0) {
                 bal = -100;
                 flag = 1;
             } else {
-                bal = 1 + (i % 1000) * 100;
+                bal = 1 + (i % WT_THOUSAND) * 100;
                 flag = 0;
             }
             maincur->set_value(maincur, post, bal, extra, flag, key);
@@ -288,22 +285,14 @@ thread_insert(void *arg)
             else if (ret == WT_ROLLBACK)
                 threadargs->rollbacks++;
         }
-/* FIXME-WT-6180: disable lower isolation levels. */
-#if 0
-        if (sharedopts->remove) {
-            if (ret == WT_ROLLBACK)
-                testutil_check(session->rollback_transaction(session, NULL));
-            else
-                testutil_check(session->commit_transaction(session, NULL));
-        }
-#else
+
         if (ret == WT_ROLLBACK)
             testutil_check(session->rollback_transaction(session, NULL));
         else
             testutil_check(session->commit_transaction(session, NULL));
-#endif
-        if (i % 1000 == 0 && i != 0) {
-            if (i % 10000 == 0)
+
+        if (i % WT_THOUSAND == 0 && i != 0) {
+            if (i % (10 * WT_THOUSAND) == 0)
                 fprintf(stderr, "*");
             else
                 fprintf(stderr, ".");

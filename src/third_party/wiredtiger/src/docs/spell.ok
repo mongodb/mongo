@@ -11,6 +11,7 @@ Adler's
 Atomicity
 BLOBs
 BLRrVv
+BLmRrSVv
 CAS
 CFLAGS
 CMake
@@ -66,6 +67,7 @@ FlexeLint
 FreeBSD
 FreeBSD's
 GCC
+GCP
 GPL
 Gawlick
 Gimpel
@@ -90,7 +92,6 @@ LLVM
 LLVMFuzzerTestOneInput
 LOGREC
 LRU
-LRrVv
 LSB
 LSM
 LSNs
@@ -124,9 +125,9 @@ RepMgr
 Riak
 RocksDB
 Roelofs
-RrVv
 Rrx
 SDK
+SDKs
 SDK's
 SCons
 SYSV
@@ -137,6 +138,7 @@ TSC
 TXID
 TXT
 Timestamping
+Truncations
 UBSAN
 UNC
 URIs
@@ -166,6 +168,7 @@ aarch
 abc
 abstime
 ack'ed
+acstu
 addr
 ajn
 alloc
@@ -184,6 +187,7 @@ atomicity
 autoconf
 autogen
 automake
+backend
 basecfg
 basho
 benchmarking
@@ -304,6 +308,7 @@ dumpfile
 dup
 dups
 ebusy
+ejnprx
 encrypt
 encryptor
 encryptor's
@@ -366,6 +371,7 @@ fuzzutil
 fvisibility
 fxray
 gcc
+gcp
 gcov
 gdbm
 ge
@@ -376,6 +382,7 @@ getter
 gid
 github
 gnuplot
+graphviz
 hb
 hotbackup
 href
@@ -389,10 +396,12 @@ hugepage
 iSi
 icount
 ie
+ifdef
 iflag
 incr
 indices
 init
+inmem
 inmemory
 insn
 instantiation
@@ -406,7 +415,6 @@ je
 jemalloc
 jitter
 jni
-jprx
 jrx
 json
 jxf
@@ -441,6 +449,7 @@ loc
 logc
 lookup
 lookups
+loongarch
 lrtf
 lru
 lsm
@@ -472,6 +481,7 @@ mixin
 mixins
 mkdir
 mmap
+modularity
 mpool
 mpoolfile
 msbuild
@@ -541,6 +551,7 @@ pre
 prealloc
 prepended
 prepends
+presumptively
 prev
 primary's
 printf
@@ -560,7 +571,6 @@ px
 py
 qnx
 qqq
-rVv
 rankdir
 rdbms
 rdlock
@@ -631,6 +641,7 @@ struct
 structs
 subdatabases
 subdirectory
+suboptimal
 subpage
 substring
 subsubsection
@@ -665,6 +676,7 @@ trackpad
 tradeoffs
 transactional
 transactionally
+truncations
 tt
 txn
 txnid
@@ -705,6 +717,7 @@ whitespace
 wiredtiger
 workQ
 workgen
+wrapup
 writelock
 writelocks
 wrlock

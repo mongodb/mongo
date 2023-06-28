@@ -49,14 +49,14 @@ def typedesc(c):
         'format'  : 'a format string',
         'int'     : 'an integer',
         'list'    : 'a list',
-        'category': 'a set of related configuration options defined below',
+        'category': 'a set of related configuration options defined as follows',
         'string'  : 'a string'}[ctype]
     if cmin and cmax:
-        desc += ' between ' + cmin + ' and ' + cmax
+        desc += ' between \c ' + cmin + ' and \c ' + cmax
     elif cmin:
-        desc += ' greater than or equal to ' + cmin
+        desc += ' greater than or equal to \c ' + cmin
     elif cmax:
-        desc += ' no more than ' + cmax
+        desc += ' no more than \c ' + cmax
     if choices:
         if ctype == 'list':
             desc += ', with values chosen from the following options: '
@@ -91,7 +91,7 @@ def parseconfig(c, method_name, name_indent=''):
                 continue
             output += parseconfig(subc, method_name, \
                                 name_indent + ('&nbsp;' * 4))
-        output += '@config{ ),,}\n'
+        output += '@config{' + name_indent + ' ),,}\n'
     return output
 
 def getconfcheck(c):

@@ -1,0 +1,36 @@
+# Configuration for bounded_cursor_perf.
+# The test will repeatedly call next() and prev() operations and track performance of the operations
+# done with both range cursor and regular cursors. 
+# This config will have a 1 minute duration, with only one read thread. 
+
+duration_seconds=10,
+cache_size_mb=1000,
+workload_manager=
+(
+    populate_config=
+    (
+        collection_count=1,
+        key_count_per_collection=100,
+        key_size=5,
+    ),
+    read_config=
+    (
+        thread_count=1
+    )
+),
+metrics_monitor=
+(
+    cache_hs_insert=
+    (
+        max=10,
+        max=100000000,
+        postrun=true,
+        save=true,
+    ),
+    cc_pages_removed=
+    (
+        max=10000000,
+        postrun=true,
+        save=true,
+    ),
+)

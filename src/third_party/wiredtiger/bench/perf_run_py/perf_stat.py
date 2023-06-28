@@ -29,6 +29,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 import glob
 import json
+import os
 import re
 from typing import List
 
@@ -152,12 +153,11 @@ class PerfStatLatency(PerfStat):
 class PerfStatLatencyWorkgen(PerfStat):
     def get_value(self, nth_max: int):
         """Return the nth maximum number from all the gathered values"""
-        return sorted(self.values)[-nth_max]
+        return sorted(self.values)[-nth_max] if nth_max < len(self.values) else 0
 
     def get_value_list(self, brief: bool):
         as_list = []
-        num_max = min(len(self.values), 5)
-        for i in range(1, num_max + 1):
+        for i in range(1, 6):
             as_dict = {
                 'name': self.output_label + str(i),
                 'value': self.get_value(i)
@@ -169,3 +169,14 @@ class PerfStatLatencyWorkgen(PerfStat):
                 'values': sorted(self.values)
             })
         return as_list
+
+
+class PerfStatDBSize(PerfStat):
+    def find_stat(self, test_stat_path: str):
+        home_path = os.path.dirname(test_stat_path)
+        total_size = 0
+
+        for ele in os.scandir(home_path):
+            total_size += os.path.getsize(ele)
+
+        return [total_size]

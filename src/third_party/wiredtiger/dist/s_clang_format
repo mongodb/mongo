@@ -1,0 +1,100 @@
+#! /bin/bash
+
+set -o pipefail
+
+t=__wt.$$
+trap 'rm -rf $t' 0 1 2 3 13 15
+
+download_clang_format() {
+    version=$1
+    # FIXME-WT-10619
+    arch=$(uname -m)
+    if [ ! "$arch" = "x86_64" ]; then
+        echo "$0: unsupported architecture $arch to run clang_format"
+        return 1
+    fi
+
+    archive=dist/clang-format.tar.gz
+    sys_os=$(uname)
+    if [ "$sys_os" = "Linux" ]; then
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm $archive
+    elif [ "$sys_os" = "Darwin" ]; then
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-"$version"-x86_64-apple-darwin.tar.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-apple-darwin/clang-format && rm $archive
+    else
+        echo "$0: unsupported environment $sys_os"
+        return 1
+    fi
+}
+
+# Find the top-level WiredTiger directory.
+dest_dir=$(git rev-parse --show-toplevel)
+
+# If this is a MongoDB source tree, move to the WiredTiger subtree.
+git_repo_str=$(git config remote.origin.url)
+is_mongo_repo=$(echo "$git_repo_str" | grep "mongodb/mongo")
+if [ -n "$is_mongo_repo" ] ; then
+       dest_dir="$dest_dir/src/third_party/wiredtiger"
+fi
+cd "$dest_dir" || exit 1
+
+# Override existing Clang-Format versions in the PATH.
+export PATH="${PWD}/dist":$PATH
+
+# Check if Clang-Format is already available with the desired version.
+desired_version="10.0.0"
+if ! command -v clang-format &> /dev/null; then
+    download_clang_format $desired_version || exit 1
+elif ! clang-format --version | grep -q $desired_version; then
+    download_clang_format $desired_version || exit 1
+fi
+
+# Users may need to manually approve binaries.
+# If we're not allowed to run Clang-Format, let's exit (should be obvious from the dialog).
+clang-format --version &> /dev/null || exit 1
+
+exclude=true
+case $# in
+0)
+    # Get all source files.
+    search=`find bench examples ext src test -name '*.[ch]' -o -name '*.cpp'`
+    ;;
+1)
+    # If the -F option is not specified then find every source file.
+    if [ $1 == "-F" ]; then
+        # We are running in fast mode, get all the source files modified according to git.
+        search=`git diff --name-only $(git merge-base --fork-point develop) | grep -E '\.(c|h|cpp)$'`
+    else
+        search="$1"
+        exclude=false
+    fi
+    ;;
+*)
+    echo "usage: $0 [-F] [file]"
+    echo "-F apply clang format to modified source files in the git index"
+    echo "Only a file or -F can be provided"
+    exit 1
+    ;;
+esac
+
+if $exclude; then
+    for f in `cat dist/s_clang_format.list`; do
+        search=`echo "$search" | sed "\#$f#d"`
+    done
+fi
+
+# Don't format inplace with -i flag.
+# We want to be able to detect modifications.
+for f in $search; do
+    cat "$f" | \
+            clang-format --fallback-style=none | \
+            python dist/s_comment.py > "$t" || exit 1
+    cmp -s "$f" "$t"
+    if test $? -ne 0; then
+        if test $# -eq 0 ; then
+            echo "Modifying $f"
+        fi
+        cp "$t" "$f"
+    fi
+done

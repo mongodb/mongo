@@ -142,7 +142,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
     for (i = 0; i < table->nkey_columns; i++)
         WT_RET(__wt_config_next(&conf, &k, &v));
     cg = col = 0;
-    coltype = 0;
+    coltype = '\0';
     while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
         if (__find_next_col(session, table, &k, &cg, &col, &coltype) != 0)
             WT_RET_MSG(session, EINVAL, "Column '%.*s' in '%s' does not appear in a column group",

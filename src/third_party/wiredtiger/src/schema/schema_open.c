@@ -28,6 +28,18 @@ __wt_schema_colgroup_name(
 }
 
 /*
+ * __wt_schema_tiered_shared_colgroup_name --
+ *     Get the URI for a tiered storage shared column group. This is used for metadata lookups.
+ */
+int
+__wt_schema_tiered_shared_colgroup_name(
+  WT_SESSION_IMPL *session, const char *tablename, bool active, WT_ITEM *buf)
+{
+    WT_PREFIX_SKIP(tablename, "table:");
+    return (__wt_buf_fmt(session, buf, "colgroup:%s.%s", tablename, active ? "active" : "shared"));
+}
+
+/*
  * __wt_schema_open_colgroups --
  *     Open the column groups for a table.
  */
@@ -68,7 +80,11 @@ __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
         __wt_schema_destroy_colgroup(session, &table->cgroups[i]);
 
         WT_ERR(__wt_buf_init(session, buf, 0));
-        WT_ERR(__wt_schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
+        if (table->is_tiered_shared)
+            WT_ERR(__wt_schema_tiered_shared_colgroup_name(
+              session, table->iface.name, i == 0 ? true : false, buf));
+        else
+            WT_ERR(__wt_schema_colgroup_name(session, table, ckey.str, ckey.len, buf));
         if ((ret = __wt_metadata_search(session, buf->data, &cgconfig)) != 0) {
             /* It is okay if the table is incomplete. */
             if (ret == WT_NOTFOUND)
@@ -442,6 +458,10 @@ __schema_open_table(WT_SESSION_IMPL *session)
 
     if (table->ncolgroups > 0 && table->is_simple)
         WT_RET_MSG(session, EINVAL, "%s requires a table with named columns", tablename);
+
+    if ((ret = __wt_config_gets(session, table_cfg, "shared", &cval)) == 0)
+        table->is_tiered_shared = true;
+    WT_RET_NOTFOUND_OK(ret);
 
     WT_RET(__wt_calloc_def(session, WT_COLGROUPS(table), &table->cgroups));
     WT_RET(__wt_schema_open_colgroups(session, table));

@@ -33,7 +33,7 @@ __wt_ref_cas_state_int(WT_SESSION_IMPL *session, WT_REF *ref, uint8_t old_state,
 
     cas_result = __wt_atomic_casv8(&ref->state, old_state, new_state);
 
-#ifdef HAVE_DIAGNOSTIC
+#ifdef HAVE_REF_TRACK
     /*
      * The history update here has potential to race; if the state gets updated again after the CAS
      * above but before the history has been updated.
@@ -92,6 +92,36 @@ __wt_page_is_empty(WT_PAGE *page)
 }
 
 /*
+ * __wt_page_evict_soon_check --
+ *     Check whether the page should be evicted urgently.
+ */
+static inline bool
+__wt_page_evict_soon_check(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_split)
+{
+    WT_BTREE *btree;
+    WT_PAGE *page;
+
+    btree = S2BT(session);
+    page = ref->page;
+
+    /*
+     * Attempt to evict pages with the special "oldest" read generation. This is set for pages that
+     * grow larger than the configured memory_page_max setting, when we see many deleted items, and
+     * when we are attempting to scan without trashing the cache.
+     *
+     * Checkpoint should not queue pages for urgent eviction if they require dirty eviction: there
+     * is a special exemption that allows checkpoint to evict dirty pages in a tree that is being
+     * checkpointed, and no other thread can help with that. Checkpoints don't rely on this code for
+     * dirty eviction: that is handled explicitly in __wt_sync_file.
+     */
+    if (WT_READGEN_EVICT_SOON(page->read_gen) && btree->evict_disabled == 0 &&
+      __wt_page_can_evict(session, ref, inmem_split) &&
+      (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page)))
+        return (true);
+    return (false);
+}
+
+/*
  * __wt_page_evict_clean --
  *     Return if the page can be evicted without dirtying the tree.
  */
@@ -120,6 +150,21 @@ __wt_page_is_modified(WT_PAGE *page)
      * free these structures).
      */
     return (page->modify != NULL && page->modify->page_state != WT_PAGE_CLEAN);
+}
+
+/*
+ * __wt_page_is_reconciling --
+ *     Return if the page is being reconciled.
+ */
+static inline bool
+__wt_page_is_reconciling(WT_PAGE *page)
+{
+    /*
+     * Be cautious modifying this function: it's reading fields set by checkpoint reconciliation,
+     * and we're not blocking checkpoints (although we must block eviction as it might clear and
+     * free these structures).
+     */
+    return (page->modify != NULL && F_ISSET(page->modify, WT_PAGE_MODIFY_RECONCILING));
 }
 
 /*
@@ -656,6 +701,9 @@ __wt_page_only_modify_set(WT_SESSION_IMPL *session, WT_PAGE *page)
 
     WT_ASSERT(session, !F_ISSET(session->dhandle, WT_DHANDLE_DEAD));
 
+    WT_ASSERT_ALWAYS(session, !F_ISSET(page->modify, WT_PAGE_MODIFY_EXCLUSIVE),
+      "Illegal attempt to modify a page that is being exclusively reconciled");
+
     last_running = 0;
     if (page->modify->page_state == WT_PAGE_CLEAN)
         last_running = S2C(session)->txn_global.last_running;
@@ -717,7 +765,7 @@ __wt_tree_modify_set(WT_SESSION_IMPL *session)
      */
     if (!S2BT(session)->modified) {
         /* Assert we never dirty a checkpoint handle. */
-        WT_ASSERT(session, session->dhandle->checkpoint == NULL);
+        WT_ASSERT(session, !WT_READING_CHECKPOINT(session));
 
         S2BT(session)->modified = true;
         WT_FULL_BARRIER();
@@ -752,6 +800,11 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
      * Allow the call to be made on clean pages.
      */
     if (__wt_page_is_modified(page)) {
+        WT_ASSERT_ALWAYS(session,
+          F_ISSET(session->dhandle, WT_DHANDLE_DEAD) || F_ISSET(S2C(session), WT_CONN_CLOSING) ||
+            !__wt_page_is_reconciling(page),
+          "Illegal attempt to mark a page clean that is being reconciled");
+
         /*
          * The only part where ordering matters is during reconciliation where updates on other
          * threads are performing writes to the page state that need to be visible to the
@@ -761,6 +814,7 @@ __wt_page_modify_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
          * separate thread, there's no write barrier needed here.
          */
         page->modify->page_state = WT_PAGE_CLEAN;
+        page->modify->flags = 0;
         __wt_cache_dirty_decr(session, page);
     }
 }
@@ -1450,6 +1504,23 @@ __wt_row_leaf_value_cell(
 }
 
 /*
+ * WT_ADDR_COPY --
+ *	We have to lock the WT_REF to look at a WT_ADDR: a structure we can use to quickly get a
+ * copy of the WT_REF address information.
+ */
+struct __wt_addr_copy {
+    uint8_t type;
+
+    uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
+    uint8_t size;
+
+    WT_TIME_AGGREGATE ta;
+
+    WT_PAGE_DELETED del; /* Fast-truncate page information */
+    bool del_set;
+};
+
+/*
  * __wt_ref_addr_copy --
  *     Return a copy of the WT_REF address information.
  */
@@ -1462,6 +1533,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
 
     unpack = &_unpack;
     page = ref->home;
+    copy->del_set = false;
 
     /*
      * To look at an on-page cell, we need to look at the parent page's disk image, and that can be
@@ -1487,7 +1559,7 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
     /* If on-page, the pointer references a cell. */
     __wt_cell_unpack_addr(session, page->dsk, (WT_CELL *)addr, unpack);
     WT_TIME_AGGREGATE_COPY(&copy->ta, &unpack->ta);
-    copy->type = 0; /* Avoid static analyzer uninitialized value complaints. */
+
     switch (unpack->raw) {
     case WT_CELL_ADDR_INT:
         copy->type = WT_ADDR_INT;
@@ -1495,6 +1567,20 @@ __wt_ref_addr_copy(WT_SESSION_IMPL *session, WT_REF *ref, WT_ADDR_COPY *copy)
     case WT_CELL_ADDR_LEAF:
         copy->type = WT_ADDR_LEAF;
         break;
+    case WT_CELL_ADDR_DEL:
+        /* Copy out any fast-truncate information. */
+        copy->del_set = true;
+        if (F_ISSET(page->dsk, WT_PAGE_FT_UPDATE))
+            copy->del = unpack->page_del;
+        else {
+            /* It's a legacy page; create default delete information. */
+            copy->del.txnid = WT_TXN_NONE;
+            copy->del.timestamp = copy->del.durable_timestamp = WT_TS_NONE;
+            copy->del.prepare_state = 0;
+            copy->del.previous_ref_state = WT_REF_DISK;
+            copy->del.committed = true;
+        }
+        /* FALLTHROUGH */
     case WT_CELL_ADDR_LEAF_NO:
         copy->type = WT_ADDR_LEAF_NO;
         break;
@@ -1523,26 +1609,98 @@ __wt_ref_block_free(WT_SESSION_IMPL *session, WT_REF *ref)
 }
 
 /*
- * __wt_page_del_active --
- *     Return if a truncate operation is active.
+ * __wt_page_del_visible_all --
+ *     Check if a truncate operation is visible to everyone and the data under it is obsolete.
  */
 static inline bool
-__wt_page_del_active(WT_SESSION_IMPL *session, WT_REF *ref, bool visible_all)
+__wt_page_del_visible_all(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool hide_prepared)
 {
-    WT_PAGE_DELETED *page_del;
     uint8_t prepare_state;
 
-    WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+    /*
+     * Like other visible_all checks, use the durable timestamp to avoid complications: there is
+     * potentially a window where a prepared and committed transaction can be visible but not yet
+     * durable, and in that window the changes under it are not obsolete yet.
+     *
+     * The hide_prepared argument causes prepared but not committed transactions to be treated as
+     * invisible. (Apparently prepared and uncommitted transactions can be visible_all, but we need
+     * to not see them in some cases; for example, prepared deletions can't exist on disk because
+     * the on-disk format doesn't have space for the extra "I'm prepared" bit, so we avoid seeing
+     * them in reconciliation. Similarly, we can't skip over a page just because a transaction has
+     * deleted it and prepared; only committed transactions are suitable.)
+     *
+     * In all cases, the ref owning the page_deleted structure should be locked and its pre-lock
+     * state should be WT_REF_DELETED. This prevents the page from being instantiated while we look
+     * at it, and locks out other operations that might simultaneously discard the structure (either
+     * after checking visibility, or because its transaction aborted).
+     */
 
-    if ((page_del = ref->ft_info.del) == NULL)
-        return (false);
-    if (page_del->txnid == WT_TXN_ABORTED)
-        return (false);
-    WT_ORDERED_READ(prepare_state, page_del->prepare_state);
-    if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+    /* If the page delete info is NULL, the deletion was previously found to be globally visible. */
+    if (page_del == NULL)
         return (true);
-    return (visible_all ? !__wt_txn_visible_all(session, page_del->txnid, page_del->timestamp) :
-                          !__wt_txn_visible(session, page_del->txnid, page_del->timestamp));
+
+    /* We discard page_del on transaction abort, so should never see an aborted one. */
+    WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
+
+    if (hide_prepared) {
+        WT_ORDERED_READ(prepare_state, page_del->prepare_state);
+        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+            return (false);
+    }
+
+    return (__wt_txn_visible_all(session, page_del->txnid, page_del->durable_timestamp));
+}
+
+/*
+ * __wt_page_del_visible --
+ *     Return if a truncate operation is visible to the caller. The same considerations apply as in
+ *     the visible_all version.
+ */
+static inline bool
+__wt_page_del_visible(WT_SESSION_IMPL *session, WT_PAGE_DELETED *page_del, bool hide_prepared)
+{
+    uint8_t prepare_state;
+
+    /* If the page delete info is NULL, the deletion was previously found to be globally visible. */
+    if (page_del == NULL)
+        return (true);
+
+    /* We discard page_del on transaction abort, so should never see an aborted one. */
+    WT_ASSERT(session, page_del->txnid != WT_TXN_ABORTED);
+
+    if (hide_prepared) {
+        WT_ORDERED_READ(prepare_state, page_del->prepare_state);
+        if (prepare_state == WT_PREPARE_INPROGRESS || prepare_state == WT_PREPARE_LOCKED)
+            return (false);
+    }
+
+    return (
+      __wt_txn_visible(session, page_del->txnid, page_del->timestamp, page_del->durable_timestamp));
+}
+
+/*
+ * __wt_page_del_committed_set --
+ *     Return if a truncate operation is resolved. (Since truncations that abort are removed
+ *     immediately, "resolved" and "committed" are equivalent here.) The caller should have already
+ *     locked the ref and confirmed that the ref's previous state was WT_REF_DELETED. The page_del
+ *     argument should be the ref's page_del member. This function should only be used for pages in
+ *     WT_REF_DELETED state. For deleted pages that have been instantiated in memory, the update
+ *     list in the page modify structure should be checked instead, as the page_del structure might
+ *     have been discarded already. (The update list is non-null if the transaction is unresolved.)
+ */
+static inline bool
+__wt_page_del_committed_set(WT_PAGE_DELETED *page_del)
+{
+    /*
+     * There are two possible cases: either page_del is NULL (in which case the deletion is globally
+     * visible and must have been committed) or it is not, in which case page_del->committed tells
+     * us what we want to know.
+     */
+
+    if (page_del == NULL)
+        return (true);
+
+    return (page_del->committed);
 }
 
 /*
@@ -1717,18 +1875,28 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
     page = ref->page;
     mod = page->modify;
 
-    /* Never modified pages can always be evicted. */
+    /* Pages without modify structures can always be evicted, it's just discarding a disk image. */
     if (mod == NULL)
         return (true);
 
     /*
-     * If a fast-truncate page is subsequently instantiated, it can become an eviction candidate. If
-     * the fast-truncate itself has not resolved when the page is instantiated, a list of updates is
-     * created, which will be discarded as part of transaction resolution. Don't attempt to evict a
-     * fast-truncate page until any update list has been removed.
+     * Check the fast-truncate information. Pages with an uncommitted truncate cannot be evicted.
+     *
+     * Because the page is in memory, we look at mod.inst_updates. If it's not NULL, that means the
+     * truncate operation isn't committed.
+     *
+     * The list of updates in mod.inst_updates will be discarded when the transaction they belong to
+     * is resolved.
+     *
+     * Note that we are not using __wt_page_del_committed here because (a) examining the page_del
+     * structure requires locking the ref, and (b) once in memory the page_del structure only
+     * remains until the next reconciliation, and nothing prevents that from occurring before the
+     * transaction commits.
      */
-    if (ref->ft_info.update != NULL)
+    if (mod->inst_updates != NULL) {
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_uncommitted_truncate);
         return (false);
+    }
 
     /*
      * We can't split or evict multiblock row-store pages where the parent's key for the page is an
@@ -1738,8 +1906,10 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * matter the size of the key.)
      */
     if (__wt_btree_syncing_by_other_session(session) &&
-      F_ISSET_ATOMIC_16(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS))
+      F_ISSET_ATOMIC_16(ref->home, WT_PAGE_INTL_OVERFLOW_KEYS)) {
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_overflow_keys);
         return (false);
+    }
 
     /*
      * Check for in-memory splits before other eviction tests. If the page should split in-memory,
@@ -1760,7 +1930,7 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      * internal page already written in the checkpoint, leaving the checkpoint inconsistent.
      */
     if (modified && __wt_btree_syncing_by_other_session(session)) {
-        WT_STAT_CONN_DATA_INCR(session, cache_eviction_checkpoint);
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_checkpoint);
         return (false);
     }
 
@@ -1777,13 +1947,17 @@ __wt_page_can_evict(WT_SESSION_IMPL *session, WT_REF *ref, bool *inmem_splitp)
      */
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL) &&
       !F_ISSET(session->dhandle, WT_DHANDLE_DEAD | WT_DHANDLE_EXCLUSIVE) &&
-      __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen))
+      __wt_gen_active(session, WT_GEN_SPLIT, page->pg_intl_split_gen)) {
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_internal_page_split);
         return (false);
+    }
 
     /* If the metadata page is clean but has modifications that appear too new to evict, skip it. */
     if (WT_IS_METADATA(S2BT(session)->dhandle) && !modified &&
-      !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp))
+      !__wt_txn_visible_all(session, mod->rec_max_txn, mod->rec_max_timestamp)) {
+        WT_STAT_CONN_DATA_INCR(session, cache_eviction_blocked_recently_modified);
         return (false);
+    }
 
     return (true);
 }
@@ -1797,7 +1971,6 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
     WT_BTREE *btree;
     WT_DECL_RET;
-    WT_PAGE *page;
     bool inmem_split;
 
     btree = S2BT(session);
@@ -1824,24 +1997,12 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
         return (0);
     }
 
-    /*
-     * Attempt to evict pages with the special "oldest" read generation. This is set for pages that
-     * grow larger than the configured memory_page_max setting, when we see many deleted items, and
-     * when we are attempting to scan without trashing the cache.
-     *
-     * Checkpoint should not queue pages for urgent eviction if they require dirty eviction: there
-     * is a special exemption that allows checkpoint to evict dirty pages in a tree that is being
-     * checkpointed, and no other thread can help with that. Checkpoints don't rely on this code for
-     * dirty eviction: that is handled explicitly in __wt_sync_file.
-     *
-     * If the operation has disabled eviction or splitting, or the session is preventing from
-     * reconciling, then just queue the page for urgent eviction. Otherwise, attempt to release and
-     * evict it.
-     */
-    page = ref->page;
-    if (WT_READGEN_EVICT_SOON(page->read_gen) && btree->evict_disabled == 0 &&
-      __wt_page_can_evict(session, ref, &inmem_split) &&
-      (!WT_SESSION_IS_CHECKPOINT(session) || __wt_page_evict_clean(page))) {
+    if (__wt_page_evict_soon_check(session, ref, &inmem_split)) {
+        /*
+         * If the operation has disabled eviction or splitting, or the session is preventing from
+         * reconciling, then just queue the page for urgent eviction. Otherwise, attempt to release
+         * and evict it.
+         */
         if (LF_ISSET(WT_READ_NO_EVICT) ||
           (inmem_split ? LF_ISSET(WT_READ_NO_SPLIT) : F_ISSET(session, WT_SESSION_NO_RECONCILE)))
             WT_IGNORE_RET_BOOL(__wt_page_evict_urgent(session, ref));
@@ -1861,11 +2022,18 @@ __wt_page_release(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 static inline u_int
 __wt_skip_choose_depth(WT_SESSION_IMPL *session)
 {
-    u_int d;
+    u_int depth, probability;
 
-    for (d = 1; d < WT_SKIP_MAXDEPTH && __wt_random(&session->rnd) < WT_SKIP_PROBABILITY; d++)
+    probability = WT_SKIP_PROBABILITY;
+#ifdef HAVE_DIAGNOSTIC
+    /* Go from 1/4 chance of having a link to the next element to ~90%. */
+    if (FLD_ISSET(S2C(session)->debug_flags, WT_CONN_DEBUG_STRESS_SKIPLIST))
+        probability = 0xe6666665; /* ~90% of the value of uint32 max. */
+#endif
+
+    for (depth = 1; depth < WT_SKIP_MAXDEPTH && __wt_random(&session->rnd) < probability; depth++)
         ;
-    return (d);
+    return (depth);
 }
 
 /*
@@ -2067,6 +2235,33 @@ __wt_page_swap_func(WT_SESSION_IMPL *session, WT_REF *held, WT_REF *want, uint32
 }
 
 /*
+ * __wt_btcur_bounds_early_exit --
+ *     Performs bound comparison to check if the key is within bounds, if not, increment the
+ *     appropriate stat, early exit, and return WT_NOTFOUND.
+ */
+static inline int
+__wt_btcur_bounds_early_exit(
+  WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, bool next, bool *key_out_of_boundsp)
+{
+    uint64_t bound_flag;
+
+    bound_flag = next ? WT_CURSTD_BOUND_UPPER : WT_CURSTD_BOUND_LOWER;
+
+    if (!WT_CURSOR_BOUNDS_SET(&cbt->iface))
+        return (0);
+    if (!F_ISSET((&cbt->iface), bound_flag))
+        return (0);
+
+    WT_RET(__wt_compare_bounds(
+      session, &cbt->iface, &cbt->iface.key, cbt->recno, next, key_out_of_boundsp));
+
+    if (*key_out_of_boundsp)
+        return (WT_NOTFOUND);
+
+    return (0);
+}
+
+/*
  * __wt_btcur_skip_page --
  *     Return if the cursor is pointing to a page with deleted records and can be skipped for cursor
  *     traversal.
@@ -2076,6 +2271,7 @@ __wt_btcur_skip_page(
   WT_SESSION_IMPL *session, WT_REF *ref, void *context, bool visible_all, bool *skipp)
 {
     WT_ADDR_COPY addr;
+    WT_BTREE *btree;
     uint8_t previous_state;
 
     WT_UNUSED(context);
@@ -2083,38 +2279,77 @@ __wt_btcur_skip_page(
 
     *skipp = false; /* Default to reading */
 
+    btree = S2BT(session);
+
     /* Don't skip pages in FLCS trees; deleted records need to read back as 0. */
-    if (S2BT(session)->type == BTREE_COL_FIX)
+    if (btree->type == BTREE_COL_FIX)
         return (0);
 
     /*
      * Determine if all records on the page have been deleted and all the tombstones are visible to
      * our transaction. If so, we can avoid reading the records on the page and move to the next
-     * page. We base this decision on the aggregate stop point added to the page during the last
-     * reconciliation. We can skip this test if the page has been modified since it was reconciled.
-     * We also skip this test on an internal page, as we rely on reconciliation to mark the internal
-     * page dirty. There could be a period of time when the internal page is marked clean but the
-     * leaf page is dirty and has newer data than let on by the internal page's aggregated
-     * information.
+     * page.
      *
-     * We are making these decisions while holding a lock for the page as checkpoint or eviction can
-     * make changes to the data structures (i.e., aggregate timestamps) we are reading. It is okay
-     * if the page is not in memory, or gets evicted before we lock it. In such a case, we can forgo
-     * checking if the page has been modified. So, only do a page modified check if the page was in
-     * memory before locking.
+     * Skip this test on an internal page, as we rely on reconciliation to mark the internal page
+     * dirty. There could be a period of time when the internal page is marked clean but the leaf
+     * page is dirty and has newer data than let on by the internal page's aggregated information.
      */
     if (F_ISSET(ref, WT_REF_FLAG_INTERNAL))
         return (0);
 
+    /*
+     * We are making these decisions while holding a lock for the page as checkpoint or eviction can
+     * make changes to the data structures (i.e., aggregate timestamps) we are reading.
+     */
     WT_REF_LOCK(session, ref, &previous_state);
-    if ((previous_state == WT_REF_DISK || previous_state == WT_REF_DELETED ||
-          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
-      __wt_ref_addr_copy(session, ref, &addr) && addr.ta.newest_stop_txn != WT_TXN_MAX &&
-      addr.ta.newest_stop_ts != WT_TS_MAX &&
-      __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts))
+
+    /*
+     * Check the fast-truncate information; there are 3 cases:
+     *
+     * (1) The page is in the WT_REF_DELETED state and page_del is NULL. The page is deleted. This
+     *     case is folded into the next because __wt_page_del_visible handles it.
+     * (2) The page is in the WT_REF_DELETED state and page_del is not NULL. The page is deleted
+     *     if the truncate operation is visible. Look at page_del; we could use the info from the
+     *     address cell below too, but that's slower.
+     * (3) The page is in memory and has been instantiated. The delete info from the address cell
+     *     will serve for readonly/unmodified pages, and for modified pages we can't skip the page.
+     *     (This case is checked further below.)
+     *
+     * In all cases, make use of the option to __wt_page_del_visible to hide prepared transactions,
+     * as we shouldn't skip pages where the deletion is prepared but not committed.
+     */
+    if (previous_state == WT_REF_DELETED && __wt_page_del_visible(session, ref->page_del, true)) {
         *skipp = true;
+        goto unlock;
+    }
 
+    /*
+     * Look at the disk address, if it exists, and if the page is unmodified. We must skip this test
+     * if the page has been modified since it was reconciled, since neither the delete information
+     * nor the timestamp information is necessarily up to date.
+     */
+    if ((previous_state == WT_REF_DISK ||
+          (previous_state == WT_REF_MEM && !__wt_page_is_modified(ref->page))) &&
+      __wt_ref_addr_copy(session, ref, &addr)) {
+        /* If there's delete information in the disk address, we can use it. */
+        if (addr.del_set && __wt_page_del_visible(session, &addr.del, true)) {
+            *skipp = true;
+            goto unlock;
+        }
+
+        /*
+         * Otherwise, check the timestamp information. We base this decision on the aggregate stop
+         * point added to the page during the last reconciliation.
+         */
+        if (addr.ta.newest_stop_txn != WT_TXN_MAX && addr.ta.newest_stop_ts != WT_TS_MAX &&
+          __wt_txn_visible(session, addr.ta.newest_stop_txn, addr.ta.newest_stop_ts,
+            addr.ta.newest_stop_durable_ts)) {
+            *skipp = true;
+            goto unlock;
+        }
+    }
+
+unlock:
     WT_REF_UNLOCK(ref, previous_state);
-
     return (0);
 }

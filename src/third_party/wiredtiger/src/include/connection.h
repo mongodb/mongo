@@ -27,7 +27,18 @@ struct __wt_process {
     double tsc_nsec_ratio; /* rdtsc ticks to nanoseconds */
     bool use_epochtime;    /* use expensive time */
 
+    bool fast_truncate_2022; /* fast-truncate fix run-time configuration */
+    bool tiered_shared_2023; /* tiered shared run-time configuration */
+
     WT_CACHE_POOL *cache_pool; /* shared cache information */
+
+    /*
+     * WT_CURSOR.modify operations set unspecified bytes to space in 'S' format and to a nul byte in
+     * all other formats. It makes it easier to debug format test program stress failures if strings
+     * are printable and don't require encoding to trace them in the log; this is a hook that allows
+     * format to set the modify pad byte to a printable character.
+     */
+    uint8_t modify_pad_byte;
 };
 extern WT_PROCESS __wt_process;
 
@@ -42,6 +53,7 @@ struct __wt_bucket_storage {
     int owned;                         /* Storage needs to be terminated */
     uint64_t retain_secs;              /* Tiered period */
     const char *auth_token;            /* Tiered authentication cookie */
+    bool tiered_shared;                /* Tiered shared */
     WT_FILE_SYSTEM *file_system;       /* File system for bucket */
     WT_STORAGE_SOURCE *storage_source; /* Storage source callbacks */
     /* Linked list of bucket storage entries */
@@ -279,6 +291,11 @@ struct __wt_connection_impl {
     WT_SPINLOCK optrack_map_spinlock; /* Translation file spinlock. */
     uintmax_t optrack_pid;            /* Cache the process ID. */
 
+#ifdef HAVE_CALL_LOG
+    /* File stream used for writing to the call log. */
+    WT_FSTREAM *call_log_fst;
+#endif
+
     void **foc;      /* Free-on-close array */
     size_t foc_cnt;  /* Array entries */
     size_t foc_size; /* Array size */
@@ -398,7 +415,10 @@ struct __wt_connection_impl {
     uint32_t stat_flags; /* Options declared in flags.py */
 
     /* Connection statistics */
-    uint64_t rec_maximum_seconds; /* Maximum seconds reconciliation took. */
+    uint64_t
+      rec_maximum_hs_wrapup_seconds; /* Maximum seconds moving updates to history store took. */
+    uint64_t rec_maximum_image_build_seconds; /* Maximum seconds building disk image took. */
+    uint64_t rec_maximum_seconds;             /* Maximum seconds reconciliation took. */
     WT_CONNECTION_STATS *stats[WT_COUNTER_SLOTS];
     WT_CONNECTION_STATS *stat_array;
 
@@ -435,40 +455,30 @@ struct __wt_connection_impl {
     const char *stat_stamp; /* Statistics log entry timestamp */
     uint64_t stat_usecs;    /* Statistics log period */
 
-    uint64_t tiered_retention;       /* Earliest time to check to remove local overlap copies */
     WT_SESSION_IMPL *tiered_session; /* Tiered thread session */
     wt_thread_t tiered_tid;          /* Tiered thread */
     bool tiered_tid_set;             /* Tiered thread set */
     WT_CONDVAR *flush_cond;          /* Flush wait mutex */
     WT_CONDVAR *tiered_cond;         /* Tiered wait mutex */
+    uint64_t tiered_interval;        /* Tiered work interval */
     bool tiered_server_running;      /* Internal tiered server operating */
     bool flush_ckpt_complete;        /* Checkpoint after flush completed */
     uint64_t flush_most_recent;      /* Clock value of last flush_tier */
     uint32_t flush_state;            /* State of last flush tier */
     wt_timestamp_t flush_ts;         /* Timestamp of most recent flush_tier */
 
-    WT_TIERED_MANAGER tiered_mgr;        /* Tiered manager thread information */
-    WT_SESSION_IMPL *tiered_mgr_session; /* Tiered manager thread session */
-    wt_thread_t tiered_mgr_tid;          /* Tiered manager thread */
-    bool tiered_mgr_tid_set;             /* Tiered manager thread set */
-    WT_CONDVAR *tiered_mgr_cond;         /* Tiered manager wait mutex */
-
-    uint32_t tiered_threads_max; /* Max tiered threads */
-    uint32_t tiered_threads_min; /* Min tiered threads */
-
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
 #define WT_CONN_LOG_CONFIG_ENABLED 0x001u  /* Logging is configured */
-#define WT_CONN_LOG_DEBUG_MODE 0x002u      /* Debug-mode logging enabled */
-#define WT_CONN_LOG_DOWNGRADED 0x004u      /* Running older version */
-#define WT_CONN_LOG_ENABLED 0x008u         /* Logging is enabled */
-#define WT_CONN_LOG_EXISTED 0x010u         /* Log files found */
-#define WT_CONN_LOG_FORCE_DOWNGRADE 0x020u /* Force downgrade */
-#define WT_CONN_LOG_RECOVER_DIRTY 0x040u   /* Recovering unclean */
-#define WT_CONN_LOG_RECOVER_DONE 0x080u    /* Recovery completed */
-#define WT_CONN_LOG_RECOVER_ERR 0x100u     /* Error if recovery required */
-#define WT_CONN_LOG_RECOVER_FAILED 0x200u  /* Recovery failed */
-#define WT_CONN_LOG_REMOVE 0x400u          /* Removal is enabled */
-#define WT_CONN_LOG_ZERO_FILL 0x800u       /* Manually zero files */
+#define WT_CONN_LOG_DOWNGRADED 0x002u      /* Running older version */
+#define WT_CONN_LOG_ENABLED 0x004u         /* Logging is enabled */
+#define WT_CONN_LOG_EXISTED 0x008u         /* Log files found */
+#define WT_CONN_LOG_FORCE_DOWNGRADE 0x010u /* Force downgrade */
+#define WT_CONN_LOG_RECOVER_DIRTY 0x020u   /* Recovering unclean */
+#define WT_CONN_LOG_RECOVER_DONE 0x040u    /* Recovery completed */
+#define WT_CONN_LOG_RECOVER_ERR 0x080u     /* Error if recovery required */
+#define WT_CONN_LOG_RECOVER_FAILED 0x100u  /* Recovery failed */
+#define WT_CONN_LOG_REMOVE 0x200u          /* Removal is enabled */
+#define WT_CONN_LOG_ZERO_FILL 0x400u       /* Manually zero files */
                                            /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t log_flags;                    /* Global logging configuration */
     WT_CONDVAR *log_cond;                  /* Log server wait mutex */
@@ -495,8 +505,8 @@ struct __wt_connection_impl {
     uint16_t log_req_min;                  /* Min required log version */
     uint32_t txn_logsync;                  /* Log sync configuration */
 
-    WT_SESSION_IMPL *meta_ckpt_session;     /* Metadata checkpoint session */
-    WT_SESSION_IMPL *ckpt_reserved_session; /* Checkpoint reserved session */
+    WT_ROLLBACK_TO_STABLE *rts, _rts;   /* Rollback to stable subsystem */
+    WT_SESSION_IMPL *meta_ckpt_session; /* Metadata checkpoint session */
 
     /*
      * Is there a data/schema change that needs to be the part of a checkpoint.
@@ -548,8 +558,8 @@ struct __wt_connection_impl {
 #define WT_DIRECT_IO_CHECKPOINT 0x1u /* Checkpoints */
 #define WT_DIRECT_IO_DATA 0x2u       /* Data files */
 #define WT_DIRECT_IO_LOG 0x4u        /* Log files */
-                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t direct_io;              /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
+                                     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t direct_io;              /* O_DIRECT, FILE_FLAG_NO_BUFFERING */
     uint64_t write_through;          /* FILE_FLAG_WRITE_THROUGH */
 
     bool mmap;     /* use mmap when reading checkpoints */
@@ -562,15 +572,36 @@ struct __wt_connection_impl {
     uint32_t debug_log_cnt;  /* Log file retention count */
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_DEBUG_CKPT_RETAIN 0x01u
-#define WT_CONN_DEBUG_CORRUPTION_ABORT 0x02u
-#define WT_CONN_DEBUG_CURSOR_COPY 0x04u
-#define WT_CONN_DEBUG_FLUSH_CKPT 0x08u
-#define WT_CONN_DEBUG_REALLOC_EXACT 0x10u
-#define WT_CONN_DEBUG_SLOW_CKPT 0x20u
-#define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x40u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t debug_flags;
+#define WT_CONN_DEBUG_CKPT_RETAIN 0x001u
+#define WT_CONN_DEBUG_CORRUPTION_ABORT 0x002u
+#define WT_CONN_DEBUG_CURSOR_COPY 0x004u
+#define WT_CONN_DEBUG_CURSOR_REPOSITION 0x008u
+#define WT_CONN_DEBUG_EVICT_AGGRESSIVE_MODE 0x010u
+#define WT_CONN_DEBUG_REALLOC_EXACT 0x020u
+#define WT_CONN_DEBUG_REALLOC_MALLOC 0x040u
+#define WT_CONN_DEBUG_SLOW_CKPT 0x080u
+#define WT_CONN_DEBUG_STRESS_SKIPLIST 0x100u
+#define WT_CONN_DEBUG_TABLE_LOGGING 0x200u
+#define WT_CONN_DEBUG_UPDATE_RESTORE_EVICT 0x400u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    uint16_t debug_flags;
+
+/* AUTOMATIC FLAG VALUE GENERATION START 0 */
+#define WT_DIAGNOSTIC_ALL 0x001u
+#define WT_DIAGNOSTIC_CHECKPOINT_VALIDATE 0x002u
+#define WT_DIAGNOSTIC_CURSOR_CHECK 0x004u
+#define WT_DIAGNOSTIC_DISK_VALIDATE 0x008u
+#define WT_DIAGNOSTIC_EVICTION_CHECK 0x010u
+#define WT_DIAGNOSTIC_GENERATION_CHECK 0x020u
+#define WT_DIAGNOSTIC_HS_VALIDATE 0x040u
+#define WT_DIAGNOSTIC_KEY_OUT_OF_ORDER 0x080u
+#define WT_DIAGNOSTIC_LOG_VALIDATE 0x100u
+#define WT_DIAGNOSTIC_PREPARED 0x200u
+#define WT_DIAGNOSTIC_SLOW_OPERATION 0x400u
+#define WT_DIAGNOSTIC_TXN_VISIBILITY 0x800u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 16 */
+    /* Categories of assertions that can be runtime enabled. */
+    uint16_t extra_diagnostics_flags;
 
     /* Verbose settings for our various categories. */
     WT_VERBOSE_LEVEL verbose[WT_VERB_NUM_CATEGORIES];
@@ -585,28 +616,32 @@ struct __wt_connection_impl {
  * Variable with flags for which subsystems the diagnostic stress timing delays have been requested.
  */
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_TIMING_STRESS_AGGRESSIVE_SWEEP 0x00001u
-#define WT_TIMING_STRESS_BACKUP_RENAME 0x00002u
-#define WT_TIMING_STRESS_CHECKPOINT_RESERVED_TXNID_DELAY 0x00004u
-#define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x00008u
-#define WT_TIMING_STRESS_CHECKPOINT_STOP 0x00010u
-#define WT_TIMING_STRESS_COMPACT_SLOW 0x00020u
-#define WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION 0x00040u
-#define WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS 0x00080u
-#define WT_TIMING_STRESS_HS_CHECKPOINT_DELAY 0x00100u
-#define WT_TIMING_STRESS_HS_SEARCH 0x00200u
-#define WT_TIMING_STRESS_HS_SWEEP 0x00400u
-#define WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY 0x00800u
-#define WT_TIMING_STRESS_SPLIT_1 0x01000u
-#define WT_TIMING_STRESS_SPLIT_2 0x02000u
-#define WT_TIMING_STRESS_SPLIT_3 0x04000u
-#define WT_TIMING_STRESS_SPLIT_4 0x08000u
-#define WT_TIMING_STRESS_SPLIT_5 0x10000u
-#define WT_TIMING_STRESS_SPLIT_6 0x20000u
-#define WT_TIMING_STRESS_SPLIT_7 0x40000u
-#define WT_TIMING_STRESS_TIERED_FLUSH_FINISH 0x80000u
-    /* AUTOMATIC FLAG VALUE GENERATION STOP 64 */
-    uint64_t timing_stress_flags;
+#define WT_TIMING_STRESS_AGGRESSIVE_SWEEP 0x000001u
+#define WT_TIMING_STRESS_BACKUP_RENAME 0x000002u
+#define WT_TIMING_STRESS_CHECKPOINT_EVICT_PAGE 0x000004u
+#define WT_TIMING_STRESS_CHECKPOINT_HANDLE 0x000008u
+#define WT_TIMING_STRESS_CHECKPOINT_SLOW 0x000010u
+#define WT_TIMING_STRESS_CHECKPOINT_STOP 0x000020u
+#define WT_TIMING_STRESS_COMPACT_SLOW 0x000040u
+#define WT_TIMING_STRESS_EVICT_REPOSITION 0x000080u
+#define WT_TIMING_STRESS_FAILPOINT_EVICTION_FAIL_AFTER_RECONCILIATION 0x000100u
+#define WT_TIMING_STRESS_FAILPOINT_HISTORY_STORE_DELETE_KEY_FROM_TS 0x000200u
+#define WT_TIMING_STRESS_HS_CHECKPOINT_DELAY 0x000400u
+#define WT_TIMING_STRESS_HS_SEARCH 0x000800u
+#define WT_TIMING_STRESS_HS_SWEEP 0x001000u
+#define WT_TIMING_STRESS_PREPARE_CHECKPOINT_DELAY 0x002000u
+#define WT_TIMING_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE 0x004000u
+#define WT_TIMING_STRESS_SPLIT_1 0x008000u
+#define WT_TIMING_STRESS_SPLIT_2 0x010000u
+#define WT_TIMING_STRESS_SPLIT_3 0x020000u
+#define WT_TIMING_STRESS_SPLIT_4 0x040000u
+#define WT_TIMING_STRESS_SPLIT_5 0x080000u
+#define WT_TIMING_STRESS_SPLIT_6 0x100000u
+#define WT_TIMING_STRESS_SPLIT_7 0x200000u
+#define WT_TIMING_STRESS_SPLIT_8 0x400000u
+#define WT_TIMING_STRESS_TIERED_FLUSH_FINISH 0x800000u
+    /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
+    uint32_t timing_stress_flags;
 
 #define WT_STDERR(s) (&S2C(s)->wt_stderr)
 #define WT_STDOUT(s) (&S2C(s)->wt_stdout)
@@ -628,34 +663,38 @@ struct __wt_connection_impl {
 #define WT_CONN_SERVER_STATISTICS 0x10u
 #define WT_CONN_SERVER_SWEEP 0x20u
 #define WT_CONN_SERVER_TIERED 0x40u
-#define WT_CONN_SERVER_TIERED_MGR 0x80u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t server_flags;
 
 /* AUTOMATIC FLAG VALUE GENERATION START 0 */
-#define WT_CONN_BACKUP_PARTIAL_RESTORE 0x000001u
-#define WT_CONN_CACHE_CURSORS 0x000002u
-#define WT_CONN_CACHE_POOL 0x000004u
-#define WT_CONN_CKPT_GATHER 0x000008u
-#define WT_CONN_CKPT_SYNC 0x000010u
-#define WT_CONN_CLOSING 0x000020u
-#define WT_CONN_CLOSING_CHECKPOINT 0x000040u
-#define WT_CONN_CLOSING_NO_MORE_OPENS 0x000080u
-#define WT_CONN_COMPATIBILITY 0x000100u
-#define WT_CONN_DATA_CORRUPTION 0x000200u
-#define WT_CONN_EVICTION_RUN 0x000400u
-#define WT_CONN_HS_OPEN 0x000800u
-#define WT_CONN_INCR_BACKUP 0x001000u
-#define WT_CONN_IN_MEMORY 0x002000u
-#define WT_CONN_LEAK_MEMORY 0x004000u
-#define WT_CONN_LSM_MERGE 0x008000u
-#define WT_CONN_OPTRACK 0x010000u
-#define WT_CONN_PANIC 0x020000u
-#define WT_CONN_READONLY 0x040000u
-#define WT_CONN_RECONFIGURING 0x080000u
-#define WT_CONN_RECOVERING 0x100000u
-#define WT_CONN_SALVAGE 0x200000u
-#define WT_CONN_WAS_BACKUP 0x400000u
+#define WT_CONN_BACKUP_PARTIAL_RESTORE 0x0000001u
+#define WT_CONN_CACHE_CURSORS 0x0000002u
+#define WT_CONN_CACHE_POOL 0x0000004u
+#define WT_CONN_CALL_LOG_ENABLED 0x0000008u
+#define WT_CONN_CKPT_GATHER 0x0000010u
+#define WT_CONN_CKPT_SYNC 0x0000020u
+#define WT_CONN_CLOSING 0x0000040u
+#define WT_CONN_CLOSING_CHECKPOINT 0x0000080u
+#define WT_CONN_CLOSING_NO_MORE_OPENS 0x0000100u
+#define WT_CONN_COMPATIBILITY 0x0000200u
+#define WT_CONN_DATA_CORRUPTION 0x0000400u
+#define WT_CONN_EVICTION_RUN 0x0000800u
+#define WT_CONN_HS_OPEN 0x0001000u
+#define WT_CONN_INCR_BACKUP 0x0002000u
+#define WT_CONN_IN_MEMORY 0x0004000u
+#define WT_CONN_LEAK_MEMORY 0x0008000u
+#define WT_CONN_LSM_MERGE 0x0010000u
+#define WT_CONN_MINIMAL 0x0020000u
+#define WT_CONN_OPTRACK 0x0040000u
+#define WT_CONN_PANIC 0x0080000u
+#define WT_CONN_READONLY 0x0100000u
+#define WT_CONN_READY 0x0200000u
+#define WT_CONN_RECONFIGURING 0x0400000u
+#define WT_CONN_RECOVERING 0x0800000u
+#define WT_CONN_RECOVERY_COMPLETE 0x1000000u
+#define WT_CONN_SALVAGE 0x2000000u
+#define WT_CONN_TIERED_FIRST_FLUSH 0x4000000u
+#define WT_CONN_WAS_BACKUP 0x8000000u
     /* AUTOMATIC FLAG VALUE GENERATION STOP 32 */
     uint32_t flags;
 };

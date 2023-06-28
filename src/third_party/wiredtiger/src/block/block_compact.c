@@ -42,7 +42,7 @@ __wt_block_compact_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
     __wt_block_configure_first_fit(block, false);
 
     /* Dump the results of the compaction pass. */
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG)) {
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_1)) {
         __wt_spin_lock(session, &block->live_lock);
         __block_dump_file_stat(session, block, false);
         __wt_spin_unlock(session, &block->live_lock);
@@ -77,7 +77,7 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
     struct timespec cur_time;
     uint64_t time_diff;
 
-    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG))
+    if (!WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT_PROGRESS, WT_VERBOSE_DEBUG_1))
         return;
 
     __wt_epoch(session, &cur_time);
@@ -86,11 +86,10 @@ __wt_block_compact_progress(WT_SESSION_IMPL *session, WT_BLOCK *block, u_int *ms
     time_diff = WT_TIMEDIFF_SEC(cur_time, session->compact->begin);
     if (time_diff / WT_PROGRESS_MSG_PERIOD > *msg_countp) {
         ++*msg_countp;
-        __wt_verbose_debug(session, WT_VERB_COMPACT_PROGRESS,
-          " compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, skipped %" PRIu64
-          " pages, rewritten %" PRIu64 "pages",
-          block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_skipped,
-          block->compact_pages_rewritten);
+        __wt_verbose_debug1(session, WT_VERB_COMPACT_PROGRESS,
+          " compacting %s for %" PRIu64 " seconds; reviewed %" PRIu64 " pages, rewritten %" PRIu64
+          " pages",
+          block->name, time_diff, block->compact_pages_reviewed, block->compact_pages_rewritten);
     }
 }
 /*
@@ -122,7 +121,7 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
     __wt_spin_lock(session, &block->live_lock);
 
     /* Dump the current state of the file. */
-    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG))
+    if (WT_VERBOSE_LEVEL_ISSET(session, WT_VERB_COMPACT, WT_VERBOSE_DEBUG_2))
         __block_dump_file_stat(session, block, true);
 
     /* Sum the available bytes in the initial 80% and 90% of the file. */
@@ -156,18 +155,16 @@ __wt_block_compact_skip(WT_SESSION_IMPL *session, WT_BLOCK *block, bool *skipp)
         block->compact_pct_tenths = 1;
     }
 
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
-      "%s: total reviewed %" PRIu64 " pages, total skipped %" PRIu64 " pages, total wrote %" PRIu64
-      " pages",
-      block->name, block->compact_pages_reviewed, block->compact_pages_skipped,
-      block->compact_pages_rewritten);
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
+    __wt_verbose_debug1(session, WT_VERB_COMPACT,
+      "%s: total reviewed %" PRIu64 " pages, total rewritten %" PRIu64 " pages", block->name,
+      block->compact_pages_reviewed, block->compact_pages_rewritten);
+    __wt_verbose_debug1(session, WT_VERB_COMPACT,
       "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first 80%% of the file",
       block->name, (uintmax_t)avail_eighty / WT_MEGABYTE, (uintmax_t)avail_eighty);
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
+    __wt_verbose_debug1(session, WT_VERB_COMPACT,
       "%s: %" PRIuMAX "MB (%" PRIuMAX ") available space in the first 90%% of the file",
       block->name, (uintmax_t)avail_ninety / WT_MEGABYTE, (uintmax_t)avail_ninety);
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
+    __wt_verbose_debug1(session, WT_VERB_COMPACT,
       "%s: require 10%% or %" PRIuMAX "MB (%" PRIuMAX
       ") in the first 90%% of the file to perform compaction, compaction %s",
       block->name, (uintmax_t)(block->size / 10) / WT_MEGABYTE, (uintmax_t)block->size / 10,
@@ -212,6 +209,12 @@ __compact_page_skip(
         }
     }
     __wt_spin_unlock(session, &block->live_lock);
+
+    ++block->compact_pages_reviewed;
+    if (*skipp)
+        ++block->compact_pages_skipped;
+    else
+        ++block->compact_pages_rewritten;
 }
 
 /*
@@ -234,12 +237,6 @@ __wt_block_compact_page_skip(
       session, block, addr, addr_size, &objectid, &offset, &size, &checksum));
 
     __compact_page_skip(session, block, offset, size, skipp);
-
-    ++block->compact_pages_reviewed;
-    if (*skipp)
-        ++block->compact_pages_skipped;
-    else
-        ++block->compact_pages_rewritten;
 
     return (0);
 }
@@ -336,7 +333,7 @@ __block_dump_bucket_stat(WT_SESSION_IMPL *session, uintmax_t file_size, uintmax_
     if (file_size > file_free)
         used_pct = (bucket_used * 100) / (file_size - file_free);
 
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
+    __wt_verbose_debug2(session, WT_VERB_COMPACT,
       "%2u%%: %12" PRIuMAX "MB, (free: %" PRIuMAX "B, %" PRIuMAX "%%), (used: %" PRIuMAX
       "MB, %" PRIuMAX "B, %" PRIuMAX "%%)",
       bucket_pct, bucket_free / WT_MEGABYTE, bucket_free, free_pct, bucket_used / WT_MEGABYTE,
@@ -359,19 +356,19 @@ __block_dump_file_stat(WT_SESSION_IMPL *session, WT_BLOCK *block, bool start)
     el = &block->live.avail;
     size = block->size;
 
-    __wt_verbose_debug(session, WT_VERB_COMPACT, "============ %s",
+    __wt_verbose_debug1(session, WT_VERB_COMPACT, "============ %s",
       start ? "testing for compaction" : "ending compaction pass");
 
     if (!start) {
-        __wt_verbose_debug(
+        __wt_verbose_debug1(
           session, WT_VERB_COMPACT, "pages reviewed: %" PRIu64, block->compact_pages_reviewed);
-        __wt_verbose_debug(
+        __wt_verbose_debug1(
           session, WT_VERB_COMPACT, "pages skipped: %" PRIu64, block->compact_pages_skipped);
-        __wt_verbose_debug(
+        __wt_verbose_debug1(
           session, WT_VERB_COMPACT, "pages rewritten : %" PRIu64, block->compact_pages_rewritten);
     }
 
-    __wt_verbose_debug(session, WT_VERB_COMPACT,
+    __wt_verbose_debug1(session, WT_VERB_COMPACT,
       "file size %" PRIuMAX "MB (%" PRIuMAX ") with %" PRIuMAX "%% space available %" PRIuMAX
       "MB (%" PRIuMAX ")",
       (uintmax_t)size / WT_MEGABYTE, (uintmax_t)size,

@@ -29,7 +29,7 @@
 #include "test_util.h"
 
 static const char name[] = "lsm:test";
-#define NUM_DOCS 100000
+#define NUM_DOCS (100 * WT_THOUSAND)
 #define NUM_QUERIES (NUM_DOCS / 100)
 
 /*
@@ -120,7 +120,9 @@ main(int argc, char *argv[])
     memset(opts, 0, sizeof(*opts));
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_make_work_dir(opts->home);
-    testutil_check(wiredtiger_open(opts->home, NULL, "create,cache_size=200M", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,cache_size=200M,statistics=(all),statistics_log=(json,on_close,wait=1)",
+      &opts->conn));
 
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session2));

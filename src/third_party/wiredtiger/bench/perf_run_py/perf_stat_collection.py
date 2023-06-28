@@ -29,7 +29,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import os
-from perf_stat import PerfStat, PerfStatCount, PerfStatLatency, PerfStatMinMax, PerfStatLatencyWorkgen
+from perf_stat import PerfStat, PerfStatCount, PerfStatLatency, PerfStatMinMax, PerfStatLatencyWorkgen, PerfStatDBSize
 from typing import List
 
 
@@ -169,5 +169,7 @@ class PerfStatCollection:
                                    stat_file='../stdout_file.txt',
                                    pattern=r'max latency exceeded.*update',
                                    output_label='Latency update(in micro sec) Max',
-                                   input_offset=11)
+                                   input_offset=11),
+            PerfStatDBSize(short_label="database_size",
+                           output_label='Database Size (in bytes)')
         ]

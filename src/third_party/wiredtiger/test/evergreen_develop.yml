@@ -1,0 +1,143 @@
+# This config file is expected to be only used by the WiredTiger (develop) Evergreen project.
+
+include:
+- filename: test/evergreen.yml
+
+variables:
+# Template for perf-tasks
+- &perf-tasks-template
+  batchtime: 1440 # 1 day
+  expansions: &ubuntu2004-perf-tests-expansions-template
+    test_env_vars:
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
+    CC_OPTIMIZE_LEVEL: -DCC_OPTIMIZE_LEVEL=-O3
+    HAVE_DIAGNOSTIC: -DHAVE_DIAGNOSTIC=0
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake
+    CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
+    python_binary: '/opt/mongodbtoolchain/v4/bin/python3'
+    pip3_binary: '/opt/mongodbtoolchain/v4/bin/pip3'
+    virtualenv_binary: '/opt/mongodbtoolchain/v4/bin/virtualenv'
+    smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
+    cmake_generator: Ninja
+    make_command: ninja
+  tasks:
+    - name: compile
+    - name: ".btree-perf"
+    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
+    # - name: ".lsm-perf"
+    - name: ".stress-perf"
+    - name: ".checkpoint-perf"
+    - name: ".evict-perf"
+    - name: ".log-perf"
+    - name: ".long-perf"
+    - name: ".oplog-perf"
+    - name: many-dhandle-stress
+    - name: ".wt2853-perf"
+    - name: cppsuite-bounded-cursor-perf-stress
+  display_tasks:
+    - name: Wiredtiger-perf-btree-jobs
+      execution_tasks:
+      - ".btree-perf"
+    # FIXME-WT-8867 Disable LSM perf tests till the support for LSM is restored.
+    # - name: Wiredtiger-perf-lsm-jobs
+    #   execution_tasks:
+    #   - ".lsm-perf"
+    - name: Wiredtiger-perf-stress-jobs
+      execution_tasks:
+      - ".stress-perf"
+    - name: Wiredtiger-perf-checkpoint-jobs
+      execution_tasks:
+      - ".checkpoint-perf"
+    - name: Wiredtiger-perf-evict-jobs
+      execution_tasks:
+      - ".evict-perf"
+    - name: Wiredtiger-perf-log-jobs
+      execution_tasks:
+      - ".log-perf"
+    - name: Wiredtiger-perf-long-jobs
+      execution_tasks:
+      - ".long-perf"
+    - name: Wiredtiger-perf-oplog-jobs
+      execution_tasks:
+      - ".oplog-perf"
+    - name: WiredTiger-wt2853-perf
+      execution_tasks:
+      - ".wt2853-perf"
+
+# Build variants that need to be run only on the develop branch.
+buildvariants:
+- <<: *perf-tasks-template
+  name: ubuntu2004-perf-tests
+  display_name: Ubuntu 20.04 Performance tests
+  run_on:
+    - ubuntu2004-medium
+  expansions:
+    <<: *ubuntu2004-perf-tests-expansions-template
+    collection: AllPerfTests
+
+- <<: *perf-tasks-template
+  name: ubuntu2004-perf-tests-arm64
+  display_name: Ubuntu 20.04 Performance tests (ARM64)
+  run_on:
+    - ubuntu2004-arm64-large
+  expansions:
+    <<: *ubuntu2004-perf-tests-expansions-template
+    collection: AllPerfTestsARM64
+
+- name: documentation-update
+  display_name: "~ Documentation update"
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    doc_update_branches: develop,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
+  tasks:
+    - name: doc-update
+
+- name: code-statistics
+  display_name: "Code statistics"
+  run_on:
+  - ubuntu2004-test
+  expansions:
+    test_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+      WT_TOPDIR=$(git rev-parse --show-toplevel)
+      WT_BUILDDIR=$WT_TOPDIR/cmake_build
+      LD_LIBRARY_PATH=$WT_BUILDDIR
+      LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libeatmydata.so
+    make_command: ninja
+    cmake_generator: Ninja
+    CMAKE_TOOLCHAIN_FILE: -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_gcc.cmake
+    CMAKE_INSTALL_PREFIX: -DCMAKE_INSTALL_PREFIX=$(pwd)/cmake_build/LOCAL_INSTALL
+  tasks:
+    - name: coverage-report
+      batchtime: 10080 # 7 days
+    - name: cyclomatic-complexity
+
+- name: compatibility-tests-less-frequent
+  display_name: Compatibility tests (less frequent)
+  batchtime: 10080 # 7 days
+  run_on:
+  - ubuntu1804-test
+  tasks:
+    - name: compatibility-test-for-older-releases
+    - name: compatibility-test-for-wt-standalone-releases
+
+- name: compatibility-tests-daily
+  display_name: Compatibility tests (daily)
+  batchtime: 1440 # 1 day
+  run_on:
+  - ubuntu2004-test
+  tasks:
+    - name: compatibility-test-upgrade-to-latest
+
+- name: compatibility-tests
+  display_name: Compatibility tests
+  run_on:
+  - ubuntu2004-test
+  tasks:
+    - name: compatibility-test-for-newer-releases
+    - name: compatibility-test-for-patch-releases
+    - name: import-compatibility-test

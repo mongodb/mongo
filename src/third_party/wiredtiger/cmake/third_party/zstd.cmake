@@ -14,6 +14,7 @@ endif()
 add_library(wt::zstd SHARED IMPORTED GLOBAL)
 set_target_properties(wt::zstd PROPERTIES
     IMPORTED_LOCATION ${HAVE_LIBZSTD}
+    IMPORTED_IMPLIB ${HAVE_LIBZSTD}
 )
 if (HAVE_LIBZSTD_INCLUDES)
     set_target_properties(wt::zstd PROPERTIES

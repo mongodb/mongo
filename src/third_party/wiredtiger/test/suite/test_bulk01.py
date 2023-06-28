@@ -162,7 +162,7 @@ class test_bulk_load(wttest.WiredTigerTestCase):
         for i in [1, 9, 10]:
             cursor.set_key(simple_key(cursor, 1))
             cursor.set_value(simple_value(cursor, 1))
-            msg = '/than previously inserted key/'
+            msg = '/less than or equal to the previously inserted key/'
             self.assertRaisesWithMessage(
                 wiredtiger.WiredTigerError, lambda: cursor.insert(), msg)
 

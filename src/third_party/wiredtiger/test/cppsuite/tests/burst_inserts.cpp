@@ -26,9 +26,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "test_harness/test.h"
-#include "test_harness/workload/random_generator.h"
-#include "test_harness/timestamp_manager.h"
+#include "src/common/random_generator.h"
+#include "src/main/test.h"
 
 using namespace test_harness;
 
@@ -37,11 +36,12 @@ using namespace test_harness;
  * mongod instance loading a large amount of data over a long period of time.
  */
 class burst_inserts : public test {
-    public:
+public:
     burst_inserts(const test_args &args) : test(args)
     {
         _burst_duration = _config->get_int("burst_duration");
         logger::log_msg(LOG_INFO, "Burst duration set to: " + std::to_string(_burst_duration));
+        init_operation_tracker();
     }
 
     /*
@@ -49,7 +49,7 @@ class burst_inserts : public test {
      * sleeps for op_rate.
      */
     void
-    insert_operation(thread_context *tc) override final
+    insert_operation(thread_worker *tc) override final
     {
         logger::log_msg(
           LOG_INFO, type_string(tc->type) + " thread {" + std::to_string(tc->id) + "} commencing.");
@@ -94,14 +94,13 @@ class burst_inserts : public test {
             while (tc->running() &&
               std::chrono::system_clock::now() - burst_start <
                 std::chrono::seconds(_burst_duration)) {
-                tc->transaction.try_begin();
-                cc.write_cursor->set_key(
-                  cc.write_cursor.get(), tc->key_to_string(start_key + added_count).c_str());
-                cc.write_cursor->search(cc.write_cursor.get());
-
+                tc->txn.try_begin();
+                auto key = tc->pad_string(std::to_string(start_key + added_count), tc->key_size);
                 /* A return value of true implies the insert was successful. */
-                if (!tc->insert(cc.write_cursor, cc.coll.id, start_key + added_count)) {
-                    tc->transaction.rollback();
+                auto value =
+                  random_generator::instance().generate_pseudo_random_string(tc->value_size);
+                if (!tc->insert(cc.write_cursor, cc.coll.id, key, value)) {
+                    tc->txn.rollback();
                     added_count = 0;
                     continue;
                 }
@@ -111,9 +110,9 @@ class burst_inserts : public test {
                 int ret = 0;
                 if ((ret = cc.read_cursor->next(cc.read_cursor.get())) != 0) {
                     if (ret == WT_NOTFOUND) {
-                        cc.read_cursor->reset(cc.read_cursor.get());
+                        testutil_check(cc.read_cursor->reset(cc.read_cursor.get()));
                     } else if (ret == WT_ROLLBACK) {
-                        tc->transaction.rollback();
+                        tc->txn.rollback();
                         added_count = 0;
                         continue;
                     } else {
@@ -121,20 +120,17 @@ class burst_inserts : public test {
                     }
                 }
 
-                if (tc->transaction.can_commit()) {
-                    if (tc->transaction.commit()) {
+                if (tc->txn.can_commit()) {
+                    if (tc->txn.commit()) {
                         cc.coll.increase_key_count(added_count);
                         start_key = cc.coll.get_key_count();
                     }
                     added_count = 0;
                 }
-
-                /* Sleep as currently this loop is too fast. */
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
             }
             /* Close out our current txn. */
-            if (tc->transaction.active()) {
-                if (tc->transaction.commit()) {
+            if (tc->txn.active()) {
+                if (tc->txn.commit()) {
                     logger::log_msg(LOG_TRACE,
                       "Committed an insertion of " + std::to_string(added_count) + " keys.");
                     cc.coll.increase_key_count(added_count);
@@ -150,10 +146,9 @@ class burst_inserts : public test {
             tc->sleep();
         }
         /* Make sure the last transaction is rolled back now the work is finished. */
-        if (tc->transaction.active())
-            tc->transaction.rollback();
+        tc->txn.try_rollback();
     }
 
-    private:
+private:
     int _burst_duration = 0;
 };

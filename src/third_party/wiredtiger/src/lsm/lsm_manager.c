@@ -67,10 +67,10 @@ __lsm_general_worker_start(WT_SESSION_IMPL *session)
         else {
             worker_args->type = WT_LSM_WORK_GENERAL_OPS;
             /*
-             * Only allow half of the threads to run merges to avoid all all workers getting stuck
-             * in long-running merge operations. Make sure the first worker is allowed, so that
-             * there is at least one thread capable of running merges. We know the first worker is
-             * id 2, so set merges on even numbered workers.
+             * Only allow half of the threads to run merges to avoid all workers getting stuck in
+             * long-running merge operations. Make sure the first worker is allowed, so that there
+             * is at least one thread capable of running merges. We know the first worker is id 2,
+             * so set merges on even numbered workers.
              */
             if (manager->lsm_workers % 2 == 0)
                 FLD_SET(worker_args->type, WT_LSM_WORK_MERGE);
@@ -352,7 +352,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
     dhandle_locked = false;
 
     while (FLD_ISSET(conn->server_flags, WT_CONN_SERVER_LSM)) {
-        __wt_sleep(0, 10000);
+        __wt_sleep(0, 10 * WT_THOUSAND);
         if (TAILQ_EMPTY(&conn->lsmqh))
             continue;
         __wt_readlock(session, &conn->dhandle_lock);
@@ -373,7 +373,7 @@ __lsm_manager_run_server(WT_SESSION_IMPL *session)
                 idlems = WT_TIMEDIFF_MS(now, lsm_tree->last_active);
             fillms = 3 * lsm_tree->chunk_fill_ms;
             if (fillms == 0)
-                fillms = 10000;
+                fillms = 10 * WT_THOUSAND;
             /*
              * If the tree appears to not be triggering enough LSM maintenance, help it out. Some
              * types of additional work units don't hurt, and can be necessary if some work units

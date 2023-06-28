@@ -123,7 +123,7 @@ class test_durable_ts01(wttest.WiredTigerTestCase):
             self.assertEquals(cursor.update(), 0)
             self.assertEquals(cursor.next(), 0)
 
-        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(200))
+        session.prepare_transaction('prepare_timestamp=' + self.timestamp_str(230))
 
         # Set a stable timestamp so that first update value is durable.
         # (Must be done after preparing since preparing before stable is prohibited.)

@@ -23,8 +23,8 @@ __wt_epoch_raw(WT_SESSION_IMPL *session, struct timespec *tsp)
     GetSystemTimeAsFileTime(&time);
 
     ns100 = (((int64_t)time.dwHighDateTime << 32) + time.dwLowDateTime) - 116444736000000000LL;
-    tsp->tv_sec = ns100 / 10000000;
-    tsp->tv_nsec = (long)((ns100 % 10000000) * 100);
+    tsp->tv_sec = ns100 / (10 * WT_MILLION);
+    tsp->tv_nsec = (long)((ns100 % (10 * WT_MILLION)) * 100);
 }
 
 /*

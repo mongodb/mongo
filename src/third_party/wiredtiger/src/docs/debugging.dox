@@ -1,0 +1,84 @@
+/*! @page debugging Debugging
+
+WiredTiger contains many assertions and diagnostic code blocks that are used to detect
+unexpected control flow and invalid program states. For performance reasons most checks
+are disabled by default and must be enabled either by compiling WiredTiger in diagnostic
+mode via the \c `-DHAVE_DIAGNOSTIC=1` flag, or for a subset of checks by turning them on at
+runtime with the \c WT_CONNECTION configuration item \c extra_diagnostics .
+Note that in diagnostic mode all checks are always enabled and cannot be disabled.
+
+There are two types of checks available. Assertions and diagnostic code blocks:
+
+@section assertions Assertions
+WiredTiger offers the following assertions:
+
+<table>
+@hrow{Assertion, Behavior in diagnostic mode, Behavior in release mode}
+@row{\c WT_ASSERT, Always run and abort WiredTiger on failure, Never run.}
+@row{\c WT_ASSERT_ALWAYS, Always run and abort WiredTiger on failure,
+    Always run and abort WiredTiger on failure.}
+@row{\c WT_ASSERT_OPTIONAL, Always run and abort WiredTiger on failure,
+    Takes a \c WT_DIAGNOSTIC_* category argument and only runs when the category is
+    enabled on the \c WT_CONNECTION. On failure abort WiredTiger}
+@row{\c WT_ERR_ASSERT, Always run and abort WiredTiger on failure,
+    Always run and take a \c WT_DIAGNOSTIC_* category argument. When the category is
+    enabled on the \c WT_CONNECTION and the assertion fails abort WiredTiger. When
+    the assertion fails and the category is not enabled on the \c WT_CONNECTION return
+    a WT_ERR }
+@row{\c WT_RET_ASSERT, Always run and abort WiredTiger on failure,
+    Always run and take a \c WT_DIAGNOSTIC_* category argument. When the category is
+    enabled on the \c WT_CONNECTION and the assertion fails abort WiredTiger. When
+    the assertion fails and the category is not enabled on the \c WT_CONNECTION return
+    a WT_RET }
+@row{\c WT_RET_PANIC_ASSERT, Always run and abort WiredTiger on failure,
+    Always run and take a \c WT_DIAGNOSTIC_* category argument. When the category is
+    enabled on the \c WT_CONNECTION and the assertion fails abort WiredTiger. When
+    the assertion fails and the category is not enabled on the \c WT_CONNECTION return
+    a WT_RET_PANIC }
+</table>
+
+@section diagnostic_code_blocks Diagnostic Code Blocks
+
+Longer, more extensive checks are marked by \c `#ifdef HAVE_DIAGNOSTIC` or
+\c EXTRA_DIAGNOSTICS_ENABLED blocks. Similar to assertions these checks are enabled either
+by running WiredTiger in diagnostic mode or by setting \c extra_diagnostics on the \c WT_CONNECTION.
+
+<table>
+@hrow{Check, Behavior in diagnostic mode, Behavior in release mode}
+@row{\c `#ifdef HAVE_DIAGNOSTIC`, Always run the code block, Never run the code block.}
+@row{\c EXTRA_DIAGNOSTICS_ENABLED, Always run the code block,
+    Takes a \c WT_DIAGNOSTIC_* category as an argument and only runs when the category
+    is enabled on the \c WT_CONNECTION.}
+</table>
+
+@section diagnostic_categories Diagnostic Categories
+
+Diagnostic checks across WiredTiger are grouped into categories that get enabled/disabled together.
+The following diagnostic categories (\c WT_DIAGNOSTIC_*) are defined:
+
+<table>
+@hrow{Category, Description}
+@row{\c WT_DIAGNOSTIC_ALL, Enable all diagnostic categories.}
+@row{\c WT_DIAGNOSTIC_CHECKPOINT_VALIDATE, Verify data integrity of checkpoints.}
+@row{\c WT_DIAGNOSTIC_CURSOR_CHECK, Verify expected outcome of cursor operation.}
+@row{\c WT_DIAGNOSTIC_DISK_VALIDATE, Validate correctness of data written to and read from disk.}
+@row{\c WT_DIAGNOSTIC_EVICTION_CHECK, Ensure correct page state when performing eviction. }
+@row{\c WT_DIAGNOSTIC_GENERATION_CHECK, Check correctness of generation logic.}
+@row{\c WT_DIAGNOSTIC_HS_VALIDATE, Ensure correctness of records in the history store and data fetched from it.}
+@row{\c WT_DIAGNOSTIC_KEY_OUT_OF_ORDER, Verify correct ordering of keys in the btree.}
+@row{\c WT_DIAGNOSTIC_LOG_VALIDATE, Verify correctness of the Write Ahead Log.}
+@row{\c WT_DIAGNOSTIC_PREPARED, Ensure correct behavior of prepared transactions.}
+@row{\c WT_DIAGNOSTIC_SLOW_OPERATION, Identify and abort on slow operations in WiredTiger.}
+@row{\c WT_DIAGNOSTIC_TXN_VISIBILITY, Verify correct visibility of transactional data.}
+</table>
+
+@subsection extra_diagnostics_configuration Configuring runtime diagnostics
+
+Enabling assertions and diagnostic code blocks at runtime is controlled by the \c extra_diagnostics
+configuration option when opening (::wiredtiger_open) or re-configuring (WT_CONNECTION::reconfigure)
+a wiredtiger connection. The \c extra_diagnostics configuration takes in a list of categories. Any category provided in the list is enabled and any category not provided is disabled.
+For example:
+
+@snippet ex_extra_diagnostics.c Configure extra_diagnostics
+
+*/

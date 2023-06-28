@@ -27,19 +27,34 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wiredtiger, wttest
+from wtscenario import make_scenarios
 
 # test_truncate05.py
 # Test various fast truncate visibility scenarios
 class test_truncate05(wttest.WiredTigerTestCase):
     conn_config = 'cache_size=2MB'
 
+    format_values = [
+        ('column', dict(key_format='r', value_format='S', extraconfig='')),
+        ('column_fix', dict(key_format='r', value_format='8t',
+            extraconfig=',allocation_size=512,leaf_page_max=512')),
+        ('row_integer', dict(key_format='i', value_format='S', extraconfig='')),
+    ]
+
+    scenarios = make_scenarios(format_values)
+
     def test_truncate_read_older_than_newest(self):
         uri = 'table:test_truncate05'
-        self.session.create(uri, 'key_format=i,value_format=S')
+        format = 'key_format={},value_format={}'.format(self.key_format, self.value_format)
+        self.session.create(uri, format + self.extraconfig)
         cursor = self.session.open_cursor(uri)
 
-        value1 = 'a' * 500
-        value2 = 'b' * 500
+        if self.value_format == '8t':
+            value1 = 97
+            value2 = 98
+        else:
+            value1 = 'a' * 500
+            value2 = 'b' * 500
 
         # Insert a range of keys.
         for i in range(1, 1000):

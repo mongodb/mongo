@@ -39,6 +39,7 @@ hs_cursor(void *arg)
 #if WIREDTIGER_VERSION_MAJOR < 10
     WT_UNUSED(arg);
 #else
+    SAP sap;
     WT_CONNECTION *conn;
     WT_CURSOR *cursor;
     WT_DECL_RET;
@@ -60,7 +61,8 @@ hs_cursor(void *arg)
      *
      * Open a session.
      */
-    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    memset(&sap, 0, sizeof(sap));
+    wt_wrap_open_session(conn, &sap, NULL, &session);
 
     memset(&hs_key, 0, sizeof(hs_key));
     memset(&hs_value, 0, sizeof(hs_value));
@@ -76,8 +78,8 @@ hs_cursor(void *arg)
          * cursor, so we should be able to traverse large chunks of the HS store quickly, without
          * blocking normal operations.
          */
-        next = mmrand(NULL, 0, 1) == 1;
-        for (i = mmrand(NULL, 1000, 100000); i > 0; --i) {
+        next = mmrand(&g.extra_rnd, 0, 1) == 1;
+        for (i = mmrand(&g.extra_rnd, WT_THOUSAND, 100 * WT_THOUSAND); i > 0; --i) {
             if ((ret = (next ? cursor->next(cursor) : cursor->prev(cursor))) != 0) {
                 testutil_assertfmt(ret == WT_NOTFOUND || ret == WT_CACHE_FULL || ret == WT_ROLLBACK,
                   "WT_CURSOR.%s failed: %d", next ? "next" : "prev", ret);
@@ -92,13 +94,13 @@ hs_cursor(void *arg)
         testutil_check(cursor->close(cursor));
 
         /* Sleep for some number of seconds, in short intervals so we don't make the run wait. */
-        for (period = mmrand(NULL, 1, 10); period > 0 && !g.workers_finished; --period)
+        for (period = mmrand(&g.extra_rnd, 1, 10); period > 0 && !g.workers_finished; --period)
             __wt_sleep(1, 0);
         if (g.workers_finished)
             break;
     }
 
-    testutil_check(session->close(session, NULL));
+    wt_wrap_close_session(session);
 #endif
 
     return (WT_THREAD_RET_VALUE);

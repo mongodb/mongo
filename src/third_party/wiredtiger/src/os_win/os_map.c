@@ -13,8 +13,8 @@
  *     Map a file into memory.
  */
 int
-__wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_regionp,
-  size_t *lenp, void *mapped_cookiep)
+__wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void **mapped_regionp,
+  size_t *lenp, void **mapped_cookiep)
 {
     WT_DECL_RET;
     WT_FILE_HANDLE_WIN *win_fh;
@@ -58,8 +58,8 @@ __wt_win_map(WT_FILE_HANDLE *file_handle, WT_SESSION *wt_session, void *mapped_r
         return (ret);
     }
 
-    *(void **)mapped_cookiep = mapped_cookie;
-    *(void **)mapped_regionp = map;
+    *mapped_cookiep = mapped_cookie;
+    *mapped_regionp = map;
     *lenp = len;
     return (0);
 }

@@ -1,0 +1,26 @@
+This branch is to run format as a docker container to work with Antithesis. This results in two containers, one for the binary to run test format,
+and one for a config that will launch docker compose (requested by Antithesis).
+
+1. Install docker on your host
+2. Configure and build with these options (requires cmake_build under the wiredtiger top directory)
+    $ cmake -DCMAKE_TOOLCHAIN_FILE=../cmake/toolchains/mongodbtoolchain_stable_clang.cmake -DENABLE_ANTITHESIS=1 -DENABLE_STRICT=0 -G "Ninja" ./..
+    $ ninja
+3. Execute the following command to build the binary docker container (from this directory):
+    $ sudo docker build -f test_format.dockerfile -t wt-test-format:latest ../..
+4. Execute the following command to build the config docker container (from this directory):
+    $ sudo docker build -f config.docker -t wt-test-format-config:latest ../..
+5. Test via docker-compose (from this directory):
+    $ sudo docker-compose up
+
+If you want to run just format from the docker image, this is the command that works for me:
+
+$ sudo docker run --rm --mount type=bind,src=/home/ubuntu/git/wiredtiger/tools/antithesis/CONFIG.antithesis,dst=/opt/bin/test/format/CONFIG.antithesis wt-test-format:latest /bin/bash /opt/bin/test.sh -c CONFIG.antithesis -h /data/RUNDIR
+
+As needed, we can export the containers:
+    $ sudo docker image save wt-test-format > wt_test_format.tar
+    $ sudo docker image save wt-test-format-config > wt_config.tar
+
+Alternatively, you can create an evergreen patch build from this branch and trigger the variant/task Ubuntu 20.04 Antithesis / build-and-push-antithesis-containers
+which will build the containers and upload to Antithesis directly.
+
+We are including libstarvoid which helps with Antithesis integration.

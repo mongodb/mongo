@@ -64,6 +64,28 @@ __wt_strnlen(const char *s, size_t maxlen)
 }
 
 /*
+ * __wt_strcat --
+ *     A safe version of string concatenation, which checks the size of the destination buffer;
+ *     return ERANGE on error.
+ */
+static inline int
+__wt_strcat(char *dest, size_t size, const char *src)
+{
+    size_t dest_length;
+    size_t src_length;
+
+    dest_length = strlen(dest);
+    src_length = strlen(src);
+
+    if (dest_length + src_length + 1 > size) /* Account for the null-terminating byte. */
+        return (ERANGE);
+
+    memcpy(dest + dest_length, src, src_length);
+    dest[dest_length + src_length] = '\0';
+    return (0);
+}
+
+/*
  * __wt_snprintf --
  *     snprintf convenience function, ignoring the returned size.
  */
@@ -175,22 +197,36 @@ __wt_spin_backoff(uint64_t *yield_count, uint64_t *sleep_usecs)
     __wt_sleep(0, (*sleep_usecs));
 }
 
-/* Maximum stress delay is 1/10 of a second. */
-#define WT_TIMING_STRESS_MAX_DELAY (100000)
-
 /*
  * __wt_timing_stress --
  *     Optionally add delay to stress code paths.
  */
 static inline void
-__wt_timing_stress(WT_SESSION_IMPL *session, u_int flag)
+__wt_timing_stress(WT_SESSION_IMPL *session, u_int flag, struct timespec *tsp)
 {
-    double pct;
-    uint64_t i, max;
-
     /* Optionally only sleep when a specified configuration flag is set. */
     if (flag != 0 && !FLD_ISSET(S2C(session)->timing_stress_flags, flag))
         return;
+
+    /* If a delay is provided then use that delay otherwise sleep for a random time. */
+    if (tsp != NULL)
+        __wt_sleep((uint64_t)tsp->tv_sec, (uint64_t)tsp->tv_nsec / WT_THOUSAND);
+    else
+        __wt_timing_stress_sleep_random(session);
+}
+
+/* Maximum stress delay is 1/10 of a second. */
+#define WT_TIMING_STRESS_MAX_DELAY (100000)
+
+/*
+ * __wt_timing_stress_sleep_random --
+ *     Sleep for a random time, with a bias towards shorter sleeps.
+ */
+static inline void
+__wt_timing_stress_sleep_random(WT_SESSION_IMPL *session)
+{
+    double pct;
+    uint64_t i, max;
 
     /*
      * If there is a lot of cache pressure, don't let the sleep time get too large. If the cache is
@@ -237,9 +273,9 @@ __wt_failpoint(WT_SESSION_IMPL *session, uint64_t conn_flag, u_int probability)
         return (false);
 
     /* Assert that the given probability is sane. */
-    WT_ASSERT(session, probability <= 10000);
+    WT_ASSERT(session, probability <= 10 * WT_THOUSAND);
 
-    return (__wt_random(&session->rnd) % 10000 <= probability);
+    return (__wt_random(&session->rnd) % (10 * WT_THOUSAND) <= probability);
 }
 
 /*

@@ -1,0 +1,849 @@
+/*! @arch_page arch-fast-truncate Deleted Pages and Fast-Truncate
+
+WiredTiger includes a scheme for discarding whole pages at a time.
+This is known as <i>fast-truncate</i> or <i>fast-delete</i> (the terms are used
+interchangeably) and the pages it is done to are called <i>deleted pages</i>.
+
+There are also four other ways deleted pages can appear in a database.
+The checkpoint cleanup code (found in \c bt_sync.c) discards pages it finds to contain
+only obsolete values.
+Pages that reconcile completely empty turn into deleted pages.
+In VLCS, an empty deleted page is inserted when loading an internal page whose start recno
+is less than the start recno of its first child.
+Finally, new trees are created with a single empty deleted leaf page.
+These circumstances are all discussed further below.
+
+The fast-truncate and deleted-page arrangements to some extent violate the system
+architecture and the system's layering and modularity.
+Consequently they have tentacles in a number of places; furthermore, a lot of the
+functioning is implicit or hidden and appears magic to the uninitiated.
+
+Ideally, this page documents all the tentacles (see @ref ft_pointers) and explains all the
+implicit magic.
+
+Most of the code related to fast-truncate and deleted pages lives in \c bt_delete.c.
+
+@section ft_deleted_pages Deleted Pages
+
+One of the states a \c WT_REF can be in is \c WT_REF_DELETED.
+This means that (as of some point) all data on the page has been removed.
+However, it is not necessarily the case that this is true for all current or possible
+readers.
+The \c page_del field of a \c WT_REF, if not \c NULL, contains information about the
+transaction that deleted the page.
+Its type is \c WT_PAGE_DELETED.
+It can be thought of as a special kind of update, and contains roughly the same
+information.
+
+The \c page_del field can be \c NULL; this means that the prior data on the page is all
+obsolete and nobody can see it.
+(Or equivalently, the deletion has become globally visible.)
+If non-null, the transaction and timestamp information describes the visibility of the
+deletion.
+When the deletion is not visible, the prior data on the page is (or may be) and may still
+need to be read.
+Reading a deleted page into memory requires deleting every item on it with its own \c
+WT_UPDATE; the process of doing this is called <i>instantiation</i> and is described below
+under @ref ft_instantiation.
+
+When a page is deleted by fast-truncate, a \c WT_PAGE_DELETED structure is allocated,
+populated with information about the transaction containing the truncate, and inserted in
+the \c page_del field.
+When a page is discarded by checkpoint cleanup or other mechanisms that have already
+determined that all the prior data is obsolete, the \c page_del field is left \c NULL.
+
+Accessing the deletion information requires locking the \c WT_REF.
+This both prevents the structure from being discarded while under examination and prevents
+the page from being simultaneously instantiated by another thread.
+(While the \c page_del field can be tested for \c NULL atomically, this has limited
+utility.)
+
+In general the deletion information should only be consulted if the ref's state prior to
+locking was \c WT_REF_DELETED.
+Apart from instantiated pages, whose state is \c WT_REF_MEM (see @ref
+ft_instantiated_pages below) the \c page_del field will be \c NULL.
+
+Because locking the ref is expensive, and visibility checks are expensive as well, we want
+to avoid doing either unnecessarily.
+Consequently many of the places in the system that lock the ref to examine the deletion
+information will discard it right away if they find the deletion has become globally
+visible.
+
+Note that because on-disk pages can only be discarded at certain points, a page with null
+\c page_del may still have an on-disk page and consequently an address.
+That page presumptively contains no useful information.  (A page with non-null \c page_del
+should always have an on-disk page.)
+
+The transaction referenced in the deletion information may be committed or uncommitted,
+but it is never aborted.
+Upon transaction rollback the \c page_del field is cleared immediately.
+
+Note that it is not possible to delete a page twice; if the same region of a tree is
+truncated twice, the already-deleted pages will be skipped over the second time.
+See @ref ft_truncate.
+
+Also note that deleted pages still "exist" in the sense that the \c WT_REF remains, and
+searches that lead to its portion of the namespace will still land on it.
+(This triggers instantiation.)
+At some point after the deletion becomes globally visible, the \c WT_REF is discarded.
+This happens either during an internal page split or reverse split, or when the internal
+page is evicted.
+It is this discard process (rather than the deletion itself) that creates gaps in the
+namespace.
+
+@section ft_instantiated_pages Instantiated Pages
+
+An instantiated page is a page in \c WT_REF_MEM state that has been produced by the
+instantiation process (see @ref ft_instantiation).
+For most purposes instantiated pages are ordinary in-memory pages.
+
+Instantiated pages always have a modify structure, and differ from ordinary in-memory
+pages in two ways.
+First, the field \c page->modify->instantiated is set to \c true, and the \c page_del
+field is retained from the prior deleted state.
+Second, if the transaction that deleted the page had not resolved yet when the
+instantiation happened, the field \c page->modify->inst_updates contains an array of the
+\c WT_UPDATE structures used to do the instantiation.
+
+These two conditions are orthogonal and resolve independently; when both are resolved the
+page is thenceforth a completely normal in-memory page.
+
+Note that instantiated pages are not automatically marked dirty.
+(See the notes on this point in the @ref ft_instantiation section.)
+
+Also note that it is not possible to fast-truncate an instantiated page.
+Only on-disk pages can be fast-truncated.
+See @ref ft_truncate.
+
+<!-- Note: you apparently can't use \c in a section header. -->
+@subsection ft_instantiated_instantiated The instantiated flag and the page_del field
+
+The \c instantiated flag and the \c page_del structure are retained for the benefit of
+parent internal page reconciliation.
+See @ref ft_internal_reconciliation below.
+
+When the page is itself reconciled, or if the transaction that deleted it rolls back, the
+\c instantiated flag is cleared and the \c page_del structure is discarded.
+
+Note that the \c page_del field of an instantiated page should not be used to make
+operational decisions.
+Additional updates might have been applied to the page since the instantiation happened;
+these may contradict or obsolete the deletion information.
+
+<!-- Note: you apparently can't use either \c or <tt> in a section header. -->
+@subsection ft_instantiated_updates The inst_updates field
+
+Meanwhile, the \c inst_updates field is kept independently until the transaction that
+created it is resolved.
+It in effect belongs to that transaction and is neither needed nor used by anything else,
+with one exception: eviction checks whether it is non-NULL before evicting the page.
+(Pages with an instantiated but uncommitted truncate cannot be evicted.)
+
+Because it is possible for the page to split between instantiation and transaction
+resolution, finding the updates created during instantiation to resolve them is
+problematic.
+The \c inst_updates field makes this possible.
+
+Upon resolution (either commit or rollback) the \c inst_updates field is discarded.
+
+@section ft_instantiation Instantiation
+
+Instantiation is the process by which an on-disk deleted page (ref in state \c
+WT_REF_DELETED) is converted into an in-memory page (ref in state \c WT_REF_MEM) with all
+its items explicitly deleted with tombstone updates.
+<i>Semantically, this is an identity transformation.</i>
+
+This occurs under two sets of circumstances: first, if a thread that cannot yet see the
+deletion tries to read from the deleted page; and second, if a search lands on the deleted
+page's portion of the namespace.
+It can happen either before or after the transaction that deleted the page is resolved.
+(But not at the same time; locking the ref prevents that.)
+
+Note that for searches that are positioning to do updates, the instantiation is
+unavoidable; however, for searches that are only reading, it would be better to return \c
+WT_NOTFOUND without pointlessly instantiating the page.
+This is not currently implemented and as of this writing it is not entirely clear how
+involved or feasible such changes would be.
+Also note that this only applies to explicit searches and searches that are part of other
+cursor operations; the cursor next and previous operations do skip over deleted pages.
+
+In any case, we notice the page is deleted when we read it.
+If the page has no address, or it has an address but the deletion is globally visible, we
+create a new in-memory page instead of reading the on-disk page.
+Otherwise, we read the on-disk page and call the instantiation code in \c bt_delete.c.
+
+The instantiation code iterates the page and adds a tombstone for every item.
+(To be precise, it adds a tombstone for every item that isn't already deleted; items that
+have a stop time do not need to be deleted again.)
+The row-store version of this iterates the entries on the page and directly adds a tombstone
+to each update list.
+The column-store version uses a cursor and calls into \c col_modify.c to do it; this is
+because the data structures are considerably more complicated and updating them directly
+would require a lot of cut-and-paste code.
+
+The tombstones are tagged with \c WT_UPDATE_RESTORED_FAST_TRUNCATE.
+This is used by \c __wt_txn_prepare to avoid trying to coalesce these
+updates with others to the same key.
+(That wouldn't work because the instantiation updates don't appear directly in the
+transaction modify list; they are referenced indirectly through the truncation.)
+
+If the deletion is not resolved (according to the \c page_del information in the ref) an
+array is allocated to hold the updates and this is placed in \c
+page->modify->inst_updates.
+As noted above this is used to find the updates during transaction resolution.
+
+Finally, \c page->modify->instantiated is set to \c true.
+
+The instantiated page is not automatically marked dirty.
+Instantiation is logically an identity transformation; if the page is not otherwise
+modified, discarding it after instantiation returns it to the \c WT_REF_DELETED state, and
+the deletion information remains in the ref.
+(If the parent page is then evicted, the deletion information is written into the address
+cell.
+If it is discarded because it is also unmodified, the deletion information must have
+already been written to disk and can be read in again later.)
+
+However, VLCS pages end up marked dirty anyway because the instantiation logic uses \c
+col_modify to post the tombstones and that always marks its page dirty.
+
+Note that in three cases the instantiation code is skipped: verify, salvage, and upgrade
+are concerned only with the on-disk state.
+These cases also skip the optimization that generates blank pages instead of reading pages
+that contain only obsolete values (those with a globally visible truncation) -- verify is,
+at least in part, concerned with the physical structure of the tree and this substitution
+can confuse it.
+Salvage and upgrade are included for consistency, and also because in salvage the internal
+page with the deletion information is not necessarily available (or correct) and it is
+probably better to not try to use it.
+
+@section ft_internal_reconciliation Internal page reconciliation
+
+Reconciliation of internal pages that have deleted (or instantiated) children requires
+special handling.
+It is necessary to check whether the page can be dropped entirely, and if not, to write
+the deletion information into the child page's address cell.
+(Like the address of a ref, the deletion information more or less belongs to the parent;
+it is written to disk as part of the parent page, not the child page.)
+See @ref ft_on_disk_format.
+
+The code that supports this lives in \c rec_child.c and is used by both VLCS and row-store
+internal page reconciliation.
+
+If the child page is deleted (that is, the state is \c WT_REF_DELETED) we must lock the
+ref to examine the deletion information.
+Then there are several possible cases.
+
+If the deletion is or has become globally visible, we can delete any on-disk block, and
+drop the child from the on-disk representation of the parent.
+This is accomplished by sending back \c WT_CHILD_IGNORE.
+
+If the deletion is visible to the thread doing the reconciliation but not globally
+visible, we need to write the deletion information to disk.
+This is accomplished by sending back \c WT_CHILD_PROXY and copying the deletion
+information for the caller.
+(The "proxy" refers to a "proxy cell", which is another name for the deleted-address cells
+used to refer to deleted pages.
+This terminology is probably outdated and should perhaps be removed sometime.)
+
+If the deletion is not visible to the thread doing the reconciliation, then we need to
+refer to the original on-disk page <i>without</i> the deletion information.
+This is accomplished by sending back \c WT_CHILD_ORIGINAL.
+This also requires leaving the parent page dirty.
+For checkpoints, \c r->leave_dirty is set; for eviction, that doesn't work, but there's
+also not much to be gained by evicting the page under these circumstances so instead we
+just fail.
+
+For instantiated pages, under normal circumstances the instantiated child will be
+reconciled before its parent.
+Eviction skips parents that have in-memory children, and when checkpointing ordinarily all
+children are written out before their parents.
+In this case the instantiated flag and deletion information will have been cleared and no
+special steps are required to reconcile the parent.
+(It is possible for the truncation to be uncommitted so the update list to be non-null;
+however, this does not matter when checkpointing either the child or the parent, as the
+updates created by instantiation will be left in memory in the usual way.
+Eviction of the child is blocked in these circumstances.)
+
+The only case when special steps are needed is when the parent is being checkpointed, and
+the child has been instantiated after the point in the tree walk that would have
+reconciled it.
+This gives us a child with no reconciliation result that we cannot refer to in the on-disk
+parent page.
+Fortunately in this case it must be correct to refer to the original pre-instantiation
+on-disk page: any changes to the instantiated page cannot be visible to the checkpoint and
+do not need to be part of it.
+However, we may need to write out the deletion information along with the address.
+This is the reason the deletion information is kept after instantiation.
+It turns out that the set of cases is exactly the same as the set of cases for deleted
+pages and the code can be shared, though it is necessary to lock the ref before calling
+it.
+
+Note that in all these cases "visible" and "globally visible" do not include prepared
+transactions.
+Truncations that have been prepared but not yet committed cannot be written to disk (the
+on-disk format doesn't have space to represent the state) so must be treated as invisible
+during reconciliation.
+(And it turns out they must always be considered invisible; see @ref ft_visibility.)
+
+@section ft_leaf_reconciliation Leaf (child) reconciliation
+
+Deleted pages are already on disk and inherently never themselves need to be reconciled.
+Instantiated pages that have been read into memory, however, do.
+
+Eviction of instantiated pages where the truncation is unresolved is blocked.
+In principle these pages could successfully go through update-restore eviction, but there
+are complications involved in doing so (e.g. handling the update list, and if the page
+were to split the \c page_del information would have to be cloned, and that requires
+locking) and it was judged not worthwhile.
+
+Eviction of instantiated pages where the truncation is committed is permitted, however,
+and checkpoint of instantiated pages is always allowed.
+The first reconciliation after instantiation clears the instantiated flag (\c
+page->modify->instantiated) and discards the \c page_del structure, as once a
+reconciliation result exists it can be used to reconcile the parent.
+(This is true whether or not it includes the tombstones from instantiation, i.e., whether
+the truncation was committed.)
+
+Note that "unresolved" includes "prepared".
+While we cannot write out a prepared truncation in the parent page's address cells, in
+principle after instantiation we could write out the prepared tombstone updates like any
+other prepared updates, and after doing so nothing special is needed in the parent.
+This is not currently done, chiefly because safely determining whether the truncation is
+prepared at the point where eviction needs to check is problematic.
+(We can't check \c page_del because it might have been discarded by then; looking in \c
+inst_updates is at best messy and it isn't entirely clear what locking or synchronization
+might be needed.
+Some such check, or an extra flag in the modify structure, is probably possible if it
+eventually becomes important to allow these evictions.)
+
+@section ft_on_disk_format On-disk format
+
+Deleted pages are referred to on disk by a special address cell type, \c WT_CELL_ADDR_DEL.
+These contain three additional packed integers between the time aggregate and the cell
+data: the transaction ID, commit timestamp, and durable timestamp of the transaction that
+deleted the page.
+(Only committed truncations are written out.
+Prepared truncations cannot be represented on disk.
+Truncations that are globally visible do not result in a cell in the parent page at all.)
+
+These fields are, however, only present if the page header includes the \c
+WT_PAGE_FT_UPDATE flag, whose value is 0x20.
+Proper support for timestamped fast-truncate only appeared in WT 11.0; earlier versions
+neither write these fields nor expect to find them.
+The explicit header flag is required to make compatibility guarantees function as needed.
+(MongoDB 6.x knows how to read pages with \c WT_PAGE_FT_UPDATE set, but does not write
+them.
+This is controlled in the WT library by the \c __wt_process::fast_truncate_2022 flag,
+whose default setting is controlled by the build config.)
+
+@section ft_truncate Truncation
+
+The B-tree cursor truncate code, found in \c bt_cursor.c, iterates through the specified
+truncation range with \c cursor_next, individually removing all values it finds.
+This is the slow-truncate path.
+
+The fast-truncate functionality is implicit.
+Passing \c true for the \c truncating argument of \c __wt_btcur_next causes the flag \c
+WT_READ_TRUNCATE to be passed to the tree-walk inside the next code.
+Fast-truncate then happens inside the tree-walk code (in \c bt_walk.c) which calls \c
+__wt_delete_page on leaf pages it visits.
+
+This function, in \c bt_delete.c, checks the page for eligibility.
+First, if the page is unmodified and in memory we attempt to evict it.
+Then we check if the page is on disk, that is, the state is \c WT_REF_DISK, and if so lock
+the ref.
+(And then check if it is <i>still</i> on disk.)
+
+Then the following categories of pages are ineligible for fast-truncate:
+- Pages that have no address. These should not exist, but we need to look at the address
+information and are therefore obliged to check.
+- Pages that may have overflow items. (Or internal pages.)
+Pages with overflow items need their overflow pages deleted as well, and that requires
+reading them into memory.
+The address cell type must be \c WT_ADDR_LEAF_NO, rather than \c WT_ADDR_LEAF, where
+overflow items may exist.
+- Pages that contain prepared values.
+- Pages where the newest transaction on the page (by either transaction ID or timestamp)
+is not visible.
+
+If the page passes these checks, we mark its parent dirty, initialize the \c page_del
+structure, add a \c WT_TXN_OP_REF_DELETE operation to the current transaction (except if
+we're truncating the history store, which is non-transactional), and set the ref state to
+\c WT_REF_DELETED.
+
+Otherwise we report back to the tree-walk code that we couldn't delete the page and it
+needs to visit it.
+(This happens by a return flag and not by returning an error.)
+
+Note that it is not possible to fast-truncate an already deleted page; ordinarily the
+tree-walk code will have already skipped over it (see @ref ft_page_skip) and also, \c
+__wt_delete_page won't accept one.
+If one truncate reaches a page truncated by another transaction that is not yet visible,
+such that the skip code doesn't skip it, we need to load the page, instantiate it, and
+attempt to slow-truncate it; this will discover the transaction conflict.
+
+Also note that the first and last pages of a truncate operation are always slow-truncated
+regardless of eligibility; this is a result of the initial positioning of the start and
+end cursors, which requires the pages under them to be present in memory.
+This point is not particularly important operationally but can create complications for
+writing tests.
+
+Finally note that currently the initial eviction attempt is done unconditionally even in
+cases where we could determine beforehand that the page will be ineligible.
+This causes it to be evicted and read in again, which is suboptimal, and should perhaps be
+improved at some point.
+
+@section ft_deleted_generation Generation of other deleted pages
+
+As mentioned earlier, there are four ways besides fast-truncate that deleted pages can
+appear.
+
+First, the checkpoint cleanup code in \c bt_sync.c discards pages that it finds contain
+only obsolete values, instead of writing them out.
+The ref state becomes \c WT_REF_DELETED, no \c page_del is generated, and when the
+checkpoint reaches the parent internal page any prior on-disk page image will be dropped
+and no cell will be produced.
+
+Second, pages that reconcile empty end up deleted.
+During a checkpoint this happens in the checkpoint cleanup; in eviction, it happens in the
+\c WT_PM_REC_EMPTY case of \c __evict_page_dirty_update.
+The ref state becomes \c WT_REF_DELETED and no \c page_del is generated.
+(Also note that \c WT_REF_MEM pages with \c WT_PM_REC_EMPTY reconciliation results are
+explicitly skipped during internal page reconciliation.)
+
+In VLCS, empty deleted pages are inserted during certain internal page reads; see @ref
+ft_vlcs.
+
+Finally, new trees are created with a single empty deleted leaf page, because creating the
+tree with no leaves at all causes problems.
+
+@section ft_page_skip Skipping deleted pages
+
+There are two separate skip functions for skipping deleted pages during tree walks.
+The basic skip function is \c __wt_delete_page_skip in \c bt_delete.c; it is always called
+in tree walks when \c WT_READ_SKIP_DELETED is set, which is all tree walks except @ref
+arch-rts.
+It checks for whether the ref state is \c WT_REF_DELETED and the truncation is visible to
+the caller.
+
+As in other cases (see @ref ft_visibility) we must treat prepared truncations as not
+visible; in order to generate prepare conflicts we cannot skip over truncations that are
+prepared but not yet committed.
+
+The other skip function is \c __wt_btcur_skip_page in \c btree_inline.h.
+This is used by cursor next and previous to skip over deleted pages in those traversals
+specifically, and in addition to checking for \c WT_REF_DELETED with visible \c page_del,
+it also inspects the address cell.
+If the page is in memory and unmodified and the address cell contains page-delete
+information, it checks for the visibility of that deletion.
+Failing that, it checks the time aggregate in case all the values on the page are no
+longer visible, e.g. because the page was slow-truncated and reconciled.
+
+For an unmodified in-memory page the deletion information in the address should be the
+same as present in the ref's \c page_del structure.
+However, inspecting the unpacked copy instead, which is free since we are unpacking the
+cell to look at the time aggregate anyway, makes this check independent of the lifecycle
+of the ref's \c page_del.
+This was more important in previous iterations of the code than it is now; however, in
+principle it's possible to drop the ref's \c page_del immediately upon instantiation in a
+read-only tree, since it is kept for internal page reconciliation and pages in read-only
+trees are never reconciled.
+Checking the unpacked information here avoids interfering with that option.
+
+Note that \c __wt_btcur_skip_page is passed to the tree-walk code as a custom skip
+function, which means that when it's used <i>both</i> it and \c __wt_delete_page_skip are
+checked.
+This is not optimal and probably ought to be tidied.
+Furthermore, it is unclear whether these functions really need to be different; that is,
+it may be that the additional time aggregate check in \c __wt_btcur_skip_page should be
+deployed for all tree walks.
+(If not, the reason should be discovered and documented.)
+<!-- FIXME-WT-9859: WT-9859 is the ticket for cleaning this up. -->
+
+@section ft_vlcs VLCS considerations
+
+In row-store, discarding a chunk of the namespace has no particular effect.
+Leaf pages support insertion at the beginning and at the end (as well as in the middle),
+so if the internal page structure directs a search to a particular leaf page there's
+always a place to put any updates that might be generated.
+
+In VLCS this is different; insertions are supported only at the ends of pages, in the
+append list.
+Historically this was furthermore only allowed on the last page of the tree; the namespace
+begins at 1 and all keys between 1 and the last key in the tree existed on some particular
+leaf page, possibly in a deleted-value cell.
+
+Extending fast-truncate and deleted support to VLCS requires allowing chunks of the
+namespace to be discarded.
+In most cases this is harmless; searches into that portion of the namespace will be
+directed by the internal page structure to the next page to the left and any updates will
+appear on its append list.
+
+However, if the leftmost child of an internal page is discarded, a problem arises:
+searches for that portion of the namespace still go to that internal page, because its
+start key hasn't changed (and can't change), but now the leftmost child begins at some
+later key.
+There's now nowhere for the search to go, and things go downhill from there.
+
+One possible solution to this problem is to use the split code to reinsert an empty page
+in the leftmost slot on demand.
+This was rejected as dangerous (violates previous assumptions, extremely difficult to test
+or verify) so instead steps were put in place to avoid ever discarding the leftmost child.
+
+These steps are:
+1. Insert an empty deleted leaf page at internal page inmem time if the first child begins
+after the internal page itself.
+2. Don't allow eviction to trigger a reverse split going upwards from the leftmost child,
+because that discards the page.
+(Note that in most cases the same reverse split will then promptly happen anyway, coming
+from the next child.)
+3. When doing a split, don't discard the leftmost child even if it's deleted.
+
+Note that this extra page never appears on disk.
+
+There is one other consideration, which is that normally VLCS leaf pages never reconcile
+empty; instead they reconcile with a single deleted-value cell, possibly with a large RLE
+count.
+These pages are detected at the end of leaf reconciliation and converted to empty pages.
+
+@section ft_flcs FLCS and deleted pages
+
+Fast-truncate and deleted pages in general are not supported in FLCS.
+Most of the code is in place (since deleted and instantiated page handling mostly occurs in
+the internal page code and this is shared with VLCS) but there's a showstopper problem:
+because there are no deleted values (deleted values read back as zero) there are also no
+gaps in the namespace.
+In particular, if we truncate a range, discard the pages, and then read through the gap we
+need to read back the entire truncated namespace as zero one entry at a time.
+That requires knowing how big the gaps are; and while that information is encoded in the
+internal page structure, it is not <i>available</i> from the internal page structure.
+Currently this looks infeasible to support, though it's possible that there's some clever
+solution nobody's thought of yet.
+
+This is perhaps unfortunate because slow-truncating FLCS pages (which contain large
+numbers of rows with very small values) is particularly expensive.
+
+For FLCS, fast-truncate is inhibited by checking for it and clearing \c WT_READ_TRUNCATE
+in the page-walk code; similarly, checkpoint cleanup avoids discarding FLCS pages.
+Because values are never deleted, pages never become empty; no special handling is needed
+to prevent deleted pages appearing via that mechanism.
+However, there is still a bit of FLCS-specific code there to avoid examining pages that
+are not in memory (unlike in row-store and VLCS) because this is not useful.
+
+The empty deleted page attached to a new tree is still created; it will turn into an empty
+in-memory page on the first search, and in principle can change back to a deleted page if
+then evicted immediately.
+However, once an update is posted to it (even if later rolled back) it will not reconcile
+empty.
+
+@section ft_visibility Notes on visibility
+
+As mentioned previously, for deleted page purposes prepared transactions must be treated
+as not visible.
+This differs from the treatment elsewhere (for ordinary updates, prepared values are
+visible but cause \c WT_PREPARE_CONFLICT if visited) and the special-case handling is
+wrapped into a pair of functions \c __wt_page_del_visible and \c
+__wt_page_del_visible_all.
+
+These functions take a boolean argument that enables this special-case handling; this is
+only an optimization, since in one place (parent page eviction checks) uncommitted
+transactions have already been excluded and the check for a prepared transaction is
+redundant.
+
+It turns out that (so far at least) <i>all</i> visibility references to truncations
+require treating prepared truncations as invisible.
+In the case of page skipping, it is necessary to visit pages with a prepared truncation so
+as to be able to generate WT_PREPARE_CONFLICT if needed.
+This is also true when reading pages in: we cannot skip reading a page because its
+truncation is visible-all unless it is actually committed.
+
+The other visibility checks appear in reconciliation and eviction, and in those cases we
+need to treat prepared truncations as invisible because we cannot write them to disk.
+
+@section ft_misc Miscellaneous other notes
+
+After recovery, when the write generations are bumped, it is necessary to check and
+possibly discard the transaction IDs (and sometimes the timestamps) in loaded \c page_del
+structures, so that they contain the values they would if unpacked with the new write
+generations.
+Otherwise we might start using transaction IDs from a previous run.
+This is done by \c __wt_delete_redo_window_cleanup in \c bt_delete.c.
+
+Internal pages are never fast-truncated.
+In most cases if a truncate spans all the children of an internal page, at the point when
+the child refs are discarded a reverse split will be triggered and this will cause the
+internal page to be discarded as well.
+However, it is possible for internal pages to become deleted pages if they reconcile
+empty.
+At this point the state is set to \c WT_REF_DELETED and no \c page_del is created, as with
+other cases of reconciling empty.
+If this portion of the namespace is subsequently searched, instantiation occurs; however,
+instantiation will create an empty leaf page.
+There is a hook in \c __wt_btree_new_leaf_page that changes the type from \c
+WT_REF_FLAG_INTERNAL to \c WT_REF_FLAG_LEAF at this point.
+(It might be tidier if this change happened at the time of deletion instead.)
+
+@section ft_pointers Pointers to pieces of the implementation
+
+<table>
+
+<!--
+For the moment at least, these entries are grouped by file, with the
+files in the following order:
+   1. Declaration headers
+   2. Inline headers
+   3. Sources
+and alphabetically within these groups.
+
+The symbols within the files are sorted by type:
+   1. Enumerators
+   2. Flags
+   3. Types and structure members
+   4. Functions and hooks within functions
+Within the groups the entries appear in the same order they appear in
+the file, on the grounds that this is sometimes significant, e.g.
+definition before use.
+-->
+
+@hrow{Source file, Type, Symbol, Description}
+@row{btmem.h, Enumerator, \c WT_REF_DELETED,
+The deleted ref state (with the other ref states).}
+@row{btmem.h, Read flag, \c WT_READ_TRUNCATE,
+The flag passed to tree-walk that causes eligible pages to be
+truncated instead of visited.}
+@row{btmem.h, Page header flag, \c WT_PAGE_FT_UPDATE,
+The on-disk flag that indicates the presence of page delete information in deleted-address
+cells.}
+@row{btmem.h, Update flag, \c WT_UPDATE_RESTORED_FAST_TRUNCATE,
+A flag used in prepare handling to identify updates from instantiation.}
+@row{btmem.h, Structure member, \c WT_PAGE_MODIFY::instantiated,
+The flag marking an in-memory \c WT_REF as an instantiated page.}
+@row{btmem.h, Structure member, \c WT_PAGE_MODIFY::inst_updates,
+The updates used to instantiate an unresolved truncation.}
+@row{btmem.h, Type, \c WT_PAGE_DELETED,
+The structure that holds page deletion information.}
+@row{btmem.h, Structure member, \c WT_REF::page_del,
+The page deletion information for a \c WT_REF.}
+
+@row{cell.h, Enumerator, \c WT_CELL_ADDR_DEL,
+The deleted-address cell type (along with the other cell types).}
+@row{cell.h, Misc, \c WT_CELL,
+The allocation of space in \c WT_CELL for the on-disk deletion information.}
+@row{cell.h, Structure member, \c WT_CELL_UNPACK_ADDR::page_del,
+The deletion information unpacked from an address cell.}
+
+@row{reconcile.h, Structure member, \c WT_CHILD_MODIFY_STATE::del,
+A \c WT_PAGE_DELETED that allows \c __wt_rec_child_modify to return page deleted
+information about a child ref after unlocking it.}
+
+@row{txn.h, Enumerator, \c WT_TXN_OP_REF_DELETE,
+The operation type for a fast-truncate transaction operation.}
+@row{txn.h, Structure member, \c WT_TXN_OP::ref,
+The data for a fast-truncate transaction operation: the \c WT_REF.}
+
+@row{btree_inline.h, Structure member, \c WT_ADDR_COPY::page_deleted,
+Page deletion information unpacked from the on-disk cell by \c __wt_ref_addr_copy.}
+@row{btree_inline.h, Structure member, \c WT_ADDR_COPY::del_set,
+True if page deletion information was unpacked.}
+@row{btree_inline.h, Hook, in \c __wt_ref_addr_copy,
+Return the page delete information unpacked from the address.}
+@row{btree_inline.h, Function, \c __wt_page_del_visible,
+Function for checking thread visibility of a \c WT_PAGE_DELETED.}
+@row{btree_inline.h, Function, \c __wt_page_del_visible_all,
+Function for checking global visibility of a \c WT_PAGE_DELETED.}
+@row{btree_inline.h, Function, \c __wt_page_del_committed_set,
+Function for checking whether a \c WT_PAGE_DELETED is committed.}
+@row{btree_inline.h, Function, \c __wt_btcur_skip_page,
+The page-skip function used by cursor next and previous.}
+
+@row{reconcile_inline.h, Hook, in \c __wt_rec_cell_build_addr,
+A hook to choose \c WT_CELL_ADDR_DEL cells when needed and propagate any passed-in page
+deletion information to the packing code.}
+
+@row{timestamp_inline.h, Macro, \c WT_TIME_AGGREGATE_UPDATE_PAGE_DEL,
+Akin to \c WT_TIME_AGGREGATE_UPDATE but for a \c WT_PAGE_DELETED; used in internal page
+reconciliation.}
+
+@row{txn_inline.h, Function, \c __wt_txn_op_delete_apply_prepare_state,
+The code for updating \c WT_PAGE_DELETED at prepare time.}
+@row{txn_inline.h, Function, \c __wt_txn_op_commit_apply_timestamps,
+Part of the code for updating \c WT_PAGE_DELETED at commit time.
+(The rest is in \c __wt_txn_commit itself.
+Note that the rollback-time update is in \c bt_delete.c.)}
+@row{txn_inline.h, Hook, in \c __wt_txn_op_set_timestamp,
+Call \c __wt_txn_op_delete_apply_prepare_state and
+\c __wt_txn_op_commit_apply_timestamps.}
+@row{txn_inline.h, Function, \c __wt_txn_modify_page_delete,
+This records a fast-truncate in the current transaction.}
+
+@row{cell_inline.h, Function, \c __cell_page_del_window_cleanup,
+Akin to \c __cell_kv_window_cleanup except for \c WT_PAGE_DELETED.}
+@row{cell_inline.h, Function, \c __cell_redo_page_del_cleanup,
+Function that redoes the timestamp cleanup for a \c WT_PAGE_DELETED structure; used
+after we bump write generations at the end recovery.}
+@row{cell_inline.h, Hook, in \c __wt_cell_unpack_safe,
+Unpack the page deletion information from deleted-address cells.}
+@row{cell_inline.h, Hook, in \c __wt_cell_pack_addr,
+Pack the page deletion information into deleted-address cells.}
+
+@row{bt_curnext.c, Hook, in \c __wt_btcur_next_prefix,
+Accept a flag argument that sets \c WT_READ_TRUNCATE.}
+@row{bt_curnext.c, Hook, in \c __wt_btcur_next,
+Accept a flag argument that sets \c WT_READ_TRUNCATE.}
+
+@row{bt_curprev.c, Hook, in \c __wt_btcur_prev,
+Accept a flag argument that sets \c WT_READ_TRUNCATE.}
+
+@row{bt_cursor.c:, Function, \c __wt_btcur_range_truncate (and others),
+The cursor-level truncate code lives here.}
+
+@row{bt_debug.c, Hook, in \c __debug_cell_int,
+Prints the deletion information for \c WT_CELL_ADDR_DEL cells.}
+@row{bt_debug.c, Hook, in \c __debug_ref,
+Prints the deletion information for deleted and instantiated pages.}
+
+@row{bt_delete.c, Function, \c __wt_delete_page,
+The implementation of fast-truncate itself.}
+@row{bt_delete.c, Function, \c __wt_delete_page_rollback,
+Code for rolling back a fast-truncate\, used by transaction rollback
+(but not RTS).}
+@row{bt_delete.c, Function, \c __delete_redo_window_cleanup_internal,
+Page-visitor part of \c __wt_delete_redo_window_cleanup.}
+@row{bt_delete.c, Function, \c __delete_redo_window_cleanup_skip,
+Custom page skip function for \c __wt_delete_redo_window_cleanup.}
+@row{bt_delete.c, Function, \c __wt_delete_redo_window_cleanup,
+Iterate a tree to do redo time window cleanup on already-loaded \c WT_PAGE_DELETED
+structures after recovery.}
+@row{bt_delete.c, Function, \c __wt_delete_page_skip,
+The page skip function to skip deleted pages that's used in ordinary tree walks.}
+@row{bt_delete.c, Function, \c __tombstone_update_alloc,
+Allocate a tombstone for instantiation.}
+@row{bt_delete.c, Function, \c __instantiate_tombstone,
+Allocate and remember a tombstone during instantiation.
+(Possibly this and \c __tombstone_update_alloc should be folded together eventually.)}
+@row{bt_delete.c, Function, \c __instantiate_col_var,
+Instantiate a VLCS page.}
+@row{bt_delete.c, Function, \c __instantiate_row,
+Instantiate a row-store page.}
+@row{bt_delete.c, Function, \c __wt_delete_page_instantiate,
+Perform instantiation of tombstones on a deleted page when reading it into memory.}
+
+@row{bt_discard.c, Hook, in \c __free_page_modify,
+Discard the truncate-related fields of \c WT_PAGE_MODIFY.}
+@row{bt_discard.c, Hook, in \c __wt_free_ref,
+Discard the \c page_del field of \c WT_REF.}
+
+@row{bt_handle.c, Hook, in \c __wt_btree_new_leaf_page,
+Change the ref type from \c WT_REF_FLAG_INTERNAL to \c WT_REF_FLAG_LEAF; if internal pages
+are deleted and later come back to life they come back to life as leaves.}
+
+@row{bt_page.c, Hook, in \c __wt_page_inmem,
+When counting how many refs to allocate on a column-store internal page\, figure out when
+we need to allocate an extra one to insert an empty page in the leftmost slot.}
+@row{bt_page.c, Hook, in \c __inmem_col_int,
+Load deleted-address cells as deleted \c WT_REF structures.}
+@row{bt_page.c, Hook, in \c __inmem_row_int,
+Load deleted-address cells as deleted \c WT_REF structures.}
+@row{bt_page.c, Hook, in \c __page_read,
+Call the instantiation code when needed.
+Also\, avoid reading deleted pages if we don't need the pre-deletion contents\, or if
+there aren't any at all.
+Get an empty page instead and mark it instantiated.}
+@row{bt_read.c, Hook, in \c __wt_page_in_func,
+Return \c WT_NOTFOUND instead of reading the page if we are skipping deleted pages.}
+
+@row{bt_split.c, Hook, in \c __split_parent_discard_ref,
+Discard the \c page_del field of the }\c WT_REF.
+@row{bt_split.c, Hook, in \c __split_parent,
+For VLCS trees\, avoid discarding the leftmost child even if it's deleted.}
+
+@row{bt_vrfy.c, Hook, in \c __verify_tree,
+Allow for deleted-address cells when checking the cell type in the address against the
+page type.}
+@row{bt_vrfy.c, Hook, in \c __verify_tree,
+Allow namespace gaps in VLCS but not in FLCS.}
+@row{bt_vrfy.c, Hook, in \c __verify_page_content_int,
+Handle deleted-address cells.}
+
+@row{bt_vrfy_dsk.c, Function, \c __verify_dsk_addr_page_del,
+Validate and crosscheck the page deletion information discovered in on-disk address
+cells.}
+
+@row{bt_walk.c, Hook, in \c __tree_walk_internal,
+Disable fast-truncate for FLCS.}
+@row{bt_walk.c, Hook, in \c __tree_walk_internal,
+Engage \c WT_READ_SKIP_DELETED by default.}
+@row{bt_walk.c, Hook, in \c __tree_walk_internal,
+Call \c __wt_delete_page_skip when \c WT_READ_SKIP_DELETED is set.}
+@row{bt_walk.c, Hook, in \c __tree_walk_internal,
+Call \c __wt_delete_page when \c WT_READ_TRUNCATE is set.}
+@row{bt_walk.c, Hook, in \c __tree_walk_skip_count_callback,
+Call \c __wt_delete_page_skip explicitly.}
+
+@row{conn_dhandle.c, Hook, in \c __wt_dhandle_update_write_gens,
+Call \c __wt_delete_redo_window_cleanup.}
+
+@row{evict_page.c, Function, \c __evict_delete_ref,
+Delete evicted pages and check for/trigger reverse splits.}
+@row{evict_page.c, Hook, in \c __evict_page_clean_update,
+Delete pages with \c __evict_delete_ref that are clean and have no on-disk address.}
+@row{evict_page.c, Hook, in \c __evict_page_dirty_update,
+Use \c __evict_delete_ref to delete pages that reconciled empty.}
+@row{evict_page.c, Hook, in \c __evict_page_clean_update,
+Check for instantiated pages and set the ref state back to \c WT_REF_DELETED.}
+@row{evict_page.c, Hook, in \c __evict_child_check,
+Prohibit evicting internal pages with uncommitted truncations.}
+
+@row{rec_child.c, Function, \c __rec_child_deleted,
+Handle the processing for deleted and instantiated pages during internal page
+reconciliation.}
+@row{rec_child.c, Hook, in \c __wt_rec_child_modify,
+Call \c __rec_child_deleted when necessary.}
+
+@row{rec_col.c, Hook, in \c __wt_rec_col_int,
+Write out deleted address cells when needed.}
+@row{rec_col.c, Hook, in \c __wt_rec_col_var,
+Reconcile empty instead if we get one big deleted-value cell.}
+
+@row{rec_row.c, Hook, in \c __wt_rec_row_int,
+Write out deleted address cells when needed.}
+
+@row{rec_write.c, Hook, in \c __rec_split_write_header,
+Set WT_PAGE_FT_UPDATE on the page header if appropriate.}
+@row{rec_write.c, Hook, in \c __rec_write_wrapup,
+Clear the instantiated flag and discard the page deletion information for instantiated
+pages.}
+<!--
+Also, the mechanism for keeping track of whether a page reconciled empty is mostly in
+rec_write.c.
+-->
+
+@row{txn.c, Hook, in \c __wt_txn_commit,
+Clear \c inst_updates and set the \c committed field in \c
+WT_PAGE_DELETED.}
+@row{txn.c, Hook, in \c __wt_txn_prepare,
+Call \c __wt_txn_op_delete_apply_prepare_state.}
+@row{txn.c, Hook, in \c __wt_txn_rollback,
+Call \c __wt_delete_page_rollback.}
+
+@row{rts_visibility.c, Hook, in \c __wt_rollback_page_needs_abort,
+Check \c page_del when deciding whether the page contains unstable values that need to be
+examined.}
+@row{rts_btree_walk.c, Hook, in \c __rollback_to_stable_page_skip,
+Check \c page del when deciding whether to skip over the page.}
+
+</table>
+
+Note also that \c txn_log.c contains the functions \c __wt_txn_truncate_log and \c
+__wt_txn_truncate_end for logging truncates, and various hooks for handling truncate log
+records.
+(Further hooks exist in \c log_auto.c.)
+However, logging of truncates happens at the cursor level and not the page level.
+The functions are called from the cursor code.
+Page-level fast-truncate actions themselves are not logged.
+Replaying a truncation from the log may (in fact, likely will as more pages will be
+on-disk and eligible) fast-truncate different or more pages than the original operation.
+This is correct because there is supposed to be no semantic difference between
+fast-truncate and slow-truncate.
+
+*/

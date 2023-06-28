@@ -30,7 +30,7 @@ import wttest
 from wtdataset import SimpleDataSet
 from wiredtiger import stat
 from wtscenario import make_scenarios
-from test_rollback_to_stable01 import test_rollback_to_stable_base
+from rollback_to_stable_util import test_rollback_to_stable_base
 
 # test_rollback_to_stable02.py
 # Test that rollback to stable brings back the history value to replace on-disk value.
@@ -62,10 +62,15 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         ('prepare', dict(prepare=True))
     ]
 
-    scenarios = make_scenarios(format_values, in_memory_values, prepare_values)
+    dryrun_values = [
+        ('no_dryrun', dict(dryrun=False)),
+        ('dryrun', dict(dryrun=True))
+    ]
+
+    scenarios = make_scenarios(format_values, in_memory_values, prepare_values, dryrun_values)
 
     def conn_config(self):
-        config = 'cache_size=100MB,statistics=(all)'
+        config = 'cache_size=100MB,statistics=(all),verbose=(rts:5)'
         if self.in_memory:
             config += ',in_memory=true'
         return config
@@ -122,10 +127,19 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         if not self.in_memory:
             self.session.checkpoint()
 
-        self.conn.rollback_to_stable()
+        # FIXME WT-10017: We need this eviction cursor to work around column-store not having the
+        # same "roll back the history store anyway" workaround that row-store has.
+        self.evict_cursor(uri, nrows, valued)
+
+        self.conn.rollback_to_stable('dryrun={}'.format('true' if self.dryrun else 'false'))
         # Check that the new updates are only seen after the update timestamp.
         self.session.breakpoint()
-        self.check(valueb, uri, nrows, None, 40)
+
+        if self.dryrun:
+            self.check(valued, uri, nrows, None, 40)
+        else:
+            self.check(valueb, uri, nrows, None, 40)
+
         self.check(valueb, uri, nrows, None, 20)
         self.check(valuea, uri, nrows, None, 10)
 
@@ -133,6 +147,8 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         calls = stat_cursor[stat.conn.txn_rts][2]
         upd_aborted = (stat_cursor[stat.conn.txn_rts_upd_aborted][2] +
             stat_cursor[stat.conn.txn_rts_hs_removed][2])
+        upd_aborted_dryrun = (stat_cursor[stat.conn.txn_rts_upd_aborted_dryrun][2] +
+            stat_cursor[stat.conn.txn_rts_hs_removed_dryrun][2])
         keys_removed = stat_cursor[stat.conn.txn_rts_keys_removed][2]
         keys_restored = stat_cursor[stat.conn.txn_rts_keys_restored][2]
         pages_visited = stat_cursor[stat.conn.txn_rts_pages_visited][2]
@@ -142,7 +158,13 @@ class test_rollback_to_stable02(test_rollback_to_stable_base):
         self.assertEqual(keys_removed, 0)
         self.assertEqual(keys_restored, 0)
         self.assertGreater(pages_visited, 0)
-        self.assertGreaterEqual(upd_aborted, nrows * 2)
+
+        if self.dryrun:
+            self.assertEqual(upd_aborted, 0)
+            self.assertGreaterEqual(upd_aborted_dryrun, nrows * 2)
+        else:
+            self.assertGreaterEqual(upd_aborted, nrows * 2)
+            self.assertEqual(upd_aborted_dryrun, 0)
 
 if __name__ == '__main__':
     wttest.run()

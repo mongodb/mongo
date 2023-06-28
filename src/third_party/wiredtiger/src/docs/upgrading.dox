@@ -1,6 +1,6 @@
 /*! @page upgrading Upgrading WiredTiger applications
 
-@section version_1101 Upgrading to Version 11.0.1
+@section version_1100 Upgrading to Version 11.0.0
 
 The WiredTiger 11.0 release is a complete refresh of the WiredTiger storage engine.
 Applications written to earlier versions of the WiredTiger API will require review

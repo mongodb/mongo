@@ -59,7 +59,7 @@ def timed(seconds, op):
 
 # Check for a local build that contains the wt utility. First check for a
 # user supplied 'WT_BUILDDIR' environment variable, then the current working
-# directory, then finally in in the disttop directory. This isn't
+# directory, then finally in the disttop directory. This isn't
 # ideal - if a user has multiple builds in a tree we could pick the wrong one.
 def _wiredtiger_builddir():
     env_builddir = os.getenv('WT_BUILDDIR')

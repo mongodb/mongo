@@ -37,15 +37,18 @@
  * with "verbose=[compact,compact_progress]". There's a chance these two cases are different.
  */
 
-#define NUM_RECORDS 1000000
+#define NUM_RECORDS WT_MILLION
 #define CHECKPOINT_NUM 3
+#define HOME_BUF_SIZE 512
+#define STAT_BUF_SIZE 128
 
 /* Constants and variables declaration. */
 /*
  * You may want to add "verbose=[compact,compact_progress]" to the connection config string to get
  * better view on what is happening.
  */
-static const char conn_config[] = "create,cache_size=2GB,statistics=(all)";
+static const char conn_config[] =
+  "create,cache_size=2GB,statistics=(all),statistics_log=(json,on_close,wait=1)";
 static const char table_config_row[] =
   "allocation_size=4KB,leaf_page_max=4KB,key_format=Q,value_format=QQQS";
 static const char table_config_col[] =
@@ -123,7 +126,7 @@ static void
 run_test_clean(bool stress_test, bool column_store, bool preserve, const char *home,
   const char *suffix, const char *uri)
 {
-    char home_full[512];
+    char home_full[HOME_BUF_SIZE];
 
     ready_counter = 0;
 
@@ -131,7 +134,7 @@ run_test_clean(bool stress_test, bool column_store, bool preserve, const char *h
     printf("Running %s test with %s store...\n", stress_test ? "stress" : "normal",
       column_store ? "column" : "row");
     testutil_assert(sizeof(home_full) > strlen(home) + strlen(suffix) + 2);
-    sprintf(home_full, "%s.%s", home, suffix);
+    testutil_check(__wt_snprintf(home_full, HOME_BUF_SIZE, "%s.%s", home, suffix));
     run_test(stress_test, column_store, home_full, uri);
 
     /* Cleanup */
@@ -368,9 +371,9 @@ static void
 get_file_stats(WT_SESSION *session, const char *uri, uint64_t *file_sz, uint64_t *avail_bytes)
 {
     WT_CURSOR *cur_stat;
-    char *descr, *str_val, stat_uri[128];
+    char *descr, *str_val, stat_uri[STAT_BUF_SIZE];
 
-    sprintf(stat_uri, "statistics:%s", uri);
+    testutil_check(__wt_snprintf(stat_uri, STAT_BUF_SIZE, "statistics:%s", uri));
     testutil_check(session->open_cursor(session, stat_uri, NULL, "statistics=(all)", &cur_stat));
 
     /* Get file size. */
@@ -411,9 +414,9 @@ get_compact_progress(WT_SESSION *session, const char *uri, uint64_t *pages_revie
 
     WT_CURSOR *cur_stat;
     char *descr, *str_val;
-    char stat_uri[128];
+    char stat_uri[STAT_BUF_SIZE];
 
-    sprintf(stat_uri, "statistics:%s", uri);
+    testutil_check(__wt_snprintf(stat_uri, STAT_BUF_SIZE, "statistics:%s", uri));
     testutil_check(session->open_cursor(session, stat_uri, NULL, "statistics=(all)", &cur_stat));
 
     cur_stat->set_key(cur_stat, WT_STAT_DSRC_BTREE_COMPACT_PAGES_REVIEWED);

@@ -17,7 +17,7 @@ template <class T> struct tailq_entry {
 };
 
 template <class T> class TestTailQWrapper {
-    public:
+public:
     TestTailQWrapper();
     ~TestTailQWrapper();
     void pushBack(T const &value);
@@ -25,7 +25,7 @@ template <class T> class TestTailQWrapper {
     void removeValue(T const &value);
     std::list<T> copyItemsFromTailQ();
 
-    private:
+private:
     TAILQ_HEAD(, tailq_entry<T>) _tailq;
 };
 

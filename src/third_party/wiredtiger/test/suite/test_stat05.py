@@ -92,7 +92,7 @@ class test_stat_cursor_config(wttest.WiredTigerTestCase):
            self, self.uri, 100, key_format=key_format, value_format=value_format, config=self.cfg)
         ds.populate()
         self.openAndWalkStatCursor()
-        cursor = self.session.open_cursor(self.uri, None)
+        cursor = ds.open_cursor(self.uri, None)
         for i in range(100, 40000 + 1):
             if i % 100 == 0:
                 self.openAndWalkStatCursor()

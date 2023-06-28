@@ -46,6 +46,21 @@ struct __wt_config_parser_impl {
 
 #define WT_CONFIG_ITEM_STATIC_INIT(n) static const WT_CONFIG_ITEM n = {"", 0, 0, WT_CONFIG_ITEM_NUM}
 
+/*
+ * If double quotes surround the string, then expand the string to include them. This is always
+ * called in the context of keys or values returned by the configuration parser. The character after
+ * the string must be at a valid memory address, and checking just that one is sufficient. If it is
+ * a double quote, then the character before must be as well, by the rules of the tokenizer.
+ */
+#define WT_CONFIG_PRESERVE_QUOTES(session, item)        \
+    do {                                                \
+        if ((item)->str[(item)->len] == '"') {          \
+            WT_ASSERT(session, (item)->str[-1] == '"'); \
+            (item)->str -= 1;                           \
+            (item)->len += 2;                           \
+        }                                               \
+    } while (0)
+
 #define WT_CONFIG_UNSET (-1)
 /*
  * DO NOT EDIT: automatically built by dist/api_config.py.
@@ -66,47 +81,49 @@ struct __wt_config_parser_impl {
 #define WT_CONFIG_ENTRY_WT_CONNECTION_rollback_to_stable 12
 #define WT_CONFIG_ENTRY_WT_CONNECTION_set_file_system 13
 #define WT_CONFIG_ENTRY_WT_CONNECTION_set_timestamp 14
-#define WT_CONFIG_ENTRY_WT_CURSOR_close 15
-#define WT_CONFIG_ENTRY_WT_CURSOR_reconfigure 16
-#define WT_CONFIG_ENTRY_WT_SESSION_alter 17
-#define WT_CONFIG_ENTRY_WT_SESSION_begin_transaction 18
-#define WT_CONFIG_ENTRY_WT_SESSION_checkpoint 19
-#define WT_CONFIG_ENTRY_WT_SESSION_close 20
-#define WT_CONFIG_ENTRY_WT_SESSION_commit_transaction 21
-#define WT_CONFIG_ENTRY_WT_SESSION_compact 22
-#define WT_CONFIG_ENTRY_WT_SESSION_create 23
-#define WT_CONFIG_ENTRY_WT_SESSION_drop 24
-#define WT_CONFIG_ENTRY_WT_SESSION_flush_tier 25
-#define WT_CONFIG_ENTRY_WT_SESSION_join 26
-#define WT_CONFIG_ENTRY_WT_SESSION_log_flush 27
-#define WT_CONFIG_ENTRY_WT_SESSION_log_printf 28
-#define WT_CONFIG_ENTRY_WT_SESSION_open_cursor 29
-#define WT_CONFIG_ENTRY_WT_SESSION_prepare_transaction 30
-#define WT_CONFIG_ENTRY_WT_SESSION_query_timestamp 31
-#define WT_CONFIG_ENTRY_WT_SESSION_reconfigure 32
-#define WT_CONFIG_ENTRY_WT_SESSION_rename 33
-#define WT_CONFIG_ENTRY_WT_SESSION_reset 34
-#define WT_CONFIG_ENTRY_WT_SESSION_reset_snapshot 35
-#define WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction 36
-#define WT_CONFIG_ENTRY_WT_SESSION_salvage 37
-#define WT_CONFIG_ENTRY_WT_SESSION_strerror 38
-#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction 39
-#define WT_CONFIG_ENTRY_WT_SESSION_truncate 40
-#define WT_CONFIG_ENTRY_WT_SESSION_upgrade 41
-#define WT_CONFIG_ENTRY_WT_SESSION_verify 42
-#define WT_CONFIG_ENTRY_colgroup_meta 43
-#define WT_CONFIG_ENTRY_file_config 44
-#define WT_CONFIG_ENTRY_file_meta 45
-#define WT_CONFIG_ENTRY_index_meta 46
-#define WT_CONFIG_ENTRY_lsm_meta 47
-#define WT_CONFIG_ENTRY_object_meta 48
-#define WT_CONFIG_ENTRY_table_meta 49
-#define WT_CONFIG_ENTRY_tier_meta 50
-#define WT_CONFIG_ENTRY_tiered_meta 51
-#define WT_CONFIG_ENTRY_wiredtiger_open 52
-#define WT_CONFIG_ENTRY_wiredtiger_open_all 53
-#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 54
-#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 55
+#define WT_CONFIG_ENTRY_WT_CURSOR_bound 15
+#define WT_CONFIG_ENTRY_WT_CURSOR_close 16
+#define WT_CONFIG_ENTRY_WT_CURSOR_reconfigure 17
+#define WT_CONFIG_ENTRY_WT_SESSION_alter 18
+#define WT_CONFIG_ENTRY_WT_SESSION_begin_transaction 19
+#define WT_CONFIG_ENTRY_WT_SESSION_checkpoint 20
+#define WT_CONFIG_ENTRY_WT_SESSION_close 21
+#define WT_CONFIG_ENTRY_WT_SESSION_commit_transaction 22
+#define WT_CONFIG_ENTRY_WT_SESSION_compact 23
+#define WT_CONFIG_ENTRY_WT_SESSION_create 24
+#define WT_CONFIG_ENTRY_WT_SESSION_drop 25
+#define WT_CONFIG_ENTRY_WT_SESSION_flush_tier 26
+#define WT_CONFIG_ENTRY_WT_SESSION_join 27
+#define WT_CONFIG_ENTRY_WT_SESSION_log_flush 28
+#define WT_CONFIG_ENTRY_WT_SESSION_log_printf 29
+#define WT_CONFIG_ENTRY_WT_SESSION_open_cursor 30
+#define WT_CONFIG_ENTRY_WT_SESSION_prepare_transaction 31
+#define WT_CONFIG_ENTRY_WT_SESSION_query_timestamp 32
+#define WT_CONFIG_ENTRY_WT_SESSION_reconfigure 33
+#define WT_CONFIG_ENTRY_WT_SESSION_rename 34
+#define WT_CONFIG_ENTRY_WT_SESSION_reset 35
+#define WT_CONFIG_ENTRY_WT_SESSION_reset_snapshot 36
+#define WT_CONFIG_ENTRY_WT_SESSION_rollback_transaction 37
+#define WT_CONFIG_ENTRY_WT_SESSION_salvage 38
+#define WT_CONFIG_ENTRY_WT_SESSION_strerror 39
+#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction 40
+#define WT_CONFIG_ENTRY_WT_SESSION_timestamp_transaction_uint 41
+#define WT_CONFIG_ENTRY_WT_SESSION_truncate 42
+#define WT_CONFIG_ENTRY_WT_SESSION_upgrade 43
+#define WT_CONFIG_ENTRY_WT_SESSION_verify 44
+#define WT_CONFIG_ENTRY_colgroup_meta 45
+#define WT_CONFIG_ENTRY_file_config 46
+#define WT_CONFIG_ENTRY_file_meta 47
+#define WT_CONFIG_ENTRY_index_meta 48
+#define WT_CONFIG_ENTRY_lsm_meta 49
+#define WT_CONFIG_ENTRY_object_meta 50
+#define WT_CONFIG_ENTRY_table_meta 51
+#define WT_CONFIG_ENTRY_tier_meta 52
+#define WT_CONFIG_ENTRY_tiered_meta 53
+#define WT_CONFIG_ENTRY_wiredtiger_open 54
+#define WT_CONFIG_ENTRY_wiredtiger_open_all 55
+#define WT_CONFIG_ENTRY_wiredtiger_open_basecfg 56
+#define WT_CONFIG_ENTRY_wiredtiger_open_usercfg 57
 /*
  * configuration section: END
  * DO NOT EDIT: automatically built by dist/flags.py.

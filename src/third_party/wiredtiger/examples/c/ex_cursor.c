@@ -31,6 +31,7 @@
 #include <test_util.h>
 
 int cursor_reset(WT_CURSOR *cursor);
+int cursor_bound(WT_CURSOR *cursor);
 int cursor_forward_scan(WT_CURSOR *cursor);
 int cursor_reverse_scan(WT_CURSOR *cursor);
 int cursor_search(WT_CURSOR *cursor);
@@ -83,6 +84,16 @@ cursor_reset(WT_CURSOR *cursor)
     return (cursor->reset(cursor));
 }
 /*! [cursor reset] */
+
+/*! [cursor bound] */
+int
+cursor_bound(WT_CURSOR *cursor)
+{
+    cursor->set_key(cursor, "A");
+    error_check(cursor->bound(cursor, "action=set,bound=lower"));
+    return (0);
+}
+/*! [cursor bound] */
 
 /*! [cursor search] */
 int

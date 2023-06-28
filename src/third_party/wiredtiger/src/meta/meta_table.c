@@ -73,7 +73,7 @@ __wt_metadata_cursor_open(WT_SESSION_IMPL *session, const char *config, WT_CURSO
      */
     btree = CUR2BT(*cursorp);
 
-#define WT_EVICT_META_SKEW 10000
+#define WT_EVICT_META_SKEW (10 * WT_THOUSAND)
     /*
      * Skew eviction so metadata almost always stays in cache.
      *
@@ -183,7 +183,7 @@ __wt_metadata_insert(WT_SESSION_IMPL *session, const char *key, const char *valu
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Insert: key: %s, value: %s, tracking: %s, %s"
       "turtle",
       key, value, WT_META_TRACKING(session) ? "true" : "false",
@@ -213,7 +213,7 @@ __wt_metadata_update(WT_SESSION_IMPL *session, const char *key, const char *valu
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Update: key: %s, value: %s, tracking: %s, %s"
       "turtle",
       key, value, WT_META_TRACKING(session) ? "true" : "false",
@@ -249,7 +249,7 @@ __wt_metadata_remove(WT_SESSION_IMPL *session, const char *key)
     WT_CURSOR *cursor;
     WT_DECL_RET;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Remove: key: %s, tracking: %s, %s"
       "turtle",
       key, WT_META_TRACKING(session) ? "true" : "false", __metadata_turtle(key) ? "" : "not ");
@@ -293,7 +293,7 @@ __wt_metadata_search(WT_SESSION_IMPL *session, const char *key, char **valuep)
 
     *valuep = NULL;
 
-    __wt_verbose(session, WT_VERB_METADATA,
+    __wt_verbose_debug3(session, WT_VERB_METADATA,
       "Search: key: %s, tracking: %s, %s"
       "turtle",
       key, WT_META_TRACKING(session) ? "true" : "false", __metadata_turtle(key) ? "" : "not ");
@@ -330,5 +330,38 @@ err:
 
     if (ret != 0)
         __wt_free(session, *valuep);
+    return (ret);
+}
+
+/*
+ * __wt_metadata_btree_id_to_uri --
+ *     Given a btree id, find the matching entry in the metadata and return a copy of the uri. The
+ *     caller has to free the returned uri.
+ */
+int
+__wt_metadata_btree_id_to_uri(WT_SESSION_IMPL *session, uint32_t btree_id, char **uri)
+{
+    WT_CONFIG_ITEM id;
+    WT_CURSOR *cursor;
+    WT_DECL_RET;
+    char *key, *value;
+
+    *uri = NULL;
+    key = value = NULL;
+
+    WT_RET(__wt_metadata_cursor(session, &cursor));
+    while ((ret = cursor->next(cursor)) == 0) {
+        WT_ERR(cursor->get_value(cursor, &value));
+        if ((ret = __wt_config_getones(session, value, "id", &id)) == 0 && btree_id == id.val) {
+            WT_ERR(cursor->get_key(cursor, &key));
+            /* Return a copy as the uri. */
+            WT_ERR(__wt_strdup(session, key, uri));
+            break;
+        }
+        WT_ERR_NOTFOUND_OK(ret, false);
+    }
+
+err:
+    WT_TRET(__wt_metadata_cursor_release(session, &cursor));
     return (ret);
 }

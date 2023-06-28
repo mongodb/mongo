@@ -39,8 +39,8 @@
  *
  * Failure mode: We get results back from our join.
  */
-#define N_RECORDS 100000
-#define N_INSERT 1000000
+#define N_RECORDS (100 * WT_THOUSAND)
+#define N_INSERT WT_MILLION
 
 void populate(TEST_OPTS *opts);
 
@@ -69,7 +69,9 @@ main(int argc, char *argv[])
     testutil_make_work_dir(opts->home);
     testutil_progress(opts, "start");
 
-    testutil_check(wiredtiger_open(opts->home, NULL, "create,cache_size=250M", &opts->conn));
+    testutil_check(wiredtiger_open(opts->home, NULL,
+      "create,cache_size=250M,statistics=(all),statistics_log=(json,on_close,wait=1)",
+      &opts->conn));
     testutil_progress(opts, "wiredtiger_open");
     testutil_check(opts->conn->open_session(opts->conn, NULL, NULL, &session));
     testutil_progress(opts, "sessions opened");
@@ -177,7 +179,7 @@ populate(TEST_OPTS *opts)
         if (__wt_random(&rnd) % 11 == 0)
             post = 54321;
         else
-            post = i % 100000;
+            post = i % (100 * WT_THOUSAND);
         if (__wt_random(&rnd) % 4 == 0) {
             balance = -100;
             flag = 1;

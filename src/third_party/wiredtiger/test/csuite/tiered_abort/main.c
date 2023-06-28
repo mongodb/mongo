@@ -55,11 +55,13 @@ static char home[1024]; /* Program working dir */
  * Also each worker thread creates its own textual records file that records the data it
  * inserted and it records the timestamp that was used for that insertion.
  */
+#define INTERVAL 1                   /* Internal thread interval */
 #define LOCAL_RETENTION 2            /* Local retention time */
 #define MIN_TIME LOCAL_RETENTION * 8 /* Make sure checkpoint and flush_tier run enough */
 #define MAX_TIME MIN_TIME * 4
 
 #define BUCKET "bucket"
+#define BUCKET_PFX "pfx-"
 #define INVALID_KEY UINT64_MAX
 #define MAX_CKPT_INVL LOCAL_RETENTION * 3  /* Maximum interval between checkpoints */
 #define MAX_FLUSH_INVL LOCAL_RETENTION * 2 /* Maximum interval between flush_tier calls */
@@ -83,7 +85,7 @@ static const char *const uri_shadow = "shadow";
 static const char *const sentinel_file = "sentinel_ready";
 
 static bool use_ts;
-static volatile uint64_t global_ts = 1;
+static uint64_t global_ts = 1;
 static uint32_t flush_calls = 1;
 
 /*
@@ -99,13 +101,17 @@ static uint32_t flush_calls = 1;
     "debug_mode=(table_logging=true,checkpoint_retention=5)," \
     "eviction_updates_target=20,eviction_updates_trigger=90," \
     "log=(enabled,file_max=10M,remove=true),session_max=%d,"  \
-    "statistics=(fast),statistics_log=(wait=1,json=true),"    \
-    "tiered_storage=(bucket=%s,bucket_prefix=pfx,local_retention=%d,name=dir_store)"
+    "statistics=(all),statistics_log=(json,on_close,wait=1)," \
+    "tiered_storage=(bucket=%s,bucket_prefix=%s,"             \
+    "local_retention=%d,interval=%d,name=dir_store)"
 #define ENV_CONFIG_TXNSYNC                                \
     ENV_CONFIG_DEF                                        \
     ",eviction_dirty_target=20,eviction_dirty_trigger=90" \
     ",transaction_sync=(enabled,method=none)"
-#define ENV_CONFIG_REC "log=(recover=on,remove=false)"
+/* Set the flush_checkpoint debug mode so that the parent can call flush_tier alone. */
+#define ENV_CONFIG_ADD_REC                                                                         \
+    "log=(recover=on,remove=false),debug_mode=(flush_checkpoint),statistics=(all),statistics_log=" \
+    "(json,on_close,wait=1)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -127,13 +133,8 @@ typedef struct {
     uint32_t info;
 } THREAD_DATA;
 
-/*
- * TODO: WT-7833 Lock to coordinate inserts and flush_tier. This lock should be removed when that
- * ticket is fixed. Flush_tier should be able to run with ongoing operations.
- */
-static pthread_rwlock_t flush_lock;
-/* Lock for transactional ops that set or query a timestamp. */
-static pthread_rwlock_t ts_lock;
+static uint32_t nth;                      /* Number of threads. */
+static wt_timestamp_t *active_timestamps; /* Oldest timestamps still in use. */
 
 static void handler(int) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
@@ -156,34 +157,31 @@ usage(void)
 static WT_THREAD_RET
 thread_ts_run(void *arg)
 {
-    WT_DECL_RET;
+    WT_CONNECTION *conn;
     WT_SESSION *session;
     THREAD_DATA *td;
-    char tscfg[64], ts_string[WT_TS_HEX_STRING_SIZE];
+    wt_timestamp_t last_ts, ts;
+    char tscfg[64];
 
     td = (THREAD_DATA *)arg;
+    conn = td->conn;
 
-    testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    /* Update the oldest timestamp every 1 millisecond. */
-    for (;;) {
+    testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    /* Update the oldest/stable timestamps every 1 millisecond. */
+    for (last_ts = 0;; __wt_sleep(0, WT_THOUSAND)) {
+        /* Get the last committed timestamp periodically in order to update the oldest timestamp. */
+        ts = maximum_stable_ts(active_timestamps, nth);
+        if (ts == last_ts)
+            continue;
+        last_ts = ts;
+
         /*
-         * We get the last committed timestamp periodically in order to update the oldest timestamp,
-         * that requires locking out transactional ops that set or query a timestamp.
+         * Set both the oldest and stable timestamp so that we don't need to maintain read
+         * availability at older timestamps.
          */
-        testutil_check(pthread_rwlock_wrlock(&ts_lock));
-        ret = td->conn->query_timestamp(td->conn, ts_string, "get=all_durable");
-        testutil_check(pthread_rwlock_unlock(&ts_lock));
-        testutil_assert(ret == 0 || ret == WT_NOTFOUND);
-        if (ret == 0) {
-            /*
-             * Set both the oldest and stable timestamp so that we don't need to maintain read
-             * availability at older timestamps.
-             */
-            testutil_check(__wt_snprintf(tscfg, sizeof(tscfg),
-              "oldest_timestamp=%s,stable_timestamp=%s", ts_string, ts_string));
-            testutil_check(td->conn->set_timestamp(td->conn, tscfg));
-        }
-        __wt_sleep(0, 1000);
+        testutil_check(__wt_snprintf(
+          tscfg, sizeof(tscfg), "oldest_timestamp=%" PRIx64 ",stable_timestamp=%" PRIx64, ts, ts));
+        testutil_check(conn->set_timestamp(conn, tscfg));
     }
     /* NOTREACHED */
 }
@@ -210,7 +208,7 @@ thread_ckpt_run(void *arg)
      * Keep a separate file with the records we wrote for checking.
      */
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;; ++i) {
+    for (i = 1;; ++i) {
         sleep_time = __wt_random(&rnd) % MAX_CKPT_INVL;
         sleep(sleep_time);
         /*
@@ -249,7 +247,12 @@ thread_flush_run(void *arg)
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, sentinel_file));
     (void)unlink(buf);
     testutil_check(td->conn->open_session(td->conn, NULL, NULL, &session));
-    for (i = 0;;) {
+    /*
+     * Increment at the end of the loop so we only count actual calls to flush_tier and don't
+     * increment for skipping for the first checkpoint. The condition for creating the sentinel file
+     * requires proper counting.
+     */
+    for (i = 1;;) {
         sleep_time = __wt_random(&rnd) % MAX_FLUSH_INVL;
         sleep(sleep_time);
         testutil_check(td->conn->query_timestamp(td->conn, ts_string, "get=last_checkpoint"));
@@ -261,19 +264,18 @@ thread_flush_run(void *arg)
          * Currently not testing any of the flush tier configuration strings other than defaults. We
          * expect the defaults are what MongoDB wants for now.
          */
-        testutil_check(pthread_rwlock_wrlock(&flush_lock));
         testutil_check(session->flush_tier(session, NULL));
-        testutil_check(pthread_rwlock_unlock(&flush_lock));
         printf("Flush tier %" PRIu32 " completed.\n", i);
         fflush(stdout);
         /*
          * Create the sentinel file so that the parent process knows the desired number of
          * flush_tier calls have finished and can start its timer.
          */
-        if (++i == flush_calls) {
+        if (i == flush_calls) {
             testutil_assert_errno((fp = fopen(buf, "w")) != NULL);
             testutil_assert_errno(fclose(fp) == 0);
         }
+        ++i;
     }
     /* NOTREACHED */
 }
@@ -295,14 +297,12 @@ thread_run(void *arg)
     uint64_t i, active_ts;
     char cbuf[MAX_VAL], lbuf[MAX_VAL], obuf[MAX_VAL];
     char kname[64], tscfg[64], uri[128];
-    bool locked;
 
     __wt_random_init(&rnd);
     memset(cbuf, 0, sizeof(cbuf));
     memset(lbuf, 0, sizeof(lbuf));
     memset(obuf, 0, sizeof(obuf));
     memset(kname, 0, sizeof(kname));
-    locked = false;
 
     td = (THREAD_DATA *)arg;
     /*
@@ -342,15 +342,13 @@ thread_run(void *arg)
         testutil_check(session->begin_transaction(session, NULL));
 
         if (use_ts) {
-            testutil_check(pthread_rwlock_rdlock(&ts_lock));
-            active_ts = __wt_atomic_addv64(&global_ts, 2);
+            active_ts = __wt_atomic_fetch_addv64(&global_ts, 2);
             testutil_check(
               __wt_snprintf(tscfg, sizeof(tscfg), "commit_timestamp=%" PRIx64, active_ts));
             /*
              * Set the transaction's timestamp now before performing the operation.
              */
             testutil_check(session->timestamp_transaction(session, tscfg));
-            testutil_check(pthread_rwlock_unlock(&ts_lock));
         }
 
         cur_coll->set_key(cur_coll, kname);
@@ -369,8 +367,6 @@ thread_run(void *arg)
         data.size = __wt_random(&rnd) % MAX_VAL;
         data.data = cbuf;
         cur_coll->set_value(cur_coll, &data);
-        testutil_check(pthread_rwlock_rdlock(&flush_lock));
-        locked = true;
         if ((ret = cur_coll->insert(cur_coll)) == WT_ROLLBACK)
             goto rollback;
         testutil_check(ret);
@@ -402,8 +398,6 @@ thread_run(void *arg)
         data.data = lbuf;
         cur_local->set_value(cur_local, &data);
         testutil_check(cur_local->insert(cur_local));
-        testutil_check(pthread_rwlock_unlock(&flush_lock));
-        locked = false;
 
         /* Save the timestamps and key separately for checking later. */
         if (fprintf(fp, "%" PRIu64 " %" PRIu64 " %" PRIu64 "\n", active_ts, active_ts, i) < 0)
@@ -412,16 +406,16 @@ thread_run(void *arg)
         if (0) {
 rollback:
             testutil_check(session->rollback_transaction(session, NULL));
-            if (locked) {
-                testutil_check(pthread_rwlock_unlock(&flush_lock));
-                locked = false;
-            }
         }
+
+        /* We're done with the timestamps, allow oldest and stable to move forward. */
+        if (use_ts)
+            WT_PUBLISH(active_timestamps[td->info], active_ts);
     }
     /* NOTREACHED */
 }
 
-static void run_workload(uint32_t, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
+static void run_workload(const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 /*
  * run_workload --
@@ -429,7 +423,7 @@ static void run_workload(uint32_t, const char *) WT_GCC_FUNC_DECL_ATTRIBUTE((nor
  *     until it is killed by the parent.
  */
 static void
-run_workload(uint32_t nth, const char *build_dir)
+run_workload(const char *build_dir)
 {
     WT_CONNECTION *conn;
     WT_SESSION *session;
@@ -440,6 +434,7 @@ run_workload(uint32_t nth, const char *build_dir)
 
     thr = dcalloc(nth + NUM_INT_THREADS, sizeof(*thr));
     td = dcalloc(nth + NUM_INT_THREADS, sizeof(THREAD_DATA));
+    active_timestamps = dcalloc(nth, sizeof(wt_timestamp_t));
 
     /*
      * Size the cache appropriately for the number of threads. Each thread adds keys sequentially to
@@ -451,7 +446,7 @@ run_workload(uint32_t nth, const char *build_dir)
     cache_mb = ((32 * WT_KILOBYTE * 10) * nth) / WT_MEGABYTE + 20;
 
     testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_TXNSYNC, cache_mb,
-      SESSION_MAX, BUCKET, LOCAL_RETENTION));
+      SESSION_MAX, BUCKET, BUCKET_PFX, LOCAL_RETENTION, INTERVAL));
 
     testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
       build_dir, WT_STORAGE_LIB));
@@ -564,6 +559,76 @@ handler(int sig)
 }
 
 /*
+ * verify_tiered --
+ *     Verify the expected locations of tiered objects.
+ */
+static void
+verify_tiered(WT_SESSION *session)
+{
+    struct stat sb;
+    WT_CONFIG_ITEM cval;
+    WT_CURSOR *metac;
+    uint32_t i, last, oldest;
+    int ret;
+    char buf[256], *key, *value;
+    const char *name;
+
+    testutil_check(session->open_cursor(session, "metadata:", NULL, NULL, &metac));
+    while ((ret = metac->next(metac)) != WT_NOTFOUND) {
+        testutil_check(ret);
+        testutil_check(metac->get_key(metac, &key));
+        if (WT_PREFIX_SKIP(key, "tiered:")) {
+            /*
+             * We have a top level entry for a tiered table. Get its configuration string and find
+             * the last id allocated (that should be in the local directory) and all others down to
+             * oldest should exist in the bucket directory. With minor exceptions, objects in the
+             * bucket directory should be removed from the local directory.
+             */
+            testutil_check(metac->get_value(metac, &value));
+            testutil_check(__wt_config_getones((WT_SESSION_IMPL *)session, value, "last", &cval));
+            last = (uint32_t)cval.val;
+            testutil_check(__wt_config_getones((WT_SESSION_IMPL *)session, value, "oldest", &cval));
+            oldest = (uint32_t)cval.val;
+            fprintf(
+              stderr, "VERIFY_TIERED: %s last %" PRIu32 " oldest %" PRIu32 "\n", key, last, oldest);
+            testutil_check(__wt_tiered_name_str(
+              (WT_SESSION_IMPL *)session, key, last, WT_TIERED_NAME_ONLY, &name));
+            /* Verify the latest object is in the local directory. */
+            testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, name));
+            ret = stat(buf, &sb);
+            testutil_assert(ret == 0);
+            /* Verify the latest object is not in the bucket directory. */
+            testutil_check(
+              __wt_snprintf(buf, sizeof(buf), "%s/%s/%s%s", home, BUCKET, BUCKET_PFX, name));
+            ret = stat(buf, &sb);
+            testutil_assert(ret != 0);
+            free((void *)name);
+            for (i = oldest; i < last; ++i) {
+                /* Verify earlier objects and their (lack of) existence in the local directory. */
+                testutil_check(__wt_tiered_name_str(
+                  (WT_SESSION_IMPL *)session, key, i, WT_TIERED_NAME_ONLY, &name));
+                testutil_check(__wt_snprintf(buf, sizeof(buf), "%s/%s", home, name));
+                ret = stat(buf, &sb);
+                /*
+                 * If we get a stat return that indicates the file exists, verify it is must be the
+                 * second last object only. Since we're running with flush_checkpoint debug mode
+                 * turned on, the recovery and checkpoint after flush_tier may open the last object
+                 * that existed prior to crash. All earlier objects must not exist.
+                 */
+                testutil_assert(ret != 0 || i == last - 1);
+                /* Verify earlier objects exist in the bucket directory. */
+                testutil_check(
+                  __wt_snprintf(buf, sizeof(buf), "%s/%s/%s%s", home, BUCKET, BUCKET_PFX, name));
+                ret = stat(buf, &sb);
+                testutil_assert(ret == 0);
+                free((void *)name);
+            }
+        }
+    }
+    testutil_check(metac->close(metac));
+}
+
+/*
  * main --
  *     TODO: Add a comment describing this function.
  */
@@ -582,7 +647,7 @@ main(int argc, char *argv[])
     pid_t pid;
     uint64_t absent_coll, absent_local, absent_oplog, absent_shadow, count, key, last_key;
     uint64_t commit_fp, durable_fp, stable_val;
-    uint32_t i, nth, timeout;
+    uint32_t i, timeout;
     int ch, status, ret;
     const char *working_dir;
     char buf[512], bucket_dir[512], build_dir[512], fname[512], kname[64];
@@ -649,9 +714,6 @@ main(int argc, char *argv[])
     testutil_check(testutil_parse_opts(argc, argv, opts));
     testutil_build_dir(opts, build_dir, 512);
 
-    testutil_check(pthread_rwlock_init(&flush_lock, NULL));
-    testutil_check(pthread_rwlock_init(&ts_lock, NULL));
-
     testutil_work_dir_from_path(home, sizeof(home), working_dir);
     /*
      * If the user wants to verify they need to tell us how many threads there were so we can find
@@ -693,7 +755,7 @@ main(int argc, char *argv[])
         testutil_assert_errno((pid = fork()) >= 0);
 
         if (pid == 0) { /* child */
-            run_workload(nth, build_dir);
+            run_workload(build_dir);
             /* NOTREACHED */
         }
 
@@ -729,8 +791,9 @@ main(int argc, char *argv[])
     if (chdir(home) != 0)
         testutil_die(errno, "parent chdir: %s", home);
 
-    /* Copy the data to a separate folder for debugging purpose. */
-    testutil_copy_data(home);
+    if (!verify_only)
+        /* Copy the data to a separate folder for debugging purpose. */
+        testutil_copy_data(home);
 
     /* Come back to root directory, so we can link wiredtiger with extensions properly. */
     if (chdir("../") != 0)
@@ -739,7 +802,7 @@ main(int argc, char *argv[])
     printf("Open database, run recovery and verify content\n");
 
     /* Open the connection which forces recovery to be run. */
-    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_REC));
+    testutil_check(__wt_snprintf(envconf, sizeof(envconf), ENV_CONFIG_ADD_REC));
 
     testutil_check(__wt_snprintf(extconf, sizeof(extconf), ",extensions=(%s/%s=(early_load=true))",
       build_dir, WT_STORAGE_LIB));
@@ -747,6 +810,16 @@ main(int argc, char *argv[])
     strcat(envconf, extconf);
     testutil_check(wiredtiger_open(home, NULL, envconf, &conn));
     testutil_check(conn->open_session(conn, NULL, NULL, &session));
+    /*
+     * Call flush_tier after crash to run code to restart object copying. Then sleep for the
+     * interval to let the internal thread remove cached objects. By doing that we can then verify
+     * what objects are where.
+     */
+    testutil_check(session->flush_tier(session, "force=true"));
+    /* Sleep long enough to let the retention period expire and be noticed by the thread. */
+    sleep(LOCAL_RETENTION + INTERVAL + 1);
+    verify_tiered(session);
+
     /* Open a cursor on all the tables. */
     testutil_check(__wt_snprintf(buf, sizeof(buf), "%s:%s", table_pfx, uri_collection));
     testutil_check(session->open_cursor(session, buf, NULL, NULL, &cur_coll));
@@ -921,8 +994,6 @@ main(int argc, char *argv[])
         printf("OPLOG: %" PRIu64 " record(s) absent from %" PRIu64 "\n", absent_oplog, count);
         fatal = true;
     }
-    testutil_check(pthread_rwlock_destroy(&flush_lock));
-    testutil_check(pthread_rwlock_destroy(&ts_lock));
     if (fatal)
         return (EXIT_FAILURE);
     printf("%" PRIu64 " records verified\n", count);

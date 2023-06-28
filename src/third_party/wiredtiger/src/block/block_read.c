@@ -36,6 +36,10 @@ __wt_bm_read(
           session, block, "read", offset, size, bm->is_live, __PRETTY_FUNCTION__, __LINE__));
 #endif
 
+    /* Swap file handles if reading from a different object. */
+    if (block->objectid != objectid)
+        WT_RET(__wt_blkcache_get_handle(session, bm, objectid, &block));
+
     /* Read the block. */
     __wt_capacity_throttle(session, size, WT_THROTTLE_READ);
     WT_RET(__wt_block_read_off(session, block, buf, objectid, offset, size, checksum));
@@ -154,17 +158,13 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
   wt_off_t offset, uint32_t size, uint32_t checksum)
 {
     WT_BLOCK_HEADER *blk, swap;
-    size_t bufsize;
+    size_t bufsize, check_size;
 
-    __wt_verbose(session, WT_VERB_READ, "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32,
-      (uintmax_t)offset, size, checksum);
+    __wt_verbose_debug2(session, WT_VERB_READ,
+      "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32, (uintmax_t)offset, size, checksum);
 
     WT_STAT_CONN_INCR(session, block_read);
     WT_STAT_CONN_INCRV(session, block_byte_read, size);
-
-    /* Swap file handles if reading from a different object. */
-    if (block->objectid != objectid)
-        WT_RET(__wt_blkcache_get_handle(session, block, objectid, &block));
 
     /*
      * Grow the buffer as necessary and read the block. Buffers should be aligned for reading, but
@@ -200,10 +200,10 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
      */
     blk = WT_BLOCK_HEADER_REF(buf->mem);
     __wt_block_header_byteswap_copy(blk, &swap);
+    check_size = F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP;
     if (swap.checksum == checksum) {
         blk->checksum = 0;
-        if (__wt_checksum_match(buf->mem,
-              F_ISSET(&swap, WT_BLOCK_DATA_CKSUM) ? size : WT_BLOCK_COMPRESS_SKIP, checksum)) {
+        if (__wt_checksum_match(buf->mem, check_size, checksum)) {
             /*
              * Swap the page-header as needed; this doesn't belong here, but it's the best place to
              * catch all callers.
@@ -215,9 +215,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
         if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
             __wt_errx(session,
               "%s: potential hardware corruption, read checksum error for %" PRIu32
-              "B block at offset %" PRIuMAX
-              ": calculated block checksum doesn't match expected checksum",
-              block->name, size, (uintmax_t)offset);
+              "B block at offset %" PRIuMAX ": calculated block checksum of %#" PRIx32
+              " doesn't match expected checksum of %#" PRIx32,
+              block->name, size, (uintmax_t)offset, __wt_checksum(buf->mem, check_size), checksum);
     } else if (!F_ISSET(session, WT_SESSION_QUIET_CORRUPT_FILE))
         __wt_errx(session,
           "%s: potential hardware corruption, read checksum error for %" PRIu32

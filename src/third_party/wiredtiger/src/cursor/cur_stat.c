@@ -408,7 +408,7 @@ __curstat_file_init(
         return (0);
     }
 
-    WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0));
+    WT_RET(__wt_session_get_btree_ckpt(session, uri, cfg, 0, NULL, NULL));
     dhandle = session->dhandle;
 
     /*
@@ -489,9 +489,15 @@ __curstat_join_desc(WT_CURSOR_STAT *cst, int slot, const char **resultp)
     sgrp = &cst->u.join_stats_group;
     session = CUR2S(sgrp->join_cursor);
     WT_RET(__wt_stat_join_desc(cst, slot, &static_desc));
-    len = strlen("join: ") + strlen(sgrp->desc_prefix) + strlen(static_desc) + 1;
-    WT_RET(__wt_realloc(session, NULL, len, &cst->desc_buf));
-    WT_RET(__wt_snprintf(cst->desc_buf, len, "join: %s%s", sgrp->desc_prefix, static_desc));
+
+    /*
+     * We conceptually want to insert the index name between the "join: " and the following
+     * description. Skip past the first part.
+     */
+    WT_PREFIX_SKIP_REQUIRED(session, static_desc, "join: ");
+    len = strlen("join: ") + strlen(sgrp->desc_prefix) + strlen(": ") + strlen(static_desc) + 1;
+    WT_RET(__wt_realloc_noclear(session, NULL, len, &cst->desc_buf));
+    WT_RET(__wt_snprintf(cst->desc_buf, len, "join: %s: %s", sgrp->desc_prefix, static_desc));
     *resultp = cst->desc_buf;
     return (0);
 }
@@ -559,6 +565,8 @@ __wt_curstat_init(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *curjoin,
         return (0);
     }
 
+    /* Data source statistics are only available after recovery completes. */
+    WT_ASSERT(session, F_ISSET(S2C(session), WT_CONN_RECOVERY_COMPLETE));
     dsrc_uri = uri + strlen("statistics:");
 
     if (strcmp(dsrc_uri, "join") == 0)
@@ -593,6 +601,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR_STATIC_INIT(iface, __curstat_get_key, /* get-key */
       __curstat_get_value,                          /* get-value */
+      __wt_cursor_get_raw_key_value_notsup,         /* get-raw-key-value */
       __curstat_set_key,                            /* set-key */
       __curstat_set_value,                          /* set-value */
       __wt_cursor_compare_notsup,                   /* compare */
@@ -607,10 +616,12 @@ __wt_curstat_open(WT_SESSION_IMPL *session, const char *uri, WT_CURSOR *other, c
       __wt_cursor_notsup,                           /* update */
       __wt_cursor_notsup,                           /* remove */
       __wt_cursor_notsup,                           /* reserve */
-      __wt_cursor_reconfigure_notsup,               /* reconfigure */
+      __wt_cursor_config_notsup,                    /* reconfigure */
       __wt_cursor_notsup,                           /* largest_key */
+      __wt_cursor_config_notsup,                    /* bound */
       __wt_cursor_notsup,                           /* cache */
       __wt_cursor_reopen_notsup,                    /* reopen */
+      __wt_cursor_checkpoint_id,                    /* checkpoint ID */
       __curstat_close);                             /* close */
     WT_CONFIG_ITEM cval, sval;
     WT_CURSOR *cursor;

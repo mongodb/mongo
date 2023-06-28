@@ -69,7 +69,7 @@ main(int argc, char *argv[])
 
     /* Set default configuration values. */
     g.c_cache = 10;
-    g.c_ops = 100000;
+    g.c_ops = 100 * WT_THOUSAND;
     g.c_key_max = 100;
     g.c_k = 8;
     g.c_factor = 16;
@@ -133,8 +133,8 @@ setup(void)
      * "standard" configuration.
      */
     testutil_check(__wt_snprintf(config, sizeof(config),
-      "create,error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s", progname, g.c_cache,
-      g.config_open == NULL ? "" : g.config_open));
+      "create,statistics=(all),error_prefix=\"%s\",cache_size=%" PRIu32 "MB,%s", progname,
+      g.c_cache, g.config_open == NULL ? "" : g.config_open));
 
     testutil_check(wiredtiger_open(home, NULL, config, &conn));
 

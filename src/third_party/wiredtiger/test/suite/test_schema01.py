@@ -27,7 +27,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import wttest
-from helper_tiered import TieredConfigMixin, tiered_storage_sources
+from helper_tiered import TieredConfigMixin, gen_tiered_storage_sources
 from wtscenario import make_scenarios
 
 pop_data = [
@@ -48,6 +48,7 @@ expected_out = [
 # test_schema01.py
 #    Test that tables are reconciled correctly when they are empty.
 class test_schema01(TieredConfigMixin, wttest.WiredTigerTestCase):
+    tiered_storage_sources = gen_tiered_storage_sources()
     scenarios = make_scenarios(tiered_storage_sources)
 
     '''Test various tree types becoming empty'''
@@ -77,11 +78,6 @@ class test_schema01(TieredConfigMixin, wttest.WiredTigerTestCase):
         return self.session.open_cursor(self.tablename, None, config)
 
     def test_populate(self):
-        # We skip testing the tiered storage scenarios as we fail to create
-        # column groups in tiered storage scenarios. We should fix this issue
-        # and then remove the condition to skip tests. FIXME: WT-9048
-        if self.is_tiered_scenario():
-            self.skipTest('Tiered storage does not work with column groups.')
 
         '''Populate a table'''
         for reopen in (False, True):

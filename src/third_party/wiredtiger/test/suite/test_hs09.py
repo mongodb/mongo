@@ -61,16 +61,11 @@ class test_hs09(wttest.WiredTigerTestCase):
         # Check the data file value.
         cursor = session.open_cursor(self.uri, None, 'checkpoint=WiredTigerCheckpoint')
 
-        # If we are expecting prepapred updates in the datastore, start an explicit transaction with
-        # ignore prepare flag to avoid getting a WT_PREPARE_CONFLICT error.
-        if expect_prepared_in_datastore:
-            session.begin_transaction("ignore_prepare=true")
+        # We no longer need to do anything special if we are expecting prepared updates
+        # in the datastore, because checkpoint cursors always set ignore_prepare.
 
         for _, value in cursor:
             self.assertEqual(value, expected_data_value)
-
-        if expect_prepared_in_datastore:
-            session.rollback_transaction()
 
         cursor.close()
         # Check the history store file value.

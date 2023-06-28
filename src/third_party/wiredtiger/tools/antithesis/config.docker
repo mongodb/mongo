@@ -1,0 +1,4 @@
+FROM scratch
+COPY tools/antithesis/docker-compose.yaml docker-compose.yaml
+COPY tools/antithesis/CONFIG.antithesis CONFIG.antithesis
+COPY cmake_build/VERSION .

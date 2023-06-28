@@ -37,6 +37,26 @@ function(create_test_executable target)
 
     # Define our test executable.
     add_executable(${target} ${CREATE_TEST_SOURCES})
+
+    # For MacOS builds we need to generate a dSYM bundle that contains the debug symbols for each 
+    # executable. The name of the binary will either be the name of the target or some other name
+    # passed to this function. We need to use the correct one for the dsymutil.
+    if (WT_DARWIN)
+        if("${CREATE_TEST_EXECUTABLE_NAME}" STREQUAL "")
+            set(test_name "${target}")
+        else()
+            set(test_name "${CREATE_TEST_EXECUTABLE_NAME}")
+        endif()
+
+        add_custom_command(
+            TARGET ${target} POST_BUILD
+            COMMAND dsymutil ${test_name}
+            WORKING_DIRECTORY ${test_binary_dir}
+            COMMENT "Running dsymutil on ${test_name}"
+            VERBATIM
+        )
+    endif()
+
     # If we want the output binary to be a different name than the target.
     if (NOT "${CREATE_TEST_EXECUTABLE_NAME}" STREQUAL "")
         set_target_properties(${target}
@@ -77,6 +97,10 @@ function(create_test_executable target)
         target_link_libraries(${target} ${CREATE_TEST_LIBS})
     endif()
 
+    if(ENABLE_ANTITHESIS)
+        target_link_libraries(${target} wt::voidstar)
+    endif()
+
     if(WT_LINUX OR WT_DARWIN)
         # Link the final test executable with a relative runpath to the
         # top-level build directory. This being the build location of the
@@ -96,6 +120,10 @@ function(create_test_executable target)
         )
     endif()
 
+    if (NOT WT_WIN)
+        target_link_libraries(${target} m)
+    endif()
+
     # If compiling for windows, additionally link in the shim library.
     if(WT_WIN)
         target_include_directories(
@@ -103,6 +131,11 @@ function(create_test_executable target)
             PUBLIC ${CMAKE_SOURCE_DIR}/test/windows
         )
         target_link_libraries(${target} windows_shim)
+    endif()
+
+    if(ENABLE_TCMALLOC)
+        # Order matters on linking as WT lib depends on tcmalloc when enabled.
+        target_link_libraries(${target} wt::wiredtiger wt::tcmalloc)
     endif()
 
     # Install any additional files, scripts, etc in the output test binary
@@ -208,8 +241,8 @@ function(define_c_test)
         0
         "C_TEST"
         ""
-        "TARGET;DIR_NAME;DEPENDS;EXEC_SCRIPT"
-        "SOURCES;FLAGS;ARGUMENTS;VARIANTS;ADDITIONAL_FILES"
+        "TARGET;DIR_NAME;EXEC_SCRIPT"
+        "SOURCES;FLAGS;ARGUMENTS;VARIANTS;DEPENDS;ADDITIONAL_FILES"
     )
     if (NOT "${C_TEST_UNPARSED_ARGUMENTS}" STREQUAL "")
         message(FATAL_ERROR "Unknown arguments to define_c_test: ${C_TEST_UNPARSED_ARGUMENTS}")

@@ -93,18 +93,18 @@ static uint16_t
 __logmgr_get_log_version(WT_VERSION version)
 {
     if (!__wt_version_defined(version))
-        return WT_NO_VALUE;
+        return (WT_NO_VALUE);
 
     if (__wt_version_lt(version, WT_LOG_V2_VERSION))
-        return 1;
+        return (1);
     else if (__wt_version_lt(version, WT_LOG_V3_VERSION))
-        return 2;
+        return (2);
     else if (__wt_version_lt(version, WT_LOG_V4_VERSION))
-        return 3;
+        return (3);
     else if (__wt_version_lt(version, WT_LOG_V5_VERSION))
-        return 4;
+        return (4);
     else
-        return WT_LOG_VERSION;
+        return (WT_LOG_VERSION);
 }
 
 /*
@@ -626,7 +626,7 @@ __log_file_server(void *arg)
         }
 
         /* Wait until the next event. */
-        __wt_cond_wait(session, conn->log_file_cond, 100000, NULL);
+        __wt_cond_wait(session, conn->log_file_cond, 100 * WT_THOUSAND, NULL);
     }
 
     if (0) {
@@ -735,8 +735,8 @@ restart:
                 /*
                  * Copy the flag for later closing.
                  */
-                if (F_ISSET(slot, WT_SLOT_CLOSEFH))
-                    F_SET(coalescing, WT_SLOT_CLOSEFH);
+                if (F_ISSET_ATOMIC_16(slot, WT_SLOT_CLOSEFH))
+                    F_SET_ATOMIC_16(coalescing, WT_SLOT_CLOSEFH);
             } else {
                 /*
                  * If this written slot is not the next LSN, try to start coalescing with later
@@ -766,7 +766,7 @@ restart:
                 /*
                  * Signal the close thread if needed.
                  */
-                if (F_ISSET(slot, WT_SLOT_CLOSEFH))
+                if (F_ISSET_ATOMIC_16(slot, WT_SLOT_CLOSEFH))
                     __wt_cond_signal(session, conn->log_file_cond);
             }
             __wt_log_slot_free(session, slot);
@@ -1022,8 +1022,8 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
      */
     WT_RET(__wt_open_internal_session(
       conn, "log-wrlsn-server", false, session_flags, 0, &conn->log_wrlsn_session));
-    WT_RET(__wt_cond_auto_alloc(
-      conn->log_wrlsn_session, "log write lsn server", 10000, WT_MILLION, &conn->log_wrlsn_cond));
+    WT_RET(__wt_cond_auto_alloc(conn->log_wrlsn_session, "log write lsn server", 10 * WT_THOUSAND,
+      WT_MILLION, &conn->log_wrlsn_cond));
     WT_RET(__wt_thread_create(
       conn->log_wrlsn_session, &conn->log_wrlsn_tid, __log_wrlsn_server, conn->log_wrlsn_session));
     conn->log_wrlsn_tid_set = true;
@@ -1042,7 +1042,7 @@ __wt_logmgr_open(WT_SESSION_IMPL *session)
         WT_RET(__wt_open_internal_session(
           conn, "log-server", false, session_flags, 0, &conn->log_session));
         WT_RET(__wt_cond_auto_alloc(
-          conn->log_session, "log server", 50000, WT_MILLION, &conn->log_cond));
+          conn->log_session, "log server", 50 * WT_THOUSAND, WT_MILLION, &conn->log_cond));
 
         /*
          * Start the thread.

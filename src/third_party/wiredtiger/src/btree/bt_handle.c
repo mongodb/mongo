@@ -8,7 +8,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt);
+static int __btree_conf(WT_SESSION_IMPL *, WT_CKPT *ckpt, bool);
 static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *);
 static int __btree_preload(WT_SESSION_IMPL *);
@@ -84,12 +84,15 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     btree->dhandle = dhandle;
 
     /* Checkpoint and verify files are readonly. */
-    if (dhandle->checkpoint != NULL || F_ISSET(btree, WT_BTREE_VERIFY) ||
+    if (WT_DHANDLE_IS_CHECKPOINT(dhandle) || F_ISSET(btree, WT_BTREE_VERIFY) ||
       F_ISSET(S2C(session), WT_CONN_READONLY))
         F_SET(btree, WT_BTREE_READONLY);
 
     /* Get the checkpoint information for this name/checkpoint pair. */
     WT_RET(__wt_meta_checkpoint(session, dhandle->name, dhandle->checkpoint, &ckpt));
+
+    /* Set the order number. */
+    dhandle->checkpoint_order = ckpt.order;
 
     /*
      * Bulk-load is only permitted on newly created files, not any empty file -- see the checkpoint
@@ -107,7 +110,7 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *op_cfg[])
     }
 
     /* Initialize and configure the WT_BTREE structure. */
-    WT_ERR(__btree_conf(session, &ckpt));
+    WT_ERR(__btree_conf(session, &ckpt, WT_DHANDLE_IS_CHECKPOINT(dhandle)));
 
     /* Connect to the underlying block manager. */
     WT_ERR(__wt_blkcache_open(
@@ -300,7 +303,7 @@ __wt_btree_config_encryptor(
  *     Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
+__btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt, bool is_ckpt)
 {
     WT_BTREE *btree;
     WT_CONFIG_ITEM cval, metadata;
@@ -551,12 +554,14 @@ __btree_conf(WT_SESSION_IMPL *session, WT_CKPT *ckpt)
      *
      * Rollback to stable does not operate on logged tables and metadata, so it is skipped.
      *
-     * The only scenario where the checkpoint run write generation number is less than the
-     * connection last checkpoint base write generation number is when rollback to stable doesn't
-     * happen during the recovery due to the unavailability of history store file.
+     * The only scenarios where the checkpoint run write generation number is less than the
+     * connection last checkpoint base write generation number are when rollback to stable doesn't
+     * happen during the recovery due to the unavailability of history store file, or when reading a
+     * checkpoint.
      */
-    if (!F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET(btree, WT_BTREE_LOGGED) ||
-      ckpt->run_write_gen < conn->last_ckpt_base_write_gen)
+    if ((!F_ISSET(conn, WT_CONN_RECOVERING) || F_ISSET(btree, WT_BTREE_LOGGED) ||
+          ckpt->run_write_gen < conn->last_ckpt_base_write_gen) &&
+      !is_ckpt)
         btree->base_write_gen = btree->run_write_gen;
     else
         btree->base_write_gen = ckpt->run_write_gen;
@@ -825,7 +830,9 @@ err:
 
 /*
  * __btree_get_last_recno --
- *     Set the last record number for a column-store.
+ *     Set the last record number for a column-store. Note that this is used to handle appending to
+ *     a column store after a truncate operation. It is not related to the WT_CURSOR::largest_key
+ *     API.
  */
 static int
 __btree_get_last_recno(WT_SESSION_IMPL *session)
@@ -836,9 +843,23 @@ __btree_get_last_recno(WT_SESSION_IMPL *session)
     uint32_t flags;
 
     btree = S2BT(session);
-    flags = WT_READ_PREV;
-    if (!F_ISSET(session->txn, WT_TXN_HAS_SNAPSHOT))
-        LF_SET(WT_READ_VISIBLE_ALL);
+
+    /*
+     * The last record number is used to support appending to a column store tree that has had a
+     * final page truncated. Since checkpoint trees are read-only they don't need the value.
+     */
+    if (WT_READING_CHECKPOINT(session)) {
+        btree->last_recno = WT_RECNO_OOB;
+        return (0);
+    }
+
+    /*
+     * The endpoint for append is global; read the last page with global visibility to make sure
+     * that if the end of the tree is truncated we don't start appending in the truncated space
+     * unless the truncation has become globally visible. (Note that this path does not examine the
+     * visibility of individual data items; it only checks whether whole pages are deleted.)
+     */
+    flags = WT_READ_PREV | WT_READ_VISIBLE_ALL;
 
     next_walk = NULL;
     WT_RET(__wt_tree_walk(session, &next_walk, flags));
@@ -932,7 +953,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session)
     btree->maxmempage = (uint64_t)cval.val;
     if (!F_ISSET(conn, WT_CONN_CACHE_POOL) && (cache_size = conn->cache_size) > 0)
         btree->maxmempage = (uint64_t)WT_MIN(
-          btree->maxmempage, (conn->cache->eviction_dirty_trigger * cache_size) / 1000);
+          btree->maxmempage, (conn->cache->eviction_dirty_trigger * cache_size) / WT_THOUSAND);
 
     /* Enforce a lower bound of a single disk leaf page */
     btree->maxmempage = WT_MAX(btree->maxmempage, btree->maxleafpage);
@@ -1012,12 +1033,18 @@ int
 __wt_btree_switch_object(WT_SESSION_IMPL *session, uint32_t objectid)
 {
     WT_BM *bm;
+    WT_BTREE *btree;
+
+    btree = S2BT(session);
+    /* If the btree is readonly, there is nothing to do. */
+    if (F_ISSET(btree, WT_BTREE_READONLY))
+        return (0);
 
     /*
      * When initially opening a tiered Btree, a tier switch is done internally without the btree
      * being fully opened. That's okay, the btree will be told later about the current object
      * number.
      */
-    bm = S2BT(session)->bm;
+    bm = btree->bm;
     return (bm == NULL ? 0 : bm->switch_object(bm, session, objectid));
 }
