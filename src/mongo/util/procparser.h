@@ -183,5 +183,23 @@ Status parseProcSysFsFileNr(FileNrKey key, StringData data, BSONObjBuilder* buil
  */
 Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuilder* builder);
 
+static const StringData kPressureSomeTime = "some"_sd;
+static const StringData kPressureFullTime = "full"_sd;
+
+/**
+ * Read a string matching /proc/pressure/<cpu|io|memory> format and write the specified keys in
+ * builder.
+ *
+ * keys - list of keys to check for in the data and output its value.
+ * data - string to parsee
+ * builder - BSON output
+ */
+Status parseProcPressure(StringData data, BSONObjBuilder* builder);
+
+/**
+ * Read from file, and write the specified keys in builder.
+ */
+Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder);
+
 }  // namespace procparser
 }  // namespace mongo

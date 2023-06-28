@@ -168,6 +168,22 @@ public:
                 &subObjBuilder);
             subObjBuilder.doneFast();
         }
+
+        {
+            BSONObjBuilder subObjBuilder(builder.subobjStart("pressure"_sd));
+            processStatusErrors(
+                procparser::parseProcPressureFile("cpu", "/proc/pressure/cpu"_sd, &subObjBuilder),
+                &subObjBuilder);
+
+            processStatusErrors(procparser::parseProcPressureFile(
+                                    "memory", "/proc/pressure/memory"_sd, &subObjBuilder),
+                                &subObjBuilder);
+
+            processStatusErrors(
+                procparser::parseProcPressureFile("io", "/proc/pressure/io"_sd, &subObjBuilder),
+                &subObjBuilder);
+            subObjBuilder.doneFast();
+        }
     }
 
 private:

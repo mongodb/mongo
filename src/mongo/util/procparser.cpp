@@ -917,5 +917,110 @@ Status parseProcSysFsFileNrFile(StringData filename, FileNrKey key, BSONObjBuild
     return parseProcSysFsFileNr(key, swString.getValue(), builder);
 }
 
+// Here is an example of the type of string it supports:
+//
+// > cat /proc/pressure/<cpu|io|memory>
+// some avg10=0.00 avg60=0.00 avg300=0.14 total=1434509127
+// full avg10=0.00 avg60=0.00 avg300=0.14 total=1035574668
+//
+// Note: /proc/pressure/cpu only has 'some' entry
+//
+Status parseProcPressure(StringData data, BSONObjBuilder* builder) {
+    using string_split_iterator = boost::split_iterator<StringData::const_iterator>;
+
+    // Split the file by lines.
+    // token_compress_on means the iterator skips over consecutive '\n'.
+    for (string_split_iterator lineIt = string_split_iterator(
+             data.begin(),
+             data.end(),
+             boost::token_finder([](char c) { return c == '\n'; }, boost::token_compress_on));
+         lineIt != string_split_iterator();
+         ++lineIt) {
+
+        StringData line((*lineIt).begin(), (*lineIt).end());
+
+        // Split the line by spaces and equal signs since these are the delimiters for pressure
+        // files. token_compress_on means the iterator skips over consecutive ' '. This is needed
+        // for every line.
+        string_split_iterator partIt =
+            string_split_iterator(line.begin(),
+                                  line.end(),
+                                  boost::token_finder([](char c) { return c == ' ' || c == '='; },
+                                                      boost::token_compress_on));
+
+        // Skip processing this line if we do not have a key.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        StringData time((*partIt).begin(), (*partIt).end());
+
+        ++partIt;
+
+        // Skip processing this line if we only have a key, and no arguments.
+        if (partIt == string_split_iterator()) {
+            continue;
+        }
+
+        // Share of time is either 'some' or 'full'.
+        if (time != kPressureSomeTime && time != kPressureFullTime) {
+            return Status(ErrorCodes::FailedToParse, "Couldn't find the share of time");
+        }
+
+        // Lookup for 'total' token in the parts.
+        auto totalIt = std::find_if(partIt, string_split_iterator(), [](const auto& vec) {
+            return StringData(vec.begin(), vec.end()) == "total"_sd;
+        });
+
+        // If 'total' token is not found on the row return an error.
+        if (totalIt == string_split_iterator()) {
+            return Status(ErrorCodes::NoSuchKey, "Failed to find 'total' token");
+        }
+
+        StringData totalToken((*totalIt).begin(), (*totalIt).end());
+
+        ++totalIt;
+
+        if (totalIt == string_split_iterator()) {
+            return Status(ErrorCodes::FailedToParse, "No value found for 'total' token");
+        }
+
+        StringData stringValue((*totalIt).begin(), (*totalIt).end());
+
+        double value;
+
+        if (!NumberParser{}(stringValue, &value).isOK()) {
+            return Status(ErrorCodes::FailedToParse,
+                          str::stream() << "Couldn't parse '" << stringValue << "' to number");
+        }
+
+        *builder << time << BSON("totalMicros" << value);
+    }
+
+    return Status::OK();
+}
+
+// Example of BSONObjBuilder created:
+//  cpu : {
+//    some : {
+//       totalMicros : ...
+//    },
+//    fulll: {
+//       totalMicros : ...
+//     }
+//  }
+Status parseProcPressureFile(StringData key, StringData filename, BSONObjBuilder* builder) {
+    auto swString = readFileAsString(filename);
+    if (!swString.isOK()) {
+        return swString.getStatus();
+    }
+
+    BSONObjBuilder sub(builder->subobjStart(key));
+    Status status = parseProcPressure(swString.getValue(), &sub);
+    sub.doneFast();
+
+    return status;
+}
+
 }  // namespace procparser
 }  // namespace mongo
