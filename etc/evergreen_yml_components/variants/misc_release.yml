@@ -302,6 +302,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
+  - name: vector_search
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -457,6 +458,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
+  - name: vector_search
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -616,6 +618,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-large
+  - name: vector_search
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1151,6 +1154,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2004-package
+  - name: vector_search
   - name: selinux_rhel8_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1275,6 +1279,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu1804-arm64-build
+  - name: vector_search
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
@@ -1396,6 +1401,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-large
+  - name: vector_search
   - name: selinux_rhel9_enterprise
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
@@ -1523,6 +1529,7 @@ buildvariants:
   - name: test_packages
     distros:
     - ubuntu2204-arm64-small
+  - name: vector_search
   - name: .publish
   - name: generate_buildid_to_debug_symbols_mapping
 
