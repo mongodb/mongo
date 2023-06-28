@@ -166,6 +166,8 @@ private:
          */
         void _runRangeDeletions();
 
+        ServiceContext* const _service;
+
         mutable Mutex _mutex = MONGO_MAKE_LATCH("ReadyRangeDeletionsProcessor");
 
         enum State { kRunning, kStopped };
