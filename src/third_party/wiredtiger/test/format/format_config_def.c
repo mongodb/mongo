@@ -65,7 +65,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"btree.repeat_data_pct", "duplicate values (percentage)", C_TABLE | C_TYPE_VAR, 0, 90, 90,
     V_TABLE_BTREE_REPEAT_DATA_PCT},
 
-  {"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 10, 0, 0,
+  {"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 20, 0, 0,
     V_TABLE_BTREE_REVERSE},
 
   {"btree.split_pct", "page split size as a percentage of the maximum page size", C_TABLE, 50, 100,

@@ -209,9 +209,11 @@ table_load(TABLE *base, TABLE *table)
         /*
          * If we are loading a mirrored table, commit after each operation to ensure that we are not
          * generating excessive cache pressure and we can successfully load the same content as the
-         * base table. Otherwise, commit if we report progress.
+         * base table. If we are not using a bulk cursor, commit frequently to allow the workload to
+         * proceed. Otherwise, commit if we report progress.
          */
-        if (g.transaction_timestamps_config && (report_progress || base != NULL)) {
+        if (g.transaction_timestamps_config &&
+          (report_progress || base != NULL || (!is_bulk && keyno % 50 == 0))) {
             bulk_commit_transaction(session);
             committed_keyno = keyno;
             bulk_begin_transaction(session);
