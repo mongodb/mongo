@@ -205,6 +205,14 @@ using DbCheckRun = std::vector<DbCheckCollectionInfo>;
 std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
                                                 const DatabaseName& dbName,
                                                 const DbCheckSingleInvocation& invocation) {
+    if (!repl::feature_flags::gSecondaryIndexChecksInDbCheck.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        uassert(ErrorCodes::InvalidOptions,
+                "When featureFlagSecondaryIndexChecksInDbCheck is not enabled, the validateMode "
+                "parameter cannot be set.",
+                !invocation.getValidateMode());
+    }
+
     NamespaceString nss(
         NamespaceStringUtil::parseNamespaceFromRequest(dbName, invocation.getColl()));
     AutoGetCollectionForRead agc(opCtx, nss);
