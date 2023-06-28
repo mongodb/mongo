@@ -361,8 +361,9 @@ Status IndexCatalogEntryImpl::_setMultikeyInMultiDocumentTransaction(
 
                 auto msg = BSON("msg"
                                 << "Setting index to multikey"
-                                << "coll" << collection->ns().ns() << "index"
-                                << _descriptor.indexName());
+                                << "coll"
+                                << NamespaceStringUtil::serializeForCatalog(collection->ns())
+                                << "index" << _descriptor.indexName());
                 opCtx->getClient()->getServiceContext()->getOpObserver()->onOpMessage(opCtx, msg);
             }
 

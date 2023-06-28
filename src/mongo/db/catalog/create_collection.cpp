@@ -543,8 +543,10 @@ Status _createTimeseries(OperationContext* opCtx,
                 Top::get(serviceContext).collectionDropped(ns);
             });
 
-        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail(
-                [&ns](const BSONObj& data) { return data["ns"_sd].String() == ns.ns(); }))) {
+        if (MONGO_unlikely(failTimeseriesViewCreation.shouldFail([&ns](const BSONObj& data) {
+                const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "ns");
+                return fpNss == ns;
+            }))) {
             LOGV2(5490200,
                   "failTimeseriesViewCreation fail point enabled. Failing creation of view "
                   "definition after bucket collection was created successfully.");

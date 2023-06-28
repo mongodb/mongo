@@ -491,10 +491,10 @@ Status insertDocuments(OperationContext* opCtx,
             hangAfterCollectionInserts.pauseWhileSet(opCtx);
         },
         [&](const BSONObj& data) {
-            const auto& collElem = data["collectionNS"];
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
             const auto& firstIdElem = data["first_id"];
             // If the failpoint specifies no collection or matches the existing one, hang.
-            return (!collElem || nss.ns() == collElem.str()) &&
+            return (fpNss.isEmpty() || nss == fpNss) &&
                 (!firstIdElem ||
                  (begin != end && firstIdElem.type() == mongo::String &&
                   begin->doc["_id"].str() == firstIdElem.str()));
@@ -528,8 +528,8 @@ Status checkFailCollectionInsertsFailPoint(const NamespaceString& ns, const BSON
         },
         [&](const BSONObj& data) {
             // If the failpoint specifies no collection or matches the existing one, fail.
-            const auto collElem = data["collectionNS"];
-            return !collElem || ns.ns() == collElem.str();
+            const auto fpNss = NamespaceStringUtil::parseFailPointData(data, "collectionNS");
+            return fpNss.isEmpty() || ns == fpNss;
         });
     return s;
 }

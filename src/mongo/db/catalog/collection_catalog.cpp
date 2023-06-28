@@ -1743,7 +1743,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
 
     if (!viewsForDb->valid() && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
-        if (!NamespaceString::validCollectionName(ns.ns())) {
+        if (!NamespaceString::validCollectionName(NamespaceStringUtil::serializeForCatalog(ns))) {
             return nullptr;
         }
 
