@@ -77,6 +77,10 @@ HardwareCodecDeflate::doCompressData(
     qpl_status status;
     uint32_t compressed_size;
 
+    // Avoid page fault.
+    for(uint32_t p = 0; p < dest_size; p += 4096)
+	dest[p] = 0;
+
     job_ptr->op = qpl_op_compress;
     job_ptr->next_in_ptr = source;
     job_ptr->next_out_ptr = dest;
@@ -108,6 +112,10 @@ HardwareCodecDeflate::doDecompressData(
     }
     qpl_status status;
     uint32_t decompressed_size;
+
+    // Avoid page fault.
+    for(uint32_t p = 0; p < uncompressed_size; p += 4096)
+        dest[p] = 0;
 
     // Performing a decompression operation.
     job_ptr->op = qpl_op_decompress;
