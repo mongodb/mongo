@@ -47,6 +47,7 @@
 #include "mongo/db/storage/collection_truncate_markers.h"
 #include "mongo/db/storage/storage_engine_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util_core.h"
@@ -466,6 +467,12 @@ TEST_F(CollectionMarkersTest, SamplingMarkerCreation) {
 
 // Tests that auto yielding with query plan iterators works
 TEST_F(CollectionMarkersTest, ScanningAutoYieldingWorks) {
+    // Manually set the yielding parameters to make the yield count computation simpler.
+    RAIIServerParameterControllerForTest queryYieldMs("internalQueryExecYieldPeriodMS",
+                                                      1'000 * 3'600);
+    RAIIServerParameterControllerForTest queryYieldDocsRead("internalQueryExecYieldIterations",
+                                                            1'000);
+
     static constexpr auto kNumElements = 5001;
     static constexpr auto kElementSize = 15;
     static constexpr auto kMinBytes = (kElementSize * 2) - 1;
@@ -503,6 +510,12 @@ TEST_F(CollectionMarkersTest, ScanningAutoYieldingWorks) {
 
 // Tests that auto yielding with query plan iterators works
 TEST_F(CollectionMarkersTest, SamplingAutoYieldingWorks) {
+    // Manually set the yielding parameters to make the yield count computation simpler.
+    RAIIServerParameterControllerForTest queryYieldMs("internalQueryExecYieldPeriodMS",
+                                                      1'000 * 3'600);
+    RAIIServerParameterControllerForTest queryYieldDocsRead("internalQueryExecYieldIterations",
+                                                            1'000);
+
     static constexpr auto kNumRounds = 5000;
     static constexpr auto kElementSize = 15;
     static constexpr auto kNumElements = kElementSize * kNumRounds;
