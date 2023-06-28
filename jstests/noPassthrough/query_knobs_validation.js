@@ -60,7 +60,7 @@ const expectedParamDefaults = {
     internalQuerySlotBasedExecutionDisableLookupPushdown: false,
     internalQuerySlotBasedExecutionDisableGroupPushdown: false,
     allowDiskUseByDefault: true,
-    documentSourceWriterBatchBuffer: 0,
+    internalQueryDocumentSourceWriterBatchExtraReservedBytes: 0,
 };
 
 function assertDefaultParameterValues() {
@@ -254,6 +254,13 @@ assertSetParameterSucceeds("allowDiskUseByDefault", true);
 
 assertSetParameterSucceeds("internalQueryFLERewriteMemoryLimit", 14 * 1024 * 1024);
 assertSetParameterFails("internalQueryFLERewriteMemoryLimit", 0);
+
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes", 10);
+assertSetParameterSucceeds("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                           4 * 1024 * 1024);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes", -1);
+assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedBytes",
+                        9 * 1024 * 1024);
 
 MongoRunner.stopMongod(conn);
 })();
