@@ -595,10 +595,6 @@ Status storeMongodOptions(const moe::Environment& params) {
                 return Status(ErrorCodes::BadValue, sb.str());
             }
         }
-    } else {
-        if (serverGlobalParams.port < 0 || serverGlobalParams.port > 65535) {
-            return Status(ErrorCodes::BadValue, "bad --port number");
-        }
     }
     if (params.count("sharding.clusterRole")) {
         auto clusterRoleParam = params["sharding.clusterRole"].as<std::string>();

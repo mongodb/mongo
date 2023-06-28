@@ -117,13 +117,6 @@ Status storeMongosOptions(const moe::Environment& params) {
         return ret;
     }
 
-    if (params.count("net.port")) {
-        int port = params["net.port"].as<int>();
-        if (port <= 0 || port > 65535) {
-            return Status(ErrorCodes::BadValue, "error: port number must be between 1 and 65535");
-        }
-    }
-
     if (params.count("security.javascriptEnabled")) {
         mongosGlobalParams.scriptingEnabled = params["security.javascriptEnabled"].as<bool>();
     }
