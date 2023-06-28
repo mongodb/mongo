@@ -126,7 +126,7 @@ public:
                                                             const BSONObj& endKey);
 
     /**
-     * Consructs a data access plan for 'query' which answers the predicate contained in 'root'.
+     * Constructs a data access plan for 'query' which answers the predicate contained in 'root'.
      * Assumes the presence of the passed in indices. Planning behavior is controlled by the
      * settings in 'params'.
      */
