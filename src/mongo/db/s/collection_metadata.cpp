@@ -87,7 +87,6 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
         case CoordinatorStateEnum::kBlockingWrites:
         case CoordinatorStateEnum::kAborting:
         case CoordinatorStateEnum::kCommitting:
-        case CoordinatorStateEnum::kQuiesced:
         case CoordinatorStateEnum::kDone:
             return boost::none;
         case CoordinatorStateEnum::kPreparingToDonate:

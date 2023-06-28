@@ -124,8 +124,6 @@ structs:
                 optional: true
             active:
                 type: bool
-                # TODO(SERVER-77873): Deprecated by the resharding improvements project, and should
-                # be removed with that feature flag.
                 description: >-
                     Dummy field that always has the same value (true) to have a unique
                     index on in order to prevent multiple resharding operations from being active at
@@ -143,7 +141,4 @@ structs:
                 type: bool
                 description: "Whether to initiate reshardCollection if the shardKey doesn't change."
                 optional: true
-            quiescePeriodEnd:
-                type: date
-                description: "When to release the instance following its completion."
-                optional: true
+                
