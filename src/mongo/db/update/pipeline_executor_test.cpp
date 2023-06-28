@@ -630,5 +630,45 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
     }
 }
 
+/**
+ * Verifies the fix for SERVER-76934 in the case where the original document has a duplicate field.
+ */
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath1) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {paddingField: 'largeValueString'}, k: {c: 1, c: 2, paddingField: "
+                 "'largeValueString'}}"));
+
+    auto doc = mutablebson::Document(preImage);
+    const std::vector<BSONObj> pipeline{
+        fromjson("{$replaceWith: {$literal: {f1: {paddingField: 'largeValueString'}, k: {c: 4, "
+                 "paddingField: 'largeValueString'}} }}")};
+    PipelineExecutor exec(expCtx, pipeline);
+    ASSERT_THROWS_CODE_AND_WHAT(exec.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                7693400,
+                                "Document already has a field named 'c'");
+}
+
+/**
+ * Verifies the fix for SERVER-76934 in the case where the pipeline tries to add a duplicate field.
+ */
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath2) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {paddingField: 'largeValueString'}, k: {c: 1, paddingField: "
+                 "'largeValueString'}}"));
+
+    auto doc = mutablebson::Document(preImage);
+    const std::vector<BSONObj> pipeline{
+        fromjson("{$replaceWith: {$literal: {f1: {paddingField: 'largeValueString'}, k: {c: 4, c: "
+                 "5, paddingField: 'largeValueString'}} }}")};
+    PipelineExecutor exec(expCtx, pipeline);
+    ASSERT_THROWS_CODE_AND_WHAT(exec.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                7693400,
+                                "Document already has a field named 'c'");
+}
+
 }  // namespace
 }  // namespace mongo
