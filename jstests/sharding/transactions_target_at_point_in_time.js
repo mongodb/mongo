@@ -37,6 +37,17 @@ const st = new ShardingTest({
     }
 });
 
+// We prevent the shards from advancing the oldest_timestamp. This ensures that the snapshot
+// history associated with the transaction is retained for the duration of this test.
+st._rs.forEach(rs => {
+    rs.nodes.forEach(conn => {
+        assert.commandWorked(conn.adminCommand({
+            configureFailPoint: "WTPreserveSnapshotHistoryIndefinitely",
+            mode: "alwaysOn",
+        }));
+    });
+});
+
 // Set up one sharded collection with 2 chunks, both on the primary shard.
 
 assert.commandWorked(
