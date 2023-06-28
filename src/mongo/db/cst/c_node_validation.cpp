@@ -27,22 +27,37 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <iterator>
+#include <memory>
 #include <set>
+#include <type_traits>
 #include <utility>
+#include <variant>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/c_node_validation.h"
+#include "mongo/db/cst/compound_key.h"
+#include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/path.h"
 #include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/stdx/variant.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
 
 namespace mongo::c_node_validation {
 using namespace std::string_literals;

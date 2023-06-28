@@ -28,25 +28,40 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <cstddef>
+#include <deque>
+#include <functional>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/json.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/hasher.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_mock.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/resharding/resharding_txn_cloner.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -259,7 +274,8 @@ protected:
         Timestamp fetchTimestamp,
         boost::optional<LogicalSessionId> startAfter) {
         // create expression context
-        static const NamespaceString _transactionsNss{"config.transactions"};
+        static const NamespaceString _transactionsNss =
+            NamespaceString::createNamespaceString_forTest("config.transactions");
         boost::intrusive_ptr<ExpressionContextForTest> expCtx(
             new ExpressionContextForTest(getOpCtx(), _transactionsNss));
         expCtx->setResolvedNamespace(_transactionsNss, {_transactionsNss, {}});

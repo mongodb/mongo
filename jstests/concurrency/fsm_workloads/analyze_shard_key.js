@@ -7,8 +7,7 @@
  * guaranteed to be true when it is run in parallel with other workloads.
  *
  * @tags: [
- *  requires_fcv_70,
- *  featureFlagUpdateOneWithoutShardKey,
+ *  requires_fcv_71,
  *  uses_transactions,
  *  resource_intensive,
  *  incompatible_with_concurrency_simultaneous,
@@ -44,8 +43,8 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.iterations = 500;
 
     // The sample rate range for query sampling.
-    $config.data.minSampleRate = 1000;
-    $config.data.maxSampleRate = 1500;
+    $config.data.minSamplesPerSecond = 1000;
+    $config.data.maxSamplesPerSecond = 1500;
     // The comment to attached to queries in the read and write states below to mark them as
     // eligible for sampling. Queries such as the aggregate queries for looking up documents to
     // update will not have this comment attached since they do not follow the query patterns
@@ -460,10 +459,10 @@ var $config = extendWorkload($config, function($config, $super) {
      * Verifies that the metrics about the characteristics of the shard key are within acceptable
      * ranges.
      */
-    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(
-        metrics) {
+    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(res) {
         // Perform basic validation of the metrics.
-        AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(metrics);
+        AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res);
+        const metrics = res.keyCharacteristics;
         assert.eq(metrics.isUnique, this.shardKeyOptions.isUnique, metrics);
 
         // Validate the cardinality metrics. Due to the concurrent writes by other threads, it is
@@ -511,23 +510,87 @@ var $config = extendWorkload($config, function($config, $super) {
     // distribution.
     $config.data.intermediateReadDistributionMetricsMaxDiff = 20;
     $config.data.intermediateWriteDistributionMetricsMaxDiff = 20;
-    // The final diff windows are larger when the reads and writes are run inside transactions or
-    // with stepdown/kill/terminate in the background due to the presence of retries from the
-    // external client.
-    $config.data.finalReadDistributionMetricsMaxDiff =
-        (TestData.runInsideTransaction || TestData.runningWithShardStepdowns) ? 15 : 12;
-    $config.data.finalWriteDistributionMetricsMaxDiff =
-        (TestData.runInsideTransaction || TestData.runningWithShardStepdowns) ? 15 : 12;
+    $config.data.finalReadDistributionMetricsMaxDiff = 15;
+    $config.data.finalWriteDistributionMetricsMaxDiff = 15;
     // The minimum number of sampled queries to wait for before verifying the read and write
     // distribution metrics.
     $config.data.numSampledQueriesThreshold = 1500;
+
+    // The diff window for the sample size for each command for the sample population to be
+    // considered as matching the mock query pattern.
+    $config.data.sampleSizePercentageMaxDiff = 5;
+
+    // The number of sampled queries returned by the latest analyzeShardKey command.
+    $config.data.previousNumSampledQueries = 0;
+
+    $config.data.isAcceptableSampleSize = function isAcceptableSampleSize(
+        part, whole, expectedPercentage) {
+        return Math.abs(AnalyzeShardKeyUtil.calculatePercentage(part, whole) - expectedPercentage) <
+            this.sampleSizePercentageMaxDiff;
+    };
+
+    $config.data.shouldValidateReadDistribution = function shouldValidateReadDistribution(
+        sampleSize) {
+        if (sampleSize.total < this.numSampledQueriesThreshold) {
+            return false;
+        }
+
+        // There are 4 read states (i.e. find, aggregate, count and distinct) and they have the
+        // same incoming and outgoing state transition probabilities.
+        const isAcceptable = this.isAcceptableSampleSize(
+                                 sampleSize.find, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.aggregate, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.count, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.distinct, sampleSize.total, 25 /* expectedPercentage */);
+
+        if (!isAcceptable) {
+            print(
+                `Skip validating the read distribution metrics because the sample ` +
+                `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
+            // The sample population should always match the mock query patterns unless there are
+            // retries.
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer);
+        }
+        return isAcceptable;
+    };
+
+    $config.data.shouldValidateWriteDistribution = function shouldValidateWriteDistribution(
+        sampleSize) {
+        if (sampleSize.total < this.numSampledQueriesThreshold) {
+            return false;
+        }
+
+        // There are 4 write states (i.e. update, remove, findAndModifyUpdate and
+        // findAndModifyRemove) and they have the same incoming and outgoing state transition
+        // probabilities.
+        const isAcceptable =
+            this.isAcceptableSampleSize(
+                sampleSize.update, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.delete, sampleSize.total, 25 /* expectedPercentage */) &&
+            this.isAcceptableSampleSize(
+                sampleSize.findAndModify, sampleSize.total, 50 /* expectedPercentage */);
+
+        if (!isAcceptable) {
+            print(
+                `Skip validating the write distribution metrics because the sample ` +
+                `population does not match the mock query patterns: ${tojsononeline(sampleSize)}`);
+            // The sample population should always match the mock query patterns unless there are
+            // retries.
+            assert(TestData.runningWithShardStepdowns || TestData.runningWithBalancer);
+        }
+        return isAcceptable;
+    };
 
     /**
      * Verifies that the metrics about the read and write distribution are within acceptable ranges.
      */
     $config.data.assertReadWriteDistributionMetrics = function assertReadWriteDistributionMetrics(
-        metrics, isFinal) {
-        AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(metrics);
+        res, isFinal) {
+        AnalyzeShardKeyUtil.assertContainReadWriteDistributionMetrics(res);
 
         let assertReadMetricsDiff = (actual, expected) => {
             const maxDiff = isFinal ? this.finalReadDistributionMetricsMaxDiff
@@ -540,32 +603,34 @@ var $config = extendWorkload($config, function($config, $super) {
             assert.lt(Math.abs(actual - expected), maxDiff, {actual, expected});
         };
 
-        if (metrics.readDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
-            assertReadMetricsDiff(metrics.readDistribution.percentageOfSingleShardReads,
+        const currentNumSampledQueries =
+            res.readDistribution.sampleSize.total + res.writeDistribution.sampleSize.total;
+        this.previousNumSampledQueries = currentNumSampledQueries;
+
+        if (this.shouldValidateReadDistribution(res.readDistribution.sampleSize)) {
+            assertReadMetricsDiff(res.readDistribution.percentageOfSingleShardReads,
                                   this.readDistribution.percentageOfSingleShardReads);
-            assertReadMetricsDiff(metrics.readDistribution.percentageOfMultiShardReads,
+            assertReadMetricsDiff(res.readDistribution.percentageOfMultiShardReads,
                                   this.readDistribution.percentageOfMultiShardReads);
-            assertReadMetricsDiff(metrics.readDistribution.percentageOfScatterGatherReads,
+            assertReadMetricsDiff(res.readDistribution.percentageOfScatterGatherReads,
                                   this.readDistribution.percentageOfScatterGatherReads);
-            assert.eq(metrics.readDistribution.numReadsByRange.length,
-                      this.analyzeShardKeyNumRanges);
+            assert.eq(res.readDistribution.numReadsByRange.length, this.analyzeShardKeyNumRanges);
         }
-        if (metrics.writeDistribution.sampleSize.total > this.numSampledQueriesThreshold) {
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfSingleShardWrites,
+
+        if (this.shouldValidateWriteDistribution(res.writeDistribution.sampleSize)) {
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfSingleShardWrites,
                                    this.writeDistribution.percentageOfSingleShardWrites);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiShardWrites,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiShardWrites,
                                    this.writeDistribution.percentageOfMultiShardWrites);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfScatterGatherWrites,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfScatterGatherWrites,
                                    this.writeDistribution.percentageOfScatterGatherWrites);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfShardKeyUpdates,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfShardKeyUpdates,
                                    this.writeDistribution.percentageOfShardKeyUpdates);
-            assertWriteMetricsDiff(
-                metrics.writeDistribution.percentageOfSingleWritesWithoutShardKey,
-                this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
-            assertWriteMetricsDiff(metrics.writeDistribution.percentageOfMultiWritesWithoutShardKey,
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfSingleWritesWithoutShardKey,
+                                   this.writeDistribution.percentageOfSingleWritesWithoutShardKey);
+            assertWriteMetricsDiff(res.writeDistribution.percentageOfMultiWritesWithoutShardKey,
                                    this.writeDistribution.percentageOfMultiWritesWithoutShardKey);
-            assert.eq(metrics.writeDistribution.numWritesByRange.length,
-                      this.analyzeShardKeyNumRanges);
+            assert.eq(res.writeDistribution.numWritesByRange.length, this.analyzeShardKeyNumRanges);
         }
     };
 
@@ -646,6 +711,33 @@ var $config = extendWorkload($config, function($config, $super) {
         return truncatedRes;
     };
 
+    /**
+     * Runs $listSampledQueries and asserts that the number of sampled queries is greater or equal
+     * to the number of sampled queries returned by the latest analyzeShardKey command.
+     */
+    $config.data.listSampledQueries = function listSampledQueries(db, collName) {
+        const ns = db.getName() + "." + collName;
+        let docs;
+        try {
+            docs = db.getSiblingDB("admin")
+                       .aggregate(
+                           [{$listSampledQueries: {namespace: ns}}],
+                           // The network override does not support issuing getMore commands since
+                           // if a network error occurs during it then it won't know whether the
+                           // cursor was advanced or not. To allow this workload to run in a suite
+                           // with network error, use a large batch size so that no getMore commands
+                           // would be issued.
+                           {cursor: TestData.runningWithShardStepdowns ? {batchSize: 100000} : {}})
+                       .toArray();
+        } catch (e) {
+            if (this.expectedAggregateInterruptErrors.includes(e.code)) {
+                return;
+            }
+            throw e;
+        }
+        assert.gte(docs.length, this.previousNumSampledQueries);
+    };
+
     // To avoid leaving a lot of config.analyzeShardKeySplitPoints documents around which could
     // make restart recovery take a long time, overwrite the values of the
     // 'analyzeShardKeySplitPointExpirationSecs' and 'ttlMonitorSleepSecs' server parameters to make
@@ -693,35 +785,53 @@ var $config = extendWorkload($config, function($config, $super) {
         });
     };
 
-    $config.data.getNumDocuments = function getNumDocuments(db, collName) {
-        const firstBatch =
-            assert
-                .commandWorked(
-                    db.runCommand({aggregate: collName, pipeline: [{$count: "count"}], cursor: {}}))
-                .cursor.firstBatch;
+    /**
+     * Returns the number of documents that match the given filter in the given collection.
+     */
+    $config.data.getNumDocuments = function getNumDocuments(db, collName, filter) {
+        const firstBatch = assert
+                               .commandWorked(db.runCommand({
+                                   aggregate: collName,
+                                   pipeline: [{$match: filter}, {$count: "count"}],
+                                   cursor: {}
+                               }))
+                               .cursor.firstBatch;
         return firstBatch.length == 0 ? 0 : firstBatch[0].count;
     };
 
     // To avoid leaving unnecessary documents in config database after this workload finishes,
     // remove all the sampled query documents and split point documents during teardown().
     $config.data.removeSampledQueryAndSplitPointDocuments =
-        function removeSampledQueryAndSplitPointDocuments(cluster) {
+        function removeSampledQueryAndSplitPointDocuments(db, collName, cluster) {
+        const ns = db.getName() + "." + collName;
         cluster.getReplicaSets().forEach(rst => {
             while (true) {
                 try {
                     const configDb = rst.getPrimary().getDB("config");
                     jsTest.log("Removing sampled query documents and split points documents");
-                    jsTest.log(tojsononeline({
-                        sampledQueries: this.getNumDocuments(configDb, "sampledQueries"),
-                        sampledQueriesDiff: this.getNumDocuments(configDb, "sampledQueriesDiff"),
-                        analyzeShardKeySplitPoints:
-                            this.getNumDocuments(configDb, "analyzeShardKeySplitPoints"),
+                    jsTest.log(
+                        "The counts before removing " + tojsononeline({
+                            sampledQueries: this.getNumDocuments(configDb, "sampledQueries", {ns}),
+                            sampledQueriesDiff:
+                                this.getNumDocuments(configDb, "sampledQueriesDiff", {ns}),
+                            analyzeShardKeySplitPoints:
+                                this.getNumDocuments(configDb, "analyzeShardKeySplitPoints", {ns}),
 
-                    }));
+                        }));
 
                     assert.commandWorked(configDb.sampledQueries.remove({}));
                     assert.commandWorked(configDb.sampledQueriesDiff.remove({}));
                     assert.commandWorked(configDb.analyzeShardKeySplitPoints.remove({}));
+
+                    jsTest.log(
+                        "The counts after removing " + tojsononeline({
+                            sampledQueries: this.getNumDocuments(configDb, "sampledQueries", {ns}),
+                            sampledQueriesDiff:
+                                this.getNumDocuments(configDb, "sampledQueriesDiff", {ns}),
+                            analyzeShardKeySplitPoints:
+                                this.getNumDocuments(configDb, "analyzeShardKeySplitPoints", {ns}),
+
+                        }));
                     return;
                 } catch (e) {
                     if (RetryableWritesUtil.isRetryableCode(e.code)) {
@@ -816,9 +926,15 @@ var $config = extendWorkload($config, function($config, $super) {
               tojson(this.truncateAnalyzeShardKeyResponseForLogging(metrics)));
         this.assertReadWriteDistributionMetrics(metrics, true /* isFinal */);
 
+        print("Listing sampled queries " +
+              tojsononeline({lastNumSampledQueries: this.previousNumSampledQueries}));
+        assert.gt(this.previousNumSampledQueries, 0);
+        this.listSampledQueries(db, collName);
+
+        print("Cleaning up");
         this.restoreSplitPointExpiration(cluster);
         this.restoreTTLMonitorSleepSecs(cluster);
-        this.removeSampledQueryAndSplitPointDocuments(cluster);
+        this.removeSampledQueryAndSplitPointDocuments(db, collName, cluster);
     };
 
     $config.states.init = function init(db, collName) {
@@ -866,7 +982,8 @@ var $config = extendWorkload($config, function($config, $super) {
         assert.commandWorked(db.adminCommand({
             configureQueryAnalyzer: ns,
             mode: "full",
-            sampleRate: AnalyzeShardKeyUtil.getRandInteger(this.minSampleRate, this.maxSampleRate)
+            samplesPerSecond: AnalyzeShardKeyUtil.getRandInteger(this.minSamplesPerSecond,
+                                                                 this.maxSamplesPerSecond)
         }));
         print("Finished enableQuerySampling state");
     };
@@ -876,6 +993,12 @@ var $config = extendWorkload($config, function($config, $super) {
         const ns = db.getName() + "." + collName;
         assert.commandWorked(db.adminCommand({configureQueryAnalyzer: ns, mode: "off"}));
         print("Finished disableQuerySampling state");
+    };
+
+    $config.states.listSampledQueries = function listSampledQueries(db, collName) {
+        print("Starting listSampledQueries state");
+        this.listSampledQueries(db, collName);
+        print("Finished listSampledQueries state");
     };
 
     $config.states.find = function find(db, collName) {
@@ -950,8 +1073,8 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            if (res.n == 0) {
-                // TODO: Make this state always validate the response after BF-28440 is resolved.
+            if (res.n == 0 || res.nModified == 0) {
+                // TODO (SERVER-77116): Make this state always validate the response.
                 assert(TestData.runningWithBalancer);
             } else {
                 assert.eq(res.nModified, 1, {cmdObj, res});
@@ -982,7 +1105,7 @@ var $config = extendWorkload($config, function($config, $super) {
         print("Starting remove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
         if (res.n == 0) {
-            // TODO: Make this state always validate the response after BF-28440 is resolved.
+            // TODO (SERVER-77116): Make this state always validate the response.
             assert(TestData.runningWithBalancer);
         } else {
             assert.eq(res.n, 1, {cmdObj, res});
@@ -1011,7 +1134,7 @@ var $config = extendWorkload($config, function($config, $super) {
         try {
             assert.commandWorked(res);
             if (res.lastErrorObject.n == 0) {
-                // TODO: Make this state always validate the response after BF-28440 is resolved.
+                // TODO (SERVER-77116): Make this state always validate the response.
                 assert(TestData.runningWithBalancer);
             } else {
                 assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
@@ -1040,7 +1163,7 @@ var $config = extendWorkload($config, function($config, $super) {
         print("Starting findAndModifyRemove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
         if (res.lastErrorObject.n == 0) {
-            // TODO: Make this state always validate the response after BF-28440 is resolved.
+            // TODO (SERVER-77116): Make this state always validate the response.
             assert(TestData.runningWithBalancer);
         } else {
             assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
@@ -1068,6 +1191,11 @@ var $config = extendWorkload($config, function($config, $super) {
         const originalDisableQuerySampling = $config.states.disableQuerySampling;
         $config.states.disableQuerySampling = function(db, collName, connCache) {
             originalDisableQuerySampling.call(this, db, collName);
+        };
+
+        const originalListSampledQueries = $config.states.listSampledQueries;
+        $config.states.listSampledQueries = function(db, collName, connCache) {
+            originalListSampledQueries.call(this, db, collName);
         };
 
         const originalAnalyzeShardKey = $config.states.analyzeShardKey;
@@ -1126,8 +1254,9 @@ var $config = extendWorkload($config, function($config, $super) {
             enableQuerySampling: 1,
         },
         analyzeShardKey: {
-            enableQuerySampling: 0.18,
+            enableQuerySampling: 0.15,
             disableQuerySampling: 0.02,
+            listSampledQueries: 0.03,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,
@@ -1138,8 +1267,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         enableQuerySampling: {
-            analyzeShardKey: 0.18,
+            analyzeShardKey: 0.15,
             disableQuerySampling: 0.02,
+            listSampledQueries: 0.03,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,
@@ -1153,9 +1283,21 @@ var $config = extendWorkload($config, function($config, $super) {
             analyzeShardKey: 0.05,
             enableQuerySampling: 0.95,
         },
-        find: {
+        listSampledQueries: {
             analyzeShardKey: 0.2,
             enableQuerySampling: 0.1,
+            aggregate: 0.1,
+            count: 0.1,
+            distinct: 0.1,
+            update: 0.1,
+            remove: 0.1,
+            findAndModifyUpdate: 0.1,
+            findAndModifyRemove: 0.1,
+        },
+        find: {
+            analyzeShardKey: 0.15,
+            enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             aggregate: 0.1,
             count: 0.1,
             distinct: 0.1,
@@ -1165,8 +1307,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         aggregate: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             count: 0.1,
             distinct: 0.1,
@@ -1176,8 +1319,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         count: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             aggregate: 0.1,
             distinct: 0.1,
@@ -1187,8 +1331,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         distinct: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,
@@ -1198,8 +1343,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         update: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,
@@ -1209,8 +1355,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         remove: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,
@@ -1220,8 +1367,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         findAndModifyUpdate: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,
@@ -1231,8 +1379,9 @@ var $config = extendWorkload($config, function($config, $super) {
             findAndModifyRemove: 0.1,
         },
         findAndModifyRemove: {
-            analyzeShardKey: 0.2,
+            analyzeShardKey: 0.15,
             enableQuerySampling: 0.1,
+            listSampledQueries: 0.05,
             find: 0.1,
             aggregate: 0.1,
             count: 0.1,

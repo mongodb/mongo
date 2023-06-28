@@ -29,21 +29,51 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/config.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/serverless/serverless_types_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/ssl_util.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -318,19 +348,6 @@ inline void protocolCheckRecipientForgetDecision(
             MONGO_UNREACHABLE;
     }
 }
-
-/*
- * Creates an ExternalKeysCollectionDocument representing an config.external_validation_keys
- * document from the given the admin.system.keys document BSONObj.
- */
-ExternalKeysCollectionDocument makeExternalClusterTimeKeyDoc(UUID migrationId, BSONObj keyDoc);
-
-/*
- * For each given ExternalKeysCollectionDocument, inserts it if there is not an existing document in
- * config.external_validation_keys for it with the same keyId and replicaSetName. Otherwise,
- * updates the ttlExpiresAt of the existing document if it is less than the new ttlExpiresAt.
- */
-repl::OpTime storeExternalClusterTimeKeyDocs(std::vector<ExternalKeysCollectionDocument> keyDocs);
 
 /**
  * Sets the "ttlExpiresAt" field for the external keys so they can be garbage collected by the ttl

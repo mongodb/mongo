@@ -31,18 +31,45 @@
  * This file contains tests for building execution stages that implement $lookup operator.
  */
 
+#include <cstddef>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
-#include "mongo/db/exec/sbe/stages/loop_join.h"
-#include "mongo/db/pipeline/document_source_lookup.h"
-#include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/expressions/compile_ctx.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/query_solution.h"
-#include "mongo/db/query/query_test_service_context.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_test_fixture.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/db/query/shard_filterer_factory_interface.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sbe {
 namespace {

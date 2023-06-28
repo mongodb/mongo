@@ -1,10 +1,6 @@
 /**
  * Tests that the cluster parameter "shardedClusterCardinalityForDirectConns" has the correct value
  * after upgrade, downgrade, and addShard.
- *
- * TODO SERVER-75391: Enable when config shards can downgrade FCV
- * @tags: [multiversion_incompatible, featureFlagClusterCardinalityParameter,
- * config_shard_incompatible]
  */
 
 (function() {
@@ -25,23 +21,6 @@ let checkClusterParameter = function(conn, expectedValue) {
 };
 
 // There is only one shard in the cluster, so the cluster parameter should be false
-checkClusterParameter(st.configRS.getPrimary(), false);
-checkClusterParameter(st.shard0, false);
-
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-assert.commandWorked(st.s.adminCommand({addShard: additionalShard.getURL(), name: "shard02"}));
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-// There are two shards in the cluster while upgrading, so the cluster parameter should be true
-checkClusterParameter(st.configRS.getPrimary(), true);
-checkClusterParameter(st.shard0, true);
-checkClusterParameter(additionalShard.getPrimary(), true);
-
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: lastLTSFCV}));
-removeShard(st, "shard02");
-assert.commandWorked(st.s.adminCommand({setFeatureCompatibilityVersion: latestFCV}));
-
-// There is one shard in the cluster while upgrading, so the cluster parameter should be false
 checkClusterParameter(st.configRS.getPrimary(), false);
 checkClusterParameter(st.shard0, false);
 

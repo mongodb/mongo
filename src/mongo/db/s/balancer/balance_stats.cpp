@@ -28,14 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <iterator>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/db/s/balancer/balance_stats.h"
-
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,21 +29,56 @@
 
 #include "mongo/db/shard_role.h"
 
-#include "storage/snapshot_helper.h"
-#include <boost/utility/in_place_factory.hpp>
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
+#include <iterator>
+#include <list>
 #include <map>
 
+#include "storage/snapshot_helper.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/catalog_helper.h"
 #include "mongo/db/catalog/collection_uuid_mismatch.h"
-#include "mongo/db/catalog/collection_uuid_mismatch_info.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/capped_snapshots.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -177,7 +212,7 @@ void verifyDbAndCollection(OperationContext* opCtx,
     // Verify that we are using the latest instance if we intend to perform writes.
     if (operationType == AcquisitionPrerequisites::OperationType::kWrite) {
         auto latest = CollectionCatalog::latest(opCtx);
-        if (!latest->containsCollection(opCtx, coll.get())) {
+        if (!latest->isLatestCollection(opCtx, coll.get())) {
             throwWriteConflictException(str::stream() << "Unable to write to collection '"
                                                       << coll->ns().toStringForErrorMsg()
                                                       << "' due to catalog changes; please "
@@ -511,10 +546,10 @@ CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
     // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
-    PlacementConcern placementConcern = nssOrUUID.nss()
-        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()),
-                           oss.getShardVersion(*nssOrUUID.nss())}
-        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()), {}};
+    PlacementConcern placementConcern = nssOrUUID.isNamespaceString()
+        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()),
+                           oss.getShardVersion(nssOrUUID.nss())}
+        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
     return CollectionOrViewAcquisitionRequest(
         nssOrUUID, placementConcern, readConcern, operationType, viewMode);
@@ -530,7 +565,7 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
 
     return CollectionAcquisitionRequest(nss,
                                         expectedUUID,
-                                        {oss.getDbVersion(nss.db()), oss.getShardVersion(nss)},
+                                        {oss.getDbVersion(nss.dbName()), oss.getShardVersion(nss)},
                                         readConcern,
                                         operationType);
 }
@@ -543,13 +578,22 @@ CollectionAcquisitionRequest CollectionAcquisitionRequest::fromOpCtx(
     auto& readConcern = repl::ReadConcernArgs::get(opCtx);
 
     // Acquisitions by uuid cannot possibly have a corresponding ShardVersion attached.
-    PlacementConcern placementConcern = nssOrUUID.nss()
-        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()),
-                           oss.getShardVersion(*nssOrUUID.nss())}
-        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName().db()), {}};
+    PlacementConcern placementConcern = nssOrUUID.isNamespaceString()
+        ? PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()),
+                           oss.getShardVersion(nssOrUUID.nss())}
+        : PlacementConcern{oss.getDbVersion(nssOrUUID.dbName()), {}};
 
     return CollectionAcquisitionRequest(nssOrUUID, placementConcern, readConcern, operationType);
 }
+
+ScopedCollectionAcquisition::ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other)
+    : _opCtx((invariant(other.isCollection()),
+              get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._opCtx)),
+      _acquiredCollection(get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)
+                              ._acquiredCollection) {
+    get<ScopedCollectionAcquisition>(other._collectionOrViewAcquisition)._opCtx = nullptr;
+    other._collectionOrViewAcquisition = std::monostate();
+};
 
 UUID ScopedCollectionAcquisition::uuid() const {
     invariant(exists(),
@@ -567,9 +611,12 @@ const ScopedCollectionDescription& ScopedCollectionAcquisition::getShardingDescr
 
 const boost::optional<ScopedCollectionFilter>& ScopedCollectionAcquisition::getShardingFilter()
     const {
-    // The collectionDescription will only not be set if the caller as acquired the acquisition
+    // The collectionDescription will only not be set if the caller has acquired the acquisition
     // using the kLocalCatalogOnlyWithPotentialDataLoss placement concern
-    invariant(_acquiredCollection.collectionDescription);
+    tassert(7740800,
+            "Getting shard filter on non-sharded or invalid collection",
+            _acquiredCollection.collectionDescription &&
+                _acquiredCollection.collectionDescription->isSharded());
     return _acquiredCollection.ownershipFilter;
 }
 
@@ -615,8 +662,7 @@ ScopedViewAcquisition::~ScopedViewAcquisition() {
 ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
                                               CollectionAcquisitionRequest acquisitionRequest,
                                               LockMode mode) {
-    return std::get<ScopedCollectionAcquisition>(
-        acquireCollectionOrView(opCtx, acquisitionRequest, mode));
+    return ScopedCollectionAcquisition(acquireCollectionOrView(opCtx, acquisitionRequest, mode));
 }
 
 std::vector<ScopedCollectionAcquisition> acquireCollections(
@@ -636,10 +682,9 @@ std::vector<ScopedCollectionAcquisition> acquireCollections(
     std::vector<ScopedCollectionAcquisition> collectionAcquisitions;
     for (auto& acquisition : acquisitions) {
         // It must be a collection, because that's what the acquisition request stated.
-        invariant(std::holds_alternative<ScopedCollectionAcquisition>(acquisition));
+        invariant(acquisition.isCollection());
 
-        collectionAcquisitions.emplace_back(
-            std::move(std::get<ScopedCollectionAcquisition>(acquisition)));
+        collectionAcquisitions.emplace_back(std::move(acquisition));
     }
     return collectionAcquisitions;
 }
@@ -677,7 +722,7 @@ void SnapshotAttempt::changeReadSourceForSecondaryReads() {
         try {
             nss = catalog->resolveNamespaceStringOrUUID(_opCtx, nsOrUUID);
         } catch (const ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
-            invariant(nsOrUUID.uuid());
+            invariant(nsOrUUID.isUUID());
 
             const auto readSource = _opCtx->recoveryUnit()->getTimestampReadSource();
             if (readSource == RecoveryUnit::ReadSource::kNoTimestamp ||
@@ -897,7 +942,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
             return acquireResolvedCollectionsOrViewsWithoutTakingLocks(
                 opCtx, *catalog, std::move(sortedAcquisitionRequests));
         } catch (...) {
-            if (openSnapshot)
+            if (openSnapshot && !opCtx->lockState()->inAWriteUnitOfWork())
                 opCtx->recoveryUnit()->abandonSnapshot();
             throw;
         }
@@ -1136,6 +1181,14 @@ void restoreTransactionResourcesToOperationContext(OperationContext* opCtx,
                 // Update the services snapshot on TransactionResources
                 acquiredCollection.collectionPtr = std::move(std::get<CollectionPtr>(collOrView));
             } else {
+                // Make sure that the placement is still correct.
+                if (std::holds_alternative<PlacementConcern>(prerequisites.placementConcern)) {
+                    checkPlacementVersion(
+                        opCtx,
+                        prerequisites.nss,
+                        std::get<PlacementConcern>(prerequisites.placementConcern));
+                }
+
                 auto reacquiredServicesSnapshot =
                     acquireServicesSnapshot(opCtx, *catalog, prerequisites);
 

@@ -10,8 +10,7 @@
 
 load("jstests/sharding/internal_txns/libs/chunk_migration_test.js");
 
-const transactionTest =
-    new InternalTransactionChunkMigrationTest(true /* storeFindAndModifyImagesInSideCollection */);
+const transactionTest = new InternalTransactionChunkMigrationTest();
 transactionTest.runTestForFindAndModifyBeforeChunkMigration(
     transactionTest.InternalTxnType.kRetryable, false /* abortOnInitialTry */);
 transactionTest.stop();

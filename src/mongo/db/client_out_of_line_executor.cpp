@@ -30,13 +30,24 @@
 
 #include "mongo/db/client_out_of_line_executor.h"
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <utility>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
-#include "mongo/util/clock_source.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/timer.h"
 

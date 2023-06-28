@@ -27,16 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <set>
+#include <utility>
 
-#include "mongo/db/auth/auth_op_observer.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/op_observer/op_observer_util.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
@@ -56,7 +66,7 @@ void AuthOpObserver::onInserts(OperationContext* opCtx,
                                std::vector<InsertStatement>::const_iterator last,
                                std::vector<bool> fromMigrate,
                                bool defaultFromMigrate,
-                               InsertsOpStateAccumulator* opAccumulator) {
+                               OpStateAccumulator* opAccumulator) {
     for (auto it = first; it != last; it++) {
         audit::logInsertOperation(opCtx->getClient(), coll->ns(), it->doc);
         AuthorizationManager::get(opCtx->getServiceContext())
@@ -175,8 +185,8 @@ void AuthOpObserver::postRenameCollection(OperationContext* const opCtx,
     const auto cmdNss = fromCollection.getCommandNS();
 
     BSONObjBuilder builder;
-    builder.append("renameCollection", fromCollection.ns());
-    builder.append("to", toCollection.ns());
+    builder.append("renameCollection", NamespaceStringUtil::serialize(fromCollection));
+    builder.append("to", NamespaceStringUtil::serialize(toCollection));
     builder.append("stayTemp", stayTemp);
     if (dropTargetUUID) {
         dropTargetUUID->appendToBuilder(&builder, "dropTarget");

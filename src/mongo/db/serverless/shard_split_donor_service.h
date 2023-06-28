@@ -29,12 +29,38 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/serverless/shard_split_state_machine_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/cancelable_executor.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

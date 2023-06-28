@@ -27,16 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
-#include "mongo/db/exec/working_set.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/matcher.h"
-#include "mongo/db/matcher/path.h"
-#include "mongo/util/stacktrace.h"
-#include "mongo/util/str.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

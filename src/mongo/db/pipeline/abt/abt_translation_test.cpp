@@ -27,15 +27,34 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
-#include "mongo/db/pipeline/abt/utils.h"
-#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/service_context_test_fixture.h"
-#include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer {
 

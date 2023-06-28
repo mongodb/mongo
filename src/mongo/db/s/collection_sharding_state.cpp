@@ -29,7 +29,24 @@
 
 #include "mongo/db/s/collection_sharding_state.h"
 
-#include "mongo/logv2/log.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/server_options.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

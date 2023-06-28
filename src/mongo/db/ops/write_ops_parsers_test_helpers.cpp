@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
-
+#include <memory>
 #include <set>
+#include <vector>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/ops/write_ops_parsers_test_helpers.h"
 
 namespace mongo {
 namespace {

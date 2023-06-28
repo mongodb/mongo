@@ -115,7 +115,7 @@ CONFIG configuration_list[] = {
 
 {"btree.repeat_data_pct", "duplicate values (percentage)", C_TABLE | C_TYPE_VAR, 0, 90, 90}
 
-{"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 10, 0, 0}
+{"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 20, 0, 0}
 
 {"btree.split_pct", "page split size as a percentage of the maximum page size", C_TABLE, 50, 100, 100}
 
@@ -305,7 +305,7 @@ CONFIG configuration_list[] = {
 
 {"stress.hs_sweep", "stress history store sweep", C_BOOL, 2, 0, 0}
 
-{"stress.prepare_resolution", "stress prepare resolution", C_BOOL, 2, 0, 0}
+{"stress.prepare_resolution_1", "stress prepare resolution (#1)", C_BOOL, 2, 0, 0}
 
 {"stress.sleep_before_read_overflow_onpage", "stress onpage overflow read race with checkpoint", C_BOOL, 2, 0, 0}
 

@@ -143,6 +143,12 @@ public:
      */
     std::vector<BulkWriteReplyItem> generateReplyItems() const;
 
+    /**
+     * Calculates an estimate of the size, in bytes, required to store the common fields that will
+     * go into each sub-batch command sent to a shard, i.e. all fields besides the actual write ops.
+     */
+    int getBaseBatchCommandSizeEstimate() const;
+
 private:
     // The OperationContext the client bulkWrite request is run on.
     OperationContext* const _opCtx;

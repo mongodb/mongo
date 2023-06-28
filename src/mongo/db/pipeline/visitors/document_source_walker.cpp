@@ -29,6 +29,10 @@
 
 #include "mongo/db/pipeline/visitors/document_source_walker.h"
 
+#include <list>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 namespace mongo {
 
 void DocumentSourceWalker::walk(const Pipeline& pipeline) {

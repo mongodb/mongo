@@ -155,6 +155,7 @@ const allCommands = {
     streams_getMoreStreamSample: {skip: isAnInternalCommand},
     streams_getStats: {skip: isAnInternalCommand},
     streams_testOnlyInsert: {skip: isAnInternalCommand},
+    streams_getMetrics: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {
@@ -512,7 +513,7 @@ const allCommands = {
                 assert.commandWorked(conn.getCollection(fullNs).insert({a: i}));
             }
         },
-        command: {configureQueryAnalyzer: fullNs, mode: "full", sampleRate: 1},
+        command: {configureQueryAnalyzer: fullNs, mode: "full", samplesPerSecond: 1},
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },

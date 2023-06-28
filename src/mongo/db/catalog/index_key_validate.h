@@ -29,9 +29,21 @@
 
 #pragma once
 
+#include <cstdint>
 #include <functional>
+#include <limits>
+#include <set>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 class BSONObj;
@@ -88,28 +100,27 @@ static std::set<StringData> allowedFieldNames = {
 
 /**
  * Checks if the key is valid for building an index according to the validation rules for the given
- * index version. If 'inCollValidation' is true we skip checking FCV for compound wildcard indexes
- * validation.
+ * index version. If 'checkFCV' is true we will check FCV for compound wildcard indexes validation.
  *
- * TODO SERVER-68303: Consider removing 'inCollValidation' flag when 'CompoundWildcardIndexes'
+ * TODO SERVER-68303: Consider removing 'checkFCV' flag when 'CompoundWildcardIndexes'
  * feature flag is removed.
  */
 Status validateKeyPattern(const BSONObj& key,
                           IndexDescriptor::IndexVersion indexVersion,
-                          bool inCollValidation = false);
+                          bool checkFCV = false);
 
 /**
  * Validates the index specification 'indexSpec' and returns an equivalent index specification that
  * has any missing attributes filled in. If the index specification is malformed, then an error
- * status is returned. If 'inCollValidation' is true we skip checking FCV for compound wildcard
- * indexes validation.
+ * status is returned. If 'checkFCV' is true we will check FCV for compound wildcard indexes
+ * validation.
  *
- * TODO SERVER-68303: Consider removing 'inCollValidation' flag when 'CompoundWildcardIndexes'
+ * TODO SERVER-68303: Consider removing 'checkFCV' flag when 'CompoundWildcardIndexes'
  * feature flag is removed.
  */
 StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
                                       const BSONObj& indexSpec,
-                                      bool inCollValidation = false);
+                                      bool checkFCV = false);
 
 /**
  * Returns a new index spec with any unknown field names removed from 'indexSpec'.
@@ -176,9 +187,13 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc);
 /**
  * Parses the index specifications from 'indexSpecObj', validates them, and returns equivalent index
  * specifications that have any missing attributes filled in. If any index specification is
- * malformed, then an error status is returned.
+ * malformed, then an error status is returned. If 'checkFCV' is true we should validate the index
+ * spec taking into account the FCV value. Some certain type of index cannot be created with
+ * downgraded FCV but can be continuously used if it's already created before FCV downgrade.
  */
-BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj);
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx,
+                                   const BSONObj& indexSpecObj,
+                                   bool checkFCV);
 
 /**
  * Optional filtering function to adjust allowed index field names at startup.

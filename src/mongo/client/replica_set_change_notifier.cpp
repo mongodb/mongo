@@ -28,13 +28,16 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/client/replica_set_change_notifier.h"
-
 #include "mongo/logv2/log.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

@@ -31,9 +31,14 @@
 
 #include <memory>
 
+#include "mongo/db/client.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/unittest/assert.h"
 
 namespace mongo::stats {
 

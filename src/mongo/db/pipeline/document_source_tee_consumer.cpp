@@ -27,13 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <vector>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/expression_context.h"

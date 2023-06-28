@@ -29,9 +29,16 @@
 
 #pragma once
 
+#include <utility>
+
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node_defs.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 namespace mongo::cost_model {
 /**

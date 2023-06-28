@@ -28,11 +28,19 @@
  */
 #pragma once
 
-#include "mongo/db/process_health/fault_facet.h"
+#include <boost/move/utility_core.hpp>
+#include <string>
 
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/process_health/fault_facet.h"
+#include "mongo/db/process_health/fault_manager_config.h"
 #include "mongo/db/process_health/health_check_status.h"
 #include "mongo/db/process_health/health_observer.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace process_health {

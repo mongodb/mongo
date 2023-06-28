@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <memory>
+#include <variant>
+
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/yieldable.h"

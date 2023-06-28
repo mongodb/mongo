@@ -28,16 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/db/query/find_common.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/curop.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/find_common.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

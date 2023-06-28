@@ -112,7 +112,7 @@ TEST(OpMsg, UnknownOptionalFlagIsIgnored) {
 TEST(OpMsg, FireAndForgetInsertWorks) {
     auto conn = getIntegrationTestConnection();
 
-    conn->dropCollection(NamespaceString("test.collection"));
+    conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
 
     conn->runFireAndForgetCommand(OpMsgRequest::fromDBAndBody("test", fromjson(R"({
         insert: "collection",
@@ -128,7 +128,7 @@ TEST(OpMsg, FireAndForgetInsertWorks) {
 TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
     auto conn = getIntegrationTestConnection();
 
-    conn->dropCollection(NamespaceString("test.collection"));
+    conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
 
     OpMsgBuilder msgBuilder;
 
@@ -159,7 +159,7 @@ TEST(OpMsg, DocumentSequenceLargeDocumentMultiInsertWorks) {
 TEST(OpMsg, DocumentSequenceMaxWriteBatchWorks) {
     auto conn = getIntegrationTestConnection();
 
-    conn->dropCollection(NamespaceString("test.collection"));
+    conn->dropCollection(NamespaceString::createNamespaceString_forTest("test.collection"));
 
     OpMsgBuilder msgBuilder;
 

@@ -27,18 +27,59 @@
  *    it in the license file.
  */
 
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
-#include "mongo/db/s/sharding_index_catalog_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/transaction/transaction_api.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_resource_yielder.h"
-#include "mongo/logv2/log.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -81,9 +122,9 @@ void commitIndexInTransaction(OperationContext* opCtx,
         std::make_shared<write_ops::UpdateCommandRequest>(CollectionType::ConfigNS);
     updateCollectionOp->setUpdates({[&] {
         write_ops::UpdateOpEntry entry;
-        entry.setQ(BSON(CollectionType::kNssFieldName << userCollectionNss.ns()
-                                                      << CollectionType::kUuidFieldName
-                                                      << collectionUUID));
+        entry.setQ(BSON(CollectionType::kNssFieldName
+                        << NamespaceStringUtil::serialize(userCollectionNss)
+                        << CollectionType::kUuidFieldName << collectionUUID));
         entry.setU(write_ops::UpdateModification::parseFromClassicUpdate(
             BSON("$set" << BSON(CollectionType::kUuidFieldName
                                 << collectionUUID << CollectionType::kIndexVersionFieldName
@@ -201,8 +242,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 

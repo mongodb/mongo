@@ -27,17 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/update/bit_node.h"
-
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/mutable_bson_test_utils.h"  // IWYU pragma: keep
-#include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/update/bit_node.h"
+#include "mongo/db/update/update_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

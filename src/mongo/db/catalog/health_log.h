@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
 #include "mongo/db/concurrency/deferred_writer.h"
 

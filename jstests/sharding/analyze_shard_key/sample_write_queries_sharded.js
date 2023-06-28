@@ -47,7 +47,7 @@ assert.commandWorked(st.s.adminCommand({moveChunk: ns, find: {x: 1000}, to: st.s
 const collectionUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, collName);
 
 assert.commandWorked(
-    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", sampleRate: 1000}));
+    st.s.adminCommand({configureQueryAnalyzer: ns, mode: "full", samplesPerSecond: 1000}));
 QuerySamplingUtil.waitForActiveSamplingShardedCluster(st, ns, collectionUuid);
 
 const expectedSampledQueryDocs = [];

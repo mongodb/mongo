@@ -27,12 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
 
-#include "mongo/bson/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/jwk_manager.h"
+#include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jwks_fetcher_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/http_client.h"
 

@@ -29,22 +29,21 @@
 
 #include "mongo/crypto/jws_validated_token.h"
 
-#include <iostream>
-#include <string>
-#include <vector>
-
+#include <memory>
 #include <openssl/opensslv.h>
+#include <string>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/jwk_manager.h"
+#include "mongo/crypto/jwks_fetcher.h"
 #include "mongo/crypto/jwks_fetcher_mock.h"
-#include "mongo/crypto/jws_validator.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 

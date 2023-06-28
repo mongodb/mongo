@@ -84,7 +84,7 @@ protected:
     }
 
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
     void insert(const char* s) {

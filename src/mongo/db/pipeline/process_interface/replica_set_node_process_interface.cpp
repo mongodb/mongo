@@ -27,23 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
 
-#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/drop_collection.h"
-#include "mongo/db/catalog/rename_collection.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/commands.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/pipeline/process_interface/common_mongod_process_interface.h"
+#include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

@@ -28,17 +28,30 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
-#include "mongo/db/audit.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/cluster_server_parameter_cmds_gen.h"
 #include "mongo/db/commands/get_cluster_parameter_invocation.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -92,7 +105,8 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to retrieve cluster server parameters",
                     authzSession->isAuthorizedForPrivilege(Privilege{
-                        ResourcePattern::forClusterResource(), ActionType::getClusterParameter}));
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::getClusterParameter}));
         }
 
         NamespaceString ns() const override {

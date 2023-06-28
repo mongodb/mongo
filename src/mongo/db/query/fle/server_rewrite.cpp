@@ -30,32 +30,44 @@
 
 #include "mongo/db/query/fle/server_rewrite.h"
 
+#include <boost/smart_ptr.hpp>
+#include <functional>
+#include <list>
 #include <memory>
+#include <string>
+#include <typeindex>
+#include <utility>
 
-#include "mongo/bson/bsonmisc.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
 #include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/crypto/fle_tags.h"
 #include "mongo/db/fle_crud.h"
-#include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_geo_near.h"
 #include "mongo/db/pipeline/document_source_graph_lookup.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/query_rewriter.h"
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/transaction_router_resource_yielder.h"
+#include "mongo/db/transaction/transaction_api.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
 
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery

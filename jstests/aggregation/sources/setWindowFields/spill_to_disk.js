@@ -5,7 +5,6 @@
  * requires_profiling,
  * assumes_read_concern_unchanged,
  * do_not_wrap_aggregations_in_facets,
- * featureFlagApproxPercentiles
  * ]
  */
 (function() {

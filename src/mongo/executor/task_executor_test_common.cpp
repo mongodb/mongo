@@ -1106,7 +1106,7 @@ COMMON_EXECUTOR_TEST(ScheduleExhaustRemoteCommandFutureIsResolvedWithErrorOnCanc
     net->exitNetwork();
     // Response should be cancelled.
     ASSERT_EQUALS(responseFuture.getNoThrow().getStatus().code(), ErrorCodes::CallbackCanceled);
-    ASSERT_EQUALS(numTimesCallbackCalled, 1);
+    ASSERT_EQUALS(numTimesCallbackCalled, 2);
 
     shutdownExecutorThread();
     joinExecutorThread();

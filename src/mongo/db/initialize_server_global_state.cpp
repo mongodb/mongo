@@ -28,37 +28,59 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_server_global_state_gen.h"
-
 #include <boost/filesystem/operations.hpp>
+#include <cerrno>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <fmt/format.h>
 #include <iostream>
-#include <memory>
+#include <string>
+#include <system_error>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <syslog.h>
-#include <unistd.h>
 #endif
 
-#include "mongo/base/init.h"
-#include "mongo/config.h"
+#if defined(__APPLE__)
+#include <TargetConditionals.h>
+#endif
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/initialize_server_global_state.h"
+#include "mongo/db/initialize_server_global_state_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_domain_global.h"
-#include "mongo/platform/process_id.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/time_support.h"
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#if defined(__APPLE__)
-#include <TargetConditionals.h>
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
 #endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

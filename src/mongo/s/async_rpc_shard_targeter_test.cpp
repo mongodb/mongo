@@ -30,6 +30,7 @@
 #include "mongo/base/error_codes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
@@ -298,11 +299,12 @@ DEATH_TEST_F(AsyncRPCShardingTestFixture, CannotCallOnRemoteErrorBeforeResolve, 
  * Test ShardId overload version of 'sendCommand'.
  */
 TEST_F(AsyncRPCShardingTestFixture, ShardIdOverload) {
-    const NamespaceString testNS = NamespaceString("testdb", "testcoll");
+    const NamespaceString testNS =
+        NamespaceString::createNamespaceString_forTest("testdb", "testcoll");
     const BSONObj testFirstBatch = BSON("x" << 1);
     const FindCommandRequest findCmd = FindCommandRequest(testNS);
-    const BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
-                                  .toBSON(CursorResponse::ResponseType::InitialResponse);
+    BSONObj findReply = CursorResponse(testNS, 0LL, {testFirstBatch})
+                            .toBSON(CursorResponse::ResponseType::InitialResponse);
 
     auto options = std::make_shared<AsyncRPCOptions<FindCommandRequest>>(
         findCmd, executor(), CancellationToken::uncancelable());

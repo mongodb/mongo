@@ -83,6 +83,17 @@ public:
     static std::string serializeForCommands(
         const NamespaceString& ns, const SerializationContext& context = SerializationContext());
 
+
+    /**
+     * This function serialize a NamespaceString without checking for presence of TenantId. This
+     * must only be used by auth systems which are not yet tenant aware.
+     *
+     * TODO SERVER-74896 Remove this function. Any remaining call sites must be changed to use the
+     * proper NamespaceStringUtil serialize method..
+     */
+    static std::string serializeForAuth(
+        const NamespaceString& ns, const SerializationContext& context = SerializationContext());
+
     /**
      * Deserializes StringData ns to a NamespaceString object.
      *
@@ -142,6 +153,12 @@ public:
     static NamespaceString parseNamespaceFromDoc(const DatabaseName& dbName, StringData coll);
 
     static NamespaceString parseNamespaceFromResponse(const DatabaseName& dbName, StringData coll);
+
+    /**
+     * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
+     * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
+     */
+    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     static NamespaceString parseFailPointData(const BSONObj& data, StringData nsFieldName);
 };

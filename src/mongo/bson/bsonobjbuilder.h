@@ -29,22 +29,38 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <limits>
+#include <list>
 #include <map>
+#include <set>
+#include <sys/types.h>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/shared_buffer.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -701,6 +717,7 @@ protected:
 // without being sure that you are not undoing the advantages of the
 // extern template declaration.
 class BSONObjBuilder;
+
 extern template class BSONObjBuilderBase<BSONObjBuilder, BufBuilder>;
 
 // BSONObjBuilder needs this forward declared in order to declare the

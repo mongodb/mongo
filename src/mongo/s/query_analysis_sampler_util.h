@@ -126,14 +126,14 @@ boost::optional<UUID> getOrGenerateSampleId(OperationContext* opCtx,
         const auto isInternalClient = !opCtx->getClient()->session() ||
             (opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient);
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot specify 'sampleRate' since it is an internal field",
+                "Cannot specify 'sampleId' since it is an internal field",
                 !request.getSampleId() || isInternalClient ||
                     TestingProctor::instance().isEnabled());
         return request.getSampleId();
     }
     if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
         uassert(ErrorCodes::InvalidOptions,
-                "Cannot specify 'sampleRate' since it is an internal field",
+                "Cannot specify 'sampleId' since it is an internal field",
                 !request.getSampleId());
         return QueryAnalysisSampler::get(opCtx).tryGenerateSampleId(opCtx, nss, cmdName);
     }

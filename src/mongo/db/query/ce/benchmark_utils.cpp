@@ -29,6 +29,18 @@
 
 #include "mongo/db/query/ce/benchmark_utils.h"
 
+#include <algorithm>
+#include <numeric>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/query/optimizer/metadata_factory.h"
+#include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/unittest/assert.h"
+
 namespace mongo::optimizer::ce {
 BSONObj BenchmarkResults::toBSON() const {
     BSONObjBuilder bob;

@@ -106,9 +106,9 @@ env.Library(
 )
 
 env.CppUnitTest(
-    target="histogram_estimator_test",
+    target='histogram_estimator_test',
     source=[
-        "histogram_estimator_test.cpp",
+        'histogram_estimator_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/query/stats/stats_test_utils',
@@ -159,9 +159,9 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="heuristic_dataflow_nodes_test",
+    target='heuristic_dataflow_nodes_test',
     source=[
-        "heuristic_dataflow_nodes_test.cpp",
+        'heuristic_dataflow_nodes_test.cpp',
     ],
     LIBDEPS=[
         'test_utils',
@@ -179,7 +179,7 @@ env.CppUnitTest(
 )
 
 env.CppUnitTest(
-    target="maxdiff_histogram_test",
+    target='maxdiff_histogram_test',
     source=[
         'maxdiff_histogram_test.cpp',
     ],

@@ -29,7 +29,13 @@
 
 #include "mongo/db/query/collation/collator_factory_interface.h"
 
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/service_context.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

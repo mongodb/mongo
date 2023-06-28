@@ -29,16 +29,36 @@
 
 #include "mongo/db/pipeline/document_source_fill.h"
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/pipeline/document_source_add_fields.h"
+#include "mongo/db/pipeline/document_source_fill_gen.h"
 #include "mongo/db/pipeline/document_source_set_window_fields.h"
-#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
-#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/overloaded_visitor.h"
-#include <string>
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
 
 namespace mongo {
 

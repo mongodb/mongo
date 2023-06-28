@@ -108,7 +108,8 @@ public:
     }
 
     static NamespaceString ns() {
-        return {"unittests", "QueryStageCountScanScan"};
+        return NamespaceString::createNamespaceString_forTest("unittests",
+                                                              "QueryStageCountScanScan");
     }
 
 protected:
@@ -148,7 +149,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(2, numCounted);
@@ -181,7 +182,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(5, numCounted);
@@ -214,7 +215,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(3, numCounted);
@@ -243,7 +244,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -273,7 +274,7 @@ public:
         params.endKeyInclusive = false;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -304,7 +305,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(0, numCounted);
@@ -336,7 +337,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -392,7 +393,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -451,7 +452,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;
@@ -517,7 +518,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(7, numCounted);
@@ -551,7 +552,7 @@ public:
         params.endKeyInclusive = true;  // yes?
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
 
         int numCounted = runCount(&count);
         ASSERT_EQUALS(9, numCounted);
@@ -582,7 +583,7 @@ public:
         params.endKeyInclusive = true;
 
         WorkingSet ws;
-        CountScan count(_expCtx.get(), coll, params, &ws);
+        CountScan count(_expCtx.get(), &coll, params, &ws);
         WorkingSetID wsid;
 
         int numCounted = 0;

@@ -29,24 +29,35 @@
 
 #pragma once
 
-#include <wiredtiger.h>
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <memory>
 #include <stack>
 #include <vector>
+#include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_snapshot_manager.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_stats.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/timer.h"
+
 namespace mongo {
 
 using RoundUpPreparedTimestamps = WiredTigerBeginTxnBlock::RoundUpPreparedTimestamps;

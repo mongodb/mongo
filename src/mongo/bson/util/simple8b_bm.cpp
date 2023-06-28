@@ -28,10 +28,16 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 
+#include <boost/cstdint.hpp>
+
+#include "mongo/bson/util/builder.h"
 #include "mongo/bson/util/simple8b.h"
 #include "mongo/bson/util/simple8b_builder.h"
-#include "mongo/platform/bits.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 

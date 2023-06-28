@@ -50,7 +50,8 @@
 
 namespace QueryStageDistinct {
 
-static const NamespaceString nss{"unittests.QueryStageDistinct"};
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageDistinct");
 
 class DistinctBase {
 public:
@@ -145,7 +146,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), &coll, std::move(params), &ws);
 
         WorkingSetID wsid;
         // Get our first result.
@@ -214,7 +215,7 @@ public:
         params.bounds.fields.push_back(oil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), &coll, std::move(params), &ws);
 
         // We should see each number in the range [1, 6] exactly once.
         std::set<int> seen;
@@ -283,7 +284,7 @@ public:
         params.bounds.fields.push_back(bOil);
 
         WorkingSet ws;
-        DistinctScan distinct(_expCtx.get(), coll, std::move(params), &ws);
+        DistinctScan distinct(_expCtx.get(), &coll, std::move(params), &ws);
 
         WorkingSetID wsid;
         PlanStage::StageState state;

@@ -46,7 +46,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/config.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler_gcc.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace_somap.h"
 #include "mongo/util/version.h"

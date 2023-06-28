@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
+#include <set>
+#include <vector>
+
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/working_set_common.h"
 
 namespace mongo {

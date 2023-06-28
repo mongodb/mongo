@@ -126,7 +126,9 @@ class TestFileExplorer(object):
         if tag_files is None:
             tag_files = []
         for tag_file in tag_files:
-            if tag_file and os.path.exists(tag_file):
+            if not tag_file:
+                continue
+            if os.path.exists(tag_file):
                 tags_conf = _tags.TagsConfig.from_file(tag_file)
                 tagged_roots = tags_conf.get_test_patterns(test_kind)
                 for tagged_root in tagged_roots:
@@ -137,6 +139,12 @@ class TestFileExplorer(object):
                         # A test could have a tag in more than one place, due to wildcards in the
                         # selector.
                         tagged_tests[test].extend(test_tags)
+            else:
+                # TODO SERVER-77265 always validate tag file input when mongo-task-generator
+                # no longer passes in invalid tag files
+                if not config.EVERGREEN_TASK_ID:
+                    raise errors.TagFileDoesNotExistError(f"A tag file was not found at {tag_file}")
+
         return tagged_tests
 
 

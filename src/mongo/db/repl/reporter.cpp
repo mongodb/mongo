@@ -30,10 +30,17 @@
 
 #include "mongo/db/repl/reporter.h"
 
-#include "mongo/bson/util/bson_extract.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <mutex>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/commands/server_status_metric.h"
-#include "mongo/db/repl/update_position_args.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"

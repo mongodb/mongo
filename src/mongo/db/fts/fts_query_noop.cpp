@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <utility>
 
 #include "mongo/db/fts/fts_query_noop.h"
-
-#include <memory>
 
 
 namespace mongo {

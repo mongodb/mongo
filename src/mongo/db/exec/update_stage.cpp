@@ -29,25 +29,63 @@
 
 #include "mongo/db/exec/update_stage.h"
 
-#include <algorithm>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <exception>
+#include <string>
+#include <vector>
 
-#include "mongo/base/status_with.h"
-#include "mongo/bson/mutable/algorithm.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/update/update_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -143,7 +181,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
     // only enable in-place mutations if the underlying storage engine offers support for
     // writing damage events.
     _doc.reset(oldObjValue,
-               (collection()->updateWithDamagesSupported()
+               (collectionPtr()->updateWithDamagesSupported()
                     ? mutablebson::Document::kInPlaceEnabled
                     : mutablebson::Document::kInPlaceDisabled));
 
@@ -204,7 +242,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
 
     // Skip adding _id field if the collection is capped (since capped collection documents can
     // neither grow nor shrink).
-    const auto createIdField = !collection()->isCapped();
+    const auto createIdField = !collectionPtr()->isCapped();
 
     // Ensure _id is first if it exists, and generate a new OID if appropriate.
     update::ensureIdFieldIsFirst(&_doc, createIdField);
@@ -266,7 +304,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 WriteUnitOfWork wunit(opCtx());
                 newObj = uassertStatusOK(collection_internal::updateDocumentWithDamages(
                     opCtx(),
-                    collection(),
+                    collectionPtr(),
                     recordId,
                     oldObj,
                     source,
@@ -298,7 +336,7 @@ BSONObj UpdateStage::transformAndUpdate(const Snapshotted<BSONObj>& oldObj,
                 WriteUnitOfWork wunit(opCtx());
                 collection_internal::updateDocument(
                     opCtx(),
-                    collection(),
+                    collectionPtr(),
                     recordId,
                     oldObj,
                     newObj,
@@ -349,7 +387,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
     }
 
     boost::optional<repl::UnreplicatedWritesBlock> unReplBlock;
-    if (collection()->ns().isImplicitlyReplicated() && !_isUserInitiatedWrite) {
+    if (collectionPtr()->ns().isImplicitlyReplicated() && !_isUserInitiatedWrite) {
         // Implictly replicated collections do not replicate updates.
         // However, user-initiated writes and some background maintenance tasks are allowed
         // to replicate as they cannot be derived from the oplog.
@@ -413,7 +451,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             "UpdateStage ensureStillMatches",
             [&] {
                 docStillMatches = write_stage_common::ensureStillMatches(
-                    collection(), opCtx(), _ws, id, _params.canonicalQuery);
+                    collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
                 return PlanStage::NEED_TIME;
             },
             [&] {
@@ -442,7 +480,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             auto [immediateReturnStageState, fromMigrate] = _preWriteFilter.checkIfNotWritable(
                 member->doc.value(),
                 "update"_sd,
-                collection()->ns(),
+                collectionPtr()->ns(),
                 [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                     planExecutorShardingCriticalSectionFuture(opCtx()) =
                         ex->getCriticalSectionSignal();
@@ -532,7 +570,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             expCtx(),
             "UpdateStage restoreState",
             [&] {
-                child()->restoreState(&collection());
+                child()->restoreState(&collectionPtr());
                 return PlanStage::NEED_TIME;
             },
             [&] {
@@ -565,7 +603,7 @@ PlanStage::StageState UpdateStage::doWork(WorkingSetID* out) {
             return PlanStage::ADVANCED;
         }
 
-        return PlanStage::NEED_TIME;
+        return isEOF() ? PlanStage::IS_EOF : PlanStage::NEED_TIME;
     } else if (PlanStage::IS_EOF == status) {
         // The child is out of results, and therefore so are we.
         return PlanStage::IS_EOF;
@@ -589,6 +627,15 @@ void UpdateStage::doRestoreStateRequiresCollection() {
                   str::stream() << "Demoted from primary while performing update on "
                                 << nsString.toStringForErrorMsg());
     }
+
+    // Single updates never yield after having already modified one document. Otherwise restore
+    // could fail (e.g. due to a sharding placement change) and we'd fail to report in the response
+    // the already modified documents.
+    const bool singleUpdateAndAlreadyWrote = !_params.request->isMulti() &&
+        (_specificStats.nModified > 0 || _specificStats.nUpserted > 0);
+    tassert(7711601,
+            "Single update should never restore after having already modified one document.",
+            !singleUpdateAndAlreadyWrote || request.explain());
 
     _preWriteFilter.restoreState();
 }
@@ -702,11 +749,13 @@ void UpdateStage::checkUpdateChangesReshardingKey(const ShardingWriteRouter& sha
     auto oldRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(oldObj.value());
     auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newObj);
 
-    uassert(
-        WouldChangeOwningShardInfo(
-            oldObj.value(), newObj, false /* upsert */, collection()->ns(), collection()->uuid()),
-        "This update would cause the doc to change owning shards under the new shard key",
-        oldRecipShard == newRecipShard);
+    uassert(WouldChangeOwningShardInfo(oldObj.value(),
+                                       newObj,
+                                       false /* upsert */,
+                                       collectionPtr()->ns(),
+                                       collectionPtr()->uuid()),
+            "This update would cause the doc to change owning shards under the new shard key",
+            oldRecipShard == newRecipShard);
 }
 
 void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj>& newObjCopy,
@@ -723,7 +772,7 @@ void UpdateStage::checkUpdateChangesShardKeyFields(const boost::optional<BSONObj
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collectionPtr()->ns());
     checkUpdateChangesExistingShardKey(newObj, oldObj);
     checkUpdateChangesReshardingKey(shardingWriteRouter, newObj, oldObj);
 }
@@ -769,8 +818,8 @@ void UpdateStage::checkUpdateChangesExistingShardKey(const BSONObj& newObj,
         uasserted(WouldChangeOwningShardInfo(oldObj.value(),
                                              newObj,
                                              false /* upsert */,
-                                             collection()->ns(),
-                                             collection()->uuid()),
+                                             collectionPtr()->ns(),
+                                             collectionPtr()->uuid()),
                   "This update would cause the doc to change owning shards");
     }
 }

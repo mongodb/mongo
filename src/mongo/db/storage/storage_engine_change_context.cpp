@@ -28,14 +28,22 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <mutex>
+#include <utility>
 
-#include "mongo/db/storage/storage_engine_change_context.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/operation_id.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine_change_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -112,11 +120,13 @@ StorageChangeLock::Token StorageEngineChangeContext::killOpsForStorageEngineChan
                     StorageEngineChangeOperationContextDoneNotifier::get(opCtxToKill);
                 doneNotifier.setNotifyWhenDone(service);
                 ++_numOpCtxtsToWaitFor;
+                killedOperationId = opCtxToKill->getOpID();
             }
             LOGV2_DEBUG(5781190,
                         1,
                         "Killed OpCtx for storage change",
-                        "killedOperationId"_attr = killedOperationId);
+                        "killedOperationId"_attr = killedOperationId,
+                        "client"_attr = client->desc());
         }
     }
 

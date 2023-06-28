@@ -29,10 +29,17 @@
 
 #include "mongo/db/catalog/commit_quorum_options.h"
 
+#include <cstddef>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

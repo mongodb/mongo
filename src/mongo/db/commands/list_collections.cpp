@@ -28,44 +28,82 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
+#include <iosfwd>
+#include <limits>
 #include <memory>
+#include <set>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/list_collections_filter.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/curop_failpoint_helpers.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/queued_data_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/list_collections_gen.h"
-#include "mongo/db/multitenancy.h"
-#include "mongo/db/query/cursor_request.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/storage/storage_engine.h"
-#include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/views/view.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -255,14 +293,12 @@ BSONObj buildCollectionBson(OperationContext* opCtx,
 ListCollectionsReply createListCollectionsCursorReply(
     CursorId cursorId,
     const NamespaceString& cursorNss,
-    const SerializationContext& serializationContext,
+    const SerializationContext& respSerializationContext,
     std::vector<mongo::ListCollectionsReplyItem>&& firstBatch) {
     return ListCollectionsReply(
-        ListCollectionsReplyCursor(cursorId,
-                                   cursorNss,
-                                   std::move(firstBatch),
-                                   SerializationContext::stateCommandReply(serializationContext)),
-        SerializationContext::stateCommandReply(serializationContext));
+        ListCollectionsReplyCursor(
+            cursorId, cursorNss, std::move(firstBatch), respSerializationContext),
+        respSerializationContext);
 }
 
 class CmdListCollections : public ListCollectionsCmdVersion1Gen<CmdListCollections> {
@@ -300,11 +336,7 @@ public:
 
         void doCheckAuthorization(OperationContext* opCtx) const final {
             AuthorizationSession* authzSession = AuthorizationSession::get(opCtx->getClient());
-
-            auto dbName = request().getDbName();
-            auto cmdObj = request().toBSON({});
-            uassertStatusOK(authzSession->checkAuthorizedToListCollections(
-                DatabaseNameUtil::serializeForAuth(dbName), cmdObj));
+            uassertStatusOK(authzSession->checkAuthorizedToListCollections(request()));
         }
 
         NamespaceString ns() const final {
@@ -322,7 +354,8 @@ public:
             const bool authorizedCollections = listCollRequest.getAuthorizedCollections();
 
             // We need to copy the serialization context from the request to the reply object
-            const auto serializationContext = listCollRequest.getSerializationContext();
+            const auto respSerializationContext =
+                SerializationContext::stateCommandReply(listCollRequest.getSerializationContext());
 
             // The collator is null because collection objects are compared using binary comparison.
             auto expCtx = make_intrusive<ExpressionContext>(
@@ -528,11 +561,10 @@ public:
 
                     try {
                         firstBatch.push_back(ListCollectionsReplyItem::parse(
-                            IDLParserContext(
-                                "ListCollectionsReplyItem",
-                                false /* apiStrict*/,
-                                cursorNss.tenantId(),
-                                SerializationContext::stateCommandReply(serializationContext)),
+                            IDLParserContext("ListCollectionsReplyItem",
+                                             false /* apiStrict*/,
+                                             cursorNss.tenantId(),
+                                             respSerializationContext),
                             nextDoc));
                     } catch (const DBException& exc) {
                         LOGV2_ERROR(
@@ -545,8 +577,10 @@ public:
                     responseSizeTracker.add(nextDoc);
                 }
                 if (exec->isEOF()) {
-                    return createListCollectionsCursorReply(
-                        0 /* cursorId */, cursorNss, serializationContext, std::move(firstBatch));
+                    return createListCollectionsCursorReply(0 /* cursorId */,
+                                                            cursorNss,
+                                                            respSerializationContext,
+                                                            std::move(firstBatch));
                 }
                 exec->saveState();
                 exec->detachFromOperationContext();
@@ -564,14 +598,13 @@ public:
                  ReadPreferenceSetting::get(opCtx),
                  cmdObj,
                  uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                     ->checkAuthorizedToListCollections(
-                                         DatabaseNameUtil::serializeForAuth(dbName), cmdObj))});
+                                     ->checkAuthorizedToListCollections(listCollRequest))});
             pinnedCursor->incNBatches();
             pinnedCursor->incNReturnedSoFar(firstBatch.size());
 
             return createListCollectionsCursorReply(pinnedCursor.getCursor()->cursorid(),
                                                     cursorNss,
-                                                    serializationContext,
+                                                    respSerializationContext,
                                                     std::move(firstBatch));
         }
     };

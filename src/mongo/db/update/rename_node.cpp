@@ -27,17 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 
-#include "mongo/db/update/rename_node.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/const_element.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/update/field_checker.h"
 #include "mongo/db/update/modifier_node.h"
 #include "mongo/db/update/path_support.h"
-#include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/rename_node.h"
+#include "mongo/db/update/runtime_update_path.h"
 #include "mongo/db/update/unset_node.h"
+#include "mongo/db/update/update_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -29,6 +29,13 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 
 namespace mongo {

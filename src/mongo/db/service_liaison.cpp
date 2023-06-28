@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/service_liaison.h"
-
-#include "mongo/db/service_context.h"
 
 namespace mongo {
 

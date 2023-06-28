@@ -14,12 +14,11 @@ RUN debconf-set-selections /tmp/preseed.txt
 RUN rm /tmp/preseed.txt
 
 RUN apt-get update
+RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get install -qy git-all wget build-essential checkinstall libreadline-gplv2-dev libncursesw5-dev libssl-dev libsqlite3-dev tk-dev libgdbm-dev libc6-dev libbz2-dev libffi-dev zlib1g-dev
 RUN apt-get install -qy libcurl4 libgssapi-krb5-2 libldap-2.4-2 libwrap0 libsasl2-2 libsasl2-modules libsasl2-modules-gssapi-mit openssl liblzma5 libssl-dev build-essential software-properties-common
-RUN add-apt-repository ppa:deadsnakes/ppa
-RUN apt-get update
 
 # installs that need to be forced to be non-interactive: python 3.9 and git
-RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true apt-get install -qy python3.9 python3.9-dev python3.9-venv git-all
+RUN bash -c "cd /opt && wget https://www.python.org/ftp/python/3.9.16/Python-3.9.16.tgz && tar xzf Python-3.9.16.tgz && cd Python-3.9.16 && ./configure --enable-optimizations && make altinstall && rm -f /opt/Python-3.9.6.tgz"
 
 # -------------------
 # Everything above this line should be common image setup

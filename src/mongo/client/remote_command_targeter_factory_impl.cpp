@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/remote_command_targeter_factory_impl.h"
-
 #include <memory>
+#include <vector>
 
-#include "mongo/base/status_with.h"
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter_factory_impl.h"
 #include "mongo/client/remote_command_targeter_rs.h"
 #include "mongo/client/remote_command_targeter_standalone.h"
 #include "mongo/util/assert_util.h"

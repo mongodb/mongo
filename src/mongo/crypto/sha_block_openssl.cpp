@@ -27,25 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <initializer_list>
 #include <memory>
 
+#include "mongo/base/data_range.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/crypto/sha512_block.h"
-
-#include "mongo/config.h"
 #include "mongo/util/assert_util.h"
 
 #ifndef MONGO_CONFIG_SSL
 #error This file should only be included in SSL-enabled builds
 #endif
 
+#include <cstdint>
 #include <cstring>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
-#include <openssl/sha.h>
+#include <openssl/opensslv.h>
+#include <openssl/ossl_typ.h>
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L || \
     (defined(LIBRESSL_VERSION_NUMBER) && LIBRESSL_VERSION_NUMBER < 0x2070000fL)

@@ -30,19 +30,27 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <memory>
 #include <set>
 #include <string>
+#include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/timeseries/bucket_spec.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 /**

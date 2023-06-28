@@ -29,12 +29,19 @@
 
 #include "mongo/db/query/index_bounds.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <tuple>
+#include <iterator>
+#include <memory>
 #include <utility>
 
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

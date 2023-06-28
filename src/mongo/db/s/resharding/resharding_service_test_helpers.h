@@ -155,7 +155,7 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override {
+                   OpStateAccumulator* opAccumulator = nullptr) override {
         if (coll->ns() != _stateDocumentNss) {
             return;
         }

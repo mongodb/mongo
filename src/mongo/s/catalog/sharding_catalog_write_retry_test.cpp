@@ -72,7 +72,8 @@ using unittest::assertGet;
 using InsertRetryTest = ShardingTestFixture;
 using UpdateRetryTest = ShardingTestFixture;
 
-const NamespaceString kTestNamespace("config.TestColl");
+const NamespaceString kTestNamespace =
+    NamespaceString::createNamespaceString_forTest("config.TestColl");
 const HostAndPort kTestHosts[] = {
     HostAndPort("TestHost1:12345"), HostAndPort("TestHost2:12345"), HostAndPort("TestHost3:12345")};
 

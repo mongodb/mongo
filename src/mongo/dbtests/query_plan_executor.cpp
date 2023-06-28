@@ -64,7 +64,8 @@ using std::shared_ptr;
 using std::string;
 using std::unique_ptr;
 
-static const NamespaceString nss("unittests.QueryPlanExecutor");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryPlanExecutor");
 
 class PlanExecutorTest : public unittest::Test {
 public:
@@ -118,7 +119,7 @@ public:
 
         // Make the stage.
         unique_ptr<PlanStage> root(
-            new CollectionScan(cq->getExpCtxRaw(), *coll, csparams, ws.get(), cq.get()->root()));
+            new CollectionScan(cq->getExpCtxRaw(), coll, csparams, ws.get(), cq.get()->root()));
 
         // Hand the plan off to the executor.
         auto statusWithPlanExecutor = plan_executor_factory::make(std::move(cq),
@@ -153,10 +154,9 @@ public:
         ixparams.bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
 
         unique_ptr<WorkingSet> ws(new WorkingSet());
-        auto ixscan =
-            std::make_unique<IndexScan>(_expCtx.get(), *coll, ixparams, ws.get(), nullptr);
-        unique_ptr<PlanStage> root = std::make_unique<FetchStage>(
-            _expCtx.get(), ws.get(), std::move(ixscan), nullptr, *coll);
+        auto ixscan = std::make_unique<IndexScan>(_expCtx.get(), coll, ixparams, ws.get(), nullptr);
+        unique_ptr<PlanStage> root =
+            std::make_unique<FetchStage>(_expCtx.get(), ws.get(), std::move(ixscan), nullptr, coll);
 
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
         auto statusWithCQ = CanonicalQuery::canonicalize(&_opCtx, std::move(findCommand));

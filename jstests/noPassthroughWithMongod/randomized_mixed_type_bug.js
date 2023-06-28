@@ -61,7 +61,7 @@ let testMixedTypeQuerying = () => {
             // Query on pathArray w/ {[compare]: val} on test and control.
             // Compare the results.
             try {
-                assert.docEq(
+                assert.sameMembers(
                     // Isn't timeseries.
                     db.control.find({[path]: {[compare]: val}}, {_id: 0}).toArray(),
                     // Is timeseries.

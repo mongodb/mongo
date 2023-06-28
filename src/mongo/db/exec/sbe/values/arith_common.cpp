@@ -29,6 +29,19 @@
 
 #include "mongo/db/exec/sbe/values/arith_common.h"
 
+#include <cmath>
+#include <cstdint>
+#include <limits>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/overflow_arithmetic.h"
+#include "mongo/util/assert_util.h"
+
 /**
 These common operations - Addition, Subtraction and Multiplication - are used in both the VM and
 constant folding in the optimizer. These methods are extensible for any computation with SBE values.

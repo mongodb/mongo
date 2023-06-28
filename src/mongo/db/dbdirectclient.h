@@ -29,11 +29,28 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/config.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/rpc/message.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 

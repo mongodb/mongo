@@ -29,9 +29,27 @@
 
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 
-#include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/node.h"
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <memory>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer {

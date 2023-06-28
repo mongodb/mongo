@@ -27,20 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/fetch.h"
-
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/plan_executor_impl.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -54,7 +51,7 @@ FetchStage::FetchStage(ExpressionContext* expCtx,
                        WorkingSet* ws,
                        std::unique_ptr<PlanStage> child,
                        const MatchExpression* filter,
-                       const CollectionPtr& collection)
+                       VariantCollectionPtrOrAcquisition collection)
     : RequiresCollectionStage(kStageType, expCtx, collection),
       _ws(ws),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
@@ -104,7 +101,7 @@ PlanStage::StageState FetchStage::doWork(WorkingSetID* out) {
                 expCtx(),
                 "FetchStage",
                 [&] {
-                    const auto& coll = collection();
+                    const auto& coll = collectionPtr();
                     if (!_cursor)
                         _cursor = coll->getCursor(opCtx());
 

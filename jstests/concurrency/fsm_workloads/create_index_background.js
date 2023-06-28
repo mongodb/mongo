@@ -68,7 +68,7 @@ var $config = (function() {
                     return coll.find({crud: {$exists: true}}).itcount() > 0;
                 }, 'No documents with "crud" field have been inserted or updated', 60 * 1000);
 
-                let createOptions = {background: true};
+                let createOptions = {};
                 let filter = this.getPartialFilterExpression();
                 if (filter !== undefined) {
                     createOptions['partialFilterExpression'] = filter;

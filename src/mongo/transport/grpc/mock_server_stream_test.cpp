@@ -35,7 +35,7 @@
 
 #include <grpcpp/support/status.h>
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/message.h"
 #include "mongo/stdx/thread.h"
@@ -72,11 +72,11 @@ public:
     }
 
     MockServerStream& getServerStream() {
-        return *_fixtures->serverStream;
+        return *_fixtures->rpc->serverStream;
     }
 
     MockServerContext& getServerContext() {
-        return *_fixtures->serverCtx;
+        return *_fixtures->rpc->serverCtx;
     }
 
     ClientStream& getClientStream() {
@@ -134,7 +134,7 @@ private:
     std::unique_ptr<MockStreamTestFixtures> _fixtures;
 };
 
-class MockServerStreamTest : public MockServerStreamBase<LockerNoopServiceContextTest> {};
+class MockServerStreamTest : public MockServerStreamBase<ServiceContextTest> {};
 
 class MockServerStreamTestWithMockedClockSource
     : public MockServerStreamBase<ServiceContextWithClockSourceMockTest> {};

@@ -18,10 +18,11 @@ function killopOnFailpoint(rst, failpointName, collName) {
     assert.commandWorked(coll.insert({a: 1}));
 
     const fp = configureFailPoint(testDB, failpointName);
+    // Pausing is only required to obtain the opId, as the target failpoint will block the build at
+    // the location where we want the index build to be killed.
     IndexBuildTest.pauseIndexBuilds(primary);
 
-    const createIdx =
-        IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true});
+    const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
     // When the index build starts, find its op id.
     const opId = IndexBuildTest.waitForIndexBuildToScanCollection(testDB, coll.getName(), 'a_1');
@@ -39,25 +40,20 @@ function killopOnFailpoint(rst, failpointName, collName) {
             'Unexpected ns field value in db.currentOp() result for index build: ' + tojson(op));
     });
 
+    // Once we have the opId, we can resume index builds (the target failpoint will block it at the
+    // desired location).
+    IndexBuildTest.resumeIndexBuilds(primary);
+
     // Index build should be present in the config.system.indexBuilds collection.
     const indexMap =
         IndexBuildTest.assertIndexes(coll, 2, ["_id_"], ["a_1"], {includeBuildUUIDs: true});
     const indexBuildUUID = indexMap['a_1'].buildUUID;
     assert(primary.getCollection('config.system.indexBuilds').findOne({_id: indexBuildUUID}));
 
-    IndexBuildTest.resumeIndexBuilds(primary);
-
     // Kill the index builder thread.
     fp.wait();
     assert.commandWorked(testDB.killOp(opId));
     fp.off();
-
-    // Wait for the index build to stop from the killop signal.
-    try {
-        IndexBuildTest.waitForIndexBuildToStop(testDB);
-    } finally {
-        IndexBuildTest.resumeIndexBuilds(primary);
-    }
 
     const exitCode = createIdx({checkExitSuccess: false});
     assert.neq(
@@ -65,7 +61,7 @@ function killopOnFailpoint(rst, failpointName, collName) {
 
     // Check that no new index has been created.  This verifies that the index build was aborted
     // rather than successfully completed.
-    IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+    IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_']);
 
     const cmdNs = testDB.getCollection('$cmd').getFullName();
     let ops = rst.dumpOplog(primary, {op: 'c', ns: cmdNs, 'o.startIndexBuild': coll.getName()});

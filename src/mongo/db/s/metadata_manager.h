@@ -29,13 +29,30 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <list>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

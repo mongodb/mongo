@@ -27,43 +27,80 @@
  *    it in the license file.
  */
 
-#include <boost/format.hpp>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/algorithm/string/case_conv.hpp>
+#include <boost/move/utility_core.hpp>
+#include <chrono>
+#include <functional>
+#include <initializer_list>
+#include <iosfwd>
+#include <memory>
+#include <queue>
+#include <ratio>
+#include <string_view>
+#include <system_error>
+#include <vector>
 
-#include "mongo/config.h"
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
-#include "mongo/db/exec/sbe/vm/vm.h"
-#include "mongo/db/exec/sbe/vm/vm_printer.h"
-
-#include <boost/algorithm/string.hpp>
-
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
-#include "mongo/db/client.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/accumulator_sum_value_enum.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/column_store_encoder.h"
 #include "mongo/db/exec/sbe/values/columnar.h"
+#include "mongo/db/exec/sbe/values/row.h"
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
 #include "mongo/db/exec/sbe/values/util.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/vm/datetime.h"
+#include "mongo/db/exec/sbe/vm/vm.h"
+#include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/fts/fts_matcher.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/index/btree_key_generator.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/storage/column_store.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/indexed_string_vector.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/summation.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -3688,6 +3725,22 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinBsonSize(ArityTy
     return {false, value::TypeTags::Nothing, 0};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinStrLenBytes(ArityType arity) {
+    invariant(arity == 1);
+
+    auto [_, operandTag, operandVal] = getFromStack(0);
+
+    if (value::isString(operandTag)) {
+        auto str = value::getStringView(operandTag, operandVal);
+        auto strLenBytes = str.size();
+        uassert(5155801,
+                "string length could not be represented as an int.",
+                strLenBytes <= std::numeric_limits<int>::max());
+        return {false, value::TypeTags::NumberInt32, strLenBytes};
+    }
+    return {false, value::TypeTags::Nothing, 0};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinToUpper(ArityType arity) {
     auto [_, operandTag, operandVal] = getFromStack(0);
 
@@ -3762,7 +3815,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinCoerceToString(A
         case value::TypeTags::Date: {
             std::string str = str::stream()
                 << TimeZoneDatabase::utcZone().formatDate(
-                       kISOFormatString,
+                       kIsoFormatStringZ,
                        Date_t::fromMillisSinceEpoch(value::bitcastTo<int64_t>(operandVal)));
             auto [strTag, strVal] = value::makeNewString(str);
             return {true, strTag, strVal};
@@ -6570,6 +6623,128 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggMinMaxNFinali
     return {true, arrayTag, arrayVal};
 }
 
+std::tuple<value::Array*, std::pair<value::TypeTags, value::Value>, int64_t, int64_t> rankState(
+    value::TypeTags stateTag, value::Value stateVal) {
+    uassert(
+        7795500, "The accumulator state should be an array", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    uassert(7795501,
+            "The accumulator state should have correct number of elements",
+            state->size() == AggRankElems::kRankArraySize);
+
+    auto lastValue = state->getAt(AggRankElems::kLastValue);
+    auto [lastRankTag, lastRankVal] = state->getAt(AggRankElems::kLastRank);
+    auto [sameRankCountTag, sameRankCountVal] = state->getAt(AggRankElems::kSameRankCount);
+
+    uassert(7795502,
+            "Last rank component should be a 64-bit integer",
+            lastRankTag == value::TypeTags::NumberInt64);
+    auto lastRank = value::bitcastTo<int64_t>(lastRankVal);
+
+    uassert(7795503,
+            "Same rank component should be a 64-bit integer",
+            sameRankCountTag == value::TypeTags::NumberInt64);
+    auto sameRankCount = value::bitcastTo<int64_t>(sameRankCountVal);
+    return {state, lastValue, lastRank, sameRankCount};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> builtinAggRankImpl(
+    value::TypeTags stateTag,
+    value::Value stateVal,
+    bool valueOwned,
+    value::TypeTags valueTag,
+    value::Value valueVal,
+    bool dense,
+    CollatorInterface* collator = nullptr) {
+    // Initialize the accumulator.
+    if (stateTag == value::TypeTags::Nothing) {
+        auto [newStateTag, newStateVal] = value::makeNewArray();
+        value::ValueGuard newStateGuard{newStateTag, newStateVal};
+        auto newState = value::getArrayView(newStateVal);
+        newState->reserve(AggRankElems::kRankArraySize);
+        if (!valueOwned) {
+            std::tie(valueTag, valueVal) = value::copyValue(valueTag, valueVal);
+        }
+        newState->push_back(valueTag, valueVal);
+        newState->push_back(value::TypeTags::NumberInt64, 1);
+        newState->push_back(value::TypeTags::NumberInt64, 1);
+        newStateGuard.reset();
+        return {true, newStateTag, newStateVal};
+    }
+
+    value::ValueGuard stateGuard{stateTag, stateVal};
+    auto [state, lastValue, lastRank, sameRankCount] = rankState(stateTag, stateVal);
+    auto [compareTag, compareVal] =
+        value::compareValue(valueTag, valueVal, lastValue.first, lastValue.second, collator);
+    if (compareTag == value::TypeTags::NumberInt32 && compareVal == 0) {
+        state->setAt(AggRankElems::kSameRankCount, value::TypeTags::NumberInt64, sameRankCount + 1);
+    } else {
+        if (!valueOwned) {
+            std::tie(valueTag, valueVal) = value::copyValue(valueTag, valueVal);
+        }
+        state->setAt(AggRankElems::kLastValue, valueTag, valueVal);
+        state->setAt(AggRankElems::kLastRank,
+                     value::TypeTags::NumberInt64,
+                     dense ? lastRank + 1 : lastRank + sameRankCount);
+        state->setAt(AggRankElems::kSameRankCount, value::TypeTags::NumberInt64, 1);
+    }
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRank(ArityType arity) {
+    invariant(arity == 2);
+    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    return builtinAggRankImpl(
+        stateTag, stateVal, valueOwned, valueTag, valueVal, false /* dense */);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankColl(ArityType arity) {
+    invariant(arity == 3);
+    auto [collatorOwned, collatorTag, collatorVal] = getFromStack(2);
+    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+
+    tassert(7795504,
+            "Incorrect value type passed to aggRankColl for collator.",
+            collatorTag == value::TypeTags::collator);
+    auto collator = value::getCollatorView(collatorVal);
+
+    return builtinAggRankImpl(
+        stateTag, stateVal, valueOwned, valueTag, valueVal, false /* dense */, collator);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRank(ArityType arity) {
+    invariant(arity == 2);
+    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    return builtinAggRankImpl(stateTag, stateVal, valueOwned, valueTag, valueVal, true /* dense */);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggDenseRankColl(ArityType arity) {
+    invariant(arity == 3);
+    auto [collatorOwned, collatorTag, collatorVal] = getFromStack(2);
+    auto [valueOwned, valueTag, valueVal] = getFromStack(1);
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+
+    tassert(7795505,
+            "Incorrect value type passed to aggDenseRankColl for collator.",
+            collatorTag == value::TypeTags::collator);
+    auto collator = value::getCollatorView(collatorVal);
+
+    return builtinAggRankImpl(
+        stateTag, stateVal, valueOwned, valueTag, valueVal, true /* dense */, collator);
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankFinalize(ArityType arity) {
+    invariant(arity == 1);
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+    auto [state, lastValue, lastRank, sameRankCount] = rankState(stateTag, stateVal);
+    return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(lastRank)};
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
     switch (f) {
@@ -6673,6 +6848,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinBitTestPosition(arity);
         case Builtin::bsonSize:
             return builtinBsonSize(arity);
+        case Builtin::strLenBytes:
+            return builtinStrLenBytes(arity);
         case Builtin::toUpper:
             return builtinToUpper(arity);
         case Builtin::toLower:
@@ -6874,6 +7051,16 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggMinMaxNMerge<true /* less */>(arity);
         case Builtin::aggMinNFinalize:
             return builtinAggMinMaxNFinalize<true /* less */>(arity);
+        case Builtin::aggRank:
+            return builtinAggRank(arity);
+        case Builtin::aggRankColl:
+            return builtinAggRankColl(arity);
+        case Builtin::aggDenseRank:
+            return builtinAggDenseRank(arity);
+        case Builtin::aggDenseRankColl:
+            return builtinAggDenseRankColl(arity);
+        case Builtin::aggRankFinalize:
+            return builtinAggRankFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -6982,6 +7169,8 @@ std::string builtinToString(Builtin b) {
             return "bitTestPosition";
         case Builtin::bsonSize:
             return "bsonSize";
+        case Builtin::strLenBytes:
+            return "strLenBytes";
         case Builtin::toUpper:
             return "toUpper";
         case Builtin::toLower:
@@ -7184,6 +7373,16 @@ std::string builtinToString(Builtin b) {
             return "aggMinNMerge";
         case Builtin::aggMinNFinalize:
             return "aggMinNFinalize";
+        case Builtin::aggRank:
+            return "aggRank";
+        case Builtin::aggRankColl:
+            return "aggRankColl";
+        case Builtin::aggDenseRank:
+            return "aggDenseRank";
+        case Builtin::aggDenseRankColl:
+            return "aggDenseRankColl";
+        case Builtin::aggRankFinalize:
+            return "aggRankFinalize";
         default:
             MONGO_UNREACHABLE;
     }

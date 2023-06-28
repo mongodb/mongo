@@ -33,6 +33,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
 
 namespace mongo {
 /**

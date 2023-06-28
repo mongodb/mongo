@@ -27,19 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/timeseries/timeseries_dotted_path_support.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <limits>
+#include <ostream>
 #include <string>
+#include <tuple>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonelement.h"
-#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bsoncolumn.h"
 #include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_dotted_path_support.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {

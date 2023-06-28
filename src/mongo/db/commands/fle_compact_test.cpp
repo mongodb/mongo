@@ -27,24 +27,66 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <MurmurHash3.h>
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/crypto/symmetric_key.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/fle2_compact.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/fle_query_interface_mock.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/random.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
+#include "mongo/util/murmur3.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -134,9 +176,8 @@ BSONObj TestKeyVault::getEncryptedKey(const UUID& uuid) {
 }
 
 UUID fieldNameToUUID(StringData field) {
-    std::array<uint8_t, UUID::kNumBytes> buf;
-
-    MurmurHash3_x86_128(field.rawData(), field.size(), 123456, buf.data());
+    std::array<char, UUID::kNumBytes> buf;
+    murmur3(field, 123456 /*seed*/, buf);
     return UUID::fromCDR(buf);
 }
 

@@ -29,15 +29,21 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 class BSONObj;

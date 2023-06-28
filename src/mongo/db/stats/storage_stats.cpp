@@ -28,25 +28,51 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/database_holder.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/s/balancer_stats_registry.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/stats/storage_stats.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
 #include "mongo/db/timeseries/timeseries_stats.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/unordered_map.h"
-
-#include "mongo/db/stats/storage_stats.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 
@@ -86,6 +112,7 @@ const stdx::unordered_map<std::string, StorageStatsGroups> _mapStorageStatsField
 void _appendRecordStats(OperationContext* opCtx,
                         const CollectionPtr& collection,
                         const NamespaceString& collNss,
+                        const SerializationContext& serializationCtx,
                         bool isNamespaceAlwaysUnsharded,
                         int scale,
                         bool isTimeseries,
@@ -97,7 +124,7 @@ void _appendRecordStats(OperationContext* opCtx,
     long long numRecords = collection->numRecords(opCtx);
     if (isTimeseries) {
         BSONObjBuilder bob(result->subobjStart("timeseries"));
-        bob.append("bucketsNs", NamespaceStringUtil::serialize(collNss));
+        bob.append("bucketsNs", NamespaceStringUtil::serialize(collNss, serializationCtx));
         bob.appendNumber("bucketCount", numRecords);
         if (numRecords) {
             bob.append("avgBucketSize", collection->averageObjectSize(opCtx));
@@ -289,6 +316,7 @@ void _appendTotalSize(OperationContext* opCtx,
 Status appendCollectionStorageStats(OperationContext* opCtx,
                                     const NamespaceString& nss,
                                     const StorageStatsSpec& storageStatsSpec,
+                                    const SerializationContext& serializationCtx,
                                     BSONObjBuilder* result,
                                     const boost::optional<BSONObj>& filterObj) {
     auto scale = storageStatsSpec.getScale().value_or(1);
@@ -375,6 +403,7 @@ Status appendCollectionStorageStats(OperationContext* opCtx,
                 _appendRecordStats(opCtx,
                                    collection,
                                    collNss,
+                                   serializationCtx,
                                    nss.isNamespaceAlwaysUnsharded(),
                                    scale,
                                    isTimeseries,

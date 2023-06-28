@@ -27,22 +27,39 @@
  *    it in the license file.
  */
 
-#include <algorithm>
-#include <boost/intrusive_ptr.hpp>
-#include <boost/optional.hpp>
-#include <iterator>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <set>
+#include <string>
+#include <type_traits>
+#include <variant>
 
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/cst_match_translation.h"
 #include "mongo/db/cst/cst_pipeline_translation.h"
 #include "mongo/db/cst/key_fieldname.h"
-#include "mongo/db/cst/key_value.h"
 #include "mongo/db/matcher/expression_expr.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/matcher_type_set.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo::cst_match_translation {
 namespace {

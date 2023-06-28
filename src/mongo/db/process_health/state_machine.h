@@ -28,11 +28,19 @@
  */
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <utility>
 #include <vector>
 
 #include "mongo/stdx/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/str.h"
 

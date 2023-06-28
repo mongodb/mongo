@@ -52,7 +52,7 @@ public:
 
 protected:
     static NamespaceString nss() {
-        return NamespaceString("unittests.pdfiletests.Insert");
+        return NamespaceString::createNamespaceString_forTest("unittests.pdfiletests.Insert");
     }
     CollectionPtr collection() {
         return CollectionPtr(

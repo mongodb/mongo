@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/type_database_gen.h"
@@ -132,7 +134,7 @@ protected:
     }
 
     CollectionType loadCollection(const ShardVersion& version) {
-        const auto coll = makeCollectionType(version);
+        auto coll = makeCollectionType(version);
         const auto scopedCollProv = scopedCollectionProvider(coll);
         const auto scopedChunksProv = scopedChunksProvider(makeChunks(version.placementVersion()));
         auto future = launchAsync([&] {

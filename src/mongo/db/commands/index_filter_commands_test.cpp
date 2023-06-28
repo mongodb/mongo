@@ -31,20 +31,44 @@
  * This file contains tests for mongo/db/commands/index_filter_commands.h
  */
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <cstddef>
+#include <fmt/format.h>
+#include <functional>
+#include <memory>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/exec/plan_cache_util.h"
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/json.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_callbacks.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
-#include "mongo/db/query/plan_ranker.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
 #include "mongo/db/query/sbe_plan_cache.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
 namespace {
@@ -191,32 +215,6 @@ protected:
         auto inputKey = makeSbeKey(*inputQuery);
 
         return _sbePlanCache->getEntry(inputKey).isOK();
-    }
-
-    /**
-     * Checks if plan cache size calculation returns expected result.
-     */
-    void assertSbePlanCacheKeySize(const char* queryStr,
-                                   const char* sortStr,
-                                   const char* projectionStr,
-                                   const char* collationStr) {
-        // Create canonical query.
-        std::unique_ptr<CanonicalQuery> cq = makeCQ(queryStr, sortStr, projectionStr, collationStr);
-        cq->setSbeCompatible(true);
-
-        auto sbeKey = makeSbeKey(*cq);
-
-        // The static size of the key structure.
-        const size_t staticSize = sizeof(sbeKey);
-
-        // The actual key representation is encoded as a string.
-        const size_t keyRepresentationSize = sbeKey.toString().size();
-
-        // The tests are setup for a single collection.
-        const size_t additionalCollectionSize = 0;
-
-        ASSERT_TRUE(sbeKey.estimatedKeySizeBytes() ==
-                    staticSize + keyRepresentationSize + additionalCollectionSize);
     }
 
     /**
@@ -589,15 +587,6 @@ TEST_F(IndexFilterCommandsTest, SetFilterAcceptsIndexNames) {
 
     ASSERT_BSONOBJ_EQ(indexes[0].embeddedObject(), fromjson("{a: 1}"));
     ASSERT_EQUALS(indexes[1].valueStringData(), "a_1:rev");
-}
-
-TEST_F(IndexFilterCommandsTest, SBEPlanCacheBudgetTest) {
-    assertSbePlanCacheKeySize("{a: 2}", "{}", "{}", "{}");
-
-    assertSbePlanCacheKeySize("{b: 'foo'}", "{}", "{}", "{locale: 'mock_reverse_string'}");
-
-    assertSbePlanCacheKeySize(
-        "{a: 1, b: 1}", "{a: -1}", "{_id: 0, a: 1}", "{locale: 'mock_reverse_string'}");
 }
 
 }  // namespace

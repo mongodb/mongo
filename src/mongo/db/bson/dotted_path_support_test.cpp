@@ -27,10 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
+#include <cstdint>
 #include <set>
+#include <string>
 #include <vector>
+
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
 
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/bson/bson_depth.h"
@@ -40,8 +45,12 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

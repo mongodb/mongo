@@ -28,6 +28,13 @@
  */
 
 #include "mongo/db/query/optimizer/props.h"
+
+#include <functional>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/util/assert_util.h"
 

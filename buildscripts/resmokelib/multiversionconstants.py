@@ -2,8 +2,10 @@
 import os
 import shutil
 from subprocess import DEVNULL, STDOUT, CalledProcessError, call, check_output
+import requests
 
 import structlog
+import buildscripts.resmokelib.config as _config
 
 from buildscripts.resmokelib.multiversion.multiversion_service import (
     MongoReleases, MongoVersion, MultiversionService, MONGO_VERSION_YAML, RELEASES_YAML)
@@ -12,6 +14,11 @@ from buildscripts.resmokelib.multiversionsetupconstants import \
 
 LAST_LTS = "last_lts"
 LAST_CONTINUOUS = "last_continuous"
+
+# We use the "releases.yml" file from "master" because it is guaranteed to be up-to-date
+# with the latest EOL versions. If a "last-continuous" version is EOL, we don't include
+# it in the multiversion config and therefore don't test against it.
+MASTER_RELEASES_FILE = "https://raw.githubusercontent.com/mongodb/mongo/master/src/mongo/util/version/releases.yml"
 
 LOGGER = structlog.getLogger(__name__)
 
@@ -32,15 +39,20 @@ def generate_mongo_version_file():
 
 def generate_releases_file():
     """Generate the releases constants file."""
-    # Copy the 'releases.yml' file from the source tree.
-    releases_yaml_path = os.path.join("src", "mongo", "util", "version", "releases.yml")
-    if not os.path.isfile(releases_yaml_path):
-        LOGGER.info(
-            'Skipping yml file generation because file .resmoke_mongo_release_values.yml does not exist at path {}.'
-            .format(releases_yaml_path))
-        return
+    try:
+        # Get the latest releases.yml from github
+        with open(RELEASES_YAML, "wb") as file:
+            file.write(requests.get(MASTER_RELEASES_FILE).content)
+    except Exception as exc:
+        LOGGER.warning(f"Could not get releases.yml file: {MASTER_RELEASES_FILE}")
 
-    shutil.copyfile(releases_yaml_path, RELEASES_YAML)
+        # If this fails in CI we want to be aware and fix this
+        if _config.EVERGREEN_TASK_ID:
+            raise exc
+
+        # Fallback to the current releases.yml
+        releases_yaml_path = os.path.join("src", "mongo", "util", "version", "releases.yml")
+        shutil.copyfile(releases_yaml_path, RELEASES_YAML)
 
 
 def in_git_root_dir():

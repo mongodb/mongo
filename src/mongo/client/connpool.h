@@ -29,22 +29,34 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <stack>
+#include <string>
+#include <vector>
 
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/executor/connection_pool_stats.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
+
 class DBConnectionPool;
 
 namespace executor {

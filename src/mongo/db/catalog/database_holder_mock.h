@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/catalog/database_holder.h"
+#include <boost/none.hpp>
 
 namespace mongo {
 
@@ -57,8 +58,9 @@ public:
 
     void closeAll(OperationContext* opCtx) override {}
 
-    std::set<DatabaseName> getNamesWithConflictingCasing(const DatabaseName& dbName) override {
-        return std::set<DatabaseName>();
+    boost::optional<DatabaseName> getNameWithConflictingCasing(
+        const DatabaseName& dbName) override {
+        return boost::none;
     }
 
     std::vector<DatabaseName> getNames() override {

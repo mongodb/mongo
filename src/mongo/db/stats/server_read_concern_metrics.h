@@ -33,6 +33,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/read_concern_stats_gen.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 

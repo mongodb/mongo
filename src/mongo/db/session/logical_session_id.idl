@@ -160,6 +160,7 @@ structs:
   OperationSessionInfoFromClient:
     description: "Parser for pulling out session transaction metadata from commands"
     strict: false
+    unsafe_dangerous_disable_extra_field_duplicate_checks: true
     fields:
       lsid:
         type: LogicalSessionFromClient

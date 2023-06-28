@@ -29,9 +29,19 @@
 
 #include "mongo/db/commands/bulk_write_parser.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
 #include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -146,9 +156,7 @@ BSONObj BulkWriteReplyItem::serialize() const {
         invariant(_ok == 1.0);
     }
 
-    if (_n) {
-        builder.append(kNFieldName, _n.get());
-    }
+    builder.append(kNFieldName, _n.value_or(0));
 
     if (_nModified) {
         builder.append(kNModifiedFieldName, _nModified.get());

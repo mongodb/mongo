@@ -29,7 +29,12 @@
 
 #include "mongo/db/timeseries/bucket_catalog/reopening.h"
 
+#include <cstddef>
+
+#include <absl/container/node_hash_map.h>
+
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::timeseries::bucket_catalog {
 

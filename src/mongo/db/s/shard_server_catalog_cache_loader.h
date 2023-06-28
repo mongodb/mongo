@@ -29,11 +29,34 @@
 
 #pragma once
 
+#include <cstdint>
+#include <list>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/operation_context_group.h"
 #include "mongo/db/s/namespace_metadata_change_notifications.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog_cache_loader.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

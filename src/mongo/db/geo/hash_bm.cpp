@@ -28,8 +28,9 @@
  */
 
 #include <benchmark/benchmark.h>
-
+#include <cstdint>
 #include <random>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/geo/hash.h"

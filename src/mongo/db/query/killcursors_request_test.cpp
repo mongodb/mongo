@@ -27,12 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/kill_cursors_gen.h"
-
-#include "mongo/db/clientcursor.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -46,7 +55,7 @@ TEST(KillCursorsRequestTest, parseSuccess) {
                         << "cursors" << BSON_ARRAY(CursorId(123) << CursorId(456)) << "$db"
                         << "db");
     KillCursorsCommandRequest request = KillCursorsCommandRequest::parse(ctxt, bsonObj);
-    ASSERT_EQ(request.getNamespace().ns(), "db.coll");
+    ASSERT_EQ(request.getNamespace().ns_forTest(), "db.coll");
     ASSERT_EQ(request.getCursorIds().size(), 2U);
     ASSERT_EQ(request.getCursorIds()[0], CursorId(123));
     ASSERT_EQ(request.getCursorIds()[1], CursorId(456));

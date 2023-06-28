@@ -28,15 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/operation_key_manager.h"
-
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/db/operation_key_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

@@ -27,11 +27,25 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+
+#include <wiredtiger.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_prepare_conflict.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

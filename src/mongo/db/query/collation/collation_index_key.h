@@ -35,6 +35,7 @@ namespace mongo {
 
 class BSONElement;
 class BSONObjBuilder;
+
 class CollatorInterface;
 
 /**

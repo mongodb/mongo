@@ -31,13 +31,25 @@
 
 #include <fmt/format.h>
 
-#include "mongo/db/feature_compatibility_version_documentation.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_set.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/util/version/releases.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -59,17 +71,19 @@ PrivilegeVector DocumentSourceListCatalog::LiteParsed::requiredPrivileges(
     // See builtin_roles.cpp.
     ActionSet listCollectionsAndIndexesActions{ActionType::listCollections,
                                                ActionType::listIndexes};
-    return _ns.isCollectionlessAggregateNS()
-        ? PrivilegeVector{Privilege(ResourcePattern::forClusterResource(),
-                                    ActionType::listDatabases),
-                          Privilege(ResourcePattern::forAnyNormalResource(),
-                                    listCollectionsAndIndexesActions),
-                          Privilege(ResourcePattern::forCollectionName("system.js"),
-                                    listCollectionsAndIndexesActions),
-                          Privilege(ResourcePattern::forAnySystemBuckets(),
-                                    listCollectionsAndIndexesActions)}
-        : PrivilegeVector{
-              Privilege(ResourcePattern::forExactNamespace(_ns), listCollectionsAndIndexesActions)};
+    if (_ns.isCollectionlessAggregateNS()) {
+        const auto& tenantId = _ns.tenantId();
+        return {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::listDatabases),
+                Privilege(ResourcePattern::forAnyNormalResource(tenantId),
+                          listCollectionsAndIndexesActions),
+                Privilege(ResourcePattern::forCollectionName(tenantId, "system.js"_sd),
+                          listCollectionsAndIndexesActions),
+                Privilege(ResourcePattern::forAnySystemBuckets(tenantId),
+                          listCollectionsAndIndexesActions)};
+    } else {
+        return {
+            Privilege(ResourcePattern::forExactNamespace(_ns), listCollectionsAndIndexesActions)};
+    }
 }
 
 DocumentSource::GetNextResult DocumentSourceListCatalog::doGetNext() {
@@ -108,7 +122,7 @@ intrusive_ptr<DocumentSource> DocumentSourceListCatalog::createFromBson(
     uassert(
         ErrorCodes::InvalidNamespace,
         "Collectionless $listCatalog must be run against the 'admin' database with {aggregate: 1}",
-        nss.db() == DatabaseName::kAdmin.db() || !nss.isCollectionlessAggregateNS());
+        nss.isAdminDB() || !nss.isCollectionlessAggregateNS());
 
     uassert(ErrorCodes::QueryFeatureNotAllowed,
             fmt::format("The {} aggregation stage is not enabled", kStageName),

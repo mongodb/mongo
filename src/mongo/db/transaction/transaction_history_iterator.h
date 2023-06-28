@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 

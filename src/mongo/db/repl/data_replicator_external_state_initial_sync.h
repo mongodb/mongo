@@ -30,6 +30,12 @@
 #pragma once
 
 #include "mongo/db/repl/data_replicator_external_state_impl.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/sync_source_selector.h"
+#include "mongo/rpc/metadata/oplog_query_metadata.h"
+#include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace repl {

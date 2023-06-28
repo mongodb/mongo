@@ -28,10 +28,20 @@
  */
 
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
-#include "mongo/util/database_name_util.h"
 
-#include "mongo/base/init.h"
+#include <boost/none.hpp>
+#include <boost/type_traits/decay.hpp>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/database_name_util.h"
 
 namespace mongo {
 namespace {

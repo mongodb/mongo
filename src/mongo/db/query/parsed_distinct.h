@@ -29,11 +29,24 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
+#include <utility>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -52,6 +65,7 @@ public:
     static const char kCollationField[];
     static const char kCommentField[];
     static const char kUnwoundArrayFieldForViewUnwind[];
+    static const char kHintField[];
 
     ParsedDistinct(std::unique_ptr<CanonicalQuery> query,
                    const std::string key,

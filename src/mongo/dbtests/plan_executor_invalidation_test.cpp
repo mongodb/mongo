@@ -83,7 +83,7 @@ public:
         params.direction = CollectionScanParams::FORWARD;
         params.tailable = false;
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection(), params, ws.get(), nullptr));
+            new CollectionScan(_expCtx.get(), &collection(), params, ws.get(), nullptr));
 
         // Create a plan executor to hold it
         auto findCommand = std::make_unique<FindCommandRequest>(nss);
@@ -131,7 +131,7 @@ public:
     }
 
     bool dropCollection(StringData ns) {
-        bool res = _client.dropCollection(NamespaceString(ns));
+        bool res = _client.dropCollection(NamespaceString::createNamespaceString_forTest(ns));
         _refreshCollection();
         return res;
     }

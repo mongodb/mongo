@@ -28,14 +28,20 @@
  */
 
 #include "mongo/db/s/metrics/sharding_data_transform_cumulative_metrics.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
 #include "mongo/db/s/move_primary/move_primary_cumulative_metrics.h"
 #include "mongo/db/s/resharding/resharding_cumulative_metrics.h"
-
-#include <cstdint>
-
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
+
 namespace mongo {
 
 namespace {

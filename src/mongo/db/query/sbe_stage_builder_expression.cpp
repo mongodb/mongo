@@ -28,23 +28,61 @@
  */
 
 #include <absl/container/flat_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
+#include <limits>
+#include <map>
+#include <memory>
+#include <numeric>
+#include <stack>
+#include <string>
+#include <string_view>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/query/sbe_stage_builder_expression.h"
-#include "mongo/db/query/util/make_data_structure.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/values/arith_common.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/vm/datetime.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/expression_visitor.h"
 #include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/bson_typemask.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
+#include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_impl.h"
+#include "mongo/db/query/sbe_stage_builder_expression.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 
@@ -1837,16 +1875,17 @@ public:
                               (expr->isOnNullSpecified() ? 1 : 0));
 
         // Get child expressions.
-        auto onNullExpression =
+        optimizer::ABT onNullExpression =
             expr->isOnNullSpecified() ? _context->popABTExpr() : optimizer::Constant::null();
 
-        auto timezoneExpression = expr->isTimezoneSpecified() ? _context->popABTExpr()
-                                                              : optimizer::Constant::str("UTC"_sd);
-        auto dateExpression = _context->popABTExpr();
-
-        auto formatExpression = expr->isFormatSpecified()
+        optimizer::ABT timezoneExpression = expr->isTimezoneSpecified()
             ? _context->popABTExpr()
-            : optimizer::Constant::str("%Y-%m-%dT%H:%M:%S.%LZ"_sd);
+            : optimizer::Constant::str("UTC"_sd);
+        optimizer::ABT dateExpression = _context->popABTExpr();
+
+        optimizer::ABT formatExpression = expr->isFormatSpecified()
+            ? _context->popABTExpr()
+            : optimizer::Constant::str(kIsoFormatStringZ);  // assumes UTC until disproven
 
         auto timeZoneDBSlot = _context->state.env->getSlot("timeZoneDB"_sd);
         auto timeZoneDBName = _context->registerVariable(timeZoneDBSlot);
@@ -1862,19 +1901,6 @@ public:
         auto dateName = makeLocalVariableName(_context->state.frameId(), 0);
         auto dateVar = makeVariable(dateName);
 
-        // Set parameters for an invocation of built-in "dateToString" function.
-        optimizer::ABTVector arguments;
-        arguments.push_back(timeZoneDBVar);
-        arguments.push_back(dateExpression);
-        arguments.push_back(formatExpression);
-        arguments.push_back(timezoneExpression);
-
-        // Create an expression to invoke built-in "dateToString" function.
-        auto dateToStringFunctionCall =
-            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
-        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
-        auto dateToStringVar = makeVariable(dateToStringName);
-
         // Create expressions to check that each argument to "dateToString" function exists, is not
         // null, and is of the correct type.
         std::vector<ABTCaseValuePair> inputValidationCases;
@@ -1888,6 +1914,37 @@ public:
         // "date" parameter validation.
         inputValidationCases.emplace_back(generateABTFailIfNotCoercibleToDate(
             dateVar, ErrorCodes::Error{4997901}, "$dateToString"_sd, "date"_sd));
+
+        // "timezone" parameter validation.
+        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
+            timezoneExpressionConst) {
+            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
+            if (!sbe::value::isNullish(timezoneTag)) {
+                // If the query did not specify a format string and a non-UTC timezone was
+                // specified, the default format should not use a 'Z' suffix.
+                if (!expr->isFormatSpecified() &&
+                    !(sbe::vm::getTimezone(timezoneTag, timezoneVal, timezoneDB).isUtcZone())) {
+                    formatExpression = optimizer::Constant::str(kIsoFormatStringNonZ);
+                }
+
+                // We don't want to error on null.
+                uassert(4997905,
+                        "$dateToString parameter 'timezone' must be a string",
+                        sbe::value::isString(timezoneTag));
+                uassert(4997906,
+                        "$dateToString parameter 'timezone' must be a valid timezone",
+                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
+            }
+        } else {
+            inputValidationCases.emplace_back(
+                generateABTNonStringCheck(timezoneExpression),
+                makeABTFail(ErrorCodes::Error{4997907},
+                            "$dateToString parameter 'timezone' must be a string"));
+            inputValidationCases.emplace_back(
+                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
+                makeABTFail(ErrorCodes::Error{4997908},
+                            "$dateToString parameter 'timezone' must be a valid timezone"));
+        }
 
         // "format" parameter validation.
         if (auto* formatExpressionConst = formatExpression.cast<optimizer::Constant>();
@@ -1911,29 +1968,18 @@ public:
                             "$dateToString parameter 'format' must be a valid format"));
         }
 
-        // "timezone" parameter validation.
-        if (auto* timezoneExpressionConst = timezoneExpression.cast<optimizer::Constant>();
-            timezoneExpressionConst) {
-            auto [timezoneTag, timezoneVal] = timezoneExpressionConst->get();
-            if (!sbe::value::isNullish(timezoneTag)) {
-                // We don't want to error on null.
-                uassert(4997905,
-                        "$dateToString parameter 'timezone' must be a string",
-                        sbe::value::isString(timezoneTag));
-                uassert(4997906,
-                        "$dateToString parameter 'timezone' must be a valid timezone",
-                        sbe::vm::isValidTimezone(timezoneTag, timezoneVal, timezoneDB));
-            }
-        } else {
-            inputValidationCases.emplace_back(
-                generateABTNonStringCheck(timezoneExpression),
-                makeABTFail(ErrorCodes::Error{4997907},
-                            "$dateToString parameter 'timezone' must be a string"));
-            inputValidationCases.emplace_back(
-                makeNot(makeABTFunction("isTimezone", timeZoneDBVar, timezoneExpression)),
-                makeABTFail(ErrorCodes::Error{4997908},
-                            "$dateToString parameter 'timezone' must be a valid timezone"));
-        }
+        // Set parameters for an invocation of built-in "dateToString" function.
+        optimizer::ABTVector arguments;
+        arguments.push_back(timeZoneDBVar);
+        arguments.push_back(dateExpression);
+        arguments.push_back(formatExpression);
+        arguments.push_back(timezoneExpression);
+
+        // Create an expression to invoke built-in "dateToString" function.
+        auto dateToStringFunctionCall =
+            optimizer::make<optimizer::FunctionCall>("dateToString", std::move(arguments));
+        auto dateToStringName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto dateToStringVar = makeVariable(dateToStringName);
 
         pushABT(optimizer::make<optimizer::Let>(
             std::move(dateName),
@@ -2961,7 +3007,21 @@ public:
         unsupportedExpression(expr->getOpName());
     }
     void visit(const ExpressionStrLenBytes* expr) final {
-        unsupportedExpression(expr->getOpName());
+        invariant(expr->getChildren().size() == 1);
+        _context->ensureArity(1);
+
+        auto strName = makeLocalVariableName(_context->state.frameId(), 0);
+        auto strExpression = _context->popABTExpr();
+        auto strVar = makeVariable(strName);
+
+        auto strLenBytesExpr = optimizer::make<optimizer::If>(
+            makeFillEmptyFalse(makeABTFunction("isString", strVar)),
+            makeABTFunction("strLenBytes", strVar),
+            makeABTFail(ErrorCodes::Error{5155800}, "$strLenBytes requires a string argument"));
+
+        pushABT(optimizer::make<optimizer::Let>(
+            std::move(strName), std::move(strExpression), std::move(strLenBytesExpr)));
+        return;
     }
     void visit(const ExpressionBinarySize* expr) final {
         unsupportedExpression(expr->getOpName());

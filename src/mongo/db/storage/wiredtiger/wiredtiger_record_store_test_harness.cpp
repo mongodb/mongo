@@ -28,7 +28,33 @@
  */
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store_test_harness.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <wiredtiger.h>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/client.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
 
 namespace mongo {
 
@@ -42,7 +68,6 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test"),
-      _lockerNoopClientObserverRegisterer(getServiceContext()),
       _engine(Client::getCurrent()->makeOperationContext().get(),
               kWiredTigerEngineName,
               _dbpath.path(),
@@ -67,16 +92,16 @@ std::unique_ptr<RecordStore> WiredTigerHarnessHelper::newRecordStore(
     WiredTigerRecoveryUnit* ru = checked_cast<WiredTigerRecoveryUnit*>(opCtx->recoveryUnit());
     std::string uri = WiredTigerKVEngine::kTableUriPrefix + ns;
     StringData ident = ns;
-    NamespaceString nss(ns);
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
 
     StatusWith<std::string> result = WiredTigerRecordStore::generateCreateString(
         kWiredTigerEngineName,
-        NamespaceString(ns),
+        NamespaceString::createNamespaceString_forTest(ns),
         ident,
         collOptions,
         "",
         keyFormat,
-        WiredTigerUtil::useTableLogging(NamespaceString(ns)));
+        WiredTigerUtil::useTableLogging(NamespaceString::createNamespaceString_forTest(ns)));
     ASSERT_TRUE(result.isOK());
     std::string config = result.getValue();
 

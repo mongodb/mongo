@@ -29,13 +29,22 @@
 
 #include "mongo/db/catalog/catalog_control.h"
 
+#include <memory>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_mock.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

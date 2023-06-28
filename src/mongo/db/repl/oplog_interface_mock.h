@@ -29,8 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/repl/oplog_interface.h"
 #include <initializer_list>
+#include <list>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog_interface.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 class TransactionHistoryIteratorBase;

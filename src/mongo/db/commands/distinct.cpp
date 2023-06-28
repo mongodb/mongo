@@ -28,40 +28,88 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
 #include <memory>
+#include <mutex>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/parsed_distinct.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/view_response_formatter.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
-#include "mongo/db/views/resolved_view.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/stats/top.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+#include "mongo/util/serialization_context.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -154,25 +202,35 @@ public:
         const BSONObj& cmdObj = request.body;
         // Acquire locks. The RAII object is optional, because in the case of a view, the locks
         // need to be released.
-        boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(
+        const auto nss = CommandHelpers::parseNsCollectionRequired(dbName, cmdObj);
+
+        AutoStatsTracker tracker(
             opCtx,
-            CommandHelpers::parseNsCollectionRequired(dbName, cmdObj),
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        const auto nss = ctx->getNss();
+            nss,
+            Top::LockType::ReadLocked,
+            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+
+        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, nss, AcquisitionPrerequisites::kRead);
+        boost::optional<ScopedCollectionOrViewAcquisition> collectionOrView =
+            supportsLockFreeRead(opCtx)
+            ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
+            : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto defaultCollator =
-            ctx->getCollection() ? ctx->getCollection()->getDefaultCollator() : nullptr;
+        const CollatorInterface* defaultCollator = collectionOrView->getCollectionPtr()
+            ? collectionOrView->getCollectionPtr()->getDefaultCollator()
+            : nullptr;
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, true, defaultCollator));
 
         SerializationContext sc(SerializationContext::stateCommandRequest());
         sc.setTenantIdSource(request.getValidatedTenantId() != boost::none);
 
-        if (ctx->getView()) {
+        if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
-            ctx.reset();
+            collectionOrView.reset();
 
             auto viewAggregation = parsedDistinct.asAggregationCommand();
             if (!viewAggregation.isOK()) {
@@ -191,16 +249,16 @@ public:
                 APIParameters::get(opCtx).getAPIStrict().value_or(false),
                 sc);
 
-            // An empty PrivilegeVector is acceptable because these privileges are only checked on
-            // getMore and explain will not open a cursor.
+            // An empty PrivilegeVector is acceptable because these privileges are only checked
+            // on getMore and explain will not open a cursor.
             return runAggregate(
                 opCtx, nss, viewAggRequest, viewAggregation.getValue(), PrivilegeVector(), result);
         }
 
-        const auto& collection = ctx->getCollection();
+        const auto& collection = collectionOrView->getCollectionPtr();
 
-        auto executor = uassertStatusOK(
-            getExecutorDistinct(&collection, QueryPlannerParams::DEFAULT, &parsedDistinct));
+        auto executor = uassertStatusOK(getExecutorDistinct(
+            &collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct));
 
         auto bodyBuilder = result->getBodyBuilder();
         Explain::explainStages(executor.get(),
@@ -220,14 +278,39 @@ public:
         CommandHelpers::handleMarkKillOnClientDisconnect(opCtx);
         // Acquire locks and resolve possible UUID. The RAII object is optional, because in the case
         // of a view, the locks need to be released.
-        boost::optional<AutoGetCollectionForReadCommandMaybeLockFree> ctx;
-        ctx.emplace(
-            opCtx,
-            CommandHelpers::parseNsOrUUID(dbName, cmdObj),
-            AutoGetCollection::Options{}.viewMode(auto_get_collection::ViewMode::kViewsPermitted));
-        const auto& nss = ctx->getNss();
 
-        if (!ctx->getView()) {
+        // TODO: Make nicer. We need to instantiate the AutoStatsTracker before the acquisition in
+        // case it would throw so we can ensure data is written to the profile collection that some
+        // test may rely on. However, we might not know the namespace at this point so it is wrapped
+        // in a boost::optional. If the request is with a UUID we instantiate it after, but this is
+        // fine as the request should not be for sharded collections.
+        boost::optional<AutoStatsTracker> tracker;
+        auto const initializeTracker = [&](const NamespaceString& nss) {
+            tracker.emplace(opCtx,
+                            nss,
+                            Top::LockType::ReadLocked,
+                            AutoStatsTracker::LogMode::kUpdateTopAndCurOp,
+                            CollectionCatalog::get(opCtx)->getDatabaseProfileLevel(nss.dbName()));
+        };
+        auto const nssOrUUID = CommandHelpers::parseNsOrUUID(dbName, cmdObj);
+        if (nssOrUUID.isNamespaceString()) {
+            initializeTracker(nssOrUUID.nss());
+        }
+        const auto acquisitionRequest = CollectionOrViewAcquisitionRequest::fromOpCtx(
+            opCtx, nssOrUUID, AcquisitionPrerequisites::kRead);
+
+        boost::optional<ScopedCollectionOrViewAcquisition> collectionOrView =
+            supportsLockFreeRead(opCtx)
+            ? acquireCollectionOrViewWithoutTakingLocks(opCtx, acquisitionRequest)
+            : acquireCollectionOrView(opCtx, acquisitionRequest, LockMode::MODE_IS);
+        const auto nss = collectionOrView->nss();
+
+        if (!tracker) {
+            initializeTracker(nss);
+        }
+
+        if (collectionOrView->isCollection()) {
+            const auto& coll = collectionOrView->getCollection();
             // Distinct doesn't filter orphan documents so it is not allowed to run on sharded
             // collections in multi-document transactions.
             uassert(
@@ -235,7 +318,7 @@ public:
                 "Cannot run 'distinct' on a sharded collection in a multi-document transaction. "
                 "Please see http://dochub.mongodb.org/core/transaction-distinct for a recommended "
                 "alternative.",
-                !opCtx->inMultiDocumentTransaction() || !ctx->getCollection().isSharded());
+                !opCtx->inMultiDocumentTransaction() || !coll.getShardingDescription().isSharded());
 
             // Similarly, we ban readConcern level snapshot for sharded collections.
             uassert(
@@ -243,12 +326,13 @@ public:
                 "Cannot run 'distinct' on a sharded collection with readConcern level 'snapshot'",
                 repl::ReadConcernArgs::get(opCtx).getLevel() !=
                         repl::ReadConcernLevel::kSnapshotReadConcern ||
-                    !ctx->getCollection().isSharded());
+                    !coll.getShardingDescription().isSharded());
         }
 
         const ExtensionsCallbackReal extensionsCallback(opCtx, &nss);
-        auto defaultCollation =
-            ctx->getCollection() ? ctx->getCollection()->getDefaultCollator() : nullptr;
+        const CollatorInterface* defaultCollation = collectionOrView->getCollectionPtr()
+            ? collectionOrView->getCollectionPtr()->getDefaultCollator()
+            : nullptr;
         auto parsedDistinct = uassertStatusOK(
             ParsedDistinct::parse(opCtx, nss, cmdObj, extensionsCallback, false, defaultCollation));
 
@@ -267,9 +351,9 @@ public:
                 .getAsync([](auto) {});
         }
 
-        if (ctx->getView()) {
+        if (collectionOrView->isView()) {
             // Relinquish locks. The aggregation command will re-acquire them.
-            ctx.reset();
+            collectionOrView.reset();
 
             auto viewAggregation = parsedDistinct.asAggregationCommand();
             uassertStatusOK(viewAggregation.getStatus());
@@ -293,10 +377,8 @@ public:
         uassertStatusOK(replCoord->checkCanServeReadsFor(
             opCtx, nss, ReadPreferenceSetting::get(opCtx).canRunOnSecondary()));
 
-        const auto& collection = ctx->getCollection();
-
-        auto executor =
-            getExecutorDistinct(&collection, QueryPlannerParams::DEFAULT, &parsedDistinct);
+        auto executor = getExecutorDistinct(
+            &collectionOrView->getCollection(), QueryPlannerParams::DEFAULT, &parsedDistinct);
         uassertStatusOK(executor.getStatus());
 
         {
@@ -357,6 +439,7 @@ public:
         }
 
         auto curOp = CurOp::get(opCtx);
+        const auto& collection = collectionOrView->getCollectionPtr();
 
         // Get summary information about the plan.
         PlanSummaryStats stats;
@@ -395,6 +478,7 @@ public:
             keyBob.append("distinct", 1);
             keyBob.append("key", 1);
             keyBob.append("query", 1);
+            keyBob.append("hint", 1);
             keyBob.append("collation", 1);
             keyBob.append("shardVersion", 1);
             return keyBob.obj();

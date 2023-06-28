@@ -36,6 +36,8 @@
 #include "mongo/base/string_data.h"
 
 namespace mongo {
+using oidcIdPAuthCallbackT = void(StringData, StringData, StringData);
+
 /**
  * OIDC Client parameters
  */
@@ -51,10 +53,10 @@ struct OIDCClientGlobalParams {
     std::string oidcRefreshToken;
 
     /*
-     * Callback function that accepts the username and IdP endpoint and then performs IdP
-     * authentication. This should be provided by tests, presumably as a JS function.
+     * Callback function that accepts the username, activation code and IdP endpoint and then
+     * performs IdP authentication. This should be provided by tests, presumably as a JS function.
      */
-    std::function<void(StringData, StringData)> oidcIdPAuthCallback;
+    std::function<oidcIdPAuthCallbackT> oidcIdPAuthCallback;
     /**
      * Client ID. Populated via server SASL reply.
      */

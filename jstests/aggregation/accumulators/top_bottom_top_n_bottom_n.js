@@ -395,17 +395,16 @@ const testOperatorText = (op) => {
 testOperatorText("$bottomN");
 testOperatorText("$topN");
 
-// Test constant output field.
+// Test constant output and sortBy.
 assert(coll.drop());
 assert.commandWorked(coll.insertMany([{a: 1}, {a: 2}, {a: 3}]));
-const testConstantOutput = (op) => {
+const testConstantOutputAndSort = (op) => {
     const results =
-        coll.aggregate(
-                [{$group: {_id: null, result: {[op]: {n: 3, output: "abc", sortBy: {a: 1}}}}}])
+        coll.aggregate([{$group: {_id: null, result: {[op]: {n: 3, output: "abc", sortBy: {}}}}}])
             .toArray();
     assert.eq(results.length, 1, results);
     assert.docEq(results[0], {_id: null, result: ["abc", "abc", "abc"]}, results);
 };
-testConstantOutput("$topN");
-testConstantOutput("$bottomN");
+testConstantOutputAndSort("$topN");
+testConstantOutputAndSort("$bottomN");
 })();

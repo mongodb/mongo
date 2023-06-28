@@ -29,8 +29,26 @@
 
 #pragma once
 
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 
@@ -74,7 +92,7 @@ public:
         return _expectedInput;
     }
 
-    Document applyTransformation(const Document& input) final;
+    Document applyTransformation(const Document& input) const final;
 
     void optimize() final;
 

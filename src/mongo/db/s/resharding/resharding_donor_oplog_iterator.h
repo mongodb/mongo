@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/s/resharding/donor_oplog_id_gen.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
 
 namespace mongo {

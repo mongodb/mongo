@@ -29,15 +29,15 @@
 
 #include "mongo/base/data_type_validated.h"
 
-#include <algorithm>
 #include <iterator>
 
-#include "mongo/base/data_range.h"
 #include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 template <>

@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
 
@@ -54,6 +60,12 @@ std::vector<Privilege> getPrivileges(const BulkWriteCommandRequest& req);
  * whether the stmtId / stmtIds fields are present on the request.
  */
 int32_t getStatementId(const BulkWriteCommandRequest& req, size_t currentOpIdx);
+
+/**
+ * From a serialized BulkWriteCommandRequest containing a single NamespaceInfoEntry,
+ * extract that NamespaceInfoEntry. For bulkWrite with queryable encryption.
+ */
+NamespaceInfoEntry getFLENamespaceInfoEntry(const BSONObj& bulkWrite);
 
 }  // namespace bulk_write_common
 }  // namespace mongo

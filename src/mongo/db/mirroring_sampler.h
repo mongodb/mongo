@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include <cstdlib>
 #include <functional>
 #include <memory>
+#include <new>
 #include <vector>
 
 #include "mongo/db/repl/hello_response.h"

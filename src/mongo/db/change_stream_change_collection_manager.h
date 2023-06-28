@@ -29,14 +29,31 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/change_collection_truncate_markers.h"
+#include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/concurrent_shared_values_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

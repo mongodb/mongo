@@ -29,6 +29,17 @@
 
 #include "mongo/db/s/type_shard_collection.h"
 
+#include <boost/none.hpp>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 
 ShardCollectionType::ShardCollectionType(NamespaceString nss,

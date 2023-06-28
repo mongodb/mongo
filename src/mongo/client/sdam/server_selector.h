@@ -27,15 +27,27 @@
  *    it in the license file.
  */
 #pragma once
+#include <algorithm>
+#include <boost/optional.hpp>
 #include <functional>
+#include <memory>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::sdam {
 /**

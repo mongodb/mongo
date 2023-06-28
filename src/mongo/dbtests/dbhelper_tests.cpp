@@ -78,7 +78,7 @@ private:
 
     BSONArray docs(OperationContext* opCtx) const {
         DBDirectClient client(opCtx);
-        FindCommandRequest findRequest{NamespaceString{ns}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns)};
         findRequest.setHint(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cursor = client.find(std::move(findRequest));
         BSONArrayBuilder bab;
@@ -106,7 +106,8 @@ public:
         repl::ReplicationCoordinator::set(
             serviceContext, std::unique_ptr<repl::ReplicationCoordinator>(coordinatorMock));
 
-        NamespaceString nss("test.findandnoopupdate");
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("test.findandnoopupdate");
 
         auto client1 = serviceContext->makeClient("client1");
         auto opCtx1 = client1->makeOperationContext();

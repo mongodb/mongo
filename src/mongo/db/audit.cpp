@@ -29,6 +29,12 @@
 
 #include "mongo/db/audit.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/util/assert_util_core.h"
+
 namespace mongo {
 namespace audit {
 std::function<void(OperationContext*)> initializeManager;

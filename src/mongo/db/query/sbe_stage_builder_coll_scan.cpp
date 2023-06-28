@@ -28,25 +28,46 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <set>
+#include <tuple>
 
-#include "mongo/db/query/sbe_stage_builder_coll_scan.h"
+#include <absl/container/inlined_vector.h>
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
-#include "mongo/db/exec/sbe/stages/exchange.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/loop_join.h"
 #include "mongo/db/exec/sbe/stages/project.h"
 #include "mongo/db/exec/sbe/stages/scan.h"
 #include "mongo/db/exec/sbe/stages/union.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/db/query/sbe_stage_builder_coll_scan.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
-#include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/record_id_helpers.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
@@ -297,12 +318,16 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateClusteredColl
     boost::optional<sbe::value::SlotId> maxRecordSlot;
     if (csn->minRecord) {
         auto [tag, val] = sbe::value::makeCopyRecordId(csn->minRecord->recordId());
-        minRecordSlot = env->registerSlot("minRecordId"_sd, tag, val, true, state.slotIdGenerator);
+        minRecordSlot =
+            boost::make_optional(state.env->registerSlot(tag, val, true, state.slotIdGenerator));
     }
     if (csn->maxRecord) {
         auto [tag, val] = sbe::value::makeCopyRecordId(csn->maxRecord->recordId());
-        maxRecordSlot = env->registerSlot("maxRecordId"_sd, tag, val, true, state.slotIdGenerator);
+        maxRecordSlot =
+            boost::make_optional(state.env->registerSlot(tag, val, true, state.slotIdGenerator));
     }
+    state.data->clusteredCollBoundsInfos.emplace_back(
+        ParameterizedClusteredScanSlots{minRecordSlot, maxRecordSlot});
 
     // Create the ScanStage.
     bool excludeScanEndRecordId =

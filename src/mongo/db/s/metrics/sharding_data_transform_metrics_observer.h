@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/s/metrics/sharding_data_transform_instance_metrics.h"
+#include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_observer_interface.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/exec/document_value/value_comparator.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

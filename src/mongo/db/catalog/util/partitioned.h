@@ -30,14 +30,15 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/align/aligned_allocator.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstdlib>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <numeric>
 #include <utility>
 #include <vector>
-
-#include <boost/align/aligned_allocator.hpp>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/util/aligned.h"

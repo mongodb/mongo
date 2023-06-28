@@ -216,8 +216,8 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = 
     }
 
     // Switch to 'tryBonsai' to create statistics and generate queries.
-    assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    assert.commandWorked(testDB.adminCommand(
+        {setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
 
     analyzeFields(testDB, coll, fields);
     const statsColl = testDB.system.statistics[collName];
@@ -253,8 +253,8 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = 
     runQueries(coll, complexPred, ceStrategies, [], ceDebugFlag);
 
     // Switch to 'tryBonsai' for accuracy analysis.
-    assert.commandWorked(
-        testDB.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    assert.commandWorked(testDB.adminCommand(
+        {setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
 
     let allStrategies = [];
     for (let strategy of ceStrategies) {

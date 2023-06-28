@@ -27,12 +27,22 @@
  *    it in the license file.
  */
 
+// IWYU pragma: no_include "cxxabi.h"
+#include <memory>
+#include <mutex>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/global_conn_pool.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/integration_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

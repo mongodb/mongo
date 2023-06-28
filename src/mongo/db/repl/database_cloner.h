@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_connection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/base_cloner.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/initial_sync_base_cloner.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {

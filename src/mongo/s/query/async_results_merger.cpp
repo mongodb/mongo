@@ -502,7 +502,7 @@ Status AsyncResultsMerger::_scheduleGetMores(WithLock lk) {
 
     // Reveal opCtx errors (such as MaxTimeMSExpired) and reflect them in the remote status.
     invariant(_opCtx, "Cannot schedule a getMore without an OperationContext");
-    const auto interruptStatus = _opCtx->checkForInterruptNoAssert();
+    auto interruptStatus = _opCtx->checkForInterruptNoAssert();
     if (!interruptStatus.isOK()) {
         for (size_t i = 0; i < _remotes.size(); ++i) {
             if (!_remotes[i].exhausted()) {

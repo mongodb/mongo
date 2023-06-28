@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <vector>
 
 #include "mongo/s/catalog/type_shard.h"

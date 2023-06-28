@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
 
-#include "mongo/db/auth/authorization_session.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/pipeline/expression_js_emit.h"
+#include "mongo/db/pipeline/javascript_execution.h"
 #include "mongo/db/pipeline/make_js_function.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 

@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <list>
+#include <utility>
 
 #include "mongo/db/exec/sbe/values/value.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/stdx/unordered_map.h"
 
 namespace mongo::stage_builder {

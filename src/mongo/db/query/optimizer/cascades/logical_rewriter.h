@@ -29,10 +29,21 @@
 
 #pragma once
 
+#include <cstddef>
+#include <functional>
 #include <queue>
+#include <set>
+#include <string>
+#include <utility>
 
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
 
 namespace mongo::optimizer::cascades {

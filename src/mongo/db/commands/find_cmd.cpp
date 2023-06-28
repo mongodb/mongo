@@ -27,50 +27,117 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_checks.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_uuid_mismatch.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/disk_use_options_gen.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/cqf_command_utils.h"
-#include "mongo/db/query/cqf_get_executor.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/find.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/find_request_shapifier.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/parsed_find_command.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_find_key_generator.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/query_analysis_writer.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/stats/server_read_concern_metrics.h"
-#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/storage_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/query_analysis_sampler_util.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -128,6 +195,7 @@ void beginQueryOp(OperationContext* opCtx, const NamespaceString& nss, const BSO
  */
 std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     OperationContext* opCtx,
+    const AutoGetCollectionForReadCommandMaybeLockFree& ctx,
     const NamespaceString& nss,
     BSONObj requestBody,
     std::unique_ptr<FindCommandRequest> findCommand,
@@ -146,12 +214,21 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
                                    extensionsCallback,
                                    MatchExpressionParser::kAllowAllSpecialFeatures));
 
-    // Register query stats collection. Exclude queries against non-existent collections and
-    // collections with encrypted fields. It is important to do this before canonicalizing and
-    // optimizing the query, each of which would alter the query shape.
-    if (collection && !collection.get()->getCollectionOptions().encryptedFieldConfig) {
-        query_stats::registerRequest(expCtx, collection.get()->ns(), [&]() {
-            return std::make_unique<query_stats::FindRequestShapifier>(expCtx, *parsedRequest);
+    // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
+    // $$USER_ROLES for the find command.
+    expCtx->setUserRoles();
+    // Register query stats collection. Exclude queries against collections with encrypted fields.
+    // It is important to do this before canonicalizing and optimizing the query, each of which
+    // would alter the query shape.
+    if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
+        BSONObj queryShape = query_shape::extractQueryShape(
+            *parsedRequest,
+            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+            expCtx);
+
+        query_stats::registerRequest(expCtx, nss, [&]() {
+            return std::make_unique<query_stats::FindKeyGenerator>(
+                expCtx, *parsedRequest, std::move(queryShape), ctx.getCollectionType());
         });
     }
 
@@ -317,6 +394,11 @@ public:
             // The collection may be NULL. If so, getExecutor() should handle it by returning an
             // execution tree with an EOFStage.
             const auto& collection = ctx->getCollection();
+            if (!ctx->getView()) {
+                const bool isClusteredCollection = collection && collection->isClustered();
+                uassertStatusOK(query_request_helper::validateResumeAfter(
+                    findCommand->getResumeAfter(), isClusteredCollection));
+            }
             auto expCtx = makeExpressionContext(opCtx, *findCommand, collection, verbosity);
             const bool isExplain = true;
             auto cq = uassertStatusOK(
@@ -434,7 +516,7 @@ public:
                     !(repl::ReadConcernArgs::get(opCtx).isSpeculativeMajority() &&
                       !findCommand->getAllowSpeculativeMajorityRead()));
 
-            const bool isFindByUUID = findCommand->getNamespaceOrUUID().uuid().has_value();
+            const bool isFindByUUID = findCommand->getNamespaceOrUUID().isUUID();
             uassert(ErrorCodes::InvalidOptions,
                     "When using the find command by UUID, the collectionUUID parameter cannot also "
                     "be specified",
@@ -537,10 +619,11 @@ public:
             const auto& collection = ctx->getCollection();
 
             uassert(ErrorCodes::NamespaceNotFound,
-                    str::stream() << "UUID " << *findCommand->getNamespaceOrUUID().uuid()
+                    str::stream() << "UUID " << findCommand->getNamespaceOrUUID().uuid()
                                   << " specified in query request not found",
                     collection || !isFindByUUID);
 
+            bool isClusteredCollection = false;
             if (collection) {
                 if (isFindByUUID) {
                     // Replace the UUID in the find command with the fully qualified namespace of
@@ -552,7 +635,7 @@ public:
                 const bool isTailable = findCommand->getTailable();
                 const bool isMajorityReadConcern = repl::ReadConcernArgs::get(opCtx).getLevel() ==
                     repl::ReadConcernLevel::kMajorityReadConcern;
-                const bool isClusteredCollection = collection->isClustered();
+                isClusteredCollection = collection->isClustered();
                 const bool isCapped = collection->isCapped();
                 const bool isReplicated = collection->ns().isReplicated();
                 if (isClusteredCollection && isCapped && isReplicated && isTailable) {
@@ -563,12 +646,16 @@ public:
                 }
             }
 
-            auto cq = parseQueryAndBeginOperation(
-                opCtx, nss, _request.body, std::move(findCommand), collection);
+            // Views use the aggregation system and the $_resumeAfter parameter is not allowed. A
+            // more descriptive error will be raised later, but we want to validate this parameter
+            // before beginning the operation.
+            if (!ctx->getView()) {
+                uassertStatusOK(query_request_helper::validateResumeAfter(
+                    findCommand->getResumeAfter(), isClusteredCollection));
+            }
 
-            // After parsing to detect if $$USER_ROLES is referenced in the query, set the value of
-            // $$USER_ROLES for the find command.
-            cq->getExpCtx()->setUserRoles();
+            auto cq = parseQueryAndBeginOperation(
+                opCtx, *ctx, nss, _request.body, std::move(findCommand), collection);
 
             // If we are running a query against a view redirect this query through the aggregation
             // system.
@@ -745,9 +832,9 @@ public:
                 if (stashResourcesForGetMore) {
                     // Collect storage stats now before we stash the recovery unit. These stats are
                     // normally collected in the service entry point layer just before a command
-                    // ends, but they must be collected before stashing the
-                    // RecoveryUnit. Otherwise, the service entry point layer will collect the
-                    // stats from the new RecoveryUnit, which wasn't actually used for the query.
+                    // ends, but they must be collected before stashing the RecoveryUnit. Otherwise,
+                    // the service entry point layer will collect the stats from the new
+                    // RecoveryUnit, which wasn't actually used for the query.
                     //
                     // The stats collected here will not get overwritten, as the service entry
                     // point layer will only set these stats when they're not empty.
@@ -812,11 +899,11 @@ public:
 
             // Rewrite any FLE find payloads that exist in the query if this is a FLE 2 query.
             if (shouldDoFLERewrite(findCommand)) {
-                invariant(findCommand->getNamespaceOrUUID().nss());
+                invariant(findCommand->getNamespaceOrUUID().isNamespaceString());
 
                 if (!findCommand->getEncryptionInformation()->getCrudProcessed().value_or(false)) {
                     processFLEFindD(
-                        opCtx, findCommand->getNamespaceOrUUID().nss().value(), findCommand.get());
+                        opCtx, findCommand->getNamespaceOrUUID().nss(), findCommand.get());
                 }
                 CurOp::get(opCtx)->debug().shouldOmitDiagnosticInformation = true;
             }

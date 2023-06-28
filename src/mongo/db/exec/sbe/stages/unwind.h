@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <vector>
+
+#include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/stage_types.h"
 
 namespace mongo::sbe {
 /**

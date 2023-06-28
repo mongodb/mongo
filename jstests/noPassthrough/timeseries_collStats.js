@@ -11,6 +11,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
@@ -22,6 +23,8 @@ const conn = MongoRunner.runMongod({
 
 const dbName = jsTestName();
 const testDB = conn.getDB(dbName);
+const alwaysUseCompressedBuckets =
+    FeatureFlagUtil.isEnabled(testDB, "TimeseriesAlwaysUseCompressedBuckets");
 const isTimeseriesScalabilityImprovementsEnabled =
     TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB);
 
@@ -182,7 +185,7 @@ if (isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numBucketsClosedDueToTimeBackward++;
 }
 expectedStats.numMeasurementsCommitted++;
-if (!isTimeseriesScalabilityImprovementsEnabled) {
+if (!isTimeseriesScalabilityImprovementsEnabled && !alwaysUseCompressedBuckets) {
     expectedStats.numCompressedBuckets++;
 }
 if (isTimeseriesScalabilityImprovementsEnabled) {
@@ -203,7 +206,9 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += numDocs;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numCompressedBuckets++;
+if (!alwaysUseCompressedBuckets) {
+    expectedStats.numCompressedBuckets++;
+}
 if (isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numBucketQueriesFailed++;
 }
@@ -226,8 +231,10 @@ expectedStats.numCommits += 2;
 expectedStats.numMeasurementsCommitted += 1001;
 expectedStats.avgNumMeasurementsPerCommit =
     Math.floor(expectedStats.numMeasurementsCommitted / expectedStats.numCommits);
-expectedStats.numCompressedBuckets++;
-expectedStats.numSubObjCompressionRestart += 2;
+if (!alwaysUseCompressedBuckets) {
+    expectedStats.numCompressedBuckets++;
+    expectedStats.numSubObjCompressionRestart += 2;
+}
 if (isTimeseriesScalabilityImprovementsEnabled) {
     expectedStats.numBucketQueriesFailed++;
 }

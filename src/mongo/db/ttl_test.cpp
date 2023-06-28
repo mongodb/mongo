@@ -173,8 +173,6 @@ private:
 };
 
 TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
@@ -205,8 +203,6 @@ TEST_F(TTLTest, TTLPassSingleCollectionTwoIndexes) {
 }
 
 TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     SimpleClient client(opCtx());
@@ -253,8 +249,6 @@ TEST_F(TTLTest, TTLPassMultipCollectionsPass) {
 // Demonstrate sub-pass behavior when all expired documents are drained before the sub-pass reaches
 // its time limit.
 TEST_F(TTLTest, TTLSingleSubPass) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set 'ttlMonitorSubPasstargetSecs' to a day to guarantee the sub-pass target time is never
@@ -300,8 +294,6 @@ TEST_F(TTLTest, TTLSingleSubPass) {
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
@@ -381,8 +373,6 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocuments) {
 }
 
 TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is
@@ -466,8 +456,6 @@ TEST_F(TTLTest, TTLSubPassesRemoveExpiredDocumentsAddedBetweenSubPasses) {
 
 // Tests that, between sub-passes, newly added TTL indexes are not ignored.
 TEST_F(TTLTest, TTLSubPassesStartRemovingFromNewTTLIndex) {
-    RAIIServerParameterControllerForTest featureFlagController("featureFlagBatchMultiDeletes",
-                                                               true);
     RAIIServerParameterControllerForTest ttlBatchDeletesController("ttlMonitorBatchDeletes", true);
 
     // Set the target time for each sub-pass to 0 to test when only a single iteration of deletes is

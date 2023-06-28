@@ -29,14 +29,26 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
 
+#include "tenant_migration_access_blocker.h"
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/commands/tenant_migration_donor_cmds_gen.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/task_executor.h"
-#include "tenant_migration_access_blocker.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -29,8 +29,24 @@
 
 #pragma once
 
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/oplog_fetcher.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 
 namespace mongo {
 namespace repl {

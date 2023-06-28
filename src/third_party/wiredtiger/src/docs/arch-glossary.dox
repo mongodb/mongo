@@ -15,7 +15,9 @@ they are used in other settings.
 
 <table class="doxtable sortable">
 <tr><th>Term<th>Category<th>Definition
+<td><td>btcur<td>btree<td>a b-tree cursor.
 <tr><td>address cookie<td>block manager<td>an opaque set of bytes returned by the block manager to reference a block in a Btree file, it includes an offset, size, checksum, and object id.
+<tr><td>aggregate time window<td>durable history<td>an aggregation of all time-windows held on a page or subordinate pages.
 <tr><td>atomicity<td>transactions<td>a guarantee provided within the context of a transaction that all operations made within that transaction either succeed or fail.
 <tr><td>barrier<td>general<td>a call that forces the CPU and compiler to enforce ordering constraints on memory operations, used in multithreaded code.
 <tr><td>block<td>block manager<td>the smallest granularity of data that is read from or written to a Btree file.  A btree page, when it appears on disk, may consist of one or more blocks.
@@ -38,8 +40,10 @@ they are used in other settings.
 <tr><td>cursor<td>general<td>a handle in the WiredTiger API that encapsulates a position in a Btree, and may hold the key and value associated with that position.
 <tr><td>data handle<td>general<td>an abstraction of a named file, table or other data source in WiredTiger
 <tr><td>data source<td>general<td>an abstraction that extends the uri name space.  A custom data source defines APIs that are invoked when objects are created in, or cursors are opened on, the new name space.
+<tr><td>data store<td>durable history<td>the file or b-tree which maintains the newest versions of a key on disk, anything older is written to the history store.
 <tr><td>dhandle<td>general<td>see data handle
 <tr><td>diagnostic build<td>general<td>a build of WiredTiger that includes extra code to check invariants, and abort if they fail.
+<tr><td>DS<td>durable history<td>See "data store"
 <tr><td>durability<td>transactions<td>the property that guarantees that transactions that have been committed will survive permanently.
 <tr><td>encryption<td>btree<td>in WiredTiger, encryption is applied to data files, log files and metadata.  Encryption algorithms may be added to WiredTiger via the extension mechanism.
 <tr><td>encryptor<td>btree<td>an encryption algorithm packaged as an extension.
@@ -47,10 +51,13 @@ they are used in other settings.
 <tr><td>extension<td>general<td>a module that uses the WiredTiger extension interface, allowing it to be added in an encapsulated way, without altering the core of the WiredTiger library.  Extensions are typically compiled into shared libraries.
 <tr><td>extent list<td>block manager<td>a list of contiguous sets of blocks in a file.  Extent lists are used to track available blocks and/or used blocks.
 <tr><td>fast truncate<td>btree<td>a truncate that spans a key range over more than one leaf page may be performed quickly by deleting entire data pages at a time.
+<tr><td>FLCS<td>general<td>fixed-length column store.
 <tr><td>frag<td>verify<td>in verify, a part of a file that is the minimum allocation size and aligned the same.  The smallest blocks may be the same as a frag, other blocks may be composed of multiple contiguous frags.
 <tr><td>hazard pointer<td>general<td>a data structure that assists in lock free algorithms, used by WiredTiger Btrees
-<tr><td>history store<td>general<td>storage in WiredTiger (currently implemented as a Btree) that keeps previous values associated with a key.
+<tr><td>history store<td>durable history<td>storage in WiredTiger (currently implemented as a Btree) that keeps previous values associated with a key.
+<tr><td>history store value<td>durable history<td>a version of a key older than the on-disk value, which has been written out to the history store.
 <tr><td>home directory<td>general<td>the directory containing all the data for a WiredTiger connection.  The connection is attached to this directory via a call to ::wiredtiger_open.
+<tr><td>HS<td>durable history<td>see "history store".
 <tr><td>Huffman encoding<td>btree<td>data in a btree may optionally be encoded using a Huffman encoding, based on either English letter frequencies or a custom encoding.  See @subpage_single huffman for details.
 <tr><td>index<td>schema<td>a Btree with records having values that are keys to another Btree. An index (or set of indices) become associated with a primary Btree via the table construct.
 <tr><td>insert<td>btree<td>an in-memory structure holding a key and a set of updates for a Btree.
@@ -68,6 +75,7 @@ they are used in other settings.
 <tr><td>object id<td>tiered storage<td>an integer that indicates an individual file that is a part of a Btree.
 <tr><td>oldest timestamp<td>transactions<td>a connection-wide value, specifies the oldest timestamp that must be tracked by the system. Values with stop timestamps older than this value do not have to be retained.
 <tr><td>on disk<td>general<td>a shorthand meaning "in the file system", and may or may not be stored on a physical disk.
+<tr><td>on-disk value<td>general<td>the newest version of a key which has been written out to disk.
 <tr><td>overflow page<td>btree<td>either in-memory or on disk, a page in a Btree that has a key or value that is too large to appear on a leaf or internal page.
 <tr><td>pack<td>general<td>convert in-memory representations of keys or values to a compact format for file storage
 <tr><td>page<td>btree<td>one logical node of a Btree, in memory, or on disk, that may store keys and/or values.  See internal page, leaf page, overflow page.
@@ -81,9 +89,12 @@ they are used in other settings.
 <tr><td>recovery<td>general<td>a procedure used on opening WiredTiger whereby, starting at the last checkpoint written, log records are played back to bring the database up to date.
 <tr><td>ref<td>btree<td>see page reference
 <tr><td>RLE<td>general<td>see run length encoding
+<tr><td>rollback to stable<td>RTS<td>the process by which WiredTiger returns the system to the "stable" point.
+<tr><td>RTS<td>RTS<td>see "Rollback to stable".
 <tr><td>run length encoding<td>general<td>also known as "RLE".  A technique to save space whereby repeated items can be represented by a count followed by the item.  For example the string of letters \sic "AAAAAAABBBCDDDD" might be encoded as \sic "7A3BC4D" using "out of band" digits.
 <tr><td>salvage<td>general<td>functionality to repair Btree disk files.
 <tr><td>schema<td>schema<td>the algorithms that use metadata to map the raw keys and values in Btrees to higher level abstractions like tables with typed columns.
+<tr><td>scratch buffer<td>general<td>a temporary buffer used to hold memory relevant to the session, also referred to as "scr".
 <tr><td>session<td>general<td>an encapsulation of information stored for single thread of control in the application. This encapsulation is kept in a handle that is used in the API.  Sessions manage transactions and performs the transactional operations.
 <tr><td>skip list<td>general<td>a variation of a sorted linked list that allows for faster (O(log(N))) searching. It is used in WiredTiger as a lock-free data structure for keys inserted on a page.
 <tr><td>spin lock<td>general<td>a simple locking algorithm that continually attempts to acquire a lock, appropriate for resources that are likely to be available and may be held for a short time.  This lock is CPU intensive while it is waiting.  Contrast with mutex
@@ -92,12 +103,17 @@ they are used in other settings.
 <tr><td>table<td>schema<td>an abstraction that allows one or more btrees to be used in a coordinated way, which is specified by the schema.  The table coordinates indices and column groups.
 <tr><td>thread<td>general<td>a thread of control.  WiredTiger uses pthreads for POSIX systems.
 <tr><td>thread group<td>general<td>a group of threads that perform a common task.  Eviction is performed by a thread group.
+<tr><td>time window<td>durable history<td>a set of start and stop transaction ids and timestamps which determine when an update is visible.
 <tr><td>timestamp<td>transactions<td>refers to one of several types of 64 bit values used to control transactional visibility of data in WiredTiger.  See oldest timestamp, stable timestamp, commit timestamp, read timestamp.
 <tr><td>transaction<td>transactions<td>a unit of work performed in WiredTiger that is atomic and consistent with the specified isolation level and durability level.
 <tr><td>truncate<td>btree<td>an operation to remove a range of key/values from a Btree.  See also fast truncate
+<tr><td>TW<td>durable history<td>see "time window".
+<tr><td>unpack<td>general<td>see vpack
 <tr><td>update<td>btree<td>a value associated with a key in a Btree.  A key may have many updates, these correspond to values written to the key previously.
 <tr><td>update chain<td>btree<td>a list of updates.
 <tr><td>verify<td>general<td>functionality to check integrity of Btree disk files.
+<tr><td>VLCS<td>general<td>variable-length column store.
+<tr><td>vpack<td>general<td>an unpacked key value pair from disk, see pack for more details
 </table>
 
 */

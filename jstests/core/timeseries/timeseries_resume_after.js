@@ -94,5 +94,25 @@ TimeseriesTest.run((insert) => {
     resumeToken = res.cursor.postBatchResumeToken;
 
     jsTestLog("Got resume token " + tojson(resumeToken));
+
+    // Test that '$_resumeAfter' fails if the recordId is Long.
+    assert.commandFailedWithCode(db.runCommand({
+        find: bucketsColl.getName(),
+        filter: {},
+        $_requestResumeToken: true,
+        $_resumeAfter: {'$recordId': NumberLong(10)},
+        hint: {$natural: 1}
+    }),
+                                 7738600);
+
+    // Test that '$_resumeAfter' fails if querying the time-series view.
+    assert.commandFailedWithCode(db.runCommand({
+        find: coll.getName(),
+        filter: {},
+        $_requestResumeToken: true,
+        $_resumeAfter: {'$recordId': BinData(5, '1234')},
+        hint: {$natural: 1}
+    }),
+                                 ErrorCodes.InvalidPipelineOperator);
 });
 })();

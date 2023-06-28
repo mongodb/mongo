@@ -29,31 +29,59 @@
 
 #include "mongo/db/commands/mr_common.h"
 
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <set>
 #include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/map_reduce_javascript_code.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
-#include "mongo/db/exec/projection_node.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_js_reduce.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_group.h"
+#include "mongo/db/pipeline/document_source_limit.h"
 #include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/document_source_merge_modes_gen.h"
 #include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_sort.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_function.h"
 #include "mongo/db/pipeline/expression_js_emit.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/pipeline/transformer_interface.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/util/make_data_structure.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 

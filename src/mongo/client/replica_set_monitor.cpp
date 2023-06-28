@@ -29,26 +29,17 @@
 
 #include "mongo/client/replica_set_monitor.h"
 
-#include <algorithm>
 #include <limits>
-#include <random>
+#include <vector>
 
-#include "mongo/bson/simple_bsonelement_comparator.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/connpool.h"
 #include "mongo/client/global_conn_pool.h"
-#include "mongo/client/read_preference.h"
-#include "mongo/db/operation_context.h"
-#include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/server_options.h"
+#include "mongo/client/replica_set_monitor_manager.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/condition_variable.h"
-#include "mongo/util/background.h"
-#include "mongo/util/debug_util.h"
-#include "mongo/util/exit.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

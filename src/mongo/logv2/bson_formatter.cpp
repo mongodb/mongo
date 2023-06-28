@@ -56,22 +56,28 @@ struct BSONValueExtractor {
     }
 
     void operator()(StringData name, CustomAttributeValue const& val) {
-        // Try to format as BSON first if available. Prefer BSONAppend if available as we might only
-        // want the value and not the whole element.
-        if (val.BSONAppend) {
-            val.BSONAppend(_builder, name);
-        } else if (val.BSONSerialize) {
-            BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
-            val.BSONSerialize(subObjBuilder);
-            subObjBuilder.done();
-        } else if (val.toBSONArray) {
-            _builder.append(name, val.toBSONArray());
-        } else if (val.stringSerialize) {
-            fmt::memory_buffer buffer;
-            val.stringSerialize(buffer);
-            _builder.append(name, fmt::to_string(buffer));
-        } else {
-            _builder.append(name, val.toString());
+        try {
+            // Try to format as BSON first if available. Prefer BSONAppend if available as we might
+            // only want the value and not the whole element.
+            if (val.BSONAppend) {
+                val.BSONAppend(_builder, name);
+            } else if (val.BSONSerialize) {
+                BSONObjBuilder subObjBuilder = _builder.subobjStart(name);
+                val.BSONSerialize(subObjBuilder);
+                subObjBuilder.done();
+            } else if (val.toBSONArray) {
+                _builder.append(name, val.toBSONArray());
+            } else if (val.stringSerialize) {
+                fmt::memory_buffer buffer;
+                val.stringSerialize(buffer);
+                _builder.append(name, fmt::to_string(buffer));
+            } else {
+                _builder.append(name, val.toString());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            _builder.append(name,
+                            std::string("Failed to serialize due to exception") + s.toString());
         }
     }
 

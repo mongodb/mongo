@@ -139,7 +139,7 @@ public:
             auto status = Grid::get(opCtx)->catalogClient()->runUserManagementWriteCommand(
                 opCtx,
                 Request::kCommandName,
-                cmd.getDbName().db(),
+                DatabaseNameUtil::serialize(cmd.getDbName()),
                 applyReadWriteConcern(
                     opCtx,
                     this,

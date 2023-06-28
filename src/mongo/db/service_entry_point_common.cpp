@@ -30,91 +30,152 @@
 
 #include "mongo/db/service_entry_point_common.h"
 
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <fmt/format.h>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/checked_cast.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/client/server_discovery_monitor.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/auth/authorization_checks.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/impersonation_session.h"
 #include "mongo/db/auth/ldap_cumulative_operation_stats.h"
+#include "mongo/db/auth/ldap_operation_stats.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/auth/security_token_authentication_guard.h"
+#include "mongo/db/auth/user_acquisition_stats.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/command_can_run_here.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
 #include "mongo/db/curop_metrics.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/error_labels.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/initialize_operation_session_info.h"
 #include "mongo/db/introspect.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/logical_time_validator.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/ops/write_ops.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/query/find.h"
-#include "mongo/db/read_concern.h"
+#include "mongo/db/query/max_time_ms_parser.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/read_write_concern_defaults_gen.h"
+#include "mongo/db/read_write_concern_provenance.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/speculative_majority_read_info.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/s/resharding/resharding_metrics_helpers.h"
 #include "mongo/db/s/sharding_cluster_parameters_gen.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_statistics.h"
 #include "mongo/db/s/transaction_coordinator_factory.h"
 #include "mongo/db/server_feature_flags_gen.h"
-#include "mongo/db/service_entry_point_common.h"
-#include "mongo/db/session/logical_session_id_helpers.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/stats/api_version_metrics.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/stats/server_read_concern_metrics.h"
 #include "mongo/db/stats/top.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction_validation.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/rpc/check_allowed_op_query_cmd.h"
 #include "mongo/rpc/factory.h"
-#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/rpc/metadata/client_metadata.h"
-#include "mongo/rpc/metadata/oplog_query_metadata.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/rpc/topology_version_gen.h"
+#include "mongo/s/analyze_shard_key_role.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/query_analysis_sampler.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/s/stale_exception.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -1502,18 +1563,17 @@ void ExecCommandDatabase::_initiateCommand() {
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
-    const auto dbname = request.getDatabase().toString();
+    const auto dbName =
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
     uassert(ErrorCodes::InvalidNamespace,
-            fmt::format("Invalid database name: '{}'", dbname),
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+            fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
+
 
     // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
     // not contribute to resource consumption metrics.
     const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
-    _scopedMetrics.emplace(
-        opCtx,
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
-        collect);
+    _scopedMetrics.emplace(opCtx, dbName, collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
@@ -1521,7 +1581,6 @@ void ExecCommandDatabase::_initiateCommand() {
         client->isFromSystemConnection();
 
     const auto invocationNss = _invocation->ns();
-
     validateSessionOptions(
         _sessionOptions, command->getName(), invocationNss, allowTransactionsOnConfigDatabase);
 
@@ -1575,9 +1634,6 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     _invocation->checkAuthorization(opCtx, request);
-    const auto dbName =
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
-    const bool iAmPrimary = replCoord->canAcceptWritesForDatabase_UNSAFE(opCtx, dbName);
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1737,16 +1793,11 @@ void ExecCommandDatabase::_initiateCommand() {
         feature_flags::gCheckForDirectShardOperations.isEnabled(
             serverGlobalParams.featureCompatibility)) {
         bool clusterHasTwoOrMoreShards = [&]() {
-            if (feature_flags::gClusterCardinalityParameter.isEnabled(
-                    serverGlobalParams.featureCompatibility)) {
-                auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-                auto* clusterCardinalityParam =
-                    clusterParameters
-                        ->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-                            "shardedClusterCardinalityForDirectConns");
-                return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-            }
-            return false;
+            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
+            auto* clusterCardinalityParam =
+                clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
+                    "shardedClusterCardinalityForDirectConns");
+            return clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
         }();
         if (clusterHasTwoOrMoreShards && !command->shouldSkipDirectConnectionChecks()) {
             const bool authIsEnabled = AuthorizationManager::get(opCtx->getServiceContext()) &&
@@ -1781,8 +1832,7 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     if (!opCtx->getClient()->isInDirectClient() &&
-        readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern &&
-        (iAmPrimary || (readConcernArgs.hasLevel() || readConcernArgs.getArgsAfterClusterTime()))) {
+        readConcernArgs.getLevel() != repl::ReadConcernLevel::kAvailableReadConcern) {
         boost::optional<ShardVersion> shardVersion;
         if (auto shardVersionElem = request.body[ShardVersion::kShardVersionField]) {
             shardVersion = ShardVersion::parse(shardVersionElem);
@@ -2158,7 +2208,7 @@ Future<void> executeCommand(std::shared_ptr<HandleRequest::ExecutionContext> exe
                     "Assertion while executing command '{command}' on database '{db}': {error}",
                     "Assertion while executing command",
                     "command"_attr = execContext->getRequest().getCommandName(),
-                    "db"_attr = execContext->getRequest().getDatabase(),
+                    "db"_attr = execContext->getRequest().getDatabaseNoThrow(),
                     "error"_attr = status.toString());
             });
     past.emplaceValue();

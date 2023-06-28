@@ -28,7 +28,15 @@
  */
 
 #include "mongo/db/serverless/shard_split_statistics.h"
+
+#include <memory>
+#include <utility>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

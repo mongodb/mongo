@@ -27,9 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/s/transaction_coordinator_structures.h"
 
 namespace mongo {
 

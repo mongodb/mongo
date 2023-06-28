@@ -29,7 +29,12 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/db/logical_time.h"
 #include "mongo/db/s/sharding_mongod_test_fixture.h"
+#include "mongo/util/clock_source_mock.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

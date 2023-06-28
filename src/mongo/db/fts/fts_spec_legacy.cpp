@@ -27,9 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/fts/fts_spec.h"
+#include <map>
+#include <string>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/fts/fts_language.h"
+#include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/fts/fts_util.h"
+#include "mongo/db/fts/stemmer.h"
+#include "mongo/db/fts/stop_words.h"
+#include "mongo/db/fts/tokenizer.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -74,7 +74,7 @@ Status populateCollectionUUIDMismatch(OperationContext* opCtx,
 
     auto response =
         executeCommandAgainstDatabasePrimary(opCtx,
-                                             info->dbName().db(),
+                                             DatabaseNameUtil::serialize(info->dbName()),
                                              swDbInfo.getValue(),
                                              listCollections.toBSON({}),
                                              ReadPreferenceSetting{ReadPreference::PrimaryOnly},

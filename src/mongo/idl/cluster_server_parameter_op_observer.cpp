@@ -61,16 +61,19 @@ void ClusterServerParameterOpObserver::onInserts(OperationContext* opCtx,
                                                  std::vector<InsertStatement>::const_iterator last,
                                                  std::vector<bool> fromMigrate,
                                                  bool defaultFromMigrate,
-                                                 InsertsOpStateAccumulator* opAccumulator) {
+                                                 OpStateAccumulator* opAccumulator) {
     if (!isConfigNamespace(coll->ns())) {
         return;
     }
 
     for (auto it = first; it != last; ++it) {
-        opCtx->recoveryUnit()->onCommit([doc = it->doc, tenantId = coll->ns().dbName().tenantId()](
-                                            OperationContext* opCtx, boost::optional<Timestamp>) {
-            cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
-        });
+        auto& doc = it->doc;
+        auto tenantId = coll->ns().dbName().tenantId();
+        cluster_parameters::validateParameter(opCtx, doc, tenantId);
+        opCtx->recoveryUnit()->onCommit(
+            [doc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
+                cluster_parameters::updateParameter(opCtx, doc, kOplog, tenantId);
+            });
     }
 }
 
@@ -82,10 +85,12 @@ void ClusterServerParameterOpObserver::onUpdate(OperationContext* opCtx,
         return;
     }
 
-    opCtx->recoveryUnit()->onCommit([updatedDoc, tenantId = args.coll->ns().dbName().tenantId()](
-                                        OperationContext* opCtx, boost::optional<Timestamp>) {
-        cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
-    });
+    auto tenantId = args.coll->ns().dbName().tenantId();
+    cluster_parameters::validateParameter(opCtx, updatedDoc, tenantId);
+    opCtx->recoveryUnit()->onCommit(
+        [updatedDoc, tenantId](OperationContext* opCtx, boost::optional<Timestamp>) {
+            cluster_parameters::updateParameter(opCtx, updatedDoc, kOplog, tenantId);
+        });
 }
 
 void ClusterServerParameterOpObserver::aboutToDelete(OperationContext* opCtx,
@@ -134,7 +139,7 @@ void ClusterServerParameterOpObserver::onDelete(OperationContext* opCtx,
 
 void ClusterServerParameterOpObserver::onDropDatabase(OperationContext* opCtx,
                                                       const DatabaseName& dbName) {
-    if (dbName.db() == DatabaseName::kConfig.db()) {
+    if (dbName.isConfigDB()) {
         // Entire config DB deleted, reset to default state.
         opCtx->recoveryUnit()->onCommit(
             [tenantId = dbName.tenantId()](OperationContext* opCtx, boost::optional<Timestamp>) {

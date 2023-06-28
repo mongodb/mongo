@@ -203,7 +203,7 @@ TEST(MockDBClientConnTest, InsertAndQueryTwice) {
 
 TEST(MockDBClientConnTest, QueryWithNoResults) {
     MockRemoteDBServer server("test");
-    const NamespaceString nss("test.user");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.user");
 
     server.insert(nss, BSON("x" << 1));
     MockDBClientConnection conn(&server);
@@ -378,7 +378,7 @@ TEST(MockDBClientConnTest, MultiNSRemove) {
 
 TEST(MockDBClientConnTest, InsertAfterRemove) {
     MockRemoteDBServer server("test");
-    const NamespaceString nss("test.user");
+    const NamespaceString nss = NamespaceString::createNamespaceString_forTest("test.user");
 
     {
         MockDBClientConnection conn(&server);

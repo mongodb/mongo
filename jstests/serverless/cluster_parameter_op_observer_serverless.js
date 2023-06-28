@@ -3,7 +3,7 @@
  * @tags: [
  *   does_not_support_stepdowns,
  *   requires_replication,
- *   requires_fcv_62,
+ *   requires_fcv_71,
  *   serverless
  *  ]
  */
@@ -15,33 +15,20 @@ load("jstests/serverless/libs/change_collection_util.js");
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 
-const kUnknownCSPLogId = 6226300;
-const kUnknownCSPLogComponent = 'control';
-const kUnknownCSPLogLevel = 3;
 const tenantId = ObjectId();
 
 function runTest(conn) {
     const tenantConn = getTenantConnection(conn.host, tenantId);
     let i = 0;
-    const connConfig = conn.getDB('config');
     for (let myConn of [conn, tenantConn]) {
         const myConnConfig = myConn.getDB('config');
-        // Using non-tenant connection, check that there's no log message yet and set the log level
-        // to debug
-        assert(!checkLog.checkContainsOnceJson(conn, kUnknownCSPLogId, {name: 'foo_' + i}));
-        const originalLogLevel =
-            assert
-                .commandWorked(connConfig.setLogLevel(kUnknownCSPLogLevel, kUnknownCSPLogComponent))
-                .was.verbosity;
 
-        // With given connection, insert into this tenant's cluster parameter collection
-        assert.writeOK(myConnConfig.clusterParameters.insert(
-            {_id: 'foo_' + i, clusterParameterTime: Date(), value: 123}));
-
-        // With non-tenant connection, reset log level and check that the op observer triggered and
-        // caused a log message about unknown cluster parameter
-        assert.commandWorked(connConfig.setLogLevel(originalLogLevel, kUnknownCSPLogComponent));
-        assert(checkLog.checkContainsOnceJson(conn, kUnknownCSPLogId, {name: 'foo_' + i}));
+        // With given connection, insert into this tenant's cluster parameter collection. Should
+        // fail since this is an invalid parameter.
+        const res = myConnConfig.clusterParameters.insert(
+            {_id: 'foo_' + i, clusterParameterTime: Date(), value: 123});
+        assert(res.hasWriteError());
+        assert.neq(res.getWriteError().length, 0);
         i += 1;
     }
 }

@@ -30,30 +30,47 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cmath>
 #include <cstdint>
 #include <cstring>  // strlen
 #include <fmt/format.h>
+#include <limits>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
-#include "mongo/config.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/decimal128.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/platform/strnlen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 class BSONObj;
+
 class BSONElement;
 class BSONObjBuilder;
 class Timestamp;
+
 class ExtendedCanonicalV200Generator;
 class ExtendedRelaxedV200Generator;
 class LegacyStrictGenerator;

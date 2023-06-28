@@ -26,23 +26,53 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/config/config_server_test_fixture.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -461,18 +491,18 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForCollAtClusterTime_W
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(2, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4", "shard5"}, false);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(3, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, true);
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForCollAtClusterTime(
-        opCtx, NamespaceString("db.collection1"), Timestamp(6, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db.collection1"), Timestamp(6, 0));
     assertSameHistoricalPlacement(historicalPlacement, {"shard1"}, true);
 }
 
@@ -710,18 +740,18 @@ TEST_F(CatalogClientAggregationsTest, GetShardsThatOwnDataForDbAtClusterTime_Wit
     // Asking for a timestamp before the closing marker should return the shards from the first
     // marker of the fcv upgrade. As result, "isExact" is expected to be false
     auto historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(2, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(2, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4", "shard5"}, false);
 
     // Asking for a timestamp after the closing marker should return the expected shards
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(3, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(3, 0));
     assertSameHistoricalPlacement(
         historicalPlacement, {"shard1", "shard2", "shard3", "shard4"}, true);
 
     historicalPlacement = catalogClient()->getShardsThatOwnDataForDbAtClusterTime(
-        opCtx, NamespaceString("db"), Timestamp(7, 0));
+        opCtx, NamespaceString::createNamespaceString_forTest("db"), Timestamp(7, 0));
     assertSameHistoricalPlacement(historicalPlacement, {"shard1", "shard2", "shard3"}, true);
 }
 

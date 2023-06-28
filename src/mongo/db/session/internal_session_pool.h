@@ -29,11 +29,25 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <list>
+#include <ratio>
+#include <stack>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
-
-#include <stack>
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

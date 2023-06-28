@@ -29,9 +29,13 @@
 
 #pragma once
 
-#include "mongo/db/repl/primary_only_service.h"
 #include <memory>
+#include <utility>
 
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 
 namespace mongo {
@@ -41,6 +45,7 @@ class TaskExecutor;
 }
 
 class OperationContext;
+
 class OpObserverRegistry;
 class ServiceContext;
 
@@ -66,6 +71,8 @@ protected:
 
     virtual std::unique_ptr<repl::PrimaryOnlyService> makeService(
         ServiceContext* serviceContext) = 0;
+
+    virtual std::unique_ptr<repl::ReplicationCoordinator> makeReplicationCoordinator();
 
     /**
      * Used to add your own op observer to the op observer registry during setUp prior to running

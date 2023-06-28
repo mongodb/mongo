@@ -277,7 +277,7 @@ protected:
     std::unique_ptr<MockQueryRewriter> _mock;
     fle::ExpressionToRewriteMap _agg;
     fle::MatchTypeToRewriteMap _match;
-    NamespaceString _mockNss{"mock"_sd};
+    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("mock"_sd);
 };
 
 #define ASSERT_MATCH_EXPRESSION_REWRITE(input, expected)                 \

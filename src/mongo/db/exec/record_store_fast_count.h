@@ -29,7 +29,15 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/stage_types.h"
 
 namespace mongo {
 
@@ -43,7 +51,7 @@ public:
     static const char* kStageType;
 
     RecordStoreFastCountStage(ExpressionContext* expCtx,
-                              const CollectionPtr& collection,
+                              VariantCollectionPtrOrAcquisition collection,
                               long long skip,
                               long long limit);
 

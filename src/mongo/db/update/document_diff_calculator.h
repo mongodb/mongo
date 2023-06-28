@@ -30,6 +30,10 @@
 #pragma once
 
 #include <boost/dynamic_bitset.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <vector>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/update/document_diff_serialization.h"

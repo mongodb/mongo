@@ -29,11 +29,17 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 
 namespace mongo {

@@ -80,7 +80,3 @@ structs:
                 type: TranslatedRequestParams
                 description: "The field is populated only once the kTranslateRequest phase is completed"
                 optional: true
-            # TODO SERVER-68084 remove the following field
-            disregardCriticalSectionOnOriginalNss:
-                type: optionalBool
-                description: "When set to true, the DDL operation is being performed without acquiring a critical section over the NSS specified by the user."

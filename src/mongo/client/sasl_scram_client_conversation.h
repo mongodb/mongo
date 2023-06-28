@@ -29,16 +29,24 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/icu.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

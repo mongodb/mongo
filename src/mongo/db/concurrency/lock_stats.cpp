@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/concurrency/lock_stats.h"
+#include <memory>
 
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/lock_stats.h"
 
 namespace mongo {
 

@@ -22,7 +22,7 @@ collection.drop();
 for (let i = 0; i < 1000; i++) {
     assert.commandWorked(collection.insert({x: i}));
 }
-assert.commandWorked(collection.createIndex({x: 1}, {background: true}));
+assert.commandWorked(collection.createIndex({x: 1}));
 
 // Attempt to fsyncLock the database, aborting early if the storage engine doesn't support it.
 const storageEngine = jsTest.options().storageEngine;

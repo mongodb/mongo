@@ -29,11 +29,18 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
+#include <boost/container_hash/extensions.hpp>
 #include <boost/container_hash/hash.hpp>
 #include <boost/dynamic_bitset.hpp>
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <cstddef>
+#include <initializer_list>
 #include <iosfwd>
+#include <string>
+#include <variant>
 #include <vector>
+
+#include "mongo/base/string_data.h"
 
 namespace mongo::boolean_simplification {
 

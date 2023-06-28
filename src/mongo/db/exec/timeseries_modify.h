@@ -30,11 +30,40 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/exec/delete_stage.h"
+#include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/timeseries/bucket_unpacker.h"
 #include "mongo/db/exec/update_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/update/update_driver.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 
@@ -151,6 +180,18 @@ protected:
      */
     void _prepareToReturnMeasurement(WorkingSetID& out);
 
+    /**
+     * Gets the user-level shard key paths.
+     */
+    const std::vector<std::unique_ptr<FieldRef>>& _getUserLevelShardKeyPaths(
+        const ScopedCollectionDescription& collDesc);
+
+    /**
+     * Gets immutable paths when the request is user-initiated and the timeseries collection is
+     * sharded and the request does not come from the router.
+     */
+    const std::vector<std::unique_ptr<FieldRef>>& _getImmutablePaths();
+
     // A user-initiated write is one which is not caused by oplog application and is not part of a
     // chunk migration.
     bool _isUserInitiatedUpdate;
@@ -165,6 +206,9 @@ protected:
 
     // Original, untranslated and complete predicate.
     std::unique_ptr<MatchExpression> _originalPredicate;
+
+    // Temporary storage for _getImmutablePaths().
+    std::vector<std::unique_ptr<FieldRef>> _immutablePaths;
 
 private:
     bool _isMultiWrite() const {
@@ -214,16 +258,19 @@ private:
 
     void _checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
                                              const BSONObj& oldBucket,
+                                             const BSONObj& newMeasurement,
                                              const BSONObj& oldMeasurement);
 
     void _checkUpdateChangesReshardingKey(const ShardingWriteRouter& shardingWriteRouter,
                                           const BSONObj& newBucket,
-                                          const BSONObj& oldBucke,
+                                          const BSONObj& oldBucket,
+                                          const BSONObj& newMeasurement,
                                           const BSONObj& oldMeasurementt);
 
     void _checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
-                                           const BSONObj& oldBucke,
-                                           const BSONObj& oldMeasurementt);
+                                           const BSONObj& oldBucket,
+                                           const BSONObj& newMeasurement,
+                                           const BSONObj& oldMeasurement);
 
     WorkingSet* _ws;
 

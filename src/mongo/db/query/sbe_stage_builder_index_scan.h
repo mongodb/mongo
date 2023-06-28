@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/collection_helpers.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo::stage_builder {
 

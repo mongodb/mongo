@@ -778,10 +778,11 @@ connection_runtime_config = [
         ]),
     Config('operation_timeout_ms', '0', r'''
         if non-zero, a requested limit on the number of elapsed real time milliseconds
-        application threads will take to complete database operations. Time is measured from the
-        start of each WiredTiger API call. There is no guarantee any operation will not take
-        longer than this amount of time. If WiredTiger notices the limit has been exceeded, an
-        operation may return a WT_ROLLBACK error. The default of 0 is to have no limit''',
+        application threads will take to complete database operations. This setting only applies
+        inside of a transaction. Time is measured from the start of each WiredTiger API call. There
+        is no guarantee any operation will not take longer than this amount of time. If WiredTiger
+        notices the limit has been exceeded, an operation may return a WT_ROLLBACK error. The
+        default of 0 is to have no limit.''',
         min=0),
     Config('operation_tracking', '', r'''
         enable tracking of performance-critical functions. See @ref operation_tracking for
@@ -841,9 +842,10 @@ connection_runtime_config = [
         'checkpoint_handle', 'checkpoint_slow', 'checkpoint_stop', 'compact_slow',
         'evict_reposition', 'failpoint_eviction_fail_after_reconciliation',
         'failpoint_history_store_delete_key_from_ts', 'history_store_checkpoint_delay',
-        'history_store_search', 'history_store_sweep_race', 'prepare_checkpoint_delay',
-        'prepare_resolution','sleep_before_read_overflow_onpage', 'split_1', 'split_2', 'split_3',
-        'split_4', 'split_5','split_6', 'split_7', 'split_8', 'tiered_flush_finish']),
+        'history_store_search', 'history_store_sweep_race', 'prefix_compare',
+        'prepare_checkpoint_delay', 'prepare_resolution_1','prepare_resolution_2',
+        'sleep_before_read_overflow_onpage','split_1', 'split_2', 'split_3', 'split_4', 'split_5',
+        'split_6', 'split_7', 'split_8','tiered_flush_finish']),
     Config('verbose', '[]', r'''
         enable messages for various subsystems and operations. Options are given as a list,
         where each message type can optionally define an associated verbosity level, such as

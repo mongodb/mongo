@@ -29,7 +29,30 @@
 
 #include "mongo/db/s/operation_sharding_state.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/s/sharding_api_d_params_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {
@@ -112,8 +135,9 @@ boost::optional<ShardVersion> OperationShardingState::getShardVersion(const Name
     return boost::none;
 }
 
-boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(StringData dbName) const {
-    const auto it = _databaseVersions.find(dbName);
+boost::optional<DatabaseVersion> OperationShardingState::getDbVersion(
+    const DatabaseName& dbName) const {
+    const auto it = _databaseVersions.find(DatabaseNameUtil::serialize(dbName));
     if (it != _databaseVersions.end()) {
         return it->second.v;
     }
@@ -211,7 +235,7 @@ ScopedSetShardRole::~ScopedSetShardRole() {
     auto& oss = OperationShardingState::get(_opCtx);
 
     if (_shardVersion) {
-        auto it = oss._shardVersions.find(_nss.ns());
+        auto it = oss._shardVersions.find(NamespaceStringUtil::serialize(_nss));
         invariant(it != oss._shardVersions.end());
         auto& tracker = it->second;
         invariant(--tracker.recursion >= 0);

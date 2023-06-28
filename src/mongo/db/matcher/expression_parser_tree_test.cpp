@@ -27,15 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
+#include <memory>
 
-#include "mongo/db/matcher/expression_parser.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

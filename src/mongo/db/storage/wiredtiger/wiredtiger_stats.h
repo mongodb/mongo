@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <map>
+#include <memory>
 #include <wiredtiger.h>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/storage_stats.h"
 
 namespace mongo {

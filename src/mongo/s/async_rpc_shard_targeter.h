@@ -70,7 +70,7 @@ public:
     /**
      * Update underlying shard targeter's view of topology on error.
      */
-    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override final {
+    SemiFuture<void> onRemoteCommandError(HostAndPort h, Status s) override {
         invariant(_shardFromLastResolve,
                   "Cannot propagate a remote command error to a ShardTargeter before calling "
                   "resolve and obtaining a shard.");

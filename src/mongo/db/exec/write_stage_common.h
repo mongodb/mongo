@@ -29,12 +29,26 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stage.h"
 #include "mongo/db/exec/shard_filterer.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_exec.h"
+#include "mongo/platform/basic.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -152,7 +166,8 @@ private:
 /**
  * Returns true if the document referred to by 'id' still exists and matches the query predicate
  * given by 'cq'. Returns true if the document still exists and 'cq' is null. Returns false
- * otherwise.
+ * otherwise, in which case the WorkingSetMember referred to by 'id' will no longer contain a valid
+ * document, and the only operation that should be performed on the WSM is to free it.
  *
  * May throw a WriteConflictException if there was a conflict while searching to see if the document
  * still exists.

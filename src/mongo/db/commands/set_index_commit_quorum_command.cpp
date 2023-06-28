@@ -27,16 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <iostream>
+#include <memory>
 #include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/set_index_commit_quorum_gen.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/write_concern_options.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

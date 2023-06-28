@@ -30,12 +30,18 @@
 #include "mongo/db/exec/and_hash.h"
 
 #include <memory>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/exec/and_common.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 

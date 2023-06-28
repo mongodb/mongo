@@ -48,6 +48,15 @@ const paramList = [
     {name: "internalQueryColumnScanMinAvgDocSizeBytes", value: 2048},
     {name: "internalQueryColumnScanMinCollectionSizeBytes", value: 2048},
     {name: "internalQueryColumnScanMinNumColumnFilters", value: 5},
+    {name: "internalQueryCardinalityEstimatorMode", value: "sampling"},
+    {name: "internalCascadesOptimizerDisableScan", value: true},
+    {name: "internalCascadesOptimizerDisableIndexes", value: true},
+    {name: "internalCascadesOptimizerDisableMergeJoinRIDIntersect", value: true},
+    {name: "internalCascadesOptimizerDisableHashJoinRIDIntersect", value: true},
+    {name: "internalCascadesOptimizerDisableGroupByAndUnionRIDIntersect", value: true},
+    {name: "internalCascadesOptimizerFastIndexNullHandling", value: true},
+    {name: "internalCascadesOptimizerMinIndexEqPrefixes", value: 2},
+    {name: "internalCascadesOptimizerMaxIndexEqPrefixes", value: 2},
 ];
 
 const conn = MongoRunner.runMongod();

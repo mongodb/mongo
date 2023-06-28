@@ -12,15 +12,15 @@
 (function() {
 "use strict";
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+load("jstests/core/timeseries/libs/timeseries.js");             // For 'TimeseriesTest' helpers.
+load("jstests/sharding/libs/timeseries_update_multi_util.js");  // For 'TimeseriesMultiUpdateUtil'.
 
 Random.setRandomSeed();
 
 const dbName = jsTestName();
 const collName = 'sharded_timeseries_update_multi';
-const timeField = 'time';
-const metaField = 'hostid';
-const testStringCamelCase = "testString";
+const timeField = TimeseriesMultiUpdateUtil.timeField;
+const metaField = TimeseriesMultiUpdateUtil.metaField;
 const testStringNoCase = "teststring";
 const caseInsensitiveCollation = {
     locale: "en",
@@ -34,76 +34,6 @@ const mongos = st.s0;
 // Databases.
 assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 const testDB = mongos.getDB(dbName);
-
-function generateTimeValue(index) {
-    return ISODate(`${2000 + index}-01-01`);
-}
-
-// The split point between two shards. This value guarantees that generated time values do not fall
-// on this boundary.
-const splitTimePointBetweenTwoShards = ISODate("2001-06-30");
-const numOfDocs = 4;
-
-function generateDocsForTestCase(collConfig) {
-    const documents = TimeseriesTest.generateHosts(numOfDocs);
-    for (let i = 0; i < numOfDocs; i++) {
-        documents[i]._id = i;
-        if (collConfig.metaGenerator) {
-            documents[i][metaField] = collConfig.metaGenerator(i);
-        }
-        documents[i][timeField] = generateTimeValue(i);
-        documents[i].f = i;
-        documents[i].stringField = testStringCamelCase;
-    }
-    return documents;
-}
-
-const collectionConfigurations = {
-    // Shard key only on meta field/subfields.
-    metaShardKey: {
-        metaGenerator: (id => id),
-        shardKey: {[metaField]: 1},
-        splitPoint: {meta: 2},
-    },
-    metaShardKeyString: {
-        metaGenerator: (id => `string:${id}`),
-        shardKey: {[metaField]: 1},
-        splitPoint: {meta: `string:2`},
-    },
-    metaObjectShardKey: {
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField]: 1},
-        splitPoint: {meta: {a: 2}},
-    },
-    metaSubFieldShardKey: {
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField + '.a']: 1},
-        splitPoint: {'meta.a': 2},
-    },
-
-    // Shard key on time field.
-    timeShardKey: {
-        shardKey: {[timeField]: 1},
-        splitPoint: {[`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
-    },
-
-    // Shard key on both meta and time field.
-    metaTimeShardKey: {
-        metaGenerator: (id => id),
-        shardKey: {[metaField]: 1, [timeField]: 1},
-        splitPoint: {meta: 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
-    },
-    metaObjectTimeShardKey: {
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField]: 1, [timeField]: 1},
-        splitPoint: {meta: {a: 2}, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
-    },
-    metaSubFieldTimeShardKey: {
-        metaGenerator: (index => ({a: index})),
-        shardKey: {[metaField + '.a']: 1, [timeField]: 1},
-        splitPoint: {'meta.a': 2, [`control.min.${timeField}`]: splitTimePointBetweenTwoShards},
-    },
-};
 
 const requestConfigurations = {
     // Empty filter leads to broadcasted request.
@@ -139,7 +69,7 @@ const requestConfigurations = {
     timeFilterOneShard: {
         updateList: [
             {
-                q: {[timeField]: generateTimeValue(0), f: 0},
+                q: {[timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(0), f: 0},
                 u: [
                     {$unset: "f"},
                     {$set: {"newField": 1}},
@@ -147,7 +77,7 @@ const requestConfigurations = {
                 multi: true,
             },
             {
-                q: {[timeField]: generateTimeValue(1), f: 1},
+                q: {[timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(1), f: 1},
                 u: [
                     {$unset: "f"},
                     {$set: {"newField": 1}},
@@ -166,12 +96,12 @@ const requestConfigurations = {
     timeFilterTwoShards: {
         updateList: [
             {
-                q: {[timeField]: generateTimeValue(1), f: 1},
+                q: {[timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(1), f: 1},
                 u: {$set: {f: ["arr", "ay"]}},
                 multi: true,
             },
             {
-                q: {[timeField]: generateTimeValue(3), f: 3},
+                q: {[timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(3), f: 3},
                 u: {$set: {f: ["arr", "ay"]}},
                 multi: true,
             }
@@ -253,7 +183,7 @@ const requestConfigurations = {
     // Meta + time filter has the request targeted to shard1.
     metaTimeFilterOneShard: {
         updateList: [{
-            q: {[metaField]: 2, [timeField]: generateTimeValue(2), f: 2},
+            q: {[metaField]: 2, [timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(2), f: 2},
             u: {$set: {f: 1000}},
             multi: true,
         }],
@@ -264,12 +194,12 @@ const requestConfigurations = {
     metaFilterTwoShards: {
         updateList: [
             {
-                q: {[timeField]: generateTimeValue(1), f: 1},
+                q: {[timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(1), f: 1},
                 u: {$set: {"newField": 101}},
                 multi: true,
             },
             {
-                q: {[timeField]: generateTimeValue(3), f: 3},
+                q: {[timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(3), f: 3},
                 u: {$set: {"newField": 101}},
                 multi: true,
             }
@@ -291,7 +221,11 @@ const requestConfigurations = {
     // Meta object + time filter has the request targeted to shard1.
     metaObjectTimeFilterOneShard: {
         updateList: [{
-            q: {[metaField]: {a: 2}, [timeField]: generateTimeValue(2), f: 2},
+            q: {
+                [metaField]: {a: 2},
+                [timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(2),
+                f: 2
+            },
             u: {$set: {f: 2000}},
             multi: true,
         }],
@@ -331,7 +265,11 @@ const requestConfigurations = {
     // Meta sub field + time filter has the request targeted to shard1.
     metaSubFieldTimeFilterOneShard: {
         updateList: [{
-            q: {[metaField + '.a']: 2, [timeField]: generateTimeValue(2), f: 2},
+            q: {
+                [metaField + '.a']: 2,
+                [timeField]: TimeseriesMultiUpdateUtil.generateTimeValue(2),
+                f: 2
+            },
             u: {$set: {"newField": 101}},
             multi: true,
         }],
@@ -387,61 +325,12 @@ function assertAndGetProfileEntriesIfRequestIsRoutedToCorrectShards(reqConfig, p
     return [primaryEntries, otherEntries];
 }
 
-function prepareShardedTimeseriesCollection(collConfig, insertFn) {
-    // Ensures that the collection does not exist.
-    const coll = testDB.getCollection(collName);
-    coll.drop();
-
-    // Creates timeseries collection.
-    const tsOptions = {timeField: timeField};
-    const hasMetaField = !!collConfig.metaGenerator;
-    if (hasMetaField) {
-        tsOptions.metaField = metaField;
-    }
-    assert.commandWorked(testDB.createCollection(collName, {timeseries: tsOptions}));
-
-    // Shards timeseries collection.
-    assert.commandWorked(coll.createIndex(collConfig.shardKey));
-    assert.commandWorked(mongos.adminCommand({
-        shardCollection: `${dbName}.${collName}`,
-        key: collConfig.shardKey,
-    }));
-
-    // Inserts initial set of documents.
-    const documents = generateDocsForTestCase(collConfig);
-    assert.commandWorked(insertFn(coll, documents));
-
-    // Manually splits the data into two chunks.
-    assert.commandWorked(mongos.adminCommand(
-        {split: `${dbName}.system.buckets.${collName}`, middle: collConfig.splitPoint}));
-
-    // Ensures that currently both chunks reside on the primary shard.
-    let counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
-    const primaryShard = st.getPrimaryShard(dbName);
-    assert.eq(2, counts[primaryShard.shardName], counts);
-
-    // Moves one of the chunks into the second shard.
-    const otherShard = st.getOther(primaryShard);
-    assert.commandWorked(mongos.adminCommand({
-        movechunk: `${dbName}.system.buckets.${collName}`,
-        find: collConfig.splitPoint,
-        to: otherShard.name,
-        _waitForDelete: true
-    }));
-
-    // Ensures that each shard owns one chunk.
-    counts = st.chunkCounts(`system.buckets.${collName}`, dbName);
-    assert.eq(1, counts[primaryShard.shardName], counts);
-    assert.eq(1, counts[otherShard.shardName], counts);
-
-    return [coll, documents];
-}
-
 function runTest(collConfig, reqConfig, insertFn) {
     jsTestLog(`Running a test with configuration: ${tojson({collConfig, reqConfig})}`);
 
     // Prepares a sharded timeseries collection.
-    const [coll, documents] = prepareShardedTimeseriesCollection(collConfig, insertFn);
+    const [coll, documents] = TimeseriesMultiUpdateUtil.prepareShardedTimeseriesCollection(
+        mongos, st, testDB, collName, collConfig, insertFn);
 
     // Resets database profiler to verify that the update request is routed to the correct shards.
     const primaryShard = st.getPrimaryShard(dbName);
@@ -486,7 +375,7 @@ function runTest(collConfig, reqConfig, insertFn) {
 }
 
 function runOneTestCase(collConfigName, reqConfigName) {
-    const collConfig = collectionConfigurations[collConfigName];
+    const collConfig = TimeseriesMultiUpdateUtil.collectionConfigurations[collConfigName];
     const reqConfig = requestConfigurations[reqConfigName];
 
     TimeseriesTest.run((insertFn) => {

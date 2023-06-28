@@ -31,15 +31,18 @@
 #define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <utility>
 
-#include "mongo/db/storage/durable_history_pin.h"
-
-#include "mongo/bson/bsonmisc.h"
-#include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/durable_history_pin.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

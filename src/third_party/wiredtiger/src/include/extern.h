@@ -397,7 +397,8 @@ extern int __wt_checkpoint_server_destroy(WT_SESSION_IMPL *session)
 extern int __wt_checkpoint_sync(WT_SESSION_IMPL *session, const char *cfg[])
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_get(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t objectid,
-  wt_off_t offset, uint32_t size, void *dst) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+  wt_off_t offset, uint32_t size, void *dst, bool *cache_hit)
+  WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_chunkcache_setup(WT_SESSION_IMPL *session, const char *cfg[], bool reconfig)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_ckpt_blkmod_to_meta(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_CKPT *ckpt)
@@ -734,7 +735,7 @@ extern int __wt_evict_thread_run(WT_SESSION_IMPL *session, WT_THREAD *thread)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_evict_thread_stop(WT_SESSION_IMPL *session, WT_THREAD *thread)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-extern int __wt_exclusive_handle_operation(WT_SESSION_IMPL *session, const char *uri,
+extern int __wt_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[], uint32_t open_flags)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 extern int __wt_ext_config_get(WT_EXTENSION_API *wt_api, WT_SESSION *wt_session,
@@ -2220,8 +2221,8 @@ static inline int __wt_lex_compare(const WT_ITEM *user_item, const WT_ITEM *tree
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_lex_compare_short(const WT_ITEM *user_item, const WT_ITEM *tree_item)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
-static inline int __wt_lex_compare_skip(const WT_ITEM *user_item, const WT_ITEM *tree_item,
-  size_t *matchp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
+static inline int __wt_lex_compare_skip(WT_SESSION_IMPL *session, const WT_ITEM *user_item,
+  const WT_ITEM *tree_item, size_t *matchp) WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_log_cmp(WT_LSN *lsn1, WT_LSN *lsn2)
   WT_GCC_FUNC_DECL_ATTRIBUTE((warn_unused_result));
 static inline int __wt_page_cell_data_ref_kv(WT_SESSION_IMPL *session, WT_PAGE *page,

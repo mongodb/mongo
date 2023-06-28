@@ -33,18 +33,41 @@
  * Connect to a Replica Set, from C++.
  */
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <map>
+#include <memory>
+#include <string>
 #include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/authenticate.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_connection.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/config.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 
 class ReplicaSetMonitor;
 class TagSet;
 struct ReadPreferenceSetting;
+
 typedef std::shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
 
 /** Use this class to connect to a replica set of servers.  The class will manage

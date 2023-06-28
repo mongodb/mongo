@@ -27,15 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
 
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_stats_gen.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fle2_get_count_info_command_gen.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/util/assert_util.h"
 
 
@@ -186,8 +204,9 @@ public:
             auto* as = AuthorizationSession::get(opCtx->getClient());
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to read tags",
-                    as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::internal));
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::internal));
         }
 
         NamespaceString ns() const final {

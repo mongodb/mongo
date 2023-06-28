@@ -345,6 +345,8 @@ struct __wt_size;
 typedef struct __wt_size WT_SIZE;
 struct __wt_spinlock;
 typedef struct __wt_spinlock WT_SPINLOCK;
+struct __wt_split_page_hist;
+typedef struct __wt_split_page_hist WT_SPLIT_PAGE_HIST;
 struct __wt_stash;
 typedef struct __wt_stash WT_STASH;
 struct __wt_table;

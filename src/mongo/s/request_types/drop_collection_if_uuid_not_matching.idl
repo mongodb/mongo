@@ -45,6 +45,7 @@ commands:
     strict: false
     namespace: concatenate_with_db
     api_version: ""
+    reply_type: OkReply
     fields:
         expectedCollectionUUID:
             type: uuid

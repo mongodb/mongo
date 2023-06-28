@@ -27,19 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <ostream>
+#include <set>
 
-#include "mongo/db/pipeline/resume_token.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
-#include <limits>
-
-#include "mongo/bson/bsonmisc.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/pipeline/change_stream_helpers_legacy.h"
+#include "mongo/db/pipeline/resume_token.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/optional_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 constexpr StringData ResumeToken::kDataFieldName;

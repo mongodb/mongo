@@ -27,11 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <iostream>
-
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/util/namespace_string_util.h"
 
 
 namespace mongo {
@@ -47,7 +44,7 @@ std::string ResourcePattern::toString() const {
         case MatchTypeEnum::kMatchCollectionName:
             return "<collection " + _ns.coll().toString() + " in any database>";
         case MatchTypeEnum::kMatchExactNamespace:
-            return "<" + _ns.ns() + ">";
+            return "<" + NamespaceStringUtil::serializeForAuth(_ns) + ">";
         case MatchTypeEnum::kMatchAnyNormalResource:
             return "<all normal resources>";
         case MatchTypeEnum::kMatchAnyResource:

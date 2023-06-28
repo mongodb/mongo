@@ -27,21 +27,37 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <initializer_list>
+#include <memory>
+#include <ostream>
 #include <utility>
 
-#include "mongo/platform/basic.h"
-
-#include <memory>
-
-#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 
@@ -54,6 +70,8 @@ std::ostream& operator<<(std::ostream& os, FieldAvailability value) {
             return os << "NotProvided";
         case FieldAvailability::kHashedValueProvided:
             return os << "HashedValueProvided";
+        case FieldAvailability::kCollatedProvided:
+            return os << "CollatedValueProvided";
         case FieldAvailability::kFullyProvided:
             return os << "FullyProvided";
     }
@@ -108,15 +126,32 @@ IndexEntry buildSimpleIndexEntry(const BSONObj& kp) {
             nullptr};
 }
 
+/**
+ * Make a minimal IndexEntry from just a key pattern and a collation. A dummy name will be added.
+ */
+IndexEntry buildSimpleIndexEntry(const BSONObj& kp, CollatorInterface* ci) {
+    return {kp,
+            IndexNames::nameToType(IndexNames::findPluginName(kp)),
+            IndexDescriptor::kLatestIndexVersion,
+            false,
+            {},
+            {},
+            false,
+            false,
+            CoreIndexInfo::Identifier("test_foo"),
+            nullptr,
+            {},
+            ci,
+            nullptr};
+}
+
 void assertNamespaceVectorsAreEqual(const std::vector<NamespaceStringOrUUID>& secondaryNssVector,
                                     const std::vector<NamespaceStringOrUUID>& expectedNssVector) {
     ASSERT_EQ(secondaryNssVector.size(), expectedNssVector.size());
     for (size_t i = 0; i < secondaryNssVector.size(); ++i) {
-        auto secondary = secondaryNssVector[i].nss();
-        auto expected = expectedNssVector[i].nss();
-        ASSERT(secondary != boost::none);
-        ASSERT(expected != boost::none);
-        ASSERT_EQ(*secondary, *expected);
+        ASSERT(secondaryNssVector[i].isNamespaceString());
+        ASSERT(expectedNssVector[i].isNamespaceString());
+        ASSERT_EQ(secondaryNssVector[i].nss(), expectedNssVector[i].nss());
     }
 }
 
@@ -529,6 +564,27 @@ TEST(QuerySolutionTest, GetFieldsWithStringBoundsIdentifiesStringsWithInclusiveB
     auto fields = IndexScanNode::getFieldsWithStringBounds(bounds, keyPattern);
     ASSERT_EQUALS(fields.size(), 1U);
     ASSERT_TRUE(fields.count("a"));
+}
+
+TEST(QuerySolutionTest, IndexScanWithCollatedValues) {
+    IndexBounds bounds;
+    CollatorInterfaceMock queryCollator(CollatorInterfaceMock::MockType::kReverseString);
+
+    BSONObj keyPattern = BSON("a" << 1);
+    bounds.isSimpleRange = true;
+    bounds.startKey = fromjson("{'a': 1}");
+    bounds.endKey = fromjson("{'a': ''}");
+    bounds.boundInclusion = BoundInclusion::kIncludeBothStartAndEndKeys;
+
+    IndexScanNode node{buildSimpleIndexEntry(BSON("a" << 1))};
+    node.bounds = bounds;
+    node.index.collator = &queryCollator;
+    node.queryCollator = &queryCollator;
+    node.computeProperties();
+
+    ASSERT_TRUE(node.hasStringBounds("a"));
+    ASSERT_EQ(node.getFieldAvailability("a"), FieldAvailability::kCollatedProvided);
+    ASSERT_EQ(node.getFieldAvailability("any_field"), FieldAvailability::kNotProvided);
 }
 
 TEST(QuerySolutionTest, IndexScanNodeRemovesNonMatchingCollatedFieldsFromSortsOnSimpleBounds) {
@@ -1235,12 +1291,16 @@ TEST(QuerySolutionTest, FieldAvailabilityOutputStreamOperator) {
     ASSERT_EQ(ex1.str(), "NotProvided");
 
     std::stringstream ex2;
-    ex2 << FieldAvailability::kFullyProvided;
-    ASSERT_EQ(ex2.str(), "FullyProvided");
+    ex2 << FieldAvailability::kHashedValueProvided;
+    ASSERT_EQ(ex2.str(), "HashedValueProvided");
 
     std::stringstream ex3;
-    ex3 << FieldAvailability::kHashedValueProvided;
-    ASSERT_EQ(ex3.str(), "HashedValueProvided");
+    ex3 << FieldAvailability::kCollatedProvided;
+    ASSERT_EQ(ex3.str(), "CollatedValueProvided");
+
+    std::stringstream ex4;
+    ex4 << FieldAvailability::kFullyProvided;
+    ASSERT_EQ(ex4.str(), "FullyProvided");
 }
 
 TEST(QuerySolutionTest, GetSecondaryNamespaceVectorOverSingleEqLookupNode) {

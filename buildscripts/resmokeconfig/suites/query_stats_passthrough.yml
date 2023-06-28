@@ -14,8 +14,8 @@ selector:
   exclude_files:
   # Transactions are not supported on MongoDB standalone nodes, so we do not run these tests.
   - jstests/core/txns/**/*.js
+  - jstests/core/views/invalid_system_views.js # TODO SERVER-78025 reenable coverage on this test
   exclude_with_any_tags:
-  - references_foreign_collection  # TODO: SERVER-76220 remove tag from tests.
   # Running $queryStats will increment these counters which can screw up some test assertions.
   - inspects_command_opcounters
 
@@ -36,3 +36,4 @@ executor:
       set_parameters:
         enableTestCommands: 1
         internalQueryStatsRateLimit: -1
+        internalQueryStatsErrorsAreCommandFatal: true

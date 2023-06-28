@@ -3,7 +3,7 @@
  * @tags: [featureFlagQueryStats]
  */
 
-load('jstests/libs/telemetry_utils.js');
+load('jstests/libs/query_stats_utils.js');
 
 (function() {
 "use strict";
@@ -98,8 +98,8 @@ const assertExpectedResults = (results,
             command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
-        batchSize: "?number",
         readConcern: {level: "local", provenance: "implicitDefault"},
+        batchSize: "?number",
         client: {application: {name: "MongoDB Shell"}}
     };
 
@@ -107,7 +107,7 @@ const assertExpectedResults = (results,
 
     // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
-    let queryStats = getTelemetry(db);
+    let queryStats = getQueryStats(db);
     assert.eq(0, queryStats.length, queryStats);
 
     // Run a getMore to exhaust the cursor, then ensure query stats results have been written
@@ -165,7 +165,7 @@ const assertExpectedResults = (results,
 
         },
         cursor: {batchSize: "?number"},
-        applicationName: "MongoDB Shell"
+        applicationName: "MongoDB Shell",
     };
 
     const cursor = coll.aggregate(
@@ -177,7 +177,7 @@ const assertExpectedResults = (results,
 
     // Since the cursor hasn't been exhausted yet, ensure no query stats results have been written
     // yet.
-    let queryStats = getTelemetry(db);
+    let queryStats = getQueryStats(db);
     assert.eq(0, queryStats.length, queryStats);
 
     // Run a getMore to exhaust the cursor, then ensure query stats results have been written
@@ -240,8 +240,8 @@ const assertExpectedResults = (results,
             command: "find",
             filter: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]},
         },
-        batchSize: "?number",
         readConcern: {level: "local", provenance: "implicitDefault"},
+        batchSize: "?number",
         client: {application: {name: "MongoDB Shell"}}
     };
 
@@ -250,8 +250,7 @@ const assertExpectedResults = (results,
 
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
-
-    const queryStats = getTelemetry(db);
+    const queryStats = getQueryStats(db);
     assert.eq(1, queryStats.length);
     assertExpectedResults(queryStats[0],
                           queryStatsKey,
@@ -278,7 +277,7 @@ const assertExpectedResults = (results,
             pipeline: [{$match: {$and: [{v: {$gt: "?number"}}, {v: {$lt: "?number"}}]}}]
         },
         cursor: {batchSize: "?number"},
-        applicationName: "MongoDB Shell"
+        applicationName: "MongoDB Shell",
     };
 
     const cursor1 = coll.aggregate(
@@ -294,8 +293,7 @@ const assertExpectedResults = (results,
 
     assert.commandWorked(
         db.runCommand({killCursors: coll.getName(), cursors: [cursor1.getId(), cursor2.getId()]}));
-
-    const queryStats = getTelemetry(db);
+    const queryStats = getQueryStats(db);
     assert.eq(1, queryStats.length);
     assertExpectedResults(queryStats[0],
                           queryStatsKey,

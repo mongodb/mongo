@@ -28,19 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <set>
 
-#include "mongo/db/s/config_server_op_observer.h"
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
+#include "mongo/db/s/config_server_op_observer.h"
 #include "mongo/db/s/topology_time_ticker.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/logv2/log.h"
 #include "mongo/s/catalog/type_config_version.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/cluster_identity_loader.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -113,7 +125,7 @@ void ConfigServerOpObserver::onInserts(OperationContext* opCtx,
                                        std::vector<InsertStatement>::const_iterator end,
                                        std::vector<bool> fromMigrate,
                                        bool defaultFromMigrate,
-                                       InsertsOpStateAccumulator* opAccumulator) {
+                                       OpStateAccumulator* opAccumulator) {
     if (coll->ns().isServerConfigurationCollection()) {
         auto idElement = begin->doc["_id"];
         if (idElement.type() == BSONType::String &&

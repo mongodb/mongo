@@ -29,8 +29,15 @@
 
 #pragma once
 
+#include <absl/numeric/int128.h>
 #include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
+#include <functional>
+#include <iterator>
 #include <vector>
 
 #include "mongo/bson/util/builder.h"
@@ -152,6 +159,7 @@ private:
      * in the cpp file.
      */
     struct PendingValue {
+
         PendingValue() = default;
         PendingValue(boost::optional<T> val,
                      std::array<uint8_t, kNumOfSelectorTypes> bitCount,

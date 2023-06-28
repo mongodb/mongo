@@ -28,11 +28,13 @@
  */
 
 #include "mongo/db/pipeline/visitors/transformer_interface_walker.h"
+
 #include "mongo/db/exec/add_fields_projection_executor.h"
 #include "mongo/db/exec/exclusion_projection_executor.h"
 #include "mongo/db/exec/inclusion_projection_executor.h"
-#include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
+#include "mongo/db/pipeline/group_from_first_document_transformation.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

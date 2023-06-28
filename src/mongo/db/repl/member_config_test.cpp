@@ -27,14 +27,29 @@
  *    it in the license file.
  */
 
+#include <absl/container/flat_hash_map.h>
 #include <algorithm>
-#include <vector>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <iterator>
+#include <map>
+#include <ostream>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/member_config.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

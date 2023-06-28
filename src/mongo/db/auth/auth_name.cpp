@@ -29,8 +29,20 @@
 
 #include "mongo/db/auth/auth_name.h"
 
+#include <bitset>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

@@ -29,12 +29,19 @@
 
 #include "mongo/db/query/sbe_runtime_planner.h"
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/histogram_server_status_metric.h"
-#include "mongo/db/exec/sbe/expressions/expression.h"
-#include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/exec/trial_run_tracker.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <deque>
+#include <tuple>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/plan_executor_sbe.h"
+#include "mongo/db/record_id.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::sbe {
 bool BaseRuntimePlanner::fetchNextDocument(plan_ranker::CandidatePlan* candidate,

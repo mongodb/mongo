@@ -27,19 +27,45 @@
  *    it in the license file.
  */
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
+#include <set>
+#include <type_traits>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/namespace_string.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine_interface.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -180,8 +206,8 @@ void DurableCatalog::init(OperationContext* opCtx) {
 
         // No rollback since this is just loading already committed data.
         auto ident = obj["ident"].String();
-        auto nss =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
         _catalogIdToEntryMap[record->id] = EntryIdentifier(record->id, ident, nss);
     }
 
@@ -204,8 +230,8 @@ std::vector<DurableCatalog::EntryIdentifier> DurableCatalog::getAllCatalogEntrie
             continue;
         }
         auto ident = obj["ident"].String();
-        auto nss =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        auto nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
 
         ret.emplace_back(record->id, ident, nss);
     }
@@ -224,8 +250,8 @@ boost::optional<DurableCatalogEntry> DurableCatalog::scanForCatalogEntryByNss(
             continue;
         }
 
-        auto entryNss =
-            NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(obj["ns"].String());
+        auto entryNss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
+            obj["ns"].String());
         if (entryNss == nss) {
             return _getDurableCatalogEntry(record->id, obj);
         }

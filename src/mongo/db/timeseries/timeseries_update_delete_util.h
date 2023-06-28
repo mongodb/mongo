@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <functional>
 #include <memory>
+#include <utility>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/parsed_writes_common.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::timeseries {
 /**

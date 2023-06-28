@@ -28,24 +28,57 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/working_set_common.h"
-
+#include <algorithm>
 #include <boost/iterator/transform_iterator.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <vector>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include <boost/container/flat_set.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/working_set.h"
+#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/index/index_access_method.h"
-#include "mongo/db/query/canonical_query.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/execution_context.h"
 #include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/shared_buffer_fragment.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -27,17 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_single_document_transformation.h"
-
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/pipeline/document_source_limit.h"
+#include "mongo/db/pipeline/document_source_single_document_transformation.h"
 #include "mongo/db/pipeline/document_source_skip.h"
-#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/explain_options.h"
 
 namespace mongo {
 

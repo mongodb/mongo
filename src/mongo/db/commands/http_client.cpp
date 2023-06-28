@@ -27,15 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <cstring>
+#include <memory>
+#include <string>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_builder.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/http_client_gen.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/http_client.h"
 

@@ -48,7 +48,9 @@ namespace {
 
 class ExtensionsCallbackRealTest : public unittest::Test {
 public:
-    ExtensionsCallbackRealTest() : _nss("unittests.extensions_callback_real_test") {
+    ExtensionsCallbackRealTest()
+        : _nss(NamespaceString::createNamespaceString_forTest(
+              "unittests.extensions_callback_real_test")) {
         _isDesugarWhereToFunctionOn = internalQueryDesugarWhereToFunction.load();
     }
 

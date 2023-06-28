@@ -1603,6 +1603,18 @@ class TestBinder(testcase.IDLTestcase):
                     v3: 2
             """))
 
+        # Test int - non continuous
+        self.assert_bind(
+            textwrap.dedent("""
+        enums:
+            foo:
+                description: foo
+                type: int
+                values:
+                    v1: 0
+                    v3: 2
+            """))
+
         # Test string
         self.assert_bind(
             textwrap.dedent("""
@@ -1630,18 +1642,6 @@ class TestBinder(testcase.IDLTestcase):
                 values:
                     v1: 0
             """), idl.errors.ERROR_ID_ENUM_BAD_TYPE)
-
-        # Test int - non continuous
-        self.assert_bind_fail(
-            textwrap.dedent("""
-        enums:
-            foo:
-                description: foo
-                type: int
-                values:
-                    v1: 0
-                    v3: 2
-            """), idl.errors.ERROR_ID_ENUM_NON_CONTINUOUS_RANGE)
 
         # Test int - dups
         self.assert_bind_fail(

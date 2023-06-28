@@ -29,9 +29,32 @@
 
 #include "mongo/db/update/update_util.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <map>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/algorithm.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/db/update/storage_validation.h"
+#include "mongo/bson/mutable/const_element.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
+#include "mongo/db/pipeline/variables.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace update {

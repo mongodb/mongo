@@ -27,11 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/sbe/stages/plan_stats.h"
-
-#include <queue>
+#include <vector>
 
 #include "mongo/db/exec/plan_stats_walker.h"
 #include "mongo/db/exec/sbe/stages/plan_stats.h"

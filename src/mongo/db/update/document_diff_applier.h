@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update_index_data.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 namespace doc_diff {

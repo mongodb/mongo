@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/jsobj.h"
 
 namespace boost {

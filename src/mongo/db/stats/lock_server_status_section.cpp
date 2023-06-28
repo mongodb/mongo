@@ -27,15 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <memory>
+#include <mutex>
 #include <valarray>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/concurrency/lock_stats.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {

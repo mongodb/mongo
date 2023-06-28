@@ -28,14 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <string>
+#include <utility>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -103,7 +127,7 @@ std::string toString(TenantOplogBatch& batch) {
     return sb.str();
 }
 
-constexpr auto dbName = "tenant_test"_sd;
+const DatabaseName dbName = DatabaseName::createDatabaseName_forTest(boost::none, "tenant_test"_sd);
 
 TEST_F(TenantOplogBatcherTest, CannotRequestTwoBatchesAtOnce) {
     auto batcher = std::make_shared<TenantOplogBatcher>(

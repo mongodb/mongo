@@ -28,30 +28,41 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/cached_plan.h"
-
 #include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/catalog/collection.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/exec/cached_plan.h"
 #include "mongo/db/exec/multi_plan.h"
 #include "mongo/db/exec/plan_cache_util.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/query/plan_cache.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/stage_builder_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -62,7 +73,7 @@ namespace mongo {
 const char* CachedPlanStage::kStageType = "CACHED_PLAN";
 
 CachedPlanStage::CachedPlanStage(ExpressionContext* expCtx,
-                                 const CollectionPtr& collection,
+                                 VariantCollectionPtrOrAcquisition collection,
                                  WorkingSet* ws,
                                  CanonicalQuery* cq,
                                  const QueryPlannerParams& params,
@@ -213,9 +224,9 @@ Status CachedPlanStage::replan(PlanYieldPolicy* yieldPolicy, bool shouldCache, s
 
     if (shouldCache) {
         // Deactivate the current cache entry.
-        const auto& coll = collection();
-        auto cache = CollectionQueryInfo::get(coll).getPlanCache();
-        cache->deactivate(plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, coll));
+        auto cache = CollectionQueryInfo::get(collectionPtr()).getPlanCache();
+        cache->deactivate(
+            plan_cache_key_factory::make<PlanCacheKey>(*_canonicalQuery, collectionPtr()));
     }
 
     // Use the query planning module to plan the whole query.

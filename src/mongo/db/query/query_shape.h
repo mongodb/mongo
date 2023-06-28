@@ -29,15 +29,27 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <functional>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/parsed_find_command.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/serialization_options.h"
 
 namespace mongo::query_shape {
 
-constexpr StringData kLiteralArgString = "?"_sd;
-
+using QueryShapeHash = SHA256Block;
 /**
  * Computes a BSONObj that is meant to be used to classify queries according to their shape, for the
  * purposes of collecting queryStats.
@@ -71,5 +83,13 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const Pipeline& pipeline,
                           const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx);
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const NamespaceString& nss);
+
+NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt);
+void appendNamespaceShape(BSONObjBuilder& bob,
+                          const NamespaceString& nss,
+                          const SerializationOptions& opts);
+
+QueryShapeHash hash(const BSONObj& queryShape);
 }  // namespace mongo::query_shape

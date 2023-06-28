@@ -29,6 +29,8 @@
 
 #include "mongo/db/process_health/health_observer_registration.h"
 
+#include <utility>
+
 namespace mongo {
 namespace process_health {
 

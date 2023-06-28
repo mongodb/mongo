@@ -29,15 +29,52 @@
 
 #include "mongo/db/exec/timeseries_modify.h"
 
+#include <exception>
 #include <fmt/format.h>
+#include <string>
+#include <tuple>
 
-#include "mongo/db/catalog/document_validation.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
+#include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 
@@ -117,6 +154,47 @@ std::unique_ptr<PlanStageStats> TimeseriesModifyStage::getStats() {
     return ret;
 }
 
+const std::vector<std::unique_ptr<FieldRef>>& TimeseriesModifyStage::_getUserLevelShardKeyPaths(
+    const ScopedCollectionDescription& collDesc) {
+    _immutablePaths.clear();
+
+    const auto& tsFields = collDesc.getTimeseriesFields();
+    for (const auto& shardKeyField : collDesc.getKeyPatternFields()) {
+        if (auto metaField = tsFields->getMetaField(); metaField &&
+            shardKeyField->isPrefixOfOrEqualTo(FieldRef{timeseries::kBucketMetaFieldName})) {
+            auto userMetaFieldRef = std::make_unique<FieldRef>(*metaField);
+            if (shardKeyField->numParts() > 1) {
+                userMetaFieldRef->appendPart(shardKeyField->dottedField(1));
+            }
+            _immutablePaths.emplace_back(std::move(userMetaFieldRef));
+        } else if (auto timeField = tsFields->getTimeField();
+                   shardKeyField->isPrefixOfOrEqualTo(
+                       FieldRef{timeseries::kControlMinFieldNamePrefix + timeField.toString()}) ||
+                   shardKeyField->isPrefixOfOrEqualTo(
+                       FieldRef{timeseries::kControlMaxFieldNamePrefix + timeField.toString()})) {
+            _immutablePaths.emplace_back(std::make_unique<FieldRef>(timeField));
+        } else {
+            tasserted(7687100,
+                      "Unexpected shard key field: {}"_format(shardKeyField->dottedField()));
+        }
+    }
+
+    return _immutablePaths;
+}
+
+const std::vector<std::unique_ptr<FieldRef>>& TimeseriesModifyStage::_getImmutablePaths() {
+    if (!_isUserInitiatedUpdate) {
+        return _immutablePaths;
+    }
+
+    const auto& collDesc = collectionAcquisition().getShardingDescription();
+    if (!collDesc.isSharded() || OperationShardingState::isComingFromRouter(opCtx())) {
+        return _immutablePaths;
+    }
+
+    return _getUserLevelShardKeyPaths(collDesc);
+}
+
 std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
     const std::vector<BSONObj>& matchedMeasurements, std::vector<BSONObj>& unchangedMeasurements) {
     // Determine which documents to update based on which ones are actually being changed.
@@ -127,9 +205,9 @@ std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
         // measurement plus an insert of the modified one.
         mutablebson::Document doc(measurement, mutablebson::Document::kInPlaceDisabled);
 
-        // Note that timeseries measurement _ids are allowed to be changed, so we don't have any
-        // immutable fields.
-        FieldRefSet immutablePaths;
+        // We want to block shard key updates if the user requested an update directly to a shard,
+        // when shard key fields should be immutable.
+        FieldRefSet immutablePaths(_getImmutablePaths());
         const bool isInsert = false;
         bool docWasModified = false;
 
@@ -176,6 +254,7 @@ std::vector<BSONObj> TimeseriesModifyStage::_applyUpdate(
 
 void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     const ScopedCollectionDescription& collDesc, const FieldRefSet& shardKeyPaths) {
+    using namespace fmt::literals;
     // We do not allow modifying either the current shard key value or new shard key value (if
     // resharding) without specifying the full current shard key in the query.
     // If the query is a simple equality match on _id, then '_params.canonicalQuery' will be null.
@@ -183,7 +262,6 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
     // earlier for requests that try to modify the immutable _id field. So it is safe to uassert if
     // '_params.canonicalQuery' is null OR if the query does not include equality matches on all
     // shard key fields.
-    const auto& shardKeyPathsVector = collDesc.getKeyPatternFields();
     pathsupport::EqualityMatches equalities;
 
     // We do not allow updates to the shard key when 'multi' is true.
@@ -191,10 +269,10 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
             "Multi-update operations are not allowed when updating the shard key field.",
             _params.isUpdate && _isSingletonWrite());
 
-    // With the introduction of PM-1632, we allow updating a document shard key without
-    // providing a full shard key if the update is executed in a retryable write or transaction.
-    // PM-1632 uses an internal transaction to execute these updates, so to make sure that we can
-    // only update the document shard key in a retryable write or transaction, mongos only sets
+    // With the introduction of PM-1632, we allow updating a document shard key without providing a
+    // full shard key if the update is executed in a retryable write or transaction. PM-1632 uses an
+    // internal transaction to execute these updates, so to make sure that we can only update the
+    // document shard key in a retryable write or transaction, mongos only sets
     // $_allowShardKeyUpdatesWithoutFullShardKeyInQuery to true if the client executed write was a
     // retryable write or in a transaction.
     if (_params.allowShardKeyUpdatesWithoutFullShardKeyInQuery &&
@@ -220,14 +298,16 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
                     _params.allowShardKeyUpdatesWithoutFullShardKeyInQuery);
         }
     } else {
+        FieldRefSet userLevelShardKeyPaths(_getUserLevelShardKeyPaths(collDesc));
         uassert(7717803,
                 "Shard key update is not allowed without specifying the full shard key in the "
-                "query",
-                (_params.canonicalQuery &&
+                "query: pred = {}, shardKeyPaths = {}"_format(
+                    _originalPredicate->serialize().toString(), userLevelShardKeyPaths.toString()),
+                (_originalPredicate &&
                  pathsupport::extractFullEqualityMatches(
-                     *(_params.canonicalQuery->root()), shardKeyPaths, &equalities)
+                     *_originalPredicate, userLevelShardKeyPaths, &equalities)
                      .isOK() &&
-                 equalities.size() == shardKeyPathsVector.size()));
+                 equalities.size() == userLevelShardKeyPaths.size()));
 
         // If this node is a replica set primary node, an attempted update to the shard key value
         // must either be a retryable write or inside a transaction. An update without a transaction
@@ -247,6 +327,7 @@ void TimeseriesModifyStage::_checkRestrictionsOnUpdatingShardKeyAreNotViolated(
 
 void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& newBucket,
                                                                 const BSONObj& oldBucket,
+                                                                const BSONObj& newMeasurement,
                                                                 const BSONObj& oldMeasurement) {
     using namespace fmt::literals;
     const auto& collDesc = collectionAcquisition().getShardingDescription();
@@ -280,18 +361,15 @@ void TimeseriesModifyStage::_checkUpdateChangesExistingShardKey(const BSONObj& n
     invariant(collFilter->keyBelongsToMe(oldShardKey));
 
     if (!collFilter->keyBelongsToMe(newShardKey)) {
-        uasserted(
-            7717801,
-            "This update would cause the doc to change owning shards, old = {}, new = {}"_format(
-                oldBucket.toString(), newBucket.toString()));
-        // TODO SERVER-76871 or SERVER-77607 would allow us to throw the following error instead.
-        /*
-        // We would need 'oldMeasurement' to be able to delete it using timeseries deleteOne instead
-        // of the old bucket document.
-        uasserted(WouldChangeOwningShardInfo(
-                      oldMeasurement, newObj, false, collection()->ns(), collection()->uuid()),
+        // We send the 'oldMeasurement' instead of the old bucket document to leverage timeseries
+        // deleteOne because the delete can run inside an internal transaction.
+        uasserted(WouldChangeOwningShardInfo(oldMeasurement,
+                                             newBucket,
+                                             false,
+                                             collectionPtr()->ns(),
+                                             collectionPtr()->uuid(),
+                                             newMeasurement),
                   "This update would cause the doc to change owning shards");
-        */
     }
 }
 
@@ -299,6 +377,7 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(
     const ShardingWriteRouter& shardingWriteRouter,
     const BSONObj& newBucket,
     const BSONObj& oldBucket,
+    const BSONObj& newMeasurement,
     const BSONObj& oldMeasurement) {
     using namespace fmt::literals;
     const auto& collDesc = collectionAcquisition().getShardingDescription();
@@ -320,27 +399,22 @@ void TimeseriesModifyStage::_checkUpdateChangesReshardingKey(
     auto newRecipShard = *shardingWriteRouter.getReshardingDestinedRecipient(newBucket);
 
     if (oldRecipShard != newRecipShard) {
+        // We send the 'oldMeasurement' instead of the old bucket document to leverage timeseries
+        // deleteOne because the delete can run inside an internal transaction.
         uasserted(
-            7717802,
-            "This update would cause the doc to change owning shards from {} to {}, old = {}, new = {}"_format(
-                oldRecipShard.toString(),
-                newRecipShard.toString(),
-                oldBucket.toString(),
-                newBucket.toString()));
-        // TODO SERVER-76871 or SERVER-77607 would allow us to throw the following error instead.
-        /*
-        // We would need 'oldMeasurement' to be able to delete it using timeseries deleteOne instead
-        // of the old bucket document.
-        uasserted(
-            WouldChangeOwningShardInfo(
-                oldMeasurement, newObj, false, collection()->ns(), collection()->uuid()),
+            WouldChangeOwningShardInfo(oldMeasurement,
+                                       newBucket,
+                                       false,
+                                       collectionPtr()->ns(),
+                                       collectionPtr()->uuid(),
+                                       newMeasurement),
             "This update would cause the doc to change owning shards under the new shard key");
-        */
     }
 }
 
 void TimeseriesModifyStage::_checkUpdateChangesShardKeyFields(const BSONObj& newBucket,
                                                               const BSONObj& oldBucket,
+                                                              const BSONObj& newMeasurement,
                                                               const BSONObj& oldMeasurement) {
     const auto isSharded = collectionAcquisition().getShardingDescription().isSharded();
     if (!isSharded) {
@@ -349,9 +423,10 @@ void TimeseriesModifyStage::_checkUpdateChangesShardKeyFields(const BSONObj& new
 
     // It is possible that both the existing and new shard keys are being updated, so we do not want
     // to short-circuit checking whether either is being modified.
-    _checkUpdateChangesExistingShardKey(newBucket, oldBucket, oldMeasurement);
-    ShardingWriteRouter shardingWriteRouter(opCtx(), collection()->ns());
-    _checkUpdateChangesReshardingKey(shardingWriteRouter, newBucket, oldBucket, oldMeasurement);
+    _checkUpdateChangesExistingShardKey(newBucket, oldBucket, newMeasurement, oldMeasurement);
+    ShardingWriteRouter shardingWriteRouter(opCtx(), collectionPtr()->ns());
+    _checkUpdateChangesReshardingKey(
+        shardingWriteRouter, newBucket, oldBucket, newMeasurement, oldMeasurement);
 }
 
 template <typename F>
@@ -366,6 +441,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         return {false, PlanStage::NEED_TIME};
     }
     _specificStats.nMeasurementsMatched += matchedMeasurements.size();
+
     bool isUpdate = _params.isUpdate;
 
     // If this is a delete, we will be deleting all matched measurements. If this is an update, we
@@ -378,10 +454,11 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
     if (isUpdate && _isUserInitiatedUpdate && !modifiedMeasurements.empty()) {
         _checkUpdateChangesShardKeyFields(
             timeseries::makeBucketDocument({modifiedMeasurements[0]},
-                                           collection()->ns(),
-                                           *collection()->getTimeseriesOptions(),
-                                           collection()->getDefaultCollator()),
+                                           collectionPtr()->ns(),
+                                           *collectionPtr()->getTimeseriesOptions(),
+                                           collectionPtr()->getDefaultCollator()),
             _bucketUnpacker.bucket(),
+            modifiedMeasurements[0],
             matchedMeasurements[0]);
     }
 
@@ -434,7 +511,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
             [&] {
                 if (isUpdate) {
                     timeseries::performAtomicWritesForUpdate(opCtx(),
-                                                             collection(),
+                                                             collectionPtr(),
                                                              recordId,
                                                              unchangedMeasurements,
                                                              modifiedMeasurements,
@@ -442,7 +519,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
                                                              _params.stmtId);
                 } else {
                     timeseries::performAtomicWritesForDelete(opCtx(),
-                                                             collection(),
+                                                             collectionPtr(),
                                                              recordId,
                                                              unchangedMeasurements,
                                                              bucketFromMigrate,
@@ -485,7 +562,7 @@ std::pair<bool, PlanStage::StageState> TimeseriesModifyStage::_writeToTimeseries
         expCtx(),
         "TimeseriesModifyStage restoreState",
         [&] {
-            child()->restoreState(&collection());
+            child()->restoreState(&collectionPtr());
             return PlanStage::NEED_TIME;
         },
         // yieldHandler
@@ -510,7 +587,7 @@ TimeseriesModifyStage::_checkIfWritingToOrphanedBucket(ScopeGuard<F>& bucketFree
     }
     return _preWriteFilter.checkIfNotWritable(_ws->get(id)->doc.value(),
                                               "timeseries "_sd + _specificStats.opType,
-                                              collection()->ns(),
+                                              collectionPtr()->ns(),
                                               [&](const ExceptionFor<ErrorCodes::StaleConfig>& ex) {
                                                   planExecutorShardingCriticalSectionFuture(
                                                       opCtx()) = ex->getCriticalSectionSignal();
@@ -541,7 +618,7 @@ PlanStage::StageState TimeseriesModifyStage::_getNextBucket(WorkingSetID& id) {
         "TimeseriesModifyStage:: ensureStillMatches",
         [&] {
             docStillMatches = write_stage_common::ensureStillMatches(
-                collection(), opCtx(), _ws, id, _params.canonicalQuery);
+                collectionPtr(), opCtx(), _ws, id, _params.canonicalQuery);
             return PlanStage::NEED_TIME;
         },
         [&] {
@@ -666,7 +743,7 @@ PlanStage::StageState TimeseriesModifyStage::doWork(WorkingSetID* out) {
 }
 
 void TimeseriesModifyStage::doRestoreStateRequiresCollection() {
-    const NamespaceString& ns = collection()->ns();
+    const NamespaceString& ns = collectionPtr()->ns();
     uassert(ErrorCodes::PrimarySteppedDown,
             "Demoted from primary while removing from {}"_format(ns.toStringForErrorMsg()),
             !opCtx()->writesAreReplicated() ||

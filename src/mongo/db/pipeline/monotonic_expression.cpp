@@ -29,6 +29,8 @@
 
 #include "mongo/db/pipeline/monotonic_expression.h"
 
+#include "mongo/util/assert_util.h"
+
 namespace mongo::monotonic {
 
 State opposite(State state) {

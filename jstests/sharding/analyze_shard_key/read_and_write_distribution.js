@@ -3,7 +3,7 @@
  * distribution metrics, but on replica sets it does not since query sampling is only supported on
  * sharded clusters at this point.
  *
- * @tags: [requires_fcv_70, featureFlagUpdateOneWithoutShardKey]
+ * @tags: [requires_fcv_71]
  */
 (function() {
 "use strict";
@@ -444,6 +444,8 @@ function waitForSampledQueries(conn, ns, shardKey, testCase) {
             (numShardKeyUpdates >= testCase.metrics.writeDistribution.numShardKeyUpdates);
     });
 
+    jsTest.log("??? res " + tojson(res));
+
     return res;
 }
 
@@ -491,8 +493,8 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
     assertMetricsEmptySampleSize(res);
 
     // Turn on query sampling and wait for sampling to become active.
-    assert.commandWorked(
-        fixture.conn.adminCommand({configureQueryAnalyzer: sampledNs, mode: "full", sampleRate}));
+    assert.commandWorked(fixture.conn.adminCommand(
+        {configureQueryAnalyzer: sampledNs, mode: "full", samplesPerSecond}));
     fixture.waitForActiveSamplingFn(sampledNs, sampledCollUuid);
 
     // Create and run test queries.
@@ -526,7 +528,7 @@ function runTest(fixture, {isShardedColl, shardKeyField, isHashed}) {
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
 
-const sampleRate = 10000;
+const samplesPerSecond = 10000;
 const analyzeShardKeyNumRanges = 10;
 
 const mongodSetParameterOpts = {
@@ -562,7 +564,7 @@ const mongosSetParametersOpts = {
 
     // This test expects every query to get sampled regardless of which mongos or mongod routes it.
     st.configRS.nodes.forEach(node => {
-        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSampleRateEqually");
+        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
     });
 
     const fixture = {
@@ -631,7 +633,7 @@ const mongosSetParametersOpts = {
 
     // This test expects every query to get sampled regardless of which mongod it runs against.
     rst.nodes.forEach(node => {
-        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSampleRateEqually");
+        configureFailPoint(node, "queryAnalysisCoordinatorDistributeSamplesPerSecondEqually");
     });
 
     const fixture = {

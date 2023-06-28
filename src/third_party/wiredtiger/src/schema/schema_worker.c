@@ -9,11 +9,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_exclusive_handle_operation --
- *     Get exclusive access to a file and apply a function.
+ * __wt_execute_handle_operation --
+ *     Apply a function to a handle, getting exclusive access if requested.
  */
 int
-__wt_exclusive_handle_operation(WT_SESSION_IMPL *session, const char *uri,
+__wt_execute_handle_operation(WT_SESSION_IMPL *session, const char *uri,
   int (*file_func)(WT_SESSION_IMPL *, const char *[]), const char *cfg[], uint32_t open_flags)
 {
     WT_DECL_RET;
@@ -104,7 +104,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session, const char *uri,
     /* Get the btree handle(s) and call the underlying function. */
     if (WT_PREFIX_MATCH(uri, "file:")) {
         if (file_func != NULL)
-            WT_ERR(__wt_exclusive_handle_operation(session, uri, file_func, cfg, open_flags));
+            WT_ERR(__wt_execute_handle_operation(session, uri, file_func, cfg, open_flags));
     } else if (WT_PREFIX_MATCH(uri, "colgroup:")) {
         WT_ERR(__wt_schema_get_colgroup(session, uri, false, NULL, &colgroup));
         WT_ERR(

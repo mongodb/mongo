@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include <boost/optional.hpp>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <limits>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
-#include "mongo/db/fle_crud.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::fle {
 

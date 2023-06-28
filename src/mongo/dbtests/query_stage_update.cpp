@@ -62,7 +62,8 @@ using std::make_unique;
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.QueryStageUpdate");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageUpdate");
 
 class QueryStageUpdateBase {
 public:
@@ -124,7 +125,7 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -146,7 +147,7 @@ public:
         params.tailable = false;
 
         unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), collection, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &collection, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -310,7 +311,7 @@ public:
 
             auto ws = make_unique<WorkingSet>();
             auto cs = make_unique<CollectionScan>(
-                _expCtx.get(), collection.getCollectionPtr(), collScanParams, ws.get(), cq->root());
+                _expCtx.get(), &collection, collScanParams, ws.get(), cq->root());
 
             auto updateStage = make_unique<UpdateStage>(
                 _expCtx.get(), updateParams, ws.get(), collection, cs.release());

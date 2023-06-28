@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/repl/election_reason_counter_gen.h"
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo {
 namespace repl {

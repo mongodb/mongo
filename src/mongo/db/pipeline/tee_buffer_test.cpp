@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <deque>
 
-#include "mongo/db/pipeline/tee_buffer.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_mock.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/tee_buffer.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -32,6 +32,11 @@ download_clang_format() {
         curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-"$version"-x86_64-apple-darwin.tar.gz -o $archive
         tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-apple-darwin/clang-format && rm $archive
         ;;
+    "arm64-Darwin")
+        # This is the same as x86_64_Darwin because those binaries run on arm with no issues.
+        curl https://s3.amazonaws.com/boxes.10gen.com/build/build/clang-format-llvm-"$version"-x86_64-apple-darwin.tar.gz -o $archive
+        tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-apple-darwin/clang-format && rm $archive
+        ;;
     "x86_64-Linux")
         curl https://s3.amazonaws.com/boxes.10gen.com/build/clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04.tar-1.gz -o $archive
         tar --strip=1 -C dist/ -xf $archive clang-format-llvm-"$version"-x86_64-linux-gnu-ubuntu-20.04/clang-format && rm $archive

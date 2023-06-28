@@ -218,6 +218,7 @@ let viewsCommandTests = {
     streams_getMoreStreamSample: {skip: isAnInternalCommand},
     streams_getStats: {skip: isAnInternalCommand},
     streams_testOnlyInsert: {skip: isAnInternalCommand},
+    streams_getMetrics: {skip: isAnInternalCommand},
     _transferMods: {skip: isAnInternalCommand},
     _vectorClockPersist: {skip: isAnInternalCommand},
     abortReshardCollection: {skip: isUnrelated},
@@ -306,10 +307,12 @@ let viewsCommandTests = {
     configureFailPoint: {skip: isUnrelated},
     configureCollectionBalancing: {skip: isUnrelated},
     configureQueryAnalyzer: {
-        command: {configureQueryAnalyzer: "test.view", mode: "full", sampleRate: 1},
-        skipStandalone: true,
-        expectFailure: true,
-        isAdminCommand: true,
+        // TODO: Re-enable multiversion testing for PM-1858.
+        skip: "not implemented"
+        // command: {configureQueryAnalyzer: "test.view", mode: "full", samplesPerSecond: 1},
+        // skipStandalone: true,
+        // expectFailure: true,
+        // isAdminCommand: true,
     },
     connPoolStats: {skip: isUnrelated},
     connPoolSync: {skip: isUnrelated},

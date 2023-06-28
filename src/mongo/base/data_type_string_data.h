@@ -33,6 +33,7 @@
 #include <cstring>
 
 #include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 
 #ifndef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_

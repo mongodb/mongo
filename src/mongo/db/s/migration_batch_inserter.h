@@ -29,8 +29,13 @@
 
 #pragma once
 
+#include <algorithm>
 #include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/document_validation.h"
@@ -38,6 +43,7 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/migration_session_id.h"
@@ -46,6 +52,7 @@
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"

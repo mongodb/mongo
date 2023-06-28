@@ -28,18 +28,35 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/client/connection_string.h"
-
-#include <list>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/client/client_api_version_parameters_gen.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/mongo_uri.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_options.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

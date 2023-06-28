@@ -45,6 +45,9 @@ parameters:
 - key: antithesis_image_tag
   description: "The docker tag to use when pushing images to Antithesis"
 
+- key: build_patch_id
+  description: "Patch id of evergreen patch to pull binaries from for testing."
+
 ## Cron parameters.
 - key: project_required_suggested_cron
   value: "0 */4 * * *" # Every 4 hours starting at 0000 UTC
@@ -577,16 +580,6 @@ functions:
       bucket: fuzzer-artifacts
       extract_to: src/corpora
       remote_file: ${mongo_fuzzer_corpus}
-
-  "fetch legacy corpus": &fetch_legacy_corpus
-    command: s3.get
-    params:
-      aws_key: ${s3_access_key_id}
-      aws_secret: ${s3_secret_access_key}
-      bucket: fuzzer-artifacts
-      # Extract the legacy corpora to the merge directory to synthesize together until we burn in.
-      extract_to: src/corpora-merged
-      remote_file: ${project}/corpus/mongo-${build_variant}-latest.tgz
 
   "archive new corpus": &archive_new_corpus
     command: archive.targz_pack
@@ -1540,8 +1533,7 @@ functions:
       local_file: jstests.tgz
       remote_file: ${project}/${build_variant}/${revision}/jstestfuzz/${task_id}-${execution}.tgz
       bucket: mciuploads
-      permissions: private
-      visibility: signed
+      permissions: public-read
       content_type: application/gzip
       display_name: Generated Tests - Execution ${execution}
 
@@ -1595,6 +1587,18 @@ functions:
       visibility: signed
       content_type: text/javascript
       display_name: Minimized jstestfuzz Test - Execution ${execution}
+  - command: s3.put
+    params:
+      optional: true
+      aws_key: ${aws_key}
+      aws_secret: ${aws_secret}
+      local_file: src/statistics-report.json
+      remote_file: ${project}/${build_variant}/${revision}/artifacts/statistics-report-${task_id}-${execution}.json
+      bucket: mciuploads
+      permissions: private
+      visibility: signed
+      content_type: application/json
+      display_name: Statistics Report - Execution ${execution}
   - *f_expansions_write
   - command: subprocess.exec
     params:
@@ -1749,8 +1753,8 @@ functions:
       args:
       - "./src/evergreen/selinux_run_test.sh"
       env:
-        test_list: ${test_list}
-        user: ec2-user
+        TEST_LIST: ${test_list}
+        SELINUX_USER: ec2-user
 
 
   ### Process & archive remote EC2 artifacts ###
@@ -2373,7 +2377,7 @@ functions:
       bucket: mciuploads
       permissions: public-read
       content_type: text/plain
-      display_name: Generated multiversion exclude tags options
+      display_name: multiversion_exclude_tags.yml from resmoke invocation
 
 # Pre task steps
 pre:
@@ -3084,8 +3088,6 @@ tasks:
 - name: fetch_and_run_libfuzzertests
   tags: []
   commands:
-  - func: "fetch corpus"
-  - func: "fetch legacy corpus"
   - func: "run tests"
     vars:
       suite: libfuzzer
@@ -3164,6 +3166,7 @@ tasks:
     vars:
       targets: install-integration-tests
       compiling_for_test: true
+      separate_debug: off
 
 - name: compile_visibility_test
   tags: []
@@ -3573,7 +3576,7 @@ tasks:
   - func: "run tests"
     vars:
       suite: benchmarks
-      exec_timeout_secs: 18000  # 5 hour timeout.
+      exec_timeout_secs: 21600 # 6 hour timeout.
       resmoke_jobs_max: 1
   - func: "send benchmark results"
 #  - func: "analyze benchmark results"
@@ -6059,7 +6062,7 @@ tasks:
 
 - <<: *gen_task_template
   name: concurrency_replication_wiredtiger_cursor_sweeps_gen
-  tags: ["concurrency", "repl"]
+  tags: ["concurrency", "repl", "cursor_sweeps"]
   commands:
   - func: "generate resmoke tasks"
     vars:
@@ -6289,7 +6292,7 @@ tasks:
 
 - <<: *task_template
   name: concurrency_simultaneous_replication_wiredtiger_cursor_sweeps
-  tags: ["concurrency", "repl", "random_name"]
+  tags: ["concurrency", "repl", "cursor_sweeps"]
   commands:
   - func: "do setup"
   - func: "run tests"
@@ -6558,6 +6561,12 @@ tasks:
   - func: "generate resmoke tasks"
     vars:
       suite: ssl_x509
+
+- <<: *gen_task_template
+  name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
+  tags: ["jscore"]
+  commands:
+  - func: "generate resmoke tasks"
 
 - <<: *task_template
   name: jsCore_decimal
@@ -7175,8 +7184,8 @@ tasks:
       content_type: ${content_type|application/gzip}
       display_name: Source tarball
       # We only need to upload the source tarball from one of the build variants
-      # because it should be the same everywhere, so just use rhel70/windows.
-      build_variants: [rhel70, windows]
+      # because it should be the same everywhere, so just use rhel80/windows.
+      build_variants: [rhel80, windows]
   - command: s3.put
     params:
       optional: true
@@ -7285,7 +7294,7 @@ tasks:
 
 
 - name: publish_packages
-  run_on: rhel80-small
+  run_on: rhel8.7-small
   tags: ["publish"]
   # This should prevent this task from running in patch builds, where we
   # don't want to publish packages.
@@ -7314,9 +7323,22 @@ tasks:
       aws_secret_remote: ${repo_aws_secret}
   - func: "set up notary client credentials"
   - *f_expansions_write
+  - command: shell.exec
+    params:
+      shell: bash
+      script: |
+        set -oe
+        podman login --username ${release_tools_container_registry_username} --password ${release_tools_container_registry_password} ${release_tools_container_registry}
   - command: subprocess.exec
     params:
       binary: bash
+      env:
+        AWS_ACCESS_KEY_ID: ${upload_lock_access_key_id}
+        AWS_SECRET_ACCESS_KEY: ${upload_lock_secret_access_key}
+        UPLOAD_LOCK_IMAGE: ${upload_lock_image}
+        UPLOAD_BUCKET: ${upload_lock_bucket}
+        AWS_REGION: ${upload_lock_region}
+        EVERGREEN_TASK_ID: ${task_id}
       args:
       - "./src/evergreen/packages_publish.sh"
 
@@ -7690,6 +7712,70 @@ tasks:
       permissions: public-read
       content_type: text/plain
       remote_file: ${push_path}-STAGE/${push_name}/mongodb-${push_name}-${push_arch}-${suffix}-${task_id}-signed.msi.md5
+
+  - command: subprocess.exec
+    params:
+      continue_on_err: true
+      binary: bash
+      env:
+        SERVER_TARBALL_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        SERVER_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        CRYPTD_TARBALL_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        CRYPTD_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        MONGOHOUSE_TARBALL_PATH: src/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        MONGOHOUSE_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mh-${push_name}-${push_arch}-${suffix}.${ext|tgz}
+        SOURCE_TARBALL_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}
+        SOURCE_TARBALL_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}
+        DEBUG_SYMBOLS_TARBALL_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+        DEBUG_SYMBOLS_TARBALL_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}
+        SERVER_TARBALL_SIGNATURE_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        SERVER_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        CRYPTD_TARBALL_SIGNATURE_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        CRYPTD_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sig
+        SOURCE_TARBALL_SIGNATURE_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
+        SOURCE_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sig
+        DEBUG_SYMBOLS_TARBALL_SIGNATURE_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+        DEBUG_SYMBOLS_TARBALL_SIGNATURE_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sig
+        MSI_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi
+        MSI_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi
+        SERVER_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        SERVER_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        CRYPTD_TARBALL_SHA1_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        CRYPTD_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha1
+        SOURCE_TARBALL_SHA1_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
+        SOURCE_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha1
+        DEBUG_SYMBOLS_TARBALL_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+        DEBUG_SYMBOLS_TARBALL_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha1
+        MSI_SHA1_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha1
+        MSI_SHA1_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha1
+        SERVER_TARBALL_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        SERVER_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        CRYPTD_TARBALL_SHA256_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        CRYPTD_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.sha256
+        SOURCE_TARBALL_SHA256_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256
+        SOURCE_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.sha256
+        DEBUG_SYMBOLS_TARBALL_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+        DEBUG_SYMBOLS_TARBALL_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.sha256
+        MSI_SHA256_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.sha256
+        MSI_SHA256_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.sha256
+        SERVER_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        SERVER_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        CRYPTD_TARBALL_MD5_PATH: src/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        CRYPTD_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-cryptd-${push_name}-${push_arch}-${suffix}.${ext|tgz}.md5
+        SOURCE_TARBALL_MD5_PATH: src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
+        SOURCE_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/src/mongodb-src-${src_suffix}.${ext|tar.gz}.md5
+        DEBUG_SYMBOLS_TARBALL_MD5_PATH: src/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+        DEBUG_SYMBOLS_TARBALL_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-debugsymbols-${suffix}.${ext|tgz}.md5
+        MSI_MD5_PATH: src/mongodb-${push_name}-${push_arch}-${suffix}.msi.md5
+        MSI_MD5_KEY: ${version_id}/${build_id}/push/${push_path}/mongodb-${push_name}-${push_arch}-${suffix}-signed.msi.md5
+        AWS_ACCESS_KEY_ID: ${upload_lock_access_key_id}
+        AWS_SECRET_ACCESS_KEY: ${upload_lock_secret_access_key}
+        UPLOAD_LOCK_IMAGE: ${upload_lock_image}
+        UPLOAD_BUCKET: ${upload_lock_bucket}
+        AWS_REGION: ${upload_lock_region}
+        EVERGREEN_TASK_ID: ${task_id}
+      args:
+      - "./src/evergreen/run_upload_lock_push.sh"
 
   - command: s3Copy.copy
     params:
@@ -8334,6 +8420,28 @@ task_groups:
 
 - <<: *compile_task_group_template
   name: compile_archive_and_run_libfuzzertests_TG
+  setup_group_can_fail_task: false
+  setup_group:
+  - command: manifest.load
+  - func: "git get project and add git tag"
+  - func: "set task expansion macros"
+  - func: "f_expansions_write"
+  - func: "kill processes"
+  - func: "cleanup environment"
+  # The python virtual environment is installed in ${workdir}, which is created in
+  # "set up venv".
+  - func: "set up venv"
+  - func: "upload pip requirements"
+  - func: "f_expansions_write"
+  - func: "configure evergreen api credentials"
+  - func: "get buildnumber"
+  - func: "f_expansions_write"
+  - func: "set up credentials"
+  - func: "use WiredTiger develop" # noop if ${use_wt_develop} is not "true"
+  - func: "set up win mount script"
+  - func: "generate compile expansions"
+  - func: "f_expansions_write"
+  - func: "fetch corpus"
   tasks:
   - compile_and_archive_libfuzzertests
   - fetch_and_run_libfuzzertests

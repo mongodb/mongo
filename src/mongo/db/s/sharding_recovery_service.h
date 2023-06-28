@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <set>
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
@@ -63,18 +67,11 @@ public:
      * Do nothing if the critical section is taken for that namespace and reason, and will invariant
      * otherwise since it is the responsibility of the caller to ensure that only one thread is
      * taking the critical section.
-     *
-     * allowViews states whether views should be supported. By default it is disabled since binaries
-     * older than 7.0 don't properly support views. It is responsability of the caller to guarantee
-     * the correct usage of this flag.
      */
-    void acquireRecoverableCriticalSectionBlockWrites(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const BSONObj& reason,
-        const WriteConcernOptions& writeConcern,
-        // TODO SERVER-68084 remove allowViews parameter
-        bool allowViews = false);
+    void acquireRecoverableCriticalSectionBlockWrites(OperationContext* opCtx,
+                                                      const NamespaceString& nss,
+                                                      const BSONObj& reason,
+                                                      const WriteConcernOptions& writeConcern);
 
     /**
      * Advances the recoverable critical section from the catch-up phase (i.e. blocking writes) to
@@ -85,18 +82,11 @@ public:
      * It updates a doc from `config.collectionCriticalSections` with `writeConcern` write concern.
      *
      * Do nothing if the critical section is already taken in commit phase.
-     *
-     * allowViews states whether views should be supported. By default it is disabled since binaries
-     * older than 7.0 don't properly support views. It is responsability of the caller to guarantee
-     * the correct usage of this flag.
      */
-    void promoteRecoverableCriticalSectionToBlockAlsoReads(
-        OperationContext* opCtx,
-        const NamespaceString& nss,
-        const BSONObj& reason,
-        const WriteConcernOptions& writeConcern,
-        // TODO SERVER-68084 remove allowViews parameter
-        bool allowViews = false);
+    void promoteRecoverableCriticalSectionToBlockAlsoReads(OperationContext* opCtx,
+                                                           const NamespaceString& nss,
+                                                           const BSONObj& reason,
+                                                           const WriteConcernOptions& writeConcern);
 
     /**
      * Releases the recoverable critical section for the given namespace and reason.
@@ -107,10 +97,6 @@ public:
      *
      * Do nothing if the critical section is not taken for that namespace and reason.
      *
-     * allowViews states whether views should be supported. By default it is disabled since binaries
-     * older than 7.0 don't properly support views. It is responsability of the caller to guarantee
-     * the correct usage of this flag.
-     *
      * Throw an invariant in case the collection critical section is already taken by another
      * operation with a different reason unless the flag 'throwIfReasonDiffers' is set to false.
      *
@@ -119,9 +105,7 @@ public:
                                            const NamespaceString& nss,
                                            const BSONObj& reason,
                                            const WriteConcernOptions& writeConcern,
-                                           bool throwIfReasonDiffers = true,
-                                           // TODO SERVER-68084 remove allowViews parameter
-                                           bool allowViews = false);
+                                           bool throwIfReasonDiffers = true);
 
     /**
      * Recovers all sharding related in memory states from disk.

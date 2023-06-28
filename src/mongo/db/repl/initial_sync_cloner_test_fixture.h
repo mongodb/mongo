@@ -31,6 +31,7 @@
 
 #include "mongo/db/repl/cloner_test_fixture.h"
 #include "mongo/db/repl/initial_sync_shared_data.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {

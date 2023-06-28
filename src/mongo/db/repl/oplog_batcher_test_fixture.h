@@ -29,13 +29,30 @@
 
 #pragma once
 
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -97,19 +114,22 @@ OplogEntry makeApplyOpsOplogEntry(int t,
                                   const std::vector<OplogEntry>& innerOps = {});
 
 OplogEntry makeCommitTransactionOplogEntry(int t,
-                                           StringData dbName,
+                                           const DatabaseName& dbName,
                                            bool prepared,
                                            boost::optional<int> count = boost::none);
 
-OplogEntry makeAbortTransactionOplogEntry(int t, StringData dbName);
+OplogEntry makeAbortTransactionOplogEntry(int t, const DatabaseName& dbName);
 
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(int t,
-                                                              StringData dbName,
+                                                              const DatabaseName& dbName,
                                                               bool prepared,
                                                               int count);
 
 std::vector<OplogEntry> makeMultiEntryTransactionOplogEntries(
-    int t, StringData dbName, bool prepared, std::vector<std::vector<OplogEntry>> innerOps);
+    int t,
+    const DatabaseName& dbName,
+    bool prepared,
+    std::vector<std::vector<OplogEntry>> innerOps);
 std::string toString(const std::vector<OplogEntry>& ops);
 }  // namespace repl
 }  // namespace mongo

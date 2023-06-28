@@ -29,16 +29,29 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <functional>
+#include <memory>
+#include <string>
+#include <variant>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/elapsed_tracker.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
 
 class ClockSource;
+
 class Yieldable;
 
 class YieldPolicyCallbacks {

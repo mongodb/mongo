@@ -29,12 +29,29 @@
 
 #pragma once
 
+#include <boost/container_hash/extensions.hpp>
+#include <boost/cstdint.hpp>
 #include <boost/functional/hash.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <ostream>
 #include <string>
 
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/crypto/hash_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {

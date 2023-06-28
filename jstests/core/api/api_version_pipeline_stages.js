@@ -13,8 +13,9 @@
 (function() {
 "use strict";
 
+const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_version_pipeline_stages";
-const coll = db[collName];
+const coll = testDb[collName];
 coll.drop();
 coll.insert({a: 1});
 
@@ -32,7 +33,7 @@ const unstablePipelines = [
 ];
 
 function assertAggregateFailsWithAPIStrict(pipeline) {
-    assert.commandFailedWithCode(db.runCommand({
+    assert.commandFailedWithCode(testDb.runCommand({
         aggregate: collName,
         pipeline: pipeline,
         cursor: {},
@@ -47,7 +48,7 @@ for (let pipeline of unstablePipelines) {
     assertAggregateFailsWithAPIStrict(pipeline);
 
     // Assert error thrown when creating a view on a pipeline with stages not in API Version 1.
-    assert.commandFailedWithCode(db.runCommand({
+    assert.commandFailedWithCode(testDb.runCommand({
         create: 'api_version_pipeline_stages_should_fail',
         viewOn: collName,
         pipeline: pipeline,
@@ -67,14 +68,14 @@ assertAggregateFailsWithAPIStrict([{$collStats: {latencyStats: {}, queryExecStat
 assertAggregateFailsWithAPIStrict(
     [{$collStats: {latencyStats: {}, storageStats: {scale: 1024}, queryExecStats: {}}}]);
 
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDb.runCommand({
     aggregate: collName,
     pipeline: [{$collStats: {}}],
     cursor: {},
     apiVersion: "1",
     apiStrict: true
 }));
-assert.commandWorked(db.runCommand({
+assert.commandWorked(testDb.runCommand({
     aggregate: collName,
     pipeline: [{$collStats: {count: {}}}],
     cursor: {},
@@ -86,7 +87,7 @@ assert.commandWorked(db.runCommand({
 // compute the count, we get back a single result in the first batch - no getMore is required.
 // This test is meant to mimic a drivers test and serve as a warning if we may be making a breaking
 // change for the drivers.
-const cmdResult = assert.commandWorked(db.runCommand({
+const cmdResult = assert.commandWorked(testDb.runCommand({
     aggregate: collName,
     pipeline: [{$collStats: {count: {}}}, {$group: {_id: 1, count: {$sum: "$count"}}}],
     cursor: {},

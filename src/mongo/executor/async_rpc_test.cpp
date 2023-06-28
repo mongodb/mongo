@@ -44,6 +44,7 @@
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/generic_args_with_types_gen.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
@@ -177,7 +178,9 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
     GenericReplyFieldsWithTypesUnstableV1 genericReplyUnstable;
     genericReplyUnstable.setOk(1);
     genericReplyUnstable.setDollarConfigTime(Timestamp(1, 1));
-    const LogicalTime clusterTime = LogicalTime(Timestamp(2, 3));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
     genericReplyApiV1.setDollarClusterTime(clusterTime);
     auto configTime = Timestamp(1, 1);
     genericArgsUnstable.setDollarConfigTime(configTime);
@@ -205,7 +208,7 @@ TEST_F(AsyncRPCTestFixture, SuccessfulHelloWithGenericFields) {
         BSONObjBuilder reply = BSONObjBuilder(helloReply.toBSON());
         reply.append("ok", 1);
         reply.append("$configTime", Timestamp(1, 1));
-        clusterTime.serializeToBSON("$clusterTime", &reply);
+        reply.append("$clusterTime", clusterTime.toBSON());
 
         return reply.obj();
     });
@@ -417,7 +420,10 @@ TEST_F(AsyncRPCTestFixture, RemoteErrorWithGenericReplyFields) {
     auto resultFuture = sendCommand(options, opCtxHolder.get(), std::move(targeter));
 
     GenericReplyFieldsWithTypesV1 stableFields;
-    stableFields.setDollarClusterTime(LogicalTime(Timestamp(2, 3)));
+    auto clusterTime = ClusterTime();
+    clusterTime.setClusterTime(LogicalTime(Timestamp(2, 3)));
+    clusterTime.setSignature(ClusterTimeSignature(std::vector<std::uint8_t>(), 0));
+    stableFields.setDollarClusterTime(clusterTime);
     GenericReplyFieldsWithTypesUnstableV1 unstableFields;
     unstableFields.setDollarConfigTime(Timestamp(1, 1));
     unstableFields.setOk(false);
@@ -490,8 +496,7 @@ TEST_F(AsyncRPCTestFixture, WriteConcernError) {
 
     const BSONObj writeConcernError = BSON("code" << ErrorCodes::WriteConcernFailed << "errmsg"
                                                   << "mock");
-    const BSONObj resWithWriteConcernError =
-        BSON("ok" << 1 << "writeConcernError" << writeConcernError);
+    BSONObj resWithWriteConcernError = BSON("ok" << 1 << "writeConcernError" << writeConcernError);
 
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
@@ -533,7 +538,7 @@ TEST_F(AsyncRPCTestFixture, WriteError) {
     const BSONObj writeError = BSON("code" << ErrorCodes::DocumentValidationFailure << "errInfo"
                                            << writeErrorExtraInfo << "errmsg"
                                            << "Document failed validation");
-    const BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
+    BSONObj resWithWriteError = BSON("ok" << 1 << "writeErrors" << BSON_ARRAY(writeError));
     auto opCtxHolder = makeOperationContext();
     auto options = std::make_shared<AsyncRPCOptions<HelloCommand>>(
         helloCmd, getExecutorPtr(), _cancellationToken);
@@ -1257,6 +1262,47 @@ TEST_F(AsyncRPCTestFixture, UseOperationKeyWhenProvided) {
             .toBSON(CursorResponse::ResponseType::InitialResponse);
     });
     future.get();
+}
+
+/**
+ * Checks that if cancellation occurs after TaskExecutor receives a network response, the
+ * cancellation fails and the network response fulfills the final response.
+ */
+TEST_F(AsyncRPCTestFixture, CancelAfterNetworkResponse) {
+    auto pauseAfterNetworkResponseFailPoint =
+        globalFailPointRegistry().find("pauseTaskExecutorAfterReceivesNetworkRespones");
+    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::alwaysOn);
+    std::unique_ptr<Targeter> targeter = std::make_unique<LocalHostTargeter>();
+    auto opCtxHolder = makeOperationContext();
+    DatabaseName testDbName = DatabaseName::createDatabaseName_forTest(boost::none, "testdb");
+    NamespaceString nss = NamespaceString::createNamespaceString_forTest(testDbName);
+
+    CancellationSource source;
+    CancellationToken token = source.token();
+    FindCommandRequest findCmd(nss);
+    auto options =
+        std::make_shared<AsyncRPCOptions<FindCommandRequest>>(findCmd, getExecutorPtr(), token);
+    auto future = sendCommand(options, opCtxHolder.get(), std::move(targeter));
+
+    // Will pause processing response after network interface.
+    stdx::thread worker([&] {
+        onCommand([&](const auto& request) {
+            return CursorResponse(nss, 0LL, {BSON("x" << 1)})
+                .toBSON(CursorResponse::ResponseType::InitialResponse);
+        });
+    });
+
+    // Cancel after network response received in the TaskExecutor.
+    pauseAfterNetworkResponseFailPoint->waitForTimesEntered(1);
+    source.cancel();
+    pauseAfterNetworkResponseFailPoint->setMode(FailPoint::off);
+
+    // Canceling after network response received does not change the final response and
+    // does not send killOperation.
+    CursorInitialReply res = std::move(future).get().response;
+    ASSERT_BSONOBJ_EQ(res.getCursor()->getFirstBatch()[0], BSON("x" << 1));
+
+    worker.join();
 }
 
 }  // namespace

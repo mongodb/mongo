@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 #include "mongo/db/query/optimizer/props.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 

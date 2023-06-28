@@ -29,7 +29,21 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <utility>
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_command_gen.h"
 #include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_policies.h"
@@ -42,6 +56,19 @@ namespace mongo {
  * still raw BSONObj on the FindCommandRequest type.
  */
 struct ParsedFindCommand {
+    ParsedFindCommand() = default;
+
+    /**
+     * This API adds the ability to construct from a pre-parsed filter. The other arguments will be
+     * re-parsed again from BSON on the 'findCommandRequest' argument, since we don't have a good
+     * way of cloning them.
+     */
+    static StatusWith<std::unique_ptr<ParsedFindCommand>> withExistingFilter(
+        const boost::intrusive_ptr<ExpressionContext>& expCtx,
+        std::unique_ptr<CollatorInterface> collator,
+        std::unique_ptr<MatchExpression> filter,
+        std::unique_ptr<FindCommandRequest> findCommandRequest);
+
     std::unique_ptr<CollatorInterface> collator;
     std::unique_ptr<MatchExpression> filter;
     boost::optional<projection_ast::Projection> proj;
@@ -80,7 +107,6 @@ namespace parsed_find_command {
  */
 StatusWith<QueryMetadataBitSet> isValid(const MatchExpression* root,
                                         const FindCommandRequest& findCommand);
-
 
 /**
  * Parses each big component of the input 'findCommand.' Throws exceptions if failing to parse.

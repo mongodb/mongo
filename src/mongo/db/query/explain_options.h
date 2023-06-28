@@ -30,6 +30,7 @@
 #pragma once
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/query/explain_verbosity_gen.h"
 

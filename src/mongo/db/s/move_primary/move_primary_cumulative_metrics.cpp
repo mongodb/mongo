@@ -29,6 +29,12 @@
 
 #include "mongo/db/s/move_primary/move_primary_cumulative_metrics.h"
 
+#include <array>
+#include <memory>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
 namespace mongo {
 namespace {
 

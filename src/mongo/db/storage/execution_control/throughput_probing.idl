@@ -75,13 +75,16 @@ server_parameters:
       callback: validateMaxConcurrency
 
   throughputProbingReadWriteRatio:
-    description: The ratio of reads/writes when using throughput probing.
+    description: >-
+      The ratio of reads/writes when using throughput probing. A value of 0.5 indicates a 1:1 ratio,
+      while a value greater than 0.5 favors reads and a value less than 0.5 favors writes.
     set_at: [ startup, runtime ]
     cpp_vartype: AtomicWord<double>
     cpp_varname: gReadWriteRatio
-    default: 1
+    default: 0.5
     validator:
-      gt: 0
+      gte: 0
+      lte: 1
 
   throughputProbingConcurrencyMovingAverageWeight:
     description: >-

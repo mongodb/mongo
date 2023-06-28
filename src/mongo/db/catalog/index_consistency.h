@@ -29,8 +29,26 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/throttle_cursor.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/catalog/validate_state.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/util/progress_meter.h"
 
@@ -42,7 +60,7 @@ class IndexDescriptor;
  * Contains all the index information and stats throughout the validation.
  */
 struct IndexInfo {
-    IndexInfo(const IndexDescriptor* descriptor, IndexAccessMethod* indexAccessMethod);
+    IndexInfo(const IndexDescriptor* descriptor);
     // Index name.
     const std::string indexName;
     // Contains the indexes key pattern.
@@ -66,7 +84,7 @@ struct IndexInfo {
     // Indicates whether key entries must be unique.
     const bool unique;
     // Index access method pointer.
-    IndexAccessMethod* accessMethod;
+    const IndexAccessMethod* accessMethod;
 };
 
 /**

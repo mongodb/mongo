@@ -27,52 +27,94 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/cursor_manager.h"
 #include "mongo/db/global_settings.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/repl/oplog_batcher.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_standalone.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_mongod.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
-#include "mongo/db/storage/storage_engine_parameters_gen.h"
+#include "mongo/db/storage/storage_engine_init.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
-#include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/exit.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 namespace mongo {
 namespace {
@@ -510,7 +552,7 @@ private:
 
     std::vector<BSONObj> _oplogEntries;
     UUID _foobarUUID;
-    NamespaceString _foobarNs{"foo.bar"_sd};
+    NamespaceString _foobarNs = NamespaceString::createNamespaceString_forTest("foo.bar"_sd);
     repl::OplogBatcher::BatchLimits _batchLimits{std::numeric_limits<std::size_t>::max(),
                                                  std::numeric_limits<std::size_t>::max()};
 };

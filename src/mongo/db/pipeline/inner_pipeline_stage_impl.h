@@ -29,13 +29,14 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include <boost/intrusive_ptr.hpp>
 #include <boost/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/inner_pipeline_stage_interface.h"
+#include "mongo/platform/basic.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 class InnerPipelineStageImpl : public InnerPipelineStageInterface {

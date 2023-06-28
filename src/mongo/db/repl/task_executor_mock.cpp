@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/repl/task_executor_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

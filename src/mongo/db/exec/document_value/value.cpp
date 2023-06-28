@@ -27,21 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/document_value/value.h"
-
-#include <boost/functional/hash.hpp>
+#include <absl/hash/hash.h>
+#include <boost/container_hash/extensions.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cmath>
+#include <cstdint>
 #include <limits>
+#include <memory>
+#include <ostream>
+#include <type_traits>
+#include <typeinfo>
+
+#include <absl/strings/string_view.h>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/exec/document_value/document_internal.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/hex.h"
@@ -666,7 +682,7 @@ string Value::coerceToString() const {
 
         case Date:
             return uassertStatusOKWithContext(
-                TimeZoneDatabase::utcZone().formatDate(kISOFormatString, getDate()),
+                TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ, getDate()),
                 "failed while coercing date to string");
 
         case EOO:
@@ -886,6 +902,17 @@ int Value::compare(const Value& rL,
     MONGO_verify(false);
 }
 
+namespace {
+/**
+ * Hashes the given 'StringData', combines the resulting hash with 'seed', and returns the result.
+ */
+size_t hashStringData(StringData sd, size_t seed) {
+    size_t strHash = absl::Hash<absl::string_view>{}(absl::string_view(sd.rawData(), sd.size()));
+    boost::hash_combine(seed, strHash);
+    return seed;
+}
+}  // namespace
+
 void Value::hash_combine(size_t& seed,
                          const StringData::ComparatorInterface* stringComparator) const {
     BSONType type = getType();
@@ -957,7 +984,7 @@ void Value::hash_combine(size_t& seed,
         case Code:
         case Symbol: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = hashStringData(sd, seed);
             break;
         }
 
@@ -966,7 +993,7 @@ void Value::hash_combine(size_t& seed,
             if (stringComparator) {
                 stringComparator->hash_combine(seed, sd);
             } else {
-                MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+                seed = hashStringData(sd, seed);
             }
             break;
         }
@@ -990,14 +1017,14 @@ void Value::hash_combine(size_t& seed,
 
         case BinData: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = hashStringData(sd, seed);
             boost::hash_combine(seed, _storage.binDataType());
             break;
         }
 
         case RegEx: {
             StringData sd = getRawData();
-            MurmurHash3_x86_32(sd.rawData(), sd.size(), seed, &seed);
+            seed = hashStringData(sd, seed);
             break;
         }
 
@@ -1235,7 +1262,7 @@ ostream& operator<<(ostream& out, const Value& val) {
             return out << "undefined";
         case Date:
             return out << [&] {
-                if (auto string = TimeZoneDatabase::utcZone().formatDate(kISOFormatString,
+                if (auto string = TimeZoneDatabase::utcZone().formatDate(kIsoFormatStringZ,
                                                                          val.coerceToDate());
                     string.isOK())
                     return string.getValue();

@@ -27,26 +27,49 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/repl/mock_repl_coord_server_fixture.h"
 #include "mongo/db/repl/oplog_entry.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_catalog.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -192,14 +215,18 @@ TEST_F(WriteOpsRetryability, ParseOplogEntryForNestedUpsert) {
     ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSON("_id" << 2));
 }
 
-TEST_F(WriteOpsRetryability, ShouldFailIfParsingDeleteOplogForUpdate) {
+TEST_F(WriteOpsRetryability, ParsingDeleteOplogForUpdate) {
     auto deleteOplog =
         makeOplogEntry(repl::OpTime(Timestamp(50, 10), 1),                     // optime
                        repl::OpTypeEnum::kDelete,                              // op type
                        NamespaceString::createNamespaceString_forTest("a.b"),  // namespace
                        BSON("_id" << 2));                                      // o
 
-    ASSERT_THROWS(parseOplogEntryForUpdate(deleteOplog), AssertionException);
+    auto res = parseOplogEntryForUpdate(deleteOplog);
+
+    ASSERT_EQ(res.getN(), 1);
+    ASSERT_EQ(res.getNModified(), 1);
+    ASSERT_BSONOBJ_EQ(res.getUpsertedId(), BSONObj());
 }
 
 TEST_F(WriteOpsRetryability, PerformInsertsSuccess) {

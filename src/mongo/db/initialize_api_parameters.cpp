@@ -27,16 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/initialize_api_parameters.h"
-
+#include <memory>
+#include <set>
 #include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/initialize_api_parameters.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

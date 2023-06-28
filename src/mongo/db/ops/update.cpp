@@ -28,28 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
-#include "mongo/db/ops/update.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/collection_yield_restore.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/client.h"
-#include "mongo/db/clientcursor.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/exec/update_stage.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/query/explain.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update.h"
 #include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/update/update_driver.h"
-#include "mongo/db/update_index_data.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWrite
 

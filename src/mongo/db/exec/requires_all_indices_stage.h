@@ -44,9 +44,14 @@ class RequiresAllIndicesStage : public RequiresCollectionStage {
 public:
     RequiresAllIndicesStage(const char* stageType,
                             ExpressionContext* expCtx,
-                            const CollectionPtr& coll)
-        : RequiresCollectionStage(stageType, expCtx, coll),
-          _allIndicesRequiredChecker(MultipleCollectionAccessor(coll)) {}
+                            VariantCollectionPtrOrAcquisition collectionVariant)
+        : RequiresCollectionStage(stageType, expCtx, collectionVariant) {
+        const auto& coll = collection();
+        auto multipleCollection = coll.isAcquisition()
+            ? MultipleCollectionAccessor{coll.getAcquisition()}
+            : MultipleCollectionAccessor{coll.getCollectionPtr()};
+        _allIndicesRequiredChecker.emplace(std::move(multipleCollection));
+    }
 
     virtual ~RequiresAllIndicesStage() = default;
 
@@ -55,7 +60,12 @@ protected:
 
     void doRestoreStateRequiresCollection() override final {
         if (_allIndicesRequiredChecker) {
-            _allIndicesRequiredChecker->check(opCtx(), MultipleCollectionAccessor(collection()));
+            const auto& coll = collection();
+            auto multipleCollection = coll.isAcquisition()
+                ? MultipleCollectionAccessor{coll.getAcquisition()}
+                : MultipleCollectionAccessor{coll.getCollectionPtr()};
+
+            _allIndicesRequiredChecker->check(opCtx(), std::move(multipleCollection));
         }
     }
 

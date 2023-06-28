@@ -29,27 +29,45 @@
 
 #include "mongo/db/cursor_manager.h"
 
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/optional.hpp>
+// IWYU pragma: no_include "boost/align/detail/aligned_alloc_posix.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/allocate_cursor_id.h"
-#include "mongo/db/audit.h"
 #include "mongo/db/auth/authorization_checks.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/cursor_server_params.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions_common.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
-#include "mongo/util/exit.h"
+#include "mongo/util/aligned.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

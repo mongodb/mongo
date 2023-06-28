@@ -29,10 +29,31 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/move_primary/move_primary_donor_service.h"
 #include "mongo/db/s/move_primary_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/s/database_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

@@ -258,7 +258,8 @@ private:
         static auto make(NetworkInterfaceTL* interface,
                          RemoteCommandRequestOnAny request,
                          const TaskExecutor::CallbackHandle& cbHandle,
-                         RemoteCommandOnReplyFn&& onReply);
+                         RemoteCommandOnReplyFn&& onReply,
+                         const BatonHandle& baton);
 
         Future<RemoteCommandResponse> sendRequest(
             std::shared_ptr<RequestState> requestState) override;

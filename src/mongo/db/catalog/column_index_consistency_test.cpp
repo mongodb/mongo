@@ -27,11 +27,21 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
 #include "mongo/db/catalog/catalog_test_fixture.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_validation.h"
 #include "mongo/db/catalog/column_index_consistency.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

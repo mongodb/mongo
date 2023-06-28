@@ -29,6 +29,10 @@
 
 #include "mongo/db/query/cost_model/on_coefficients_change_updater_impl.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "mongo/bson/json.h"
 #include "mongo/db/query/query_knobs_gen.h"
 

@@ -28,21 +28,23 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+#include <utility>
 
-#include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_options.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_process.h"
-#include "mongo/db/repl/rollback_gen.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/str.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 

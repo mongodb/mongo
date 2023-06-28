@@ -35,8 +35,7 @@ assert.commandWorked(coll.insert({a: 1}));
 const secondary = rst.getSecondary();
 IndexBuildTest.pauseIndexBuilds(secondary);
 
-const createIdx =
-    IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1}, {background: true});
+const createIdx = IndexBuildTest.startIndexBuild(primary, coll.getFullName(), {a: 1});
 
 // Wait for secondary to start processing commitIndexBuild oplog entry from the primary.
 const secondaryDB = secondary.getDB(testDB.getName());

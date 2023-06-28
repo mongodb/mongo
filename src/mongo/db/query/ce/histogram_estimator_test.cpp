@@ -27,15 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include <iostream>
+#include <map>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/histogram_estimator.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/stats/collection_statistics_mock.h"
 #include "mongo/db/query/stats/max_diff.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -190,7 +212,7 @@ void addHistogramFromValues(CEHistogramTester& t,
     }
 }
 
-class CEHistogramTest : public LockerNoopServiceContextTest {};
+class CEHistogramTest : public ServiceContextTest {};
 
 TEST_F(CEHistogramTest, AssertSmallMaxDiffHistogramEstimatesAtomicPredicates) {
     constexpr CEType kCollCard{8.0};

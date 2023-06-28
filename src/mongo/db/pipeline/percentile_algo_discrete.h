@@ -29,6 +29,8 @@
 
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/pipeline/percentile_algo.h"
 
 namespace mongo {

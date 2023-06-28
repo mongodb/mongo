@@ -46,7 +46,7 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
 }  // namespace
 
 static const char* const _ns = "unittests.indexupdate";
-static const NamespaceString _nss = NamespaceString(_ns);
+static const NamespaceString _nss = NamespaceString::createNamespaceString_forTest(_ns);
 
 /**
  * Test fixture for a write locked test using collection _ns.  Includes functionality to
@@ -154,8 +154,7 @@ public:
         const BSONObj spec = BSON("name"
                                   << "a"
                                   << "key" << BSON("a" << 1) << "v"
-                                  << static_cast<int>(kIndexVersion) << "unique" << true
-                                  << "background" << background);
+                                  << static_cast<int>(kIndexVersion) << "unique" << true);
 
         ScopeGuard abortOnExit([&] {
             indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
@@ -212,8 +211,7 @@ public:
             const BSONObj spec = BSON("name"
                                       << "a"
                                       << "key" << BSON("a" << 1) << "v"
-                                      << static_cast<int>(kIndexVersion) << "unique" << true
-                                      << "background" << background);
+                                      << static_cast<int>(kIndexVersion) << "unique" << true);
             ScopeGuard abortOnExit([&] {
                 indexer.abortIndexBuild(_opCtx, collection(), MultiIndexBlock::kNoopOnCleanUpFn);
             });
@@ -480,8 +478,8 @@ public:
     void run() {
         ASSERT_OK(createIndex(BSON("name"
                                    << "super3"
-                                   << "unique" << 1 << "sparse" << false << "background" << true
-                                   << "expireAfterSeconds" << 3600 << "key"
+                                   << "unique" << 1 << "sparse" << false << "expireAfterSeconds"
+                                   << 3600 << "key"
                                    << BSON("superIdx"
                                            << "2d")
                                    << "v" << static_cast<int>(kIndexVersion))));

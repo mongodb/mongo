@@ -26,10 +26,7 @@ try {
     awaitParallelShell = startParallelShell(() => {
         db.getSiblingDB("test").runCommand({
             createIndexes: "collstats_show_ready_and_in_progress_indexes",
-            indexes: [
-                {key: {a: 1}, name: 'a_1', background: true},
-                {key: {b: 1}, name: 'b_1', background: true}
-            ]
+            indexes: [{key: {a: 1}, name: 'a_1'}, {key: {b: 1}, name: 'b_1'}]
         });
     }, db.getMongo().port);
 

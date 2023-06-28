@@ -29,11 +29,23 @@
 
 #include "mongo/db/pipeline/abt/canonical_query_translation.h"
 
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/pipeline/abt/algebrizer_context.h"
 #include "mongo/db/pipeline/abt/collation_translation.h"
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
 #include "mongo/db/pipeline/abt/transformer_visitor.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::optimizer {
 

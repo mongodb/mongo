@@ -826,6 +826,46 @@ TEST_F(LogV2TypesTest, Duration) {
                   ms.count());
 }
 
+void exceptionThrower() {
+    uasserted(7733401, "exception in logger");
+}
+
+template <typename T>
+void testExceptionHandling(T arg, LogV2Test::LineCapture& text, LogV2Test::LineCapture& json) {
+    LOGV2(7733402, "test1 {a1}", "a1"_attr = arg);
+
+    ASSERT_EQ(
+        mongo::fromjson(json.back()).getField(kAttributesFieldName).Obj().getField("a1").String(),
+        "Failed to serialize due to exception: Location7733401: exception in logger");
+
+    ASSERT_EQ(text.back(),
+              "test1 Failed to serialize due to exception: Location7733401: exception in logger");
+}
+
+// Throw an exception in a BSON serialization method
+TEST_F(LogV2TypesTest, AttrExceptionBSONSerialize) {
+    struct TypeWithBSONSerialize {
+        void serialize(BSONObjBuilder*) const {
+            exceptionThrower();
+        }
+    };
+
+    testExceptionHandling(TypeWithBSONSerialize(), text, json);
+}
+
+// Throw an exception in a BSON Array serialization method
+TEST_F(LogV2TypesTest, AttrExceptionBSONToARray) {
+    struct TypeToArray {
+        BSONArray toBSONArray() const {
+            exceptionThrower();
+            return {};
+        }
+    };
+
+    testExceptionHandling(TypeToArray(), text, json);
+}
+
+
 TEST_F(LogV2Test, TextFormat) {
     auto lines = makeLineCapture(TextFormatter());
 

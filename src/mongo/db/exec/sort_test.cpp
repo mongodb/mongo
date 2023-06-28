@@ -33,17 +33,33 @@
 
 #include "mongo/db/exec/sort.h"
 
-#include <boost/optional.hpp>
 #include <memory>
+#include <utility>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/queued_data_stage.h"
-#include "mongo/db/json.h"
+#include "mongo/db/exec/sort_key_generator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/collation/collator_factory_mock.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/collation/collator_interface_mock.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source_mock.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 using namespace mongo;
 

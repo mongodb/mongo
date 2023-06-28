@@ -28,38 +28,48 @@
  */
 
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/fsync.h"
-
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <cstdint>
+#include <exception>
 #include <string>
-#include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/fsync.h"
 #include "mongo/db/commands/fsync_locked.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/backup_cursor_hooks.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/exit.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
 namespace mongo {
-
-class FSyncLockThread;
 
 // Protects access to globalFsyncLockThread and other global fsync state.
 Mutex fsyncStateMutex = MONGO_MAKE_LATCH("fsyncStateMutex");
@@ -117,8 +127,8 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::fsync)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::fsync)) {
             return {ErrorCodes::Unauthorized, "unauthorized"};
         }
 
@@ -297,11 +307,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
-        bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
-                                ->isAuthorizedForActionsOnResource(
-                                    ResourcePattern::forClusterResource(), ActionType::unlock);
+        bool isAuthorized =
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forClusterResource(dbName.tenantId()), ActionType::unlock);
 
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }

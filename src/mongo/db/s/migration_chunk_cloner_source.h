@@ -29,27 +29,53 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <deque>
+#include <functional>
 #include <list>
 #include <memory>
 #include <mutex>
 #include <set>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog_entry.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/s/migration_chunk_cloner_source.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_source.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/request_types/move_range_request_gen.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/concurrency/notification.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -472,7 +498,7 @@ private:
         //
         // If (_recordIdsIter == _recordIds.end() && _overflowDocs.empty() &&
         //     _inProgressReads == 0) then all documents have been returned to the destination.
-        RecordIdSet::size_type _inProgressReads = 0;
+        int64_t _inProgressReads = 0;
 
         // This condition variable allows us to wait on the following condition:
         //   Either we're done and the above condition is satisfied, or there is some document to
@@ -487,7 +513,7 @@ private:
      * Idempotent method, which cleans up any previously initialized state. It is safe to be called
      * at any time, but no methods should be called after it.
      */
-    void _cleanup();
+    void _cleanup(bool wasSuccessful);
 
     /**
      * Synchronously invokes the recipient shard with the specified command and either returns the

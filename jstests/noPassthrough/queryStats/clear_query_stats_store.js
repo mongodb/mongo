@@ -2,7 +2,7 @@
  * Test that the telemetry store can be cleared when the cache size is reset to 0.
  * @tags: [featureFlagQueryStats]
  */
-load("jstests/libs/telemetry_utils.js");  // For verifyMetrics.
+load("jstests/libs/query_stats_utils.js");  // For verifyMetrics.
 
 (function() {
 "use strict";

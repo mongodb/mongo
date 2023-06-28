@@ -30,20 +30,36 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <fmt/format.h>
 #include <iosfwd>
 #include <mutex>
 #include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
 
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -186,6 +202,7 @@ public:
     // limitation).
 #define NSS_CONSTANT(id, db, coll) static const ConstantProxy id;
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
+
 #undef NSS_CONSTANT
 
     /**
@@ -209,14 +226,6 @@ public:
                     StringData collectionName,
                     boost::optional<TenantId> tenantId = boost::none)
         : NamespaceString(std::move(tenantId), db, collectionName) {}
-
-    /**
-     * Constructs a NamespaceString from the string 'ns'. Should only be used when reading a
-     * namespace from disk. 'ns' is expected to contain a tenantId when running in Serverless mode.
-     */
-    // TODO SERVER-70013 Move this function into NamespaceStringUtil, and delegate overlapping
-    // functionality to DatabaseNameUtil::parseDbNameFromStringExpectTenantIdInMultitenancyMode.
-    static NamespaceString parseFromStringExpectTenantIdInMultitenancyMode(StringData ns);
 
     /**
      * Constructs a NamespaceString in the global config db, "config.<collName>".
@@ -437,10 +446,6 @@ public:
      */
     std::string toString_forTest() const {
         return toString();
-    }
-
-    std::string toString() const {
-        return ns().toString();
     }
 
     /**
@@ -698,7 +703,7 @@ public:
      * valid.
      */
     bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
-        return validDBName(db(), behavior) && !coll().empty();
+        return validDBName(dbName(), behavior) && !coll().empty();
     }
 
     /**
@@ -740,7 +745,7 @@ public:
 
     static bool validDBName(const DatabaseName& dbName,
                             DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
-        return validDBName(dbName.db(), behavior);
+        return validDBName(dbName.toStringWithTenantId(), behavior);
     }
 
     /**
@@ -755,7 +760,7 @@ public:
      * @param ns - a full namespace (a.b)
      * @return if db.coll is an allowed collection name
      */
-    static bool validCollectionComponent(StringData ns);
+    static bool validCollectionComponent(const NamespaceString& ns);
 
     /**
      * Takes a collection name and returns true if it is a valid collection name.
@@ -860,6 +865,10 @@ private:
      */
     NamespaceString(boost::optional<TenantId> tenantId, StringData db, StringData collectionName)
         : _data(makeData(tenantId, db, collectionName)) {}
+
+    std::string toString() const {
+        return ns().toString();
+    }
 
     std::string toStringWithTenantId() const {
         if (_hasTenantId()) {
@@ -970,19 +979,21 @@ public:
         : _nssOrUUID(
               UUIDWithDbName{DatabaseName{std::move(tenantId), std::move(db)}, std::move(uuid)}) {}
 
-    boost::optional<NamespaceString> nss() const {
-        if (!stdx::holds_alternative<NamespaceString>(_nssOrUUID)) {
-            return boost::none;
-        }
+    bool isNamespaceString() const {
+        return stdx::holds_alternative<NamespaceString>(_nssOrUUID);
+    }
 
+    const NamespaceString& nss() const {
+        invariant(stdx::holds_alternative<NamespaceString>(_nssOrUUID));
         return get<NamespaceString>(_nssOrUUID);
     }
 
-    boost::optional<UUID> uuid() const {
-        if (!stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID)) {
-            return boost::none;
-        }
+    bool isUUID() const {
+        return stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID);
+    }
 
+    const UUID& uuid() const {
+        invariant(stdx::holds_alternative<UUIDWithDbName>(_nssOrUUID));
         return get<1>(get<UUIDWithDbName>(_nssOrUUID));
     }
 
@@ -1005,12 +1016,6 @@ public:
 
         return get<0>(get<UUIDWithDbName>(_nssOrUUID));
     }
-
-    /**
-     * Returns OK if either the nss is not set or is a valid nss. Otherwise returns an
-     * InvalidNamespace error.
-     */
-    Status isNssValid() const;
 
     /**
      * This function should only be used when logging a NamespaceStringOrUUID in an error message.
@@ -1121,12 +1126,13 @@ inline bool NamespaceString::validDBName(StringData db, DollarInDbNameBehavior b
     return true;
 }
 
-inline bool NamespaceString::validCollectionComponent(StringData ns) {
-    size_t idx = ns.find('.');
+inline bool NamespaceString::validCollectionComponent(const NamespaceString& ns) {
+    const auto nsStr = ns.ns();
+    size_t idx = nsStr.find('.');
     if (idx == std::string::npos)
         return false;
 
-    return validCollectionName(ns.substr(idx + 1)) || oplog(ns);
+    return validCollectionName(nsStr.substr(idx + 1)) || oplog(nsStr);
 }
 
 inline bool NamespaceString::validCollectionName(StringData coll) {
@@ -1149,6 +1155,10 @@ inline bool NamespaceString::validCollectionName(StringData coll) {
     return true;
 }
 
+inline std::string stringifyForAssert(const NamespaceString& nss) {
+    return toStringForLogging(nss);
+}
+
 // Here are the `constexpr` definitions for the `NamespaceString::ConstantProxy`
 // constant static data members of `NamespaceString`. They cannot be defined
 // `constexpr` inside the class definition, but they can be upgraded to
@@ -1159,6 +1169,7 @@ namespace nss_detail::const_proxy_shared_states {
 #define NSS_CONSTANT(id, db, coll) \
     constexpr inline NamespaceString::ConstantProxy::SharedState id{db, coll};
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
+
 #undef NSS_CONSTANT
 }  // namespace nss_detail::const_proxy_shared_states
 
@@ -1166,6 +1177,7 @@ namespace nss_detail::const_proxy_shared_states {
     constexpr inline NamespaceString::ConstantProxy NamespaceString::id{ \
         &nss_detail::const_proxy_shared_states::id};
 #include "namespace_string_reserved.def.h"  // IWYU pragma: keep
+
 #undef NSS_CONSTANT
 
 }  // namespace mongo

@@ -28,7 +28,24 @@
  */
 
 #include "mongo/db/catalog/historical_catalogid_tracker.h"
-#include "mongo/db/storage/storage_options.h"
+
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <immer/detail/iterator_facade.hpp>
+#include <immer/detail/util.hpp>
+#include <immer/map.hpp>
+#include <immer/map_transient.hpp>
+#include <immer/set.hpp>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace {

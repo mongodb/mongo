@@ -330,6 +330,22 @@ void logCert(const CertInformationToLog& cert, StringData certType, const int lo
     LOGV2(logNum, "Certificate information", attrs);
 }
 
+logv2::DynamicAttributes CertInformationToLog::getDynamicAttributes() const {
+    logv2::DynamicAttributes attrs;
+    attrs.add("subject", subject);
+    attrs.add("issuer", issuer);
+    attrs.add("thumbprint", StringData(hexEncodedThumbprint));
+    attrs.add("notValidBefore", validityNotBefore);
+    attrs.add("notValidAfter", validityNotAfter);
+    if (keyFile) {
+        attrs.add("keyFile", StringData(*keyFile));
+    }
+    if (targetClusterURI) {
+        attrs.add("targetClusterURI", StringData(*targetClusterURI));
+    }
+    return attrs;
+}
+
 void logCRL(const CRLInformationToLog& crl, const int logNum) {
     LOGV2(logNum,
           "CRL information",

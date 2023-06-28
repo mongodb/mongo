@@ -27,29 +27,72 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <chrono>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
 #include "mongo/db/catalog_raii.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/op_observer/op_observer_impl.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deleter_service_test.h"
 #include "mongo/db/s/range_deletion_task_gen.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
+#include "mongo/db/s/sharding_mongod_test_fixture.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/catalog_cache_loader.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_version_factory.h"
-#include "mongo/stdx/chrono.h"
+#include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace {

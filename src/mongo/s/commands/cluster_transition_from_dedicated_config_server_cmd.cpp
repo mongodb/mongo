@@ -101,7 +101,7 @@ public:
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
                         ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forClusterResource(),
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
                             ActionType::transitionFromDedicatedConfigServer));
         }
     };

@@ -27,14 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/ops/write_ops_parsers_test_helpers.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -212,7 +231,7 @@ TEST(CommandWriteOpsParsers, SingleInsert) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 1u);
@@ -237,7 +256,7 @@ TEST(CommandWriteOpsParsers, RealMultiInsert) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 2u);
@@ -257,7 +276,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtId) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 2u);
@@ -277,7 +296,7 @@ TEST(CommandWriteOpsParsers, MultiInsertWithStmtIdsArray) {
     for (bool seq : {false, true}) {
         auto request = toOpMsg(ns.db(), cmd, seq);
         const auto op = InsertOp::parse(request);
-        ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT(op.getWriteCommandRequestBase().getOrdered());
         ASSERT_EQ(op.getDocuments().size(), 2u);
@@ -304,7 +323,7 @@ TEST(CommandWriteOpsParsers, UpdateCommandRequest) {
             for (bool seq : {false, true}) {
                 auto request = toOpMsg(ns.db(), cmd, seq);
                 auto op = UpdateOp::parse(request);
-                ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+                ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
                 ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
                 ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
                 ASSERT_EQ(op.getUpdates().size(), 1u);
@@ -341,7 +360,7 @@ TEST(CommandWriteOpsParsers, UpdateWithPipeline) {
             for (bool seq : {false, true}) {
                 auto request = toOpMsg(ns.db(), cmd, seq);
                 auto op = UpdateOp::parse(request);
-                ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+                ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
                 ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
                 ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
                 ASSERT_EQ(op.getUpdates().size(), 1u);
@@ -374,7 +393,7 @@ TEST(CommandWriteOpsParsers, Remove) {
         for (bool seq : {false, true}) {
             auto request = toOpMsg(ns.db(), cmd, seq);
             auto op = DeleteOp::parse(request);
-            ASSERT_EQ(op.getNamespace().ns(), ns.ns());
+            ASSERT_EQ(op.getNamespace().ns_forTest(), ns.ns_forTest());
             ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
             ASSERT_EQ(op.getWriteCommandRequestBase().getOrdered(), true);
             ASSERT_EQ(op.getDeletes().size(), 1u);
@@ -407,7 +426,7 @@ TEST(LegacyWriteOpsParsers, SingleInsert) {
         auto message = makeUnsupportedOpInsertMessage(
             ns, &obj, 1, continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
-        ASSERT_EQ(op.getNamespace().ns(), ns);
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT_EQ(!op.getWriteCommandRequestBase().getOrdered(), continueOnError);
         ASSERT_EQ(op.getDocuments().size(), 1u);
@@ -435,7 +454,7 @@ TEST(LegacyWriteOpsParsers, RealMultiInsert) {
         auto message = makeUnsupportedOpInsertMessage(
             ns, objs.data(), objs.size(), continueOnError ? InsertOption_ContinueOnError : 0);
         const auto op = InsertOp::parseLegacy(message);
-        ASSERT_EQ(op.getNamespace().ns(), ns);
+        ASSERT_EQ(op.getNamespace().ns_forTest(), ns);
         ASSERT(!op.getWriteCommandRequestBase().getBypassDocumentValidation());
         ASSERT_EQ(!op.getWriteCommandRequestBase().getOrdered(), continueOnError);
         ASSERT_EQ(op.getDocuments().size(), 2u);

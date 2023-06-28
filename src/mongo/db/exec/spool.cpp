@@ -29,7 +29,16 @@
 
 #include "mongo/db/exec/spool.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
 
 namespace {
 /**

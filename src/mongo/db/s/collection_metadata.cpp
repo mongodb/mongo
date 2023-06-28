@@ -28,17 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/collection_metadata.h"
-
+#include <boost/none.hpp>
 #include <fmt/format.h>
+#include <map>
+#include <set>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/builder.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -77,6 +87,7 @@ boost::optional<ShardKeyPattern> CollectionMetadata::getReshardingKeyIfShouldFor
         case CoordinatorStateEnum::kBlockingWrites:
         case CoordinatorStateEnum::kAborting:
         case CoordinatorStateEnum::kCommitting:
+        case CoordinatorStateEnum::kQuiesced:
         case CoordinatorStateEnum::kDone:
             return boost::none;
         case CoordinatorStateEnum::kPreparingToDonate:

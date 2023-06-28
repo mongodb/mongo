@@ -73,7 +73,7 @@ inline std::string toStringForLogging(const std::unique_ptr<Service>& service) {
 class CommandService : public Service {
 public:
     using InSessionPtr = std::shared_ptr<IngressSession>;
-    using RpcHandler = std::function<::grpc::Status(InSessionPtr)>;
+    using RPCHandler = std::function<void(InSessionPtr)>;
 
     static constexpr const char* kAuthenticatedCommandStreamMethodName =
         "/mongodb.CommandService/AuthenticatedCommandStream";
@@ -95,9 +95,14 @@ public:
      * The provided callback is used to handle streams created from both methods. The status
      * returned from the callback will be communicated to the client. The callback MUST terminate
      * the session before returning.
+     *
+     * The session's termination status will be converted to the closest matching gRPC status and
+     * returned to the client once the handler exits. This conversion is lossy though, so it is
+     * better to communicate errors to the client by writing messages to the stream rather than by
+     * setting a termination status.
      */
     CommandService(GRPCTransportLayer* tl,
-                   RpcHandler callback,
+                   RPCHandler callback,
                    std::shared_ptr<WireVersionProvider> wvProvider);
 
     ~CommandService() = default;
@@ -114,7 +119,7 @@ private:
     ::grpc::Status _handleAuthenticatedStream(ServerContext& serverCtx, ServerStream& stream);
 
     GRPCTransportLayer* _tl;
-    RpcHandler _callback;
+    RPCHandler _callback;
     std::shared_ptr<WireVersionProvider> _wvProvider;
     std::unique_ptr<ClientCache> _clientCache;
 

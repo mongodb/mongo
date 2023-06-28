@@ -28,7 +28,22 @@
  */
 
 #include "mongo/db/pipeline/abt/match_expression_visitor.h"
+
+#include <cstddef>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_array.h"
 #include "mongo/db/matcher/expression_expr.h"
@@ -37,6 +52,7 @@
 #include "mongo/db/matcher/expression_internal_eq_hashed_key.h"
 #include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/matcher/expression_text_noop.h"
 #include "mongo/db/matcher/expression_tree.h"
@@ -45,6 +61,7 @@
 #include "mongo/db/matcher/expression_where.h"
 #include "mongo/db/matcher/expression_where_noop.h"
 #include "mongo/db/matcher/match_expression_walker.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_all_elem_match_from_index.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_allowed_properties.h"
 #include "mongo/db/matcher/schema/expression_internal_schema_cond.h"
@@ -64,7 +81,14 @@
 #include "mongo/db/pipeline/abt/agg_expression_visitor.h"
 #include "mongo/db/pipeline/abt/expr_algebrizer_context.h"
 #include "mongo/db/pipeline/abt/utils.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/db/query/tree_walker.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::optimizer {
 

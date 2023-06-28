@@ -64,9 +64,6 @@ public:
      * Called when inserts are done and indexes can be committed.
      */
     virtual Status commit() = 0;
-
-    virtual std::string toString() const = 0;
-    virtual BSONObj toBSON() const = 0;
 };
 
 }  // namespace repl

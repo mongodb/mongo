@@ -27,13 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <initializer_list>
+#include <limits>
+#include <list>
+#include <ostream>
+#include <set>
+#include <string>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-#include "mongo/unittest/unittest.h"
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 namespace {

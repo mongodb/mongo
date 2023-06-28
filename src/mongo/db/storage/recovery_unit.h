@@ -29,20 +29,28 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
+#include <memory>
 #include <string>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_stats.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 
 namespace mongo {
 
 class BSONObjBuilder;
+
 class OperationContext;
 
 /**
@@ -598,22 +606,6 @@ public:
     };
 
     /**
-     * A SnapshotChange is an action that can be registered at anytime. When a WriteUnitOfWork
-     * begins, the openSnapshot() callback is called for any registered snapshot changes. Similarly,
-     * when the snapshot is abandoned, or the WriteUnitOfWork is committed or aborted, the
-     * closeSnapshot() callback is called.
-     *
-     * The same rules apply here that apply to the Change class.
-     */
-    class SnapshotChange {
-    public:
-        virtual ~SnapshotChange() {}
-
-        virtual void openSnapshot(OperationContext* opCtx) = 0;
-        virtual void closeSnapshot(OperationContext* opCtx) = 0;
-    };
-
-    /**
      * The commitUnitOfWork() method calls the commit() method of each registered change in order of
      * registration. The endUnitOfWork() method calls the rollback() method of each registered
      * Change in reverse order of registration. Either will unregister and delete the changes.
@@ -651,21 +643,25 @@ public:
 
     /**
      * Like registerChange() above but should only be used to make new state visible in the
-     * in-memory catalog. Only one change of this kind may be registered at a given time to ensure
-     * catalog updates are atomic. Change registered with this function will commit after the commit
-     * changes registered with registerChange and rollback will run before the rollback changes
-     * registered with registerChange.
+     * in-memory catalog. Change registered with this function will commit before the commit
+     * changes registered with registerChange and rollback will run after the rollback changes
+     * registered with registerChange. Only one change of this kind should be registered at a given
+     * time to ensure catalog updates are atomic, however multiple callbacks are allowed for testing
+     * purposes.
      *
-     * This separation ensures that regular Changes that can modify state are run before the Change
-     * to install the new state in the in-memory catalog, after which there should be no further
-     * changes.
+     * This separation ensures that regular Changes can observe changes to catalog visibility.
      */
     void registerChangeForCatalogVisibility(std::unique_ptr<Change> change);
 
     /**
-     * Returns true if a change has been registered with registerChangeForCatalogVisibility() above.
+     * Like registerChange() above but should only be used to push idents for two phase drop to the
+     * reaper. This currently needs to happen before a drop is made visible in the catalog to avoid
+     * a window where a reader would observe the drop in the catalog but not be able to find the
+     * ident in the reaper.
+     *
+     * TODO SERVER-77959: Remove this.
      */
-    bool hasRegisteredChangeForCatalogVisibility();
+    void registerChangeForTwoPhaseDrop(std::unique_ptr<Change> change);
 
     /**
      * Registers a callback to be called if the current WriteUnitOfWork rolls back.
@@ -717,6 +713,31 @@ public:
         };
 
         registerChange(std::make_unique<OnCommitChange>(std::move(callback)));
+    }
+
+    /**
+     * Registers a callback to be called if the current WriteUnitOfWork commits for two phase drop.
+     *
+     * Should only be used for adding drop pending idents to the reaper!
+     *
+     * TODO SERVER-77959: Remove this.
+     */
+    template <typename Callback>
+    void onCommitForTwoPhaseDrop(Callback callback) {
+        class OnCommitTwoPhaseChange final : public Change {
+        public:
+            OnCommitTwoPhaseChange(Callback&& callback) : _callback(std::move(callback)) {}
+            void rollback(OperationContext* opCtx) final {}
+            void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) final {
+                _callback(opCtx, commitTime);
+            }
+
+        private:
+            Callback _callback;
+        };
+
+        registerChangeForTwoPhaseDrop(
+            std::make_unique<OnCommitTwoPhaseChange>(std::move(callback)));
     }
 
     virtual void setOrderedCommit(bool orderedCommit) = 0;
@@ -885,12 +906,11 @@ private:
 
     typedef std::vector<std::unique_ptr<Change>> Changes;
     Changes _changes;
-    typedef std::vector<std::unique_ptr<SnapshotChange>> SnapshotChanges;
-    SnapshotChanges _snapshotChanges;
+    Changes _changesForCatalogVisibility;
+    Changes _changesForTwoPhaseDrop;
     // The Snapshot is always initialized by the RecoveryUnit constructor. We use an optional to
     // simplify destructing and re-constructing the Snapshot in-place.
     boost::optional<Snapshot> _snapshot;
-    std::unique_ptr<Change> _changeForCatalogVisibility;
     State _state = State::kInactive;
     OperationContext* _opCtx = nullptr;
     bool _readOnly = false;

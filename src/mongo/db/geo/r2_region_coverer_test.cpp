@@ -28,18 +28,35 @@
  */
 
 
+#include <cmath>
+#include <cstddef>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <chrono>
+#include <iterator>
+#include <limits>
+#include <map>
 #include <memory>
 #include <random>
 
-#include "mongo/db/geo/r2_region_coverer.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/geo/geometry_container.h"
+#include "mongo/db/geo/r2_region_coverer.h"
+#include "mongo/db/geo/shapes.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

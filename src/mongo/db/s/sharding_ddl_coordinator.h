@@ -29,19 +29,53 @@
 
 #pragma once
 
+#include <memory>
+#include <set>
+#include <stack>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/internal_session_pool.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/database_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -179,9 +213,12 @@ private:
         std::shared_ptr<executor::ScopedTaskExecutor> executor,
         const CancellationToken& token);
 
+    template <typename T>
     ExecutorFuture<void> _acquireLockAsync(std::shared_ptr<executor::ScopedTaskExecutor> executor,
                                            const CancellationToken& token,
-                                           StringData resource);
+                                           const T& resource,
+                                           LockMode lockMode);
+
     ExecutorFuture<void> _translateTimeseriesNss(
         std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token);
 
@@ -191,7 +228,12 @@ private:
     SharedPromise<void> _constructionCompletionPromise;
     SharedPromise<void> _completionPromise;
 
-    std::stack<DDLLockManager::ScopedLock> _scopedLocks;
+    // A Locker object works attached to an opCtx and it's destroyed once the opCtx gets out of
+    // scope. However, we must keep alive a unique Locker object during the whole
+    // ShardingDDLCoordinator life to preserve the lock state among all the executor tasks.
+    std::unique_ptr<Locker> _locker;
+
+    std::stack<DDLLockManager::ScopedBaseDDLLock> _scopedLocks;
 };
 
 template <class StateDoc>
@@ -244,7 +286,7 @@ protected:
             stdx::lock_guard lk{_docMutex};
             if (const auto& bucketNss = _doc.getBucketNss()) {
                 // Bucket namespace is only present in case the collection is a sharded timeseries
-                bob.append("bucketNamespace", bucketNss.get().toString());
+                bob.append("bucketNamespace", NamespaceStringUtil::serialize(bucketNss.get()));
             }
         }
 

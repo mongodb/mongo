@@ -112,7 +112,7 @@ def StringDataPrinter(valobj, *_args):  # pylint: disable=invalid-name
         return 'nullptr'
 
     size1 = valobj.GetChildMemberWithName("_size").GetValueAsUnsigned(0)
-    return '"{}"'.format(valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).encode("utf-8"))
+    return '"{}"'.format(valobj.GetProcess().ReadMemory(ptr, size1, lldb.SBError()).decode("utf-8"))
 
 
 def read_memory_as_hex(process, address, size):

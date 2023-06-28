@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/client/index_spec.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/client/read_preference.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

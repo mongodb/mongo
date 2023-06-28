@@ -30,25 +30,46 @@
 
 #include "mongo/db/query/planner_ixselect.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <functional>
+#include <memory>
+#include <set>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/geo/geometry_container.h"
 #include "mongo/db/geo/hash.h"
+#include "mongo/db/geo/shapes.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/index/s2_common.h"
-#include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
 #include "mongo/db/matcher/expression_internal_bucket_geo_within.h"
-#include "mongo/db/matcher/expression_internal_expr_comparison.h"
-#include "mongo/db/matcher/expression_text.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
-#include "mongo/db/query/query_planner_common.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -381,11 +402,13 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
     }
 
     if (index.type == IndexType::INDEX_WILDCARD) {
-        // Fields after "$_path" of a compound wildcard index should not be used to answer any
-        // query, because wildcard IndexEntry with reserved field, "$_path", present is used only
-        // to answer query on non-wildcard prefix.
+        // If the compound wildcard index is expanded to a generic CWI IndexEntry with '$_path'
+        // field being the wildcard field, this index is mostly for queries on regular prefix of the
+        // CWI. So such IndexEntry is ineligible to answer a query on any field after "$_path".
         size_t idx = 0;
         for (auto&& elt : index.keyPattern) {
+            // Bail out because this IndexEntry is trying to answer a field comes after "$_path"
+            // field.
             if (elt.fieldNameStringData() == "$_path") {
                 return false;
             }
@@ -393,13 +416,6 @@ bool QueryPlannerIXSelect::_compatible(const BSONElement& keyPatternElt,
                 break;
             }
             idx++;
-        }
-
-        // If this IndexEntry is considered relevant to a regular field of a compound wildcard
-        // index, the IndexEntry must not have a specific expanded field for the wildcard field.
-        // Instead, the key pattern should contain a reserved "$_path" field.
-        if (keyPatternIdx < index.wildcardFieldPos && !index.keyPattern.hasField("$_path")) {
-            return false;
         }
     }
 

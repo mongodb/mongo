@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/service_context.h"
-#include "mongo/util/str.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace repl {

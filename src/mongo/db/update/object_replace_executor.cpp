@@ -27,17 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <map>
 
-#include "mongo/db/update/object_replace_executor.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/storage_validation.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

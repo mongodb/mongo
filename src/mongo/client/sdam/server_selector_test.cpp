@@ -28,11 +28,30 @@
  */
 #include "mongo/client/sdam/server_selector.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <map>
+#include <ratio>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/sdam/topology_description.h"
-#include "mongo/client/sdam/topology_manager.h"
+#include "mongo/client/sdam/topology_state_machine.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/wire_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/system_clock_source.h"
 
 namespace mongo::sdam {

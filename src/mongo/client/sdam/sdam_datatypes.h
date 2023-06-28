@@ -29,11 +29,22 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <chrono>
+#include <iosfwd>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"

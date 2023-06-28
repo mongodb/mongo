@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/intrusive_ptr.hpp>
+#include <memory>
 #include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
@@ -43,6 +43,11 @@
 #include "mongo/db/pipeline/document_source_count.h"
 #include "mongo/db/pipeline/document_source_group.h"
 #include "mongo/db/pipeline/document_source_single_document_transformation.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 namespace {

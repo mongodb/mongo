@@ -27,21 +27,48 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <memory>
+#include <set>
 #include <string>
+#include <type_traits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/analyze_cmd.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/analyze_command_gen.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/stats_catalog.h"
 #include "mongo/db/query/stats/stats_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

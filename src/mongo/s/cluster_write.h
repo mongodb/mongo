@@ -41,6 +41,7 @@ namespace cluster {
  */
 void write(OperationContext* opCtx,
            const BatchedCommandRequest& request,
+           NamespaceString* nss,
            BatchWriteExecStats* stats,
            BatchedCommandResponse* response,
            boost::optional<OID> targetEpoch = boost::none);

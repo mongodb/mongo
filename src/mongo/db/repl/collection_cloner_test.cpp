@@ -27,21 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <functional>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
 #include "mongo/db/repl/collection_cloner.h"
 #include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 namespace repl {

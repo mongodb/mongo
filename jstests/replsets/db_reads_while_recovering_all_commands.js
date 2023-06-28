@@ -147,6 +147,7 @@ const allCommands = {
     streams_getMoreStreamSample: {skip: isAnInternalCommand},
     streams_getStats: {skip: isAnInternalCommand},
     streams_testOnlyInsert: {skip: isAnInternalCommand},
+    streams_getMetrics: {skip: isAnInternalCommand},
     _transferMods: {skip: isPrimaryOnly},
     _vectorClockPersist: {skip: isPrimaryOnly},
     abortReshardCollection: {skip: isPrimaryOnly},

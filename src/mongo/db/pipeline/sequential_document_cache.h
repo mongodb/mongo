@@ -31,11 +31,11 @@
 
 #include <boost/optional/optional.hpp>
 #include <cstddef>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/exec/document_value/document.h"
-
 #include "mongo/base/status.h"
+#include "mongo/db/exec/document_value/document.h"
 
 namespace mongo {
 

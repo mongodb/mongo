@@ -29,7 +29,10 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/optime.h"
 
 namespace mongo {

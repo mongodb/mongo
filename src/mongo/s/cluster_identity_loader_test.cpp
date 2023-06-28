@@ -67,6 +67,9 @@ BSONObj getReplSecondaryOkMetadata() {
 class ClusterIdentityTest : public ShardingTestFixture {
 public:
     void setUp() {
+        // TODO SERVER-78051: Remove once shards can access the loaded cluster id.
+        serverGlobalParams.clusterRole = ClusterRole::ConfigServer;
+
         ShardingTestFixture::setUp();
         configTargeter()->setFindHostReturnValue(configHost);
     }
@@ -80,7 +83,7 @@ public:
             auto opMsg = OpMsgRequest::fromDBAndBody(request.dbname, request.cmdObj);
             auto query = query_request_helper::makeFromFindCommandForTests(opMsg.body);
 
-            ASSERT_EQ(query->getNamespaceOrUUID().nss()->ns(), "config.version");
+            ASSERT_EQ(query->getNamespaceOrUUID().nss(), NamespaceString::kConfigVersionNamespace);
             ASSERT_BSONOBJ_EQ(query->getFilter(), BSONObj());
             ASSERT_FALSE(query->getLimit().has_value());
 

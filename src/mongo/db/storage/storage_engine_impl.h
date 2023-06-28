@@ -29,24 +29,45 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
 #include <functional>
+#include <list>
 #include <map>
 #include <memory>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
 #include "mongo/db/storage/journal_listener.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/kv/kv_drop_pending_ident_reaper.h"
+#include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_engine_interface.h"
 #include "mongo/db/storage/temporary_record_store.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/periodic_runner.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

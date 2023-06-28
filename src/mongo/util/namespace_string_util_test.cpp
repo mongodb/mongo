@@ -84,7 +84,7 @@ TEST(NamespaceStringUtilTest,
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", true);
     TenantId tenantId(OID::gen());
     NamespaceString nss = NamespaceStringUtil::deserialize(tenantId, "foo.bar");
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT(nss.tenantId());
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar"));
 }
@@ -111,7 +111,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOnFeatureFlagRequire
     std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, tenantNsStr);
     NamespaceString nss1 = NamespaceStringUtil::deserialize(tenantId, tenantNsStr);
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT(nss.tenantId());
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar"));
     ASSERT_EQ(nss, nss1);
@@ -135,7 +135,7 @@ TEST(NamespaceStringUtilTest,
     std::string dbNameStr = str::stream() << tenantId.toString() << "_foo";
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, tenantNsStr);
     ASSERT_EQ(nss.tenantId(), boost::none);
-    ASSERT_EQ(nss.dbName().db(), dbNameStr);
+    ASSERT_EQ(nss.dbName().toString_forTest(), dbNameStr);
 }
 
 // Deserialize NamespaceString when multitenancySupport and featureFlagRequireTenantID are disabled.
@@ -143,7 +143,7 @@ TEST(NamespaceStringUtilTest, DeserializeMultitenancySupportOffFeatureFlagRequir
     RAIIServerParameterControllerForTest multitenanyController("multitenancySupport", false);
     RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID", false);
     NamespaceString nss = NamespaceStringUtil::deserialize(boost::none, "foo.bar");
-    ASSERT_EQ(nss.ns(), "foo.bar");
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
     ASSERT(!nss.tenantId());
     ASSERT_EQ(nss, NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar"));
 }
@@ -421,6 +421,20 @@ TEST(NamespaceStringUtilTest, DeserializeExpectPrefixTrue_CommandRequest) {
         ASSERT_EQ(nss.tenantId(), tenantId);
         ASSERT_EQ(nss.toString_forTest(), nsString);
     }
+}
+
+TEST(NamespaceStringUtilTest, ParseNSSWithTenantId) {
+    RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
+
+    TenantId tenantId(OID::gen());
+    std::string tenantNsStr = str::stream() << tenantId.toString() << "_foo.bar";
+
+    NamespaceString nss =
+        NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(tenantNsStr);
+    ASSERT_EQ(nss.ns_forTest(), "foo.bar");
+    ASSERT_EQ(nss.toStringWithTenantId_forTest(), tenantNsStr);
+    ASSERT(nss.tenantId());
+    ASSERT_EQ(*nss.tenantId(), tenantId);
 }
 
 TEST(NamespaceStringUtilTest, ParseFailPointData) {

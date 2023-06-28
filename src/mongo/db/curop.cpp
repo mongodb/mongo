@@ -31,29 +31,65 @@
 
 #include "mongo/db/curop.h"
 
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
+#include <mutex>
+#include <ostream>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/authorization_manager.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/json.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/profile_filter.h"
-#include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/plan_summary_stats.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/stats/timer_stats.h"
-#include "mongo/db/storage/storage_engine_feature_flags_gen.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/diagnostic_info.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/log_with_sampling.h"
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/str.h"
-#include "mongo/util/system_tick_source.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -63,15 +99,17 @@ namespace {
 auto& oplogGetMoreStats = makeServerStatusMetric<TimerStats>("repl.network.oplogGetMoresProcessed");
 
 BSONObj serializeDollarDbInOpDescription(boost::optional<TenantId> tenantId,
-                                         const BSONObj& cmdObj) {
+                                         const BSONObj& cmdObj,
+                                         const SerializationContext& sc) {
     auto db = cmdObj["$db"];
     if (!db) {
         return cmdObj;
     }
 
-    auto dbName = DatabaseNameUtil::deserialize(tenantId, db.String());
-    auto newCmdObj =
-        cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(dbName)).firstElement());
+    auto dbName = DatabaseNameUtil::deserialize(tenantId, db.String(), sc);
+    auto newCmdObj = cmdObj.addField(BSON("$db" << DatabaseNameUtil::serialize(
+                                              dbName, SerializationContext::stateCommandReply(sc)))
+                                         .firstElement());
     return newCmdObj;
 }
 
@@ -265,7 +303,10 @@ void CurOp::reportCurrentOpForClient(const boost::intrusive_ptr<ExpressionContex
                 str::stream() << "SerializationContext on the expCtx should not be empty, with ns: "
                               << expCtx->ns.ns(),
                 expCtx->serializationCtxt != SerializationContext::stateDefault());
-        CurOp::get(clientOpCtx)->reportState(infoBuilder, expCtx->serializationCtxt, truncateOps);
+
+        // reportState is used to generate a command reply
+        auto sc = SerializationContext::stateCommandReply(expCtx->serializationCtxt);
+        CurOp::get(clientOpCtx)->reportState(infoBuilder, sc, truncateOps);
     }
 
 #ifndef MONGO_CONFIG_USE_RAW_LATCHES
@@ -305,11 +346,7 @@ OperationContext* CurOp::opCtx() {
 }
 
 void CurOp::setOpDescription_inlock(const BSONObj& opDescription) {
-    if (_nss.tenantId()) {
-        _opDescription = serializeDollarDbInOpDescription(_nss.tenantId(), opDescription);
-    } else {
-        _opDescription = opDescription;
-    }
+    _opDescription = opDescription;
 }
 
 void CurOp::setGenericCursor_inlock(GenericCursor gc) {
@@ -336,7 +373,7 @@ void CurOp::setGenericOpRequestDetails(NamespaceString nss,
     _isCommand = _debug.iscommand = isCommand;
     _logicalOp = _debug.logicalOp = logicalOp;
     _networkOp = _debug.networkOp = op;
-    _opDescription = serializeDollarDbInOpDescription(nss.tenantId(), cmdObj);
+    _opDescription = cmdObj;
     _command = command;
     _nss = std::move(nss);
 }
@@ -528,7 +565,8 @@ bool CurOp::completeAndLogOperation(logv2::LogComponent component,
                 Lock::GlobalLock lk(opCtx,
                                     MODE_IS,
                                     Date_t::now() + Milliseconds(500),
-                                    Lock::InterruptBehavior::kThrow);
+                                    Lock::InterruptBehavior::kThrow,
+                                    Lock::GlobalLockSkipOptions{.skipRSTLLock = true});
                 _debug.storageStats =
                     opCtx->recoveryUnit()->computeOperationStatisticsSinceLastCall();
             } catch (const DBException& ex) {
@@ -733,7 +771,9 @@ void CurOp::reportState(BSONObjBuilder* builder,
     // is true, limit the size of each op to 1000 bytes. Otherwise, do not truncate.
     const boost::optional<size_t> maxQuerySize{truncateOps, 1000};
 
-    auto obj = appendCommentField(opCtx, _opDescription);
+    auto opDescription =
+        serializeDollarDbInOpDescription(_nss.tenantId(), _opDescription, serializationContext);
+    auto obj = appendCommentField(opCtx, opDescription);
 
     // If flag is true, add command field to builder without sensitive information.
     if (omitAndRedactInformation) {
@@ -823,15 +863,9 @@ void CurOp::reportState(BSONObjBuilder* builder,
         builder->append("dataThroughputAverage", *_debug.dataThroughputAverage);
     }
 
-    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
-    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
-    // consistent behavior.
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-            .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
-        if (admissionPriority < AdmissionContext::Priority::kNormal) {
-            builder->append("admissionPriority", toString(admissionPriority));
-        }
+    auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+    if (admissionPriority < AdmissionContext::Priority::kNormal) {
+        builder->append("admissionPriority", toString(admissionPriority));
     }
 
     if (auto start = _waitForWriteConcernStart.load(); start > 0) {
@@ -1050,15 +1084,9 @@ void OpDebug::report(OperationContext* opCtx,
         pAttrs->add("reslen", responseLength);
     }
 
-    // (Ignore FCV check): This feature flag is used to initialize ticketing during storage engine
-    // initialization and FCV checking is ignored there, so here we also need to ignore FCV to keep
-    // consistent behavior.
-    if (feature_flags::gFeatureFlagDeprioritizeLowPriorityOperations
-            .isEnabledAndIgnoreFCVUnsafe()) {
-        auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
-        if (admissionPriority < AdmissionContext::Priority::kNormal) {
-            pAttrs->add("admissionPriority", admissionPriority);
-        }
+    auto admissionPriority = opCtx->lockState()->getAdmissionPriority();
+    if (admissionPriority < AdmissionContext::Priority::kNormal) {
+        pAttrs->add("admissionPriority", admissionPriority);
     }
 
     if (lockStats) {

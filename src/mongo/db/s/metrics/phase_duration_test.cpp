@@ -29,7 +29,12 @@
 
 #include "mongo/db/s/metrics/phase_duration.h"
 
-#include "mongo/unittest/unittest.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
 
 namespace mongo {

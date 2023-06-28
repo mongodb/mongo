@@ -28,15 +28,35 @@
  */
 
 #include "mongo/db/pipeline/variables.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+
+#include <absl/container/flat_hash_map.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/client.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_dependencies.h"
 #include "mongo/db/pipeline/variable_validation.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/platform/basic.h"
-#include "mongo/platform/random.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

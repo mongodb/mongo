@@ -138,9 +138,10 @@ assert.commandWorked(citiesTenantConnPrimary.getDB("admin").runCommand(
     {setClusterParameter: {changeStreams: {expireAfterSeconds: kExpireAfterSeconds}}}));
 
 // Get tenants respective collections for testing.
-const stocksTestDb = stocksTenantConnPrimary.getDB(jsTestName());
-const citiesTestDb = citiesTenantConnPrimary.getDB(jsTestName());
-const notUsedTestDb = notUsedTenantConnPrimary.getDB(jsTestName());
+const dbName = "change_coll_expired_doc_remover";
+const stocksTestDb = stocksTenantConnPrimary.getDB(dbName);
+const citiesTestDb = citiesTenantConnPrimary.getDB(dbName);
+const notUsedTestDb = notUsedTenantConnPrimary.getDB(dbName);
 
 const stocksColl = assertDropAndRecreateCollection(stocksTestDb, "stocks");
 const citiesColl = assertDropAndRecreateCollection(citiesTestDb, "cities");
@@ -308,6 +309,5 @@ assertChangeCollectionDocuments(
 
 fpHangBeforeRemovingDocsPrimary.off();
 fpHangBeforeRemovingDocsSecondary.off();
-
 replSet.stopSet();
 })();

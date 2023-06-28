@@ -30,14 +30,23 @@ if [[ -n "${last_continuous_evg_version_id}" ]]; then
   last_continuous_arg="${last_continuous_evg_version_id}"
 fi
 
-db-contrib-tool setup-repro-env \
-  --installDir /data/install \
+base_command="db-contrib-tool setup-repro-env"
+evergreen_args="--installDir /data/install \
   --linkDir /data/multiversion \
-  --edition $edition \
   --platform $platform \
-  --architecture $architecture \
+  --architecture $architecture"
+local_args="--edition $edition \
   --fallbackToMaster \
-  --resmokeCmd "python buildscripts/resmoke.py" \
+  --resmokeCmd \"python buildscripts/resmoke.py\" \
   --debug \
-  $last_lts_arg \
-  $last_continuous_arg 4.4 5.0 6.0
+  ${last_lts_arg} \
+  ${last_continuous_arg} 4.4 5.0 6.0"
+
+remote_invocation="${base_command} ${evergreen_args} ${local_args}"
+eval "${remote_invocation}"
+echo "Verbatim db-contrib-tool invocation: ${remote_invocation}"
+
+local_invocation="${base_command} ${local_args}"
+echo "Local db-contrib-tool invocation: ${local_invocation}"
+
+echo "${local_invocation}" > local-db-contrib-tool-invocation.txt

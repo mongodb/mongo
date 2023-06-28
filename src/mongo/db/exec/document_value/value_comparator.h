@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include <set>
+
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"

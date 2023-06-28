@@ -28,15 +28,23 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstring>
 #include <random>
+#include <string>
 #include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

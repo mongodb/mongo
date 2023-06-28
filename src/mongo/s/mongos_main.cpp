@@ -47,7 +47,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/client_metadata_propagation_egress_hook.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/ftdc/ftdc_mongos.h"
 #include "mongo/db/initialize_server_global_state.h"
@@ -56,6 +55,8 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/process_health/fault_manager.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongos.h"
@@ -104,6 +105,7 @@
 #include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/debugger.h"
 #include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
@@ -362,7 +364,6 @@ Status waitForSigningKeys(OperationContext* opCtx) {
         }
     }
 }
-
 
 /**
  * Abort all active transactions in the catalog that has not yet been committed.
@@ -768,6 +769,7 @@ ExitCode runMongosServer(ServiceContext* serviceContext) {
 
     ReadWriteConcernDefaults::create(serviceContext, readWriteConcernDefaultsCacheLookupMongoS);
     ChangeStreamOptionsManager::create(serviceContext);
+    query_settings::QuerySettingsManager::create(serviceContext);
 
     auto opCtxHolder = tc->makeOperationContext();
     auto const opCtx = opCtxHolder.get();
@@ -985,6 +987,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
     if (argc < 1)
         return ExitCode::badOptions;
 
+    waitForDebugger();
 
     setupSignalHandlers();
 
@@ -1000,9 +1003,7 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     try {
-        auto serviceContextHolder = ServiceContext::make();
-        serviceContextHolder->registerClientObserver(std::make_unique<LockerImplClientObserver>());
-        setGlobalServiceContext(std::move(serviceContextHolder));
+        setGlobalServiceContext(ServiceContext::make());
     } catch (...) {
         auto cause = exceptionToStatus();
         LOGV2_FATAL_OPTIONS(

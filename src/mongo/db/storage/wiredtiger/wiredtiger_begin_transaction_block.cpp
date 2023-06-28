@@ -28,18 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <cstdio>
 #include <fmt/format.h>
+#include <string>
 
-#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
+#include <boost/preprocessor/control/iif.hpp>
+#include <wiredtiger.h>
 
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl_set_member_in_standalone_mode.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_begin_transaction_block.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
-#include "mongo/util/errno_util.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

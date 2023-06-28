@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/s/transaction_coordinator_curop.h"
+#include <string>
 
 #include "mongo/base/shim.h"
+#include "mongo/db/s/transaction_coordinator_curop.h"
 
 namespace mongo {
 

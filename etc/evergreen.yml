@@ -63,12 +63,6 @@ include:
 
 variables:
 
-- &libfuzzertests
-  name: libfuzzertests!
-  execution_tasks:
-  - compile_and_archive_libfuzzertests
-  - fetch_and_run_libfuzzertests
-
 # Common compile variant dependency specifications.
 # THIS WAS COPIED TO config_shard.yml - ANY MODIFICATIONS HERE SHOULD ALSO BE MADE IN THAT FILE.
 - &linux_x86_dynamic_compile_variant_dependency
@@ -143,7 +137,7 @@ variables:
 
 # If you add anything to san_options, make sure the appropriate changes are
 # also made to SConstruct.
-# and also to the san_options in compile_static_analysis.yml
+# and also to the san_options in compile_static_analysis.yml and sanitizer.yml
 - aubsan_options: &aubsan_options
   >-
     UBSAN_OPTIONS="print_stacktrace=1:external_symbolizer_path=/opt/mongodbtoolchain/v4/bin/llvm-symbolizer"
@@ -589,6 +583,7 @@ buildvariants:
   - name: disk_wiredtiger
   - name: free_monitoring
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common !.auth !.sharding
   - name: jsCore_txns_large_txns_format
   - name: json_schema
@@ -830,7 +825,6 @@ buildvariants:
   - name: replica_sets_max_mirroring_large_txns_format_gen
   - name: .ssl
   - name: .stitch
-  - name: unittest_shell_hang_analyzer_gen
 
 - name: &enterprise-macos-rosetta-2 enterprise-macos-rosetta-2
   display_name: "Enterprise macOS Via Rosetta 2"
@@ -1016,6 +1010,7 @@ buildvariants:
   - name: .encrypt
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1058,6 +1053,7 @@ buildvariants:
   - name: search_pinned_connections_auth
   - name: search_ssl
   - name: session_jscore_passthrough
+  - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: .sharding .jscore !.wo_snapshot !.multi_stmt
   - name: sharding_api_version_jscore_passthrough_gen
   - name: sharding_api_strict_passthrough_gen
@@ -1126,6 +1122,7 @@ buildvariants:
   - name: .encrypt !.no_debug_mode
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1266,6 +1263,7 @@ buildvariants:
   - name: feature_flag_multiversion_gen
   - name: idl_tests
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
   - name: jsCore_min_batch_repeat_queries_ese_gsm
@@ -1400,6 +1398,7 @@ buildvariants:
   - name: check_for_todos
   - name: disk_wiredtiger
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
     distros:
     - rhel80-xlarge
@@ -1465,6 +1464,7 @@ buildvariants:
   - name: concurrency_sharded_with_stepdowns_and_balancer_gen
   - name: concurrency_sharded_initial_sync_gen
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: jsCore
   - name: jsCore_txns
   - name: .multi_shard
@@ -1914,6 +1914,7 @@ buildvariants:
   - name: sharding_max_mirroring_opportunistic_secondary_targeting_ese_gcm_gen
   - name: sharded_collections_single_writes_without_shard_key_jscore_passthrough_gen
   - name: sharded_multi_stmt_txn_jscore_passthrough
+  - name: streams
   - name: .updatefuzzer
   - name: query_stats_passthrough
   - name: query_stats_passthrough_writeonly
@@ -2008,7 +2009,7 @@ buildvariants:
   - name: audit
   - name: .causally_consistent !.wo_snapshot
   - name: .change_streams
-  - name: disk_wiredtiger
+  # - name: disk_wiredtiger
   - name: .misc_js
   - name: .concurrency !.ubsan !.no_txns !.kill_terminate !.compute_mode
   - name: .encrypt
@@ -2017,6 +2018,7 @@ buildvariants:
   - name: external_auth_aws
   - name: external_auth_oidc
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common !.sbe_only
   - name: jsCore_min_batch_repeat_queries_ese_gsm
   - name: jsCore_txns_large_txns_format
@@ -2088,7 +2090,7 @@ buildvariants:
   # TODO SERVER-57866: Remove the explicit mentions of change stream multitenant suites.
   - name: change_streams_multitenant_passthrough
   - name: change_streams_multitenant_sharded_collections_passthrough
-  - name: disk_wiredtiger
+  # - name: disk_wiredtiger
   - name: external_auth
   - name: external_auth_aws
   - name: external_auth_oidc
@@ -2096,6 +2098,7 @@ buildvariants:
   - name: free_monitoring
   - name: generate_buildid_to_debug_symbols_mapping
   - name: initial_sync_fuzzer_gen
+  - name: fcv_upgrade_downgrade_replica_sets_jscore_passthrough_gen
   - name: .jscore .common
   - name: jsCore_column_store_indexes
   - name: jsCore_min_batch_repeat_queries_ese_gsm
@@ -2941,43 +2944,3 @@ buildvariants:
   - name: compile_dist_test_TG
     distros:
     - windows-vsCurrent-large
-
-- &rhel80-debug-aubsan-lite_fuzzer-template
-  name: &rhel80-debug-aubsan-lite_fuzzer rhel80-debug-aubsan-lite_fuzzer
-  display_name: "{A,UB}SAN Enterprise RHEL 8.0 FUZZER"
-  cron: "0 4 * * *" # From the ${project_nightly_cron} parameter.
-  modules:
-  - enterprise
-  run_on:
-  - rhel80-build
-  stepback: false
-  expansions:
-    additional_package_targets: >-
-      archive-mongocryptd
-      archive-mongocryptd-debug
-    lang_environment: LANG=C
-    toolchain_version: stable
-    # If you add anything to san_options, make sure the appropriate changes are
-    # also made to SConstruct.
-    san_options: *aubsan_options
-    compile_flags: >-
-      LINKFLAGS=-nostdlib++
-      LIBS=stdc++
-      --variables-files=etc/scons/mongodbtoolchain_${toolchain_version}_clang.vars
-      --dbg=on
-      --opt=on
-      --allocator=system
-      --sanitize=undefined,address,fuzzer
-      --ssl
-      --ocsp-stapling=off
-      -j$(grep -c ^processor /proc/cpuinfo)
-    test_flags: --excludeWithAnyTags=requires_ocsp_stapling
-    resmoke_jobs_factor: 0.3  # Avoid starting too many mongod's under {A,UB}SAN build.
-    hang_analyzer_dump_core: false
-    scons_cache_scope: shared
-    separate_debug: off
-    compile_variant: *rhel80-debug-aubsan-lite_fuzzer
-  display_tasks:
-  - *libfuzzertests
-  tasks:
-  - name: compile_archive_and_run_libfuzzertests_TG

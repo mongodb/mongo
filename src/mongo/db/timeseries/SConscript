@@ -120,6 +120,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/shard_role',
         '$BUILD_DIR/mongo/db/timeseries/bucket_catalog/bucket_catalog',
         '$BUILD_DIR/mongo/db/update/update_common',
+        'bucket_compression',
         'timeseries_conversion_util',
         'timeseries_options',
     ],

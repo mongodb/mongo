@@ -27,28 +27,54 @@
  *    it in the license file.
  */
 
-#include <fstream>
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <fstream>  // IWYU pragma: keep
 #include <iostream>
 #include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/operations.hpp>
-#include <boost/format.hpp>
-#include <boost/optional/optional.hpp>
+#include <absl/container/node_hash_set.h>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/path_traits.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/json_test_arg_parser.h"
+#include "mongo/client/sdam/sdam_configuration.h"
 #include "mongo/client/sdam/sdam_configuration_parameters_gen.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
+#include "mongo/client/sdam/server_description.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/client/sdam/topology_manager.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/optional_util.h"
-#include "mongo/util/options_parser/environment.h"
-#include "mongo/util/options_parser/option_section.h"
-#include "mongo/util/options_parser/options_parser.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

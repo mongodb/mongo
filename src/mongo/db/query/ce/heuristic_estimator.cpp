@@ -29,11 +29,27 @@
 
 #include "mongo/db/query/ce/heuristic_estimator.h"
 
+#include <algorithm>
+#include <type_traits>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/query/ce/heuristic_predicate_estimation.h"
 #include "mongo/db/query/ce/sel_tree_utils.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
-
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::ce {

@@ -28,30 +28,54 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/commands/authentication_commands.h"
-
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <iterator>
+#include <memory>
+#include <set>
 #include <string>
+#include <utility>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_manager_global_parameters_gen.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/commands/authentication_commands.h"
 #include "mongo/db/commands/authentication_commands_gen.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 
@@ -126,7 +150,7 @@ public:
             as->logoutDatabase(opCtx->getClient(),
                                DatabaseNameUtil::serializeForAuth(dbname),
                                "Logging out on user request");
-            if (getTestCommandsEnabled() && (dbname.db() == DatabaseName::kAdmin.db())) {
+            if (getTestCommandsEnabled() && (dbname.isAdminDB())) {
                 // Allows logging out as the internal user against the admin database, however
                 // this actually logs out of the local database as well. This is to
                 // support the auth passthrough test framework on mongos (since you can't use the
@@ -217,7 +241,7 @@ void _authenticateX509(OperationContext* opCtx, AuthenticationSession* session) 
 
     uassert(ErrorCodes::ProtocolError,
             "X.509 authentication must always use the $external database.",
-            userName.getDB() == DatabaseName::kExternal.db());
+            userName.getDatabaseName().isExternalDB());
 
     auto isInternalClient = [&]() -> bool {
         return opCtx->getClient()->session()->getTags() & transport::Session::kInternalClient;

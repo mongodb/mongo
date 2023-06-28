@@ -17,9 +17,15 @@ function testUnshardedCollection(conn) {
     assert.commandWorked(
         coll.insert([{candidateKey: "a"}, {candidateKey: new Array(1000).join("a")}]));
 
-    const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: candidateKey}));
-    assert.lt(res.avgDocSizeBytes, 1000, res);
-    assert.gt(res.avgDocSizeBytes, 1000 / 2, res);
+    const res = assert.commandWorked(conn.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateKey,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    }));
+    assert.lt(res.keyCharacteristics.avgDocSizeBytes, 1000, res);
+    assert.gt(res.keyCharacteristics.avgDocSizeBytes, 1000 / 2, res);
 
     assert(coll.drop());
 }
@@ -54,22 +60,21 @@ function testShardedCollection(st) {
         {currentKey: 10, candidateKey: new Array(1000).join("a")}
     ]));
 
-    const res = st.s.adminCommand({analyzeShardKey: ns, key: candidateKey});
-    assert.lt(res.avgDocSizeBytes, 1000, res);
-    assert.gt(res.avgDocSizeBytes, 3000 / 5, res);
+    const res = st.s.adminCommand({
+        analyzeShardKey: ns,
+        key: candidateKey,
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    });
+    assert.lt(res.keyCharacteristics.avgDocSizeBytes, 1000, res);
+    assert.gt(res.keyCharacteristics.avgDocSizeBytes, 3000 / 5, res);
 
     assert(coll.drop());
 }
 
-const setParameterOpts = {
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"})
-};
-
 {
-    const st = new ShardingTest({shards: 2, rs: {nodes: 2, setParameter: setParameterOpts}});
+    const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
     testUnshardedCollection(st.s);
     testShardedCollection(st);
@@ -78,7 +83,7 @@ const setParameterOpts = {
 }
 
 {
-    const rst = new ReplSetTest({nodes: 2, nodeOptions: {setParameter: setParameterOpts}});
+    const rst = new ReplSetTest({nodes: 2});
     rst.startSet();
     rst.initiate();
     const primary = rst.getPrimary();

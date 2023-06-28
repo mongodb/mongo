@@ -29,8 +29,30 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/rs_local_client.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

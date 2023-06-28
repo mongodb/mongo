@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <vector>
+
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/operation_context.h"

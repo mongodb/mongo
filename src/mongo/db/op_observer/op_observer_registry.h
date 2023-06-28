@@ -30,10 +30,35 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -49,8 +74,8 @@ class OpObserverRegistry final : public OpObserver {
     OpObserverRegistry& operator=(const OpObserverRegistry&) = delete;
 
 public:
-    OpObserverRegistry() = default;
-    virtual ~OpObserverRegistry() = default;
+    OpObserverRegistry();
+    virtual ~OpObserverRegistry();
 
     // This implementaton is unused, but needs to be implemented to conform to the OpObserver
     // interface.
@@ -201,9 +226,9 @@ public:
                    std::vector<InsertStatement>::const_iterator end,
                    std::vector<bool> fromMigrate,
                    bool defaultFromMigrate,
-                   InsertsOpStateAccumulator* opAccumulator = nullptr) override {
+                   OpStateAccumulator* opAccumulator = nullptr) override {
         ReservedTimes times{opCtx};
-        InsertsOpStateAccumulator opStateAccumulator;
+        OpStateAccumulator opStateAccumulator;
 
         const auto& nss = coll->ns();
         std::vector<OpObserver*>* observerQueue;

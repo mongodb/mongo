@@ -29,11 +29,15 @@
 
 #pragma once
 
+#include <cstddef>
 #include <map>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/fts/fts_language.h"
 #include "mongo/db/fts/fts_util.h"
 #include "mongo/db/fts/stemmer.h"

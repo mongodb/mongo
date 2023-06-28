@@ -29,8 +29,28 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/range_arithmetic.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -30,12 +30,46 @@
 
 #include "views_for_database.h"
 
+#include <string>
+#include <utility>
+
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/views/util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -356,7 +390,7 @@ void ViewsForDatabase::clear(OperationContext* opCtx) {
     for (auto&& [name, view] : _viewMap) {
         audit::logDropView(opCtx->getClient(),
                            view->name(),
-                           view->viewOn().ns(),
+                           NamespaceStringUtil::serialize(view->viewOn()),
                            view->pipeline(),
                            ErrorCodes::OK);
     }

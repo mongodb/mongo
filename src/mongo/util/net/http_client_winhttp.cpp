@@ -57,7 +57,7 @@ namespace mongo {
 namespace {
 
 const LPCWSTR kAcceptTypes[] = {
-    L"application/octet-stream",
+    L"*/*",
     nullptr,
 };
 

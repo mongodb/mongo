@@ -29,15 +29,28 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <climits>  // For UINT_MAX
+#include <functional>
+#include <limits>
+#include <string>
+#include <thread>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/concurrency/flow_control_ticketholder.h"
 #include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

@@ -28,16 +28,34 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
-#include "mongo/db/auth/action_set.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/database_sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/request_types/get_database_version_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -61,8 +79,9 @@ public:
         // The command parameter happens to be string so it's historically been interpreted
         // by parseNs as a collection. Continuing to do so here for unexamined compatibility.
         NamespaceString ns() const override {
-            return NamespaceStringUtil::parseNamespaceFromRequest(request().getDbName(),
-                                                                  _targetDb());
+            const auto& cmd = request();
+            return NamespaceStringUtil::parseNamespaceFromRequest(cmd.getDbName(),
+                                                                  cmd.getCommandParameter());
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
@@ -79,7 +98,7 @@ public:
                     str::stream() << definition()->getName() << " can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
 
-            DatabaseName dbName = DatabaseNameUtil::deserialize(boost::none, _targetDb());
+            auto dbName = _targetDb();
             AutoGetDb autoDb(opCtx, dbName, MODE_IS);
             const auto scopedDss =
                 DatabaseShardingState::assertDbLockedAndAcquireShared(opCtx, dbName);
@@ -95,8 +114,10 @@ public:
             }
         }
 
-        StringData _targetDb() const {
-            return request().getCommandParameter();
+        DatabaseName _targetDb() const {
+            const auto& cmd = request();
+            return DatabaseNameUtil::deserialize(cmd.getDbName().tenantId(),
+                                                 cmd.getCommandParameter());
         }
     };
 

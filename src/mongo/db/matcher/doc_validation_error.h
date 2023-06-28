@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include <memory>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::doc_validation_error {
 // The default maximum allowed size for a single doc validation error.

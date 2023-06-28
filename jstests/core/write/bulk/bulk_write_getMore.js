@@ -18,6 +18,8 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
+load("jstests/libs/bulk_write_utils.js");  // For cursorEntryValidator.
+
 (function() {
 "use strict";
 
@@ -25,14 +27,6 @@ var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
 coll.drop();
 coll1.drop();
-
-const cursorEntryValidator = function(entry, expectedEntry) {
-    assert(entry.ok == expectedEntry.ok);
-    assert(entry.idx == expectedEntry.idx);
-    assert(entry.n == expectedEntry.n);
-    assert(entry.nModified == expectedEntry.nModified);
-    assert(entry.code == expectedEntry.code);
-};
 
 // The retryable write override does not append txnNumber to getMore since it is not a retryable
 // command.

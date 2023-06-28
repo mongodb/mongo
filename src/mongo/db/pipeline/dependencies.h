@@ -30,10 +30,13 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <set>
 #include <string>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/pipeline/variables.h"
 
 namespace mongo {

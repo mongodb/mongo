@@ -59,10 +59,21 @@ static int ares__isprint(int ch)
   return 0;
 }
 
-/* Character set allowed by hostnames */
+/* Character set allowed by hostnames.  This is to include the normal
+ * domain name character set plus:
+ *  - underscores which are used in SRV records.
+ *  - Forward slashes such as are used for classless in-addr.arpa 
+ *    delegation (CNAMEs)
+ *  - Asterisks may be used for wildcard domains in CNAMEs as seen in the
+ *    real world.
+ * While RFC 2181 section 11 does state not to do validation,
+ * that applies to servers, not clients.  Vulnerabilities have been
+ * reported when this validation is not performed.  Security is more
+ * important than edge-case compatibility (which is probably invalid
+ * anyhow). */
 static int is_hostnamech(int ch)
 {
-  /* [A-Za-z0-9-.]
+  /* [A-Za-z0-9-*._/]
    * Don't use isalnum() as it is locale-specific
    */
   if (ch >= 'A' && ch <= 'Z')
@@ -71,7 +82,7 @@ static int is_hostnamech(int ch)
     return 1;
   if (ch >= '0' && ch <= '9')
     return 1;
-  if (ch == '-' || ch == '.')
+  if (ch == '-' || ch == '.' || ch == '_' || ch == '/' || ch == '*')
     return 1;
 
   return 0;
@@ -168,9 +179,9 @@ int ares__expand_name_validated(const unsigned char *encoded,
               if (!ares__isprint(*p) && !(name_len == 1 && *p == 0))
                 {
                   *q++ = '\\';
-                  *q++ = '0' + *p / 100;
-                  *q++ = '0' + (*p % 100) / 10;
-                  *q++ = '0' + (*p % 10);
+                  *q++ = (char)('0' + *p / 100);
+                  *q++ = (char)('0' + (*p % 100) / 10);
+                  *q++ = (char)('0' + (*p % 10));
                 }
               else if (is_reservedch(*p))
                 {

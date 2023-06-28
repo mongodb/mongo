@@ -29,9 +29,26 @@
 
 #pragma once
 
+#include <cstdlib>
+#include <functional>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/utils.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
 
 namespace mongo::optimizer::ce {

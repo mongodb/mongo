@@ -27,11 +27,26 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
-#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/value_utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::stats {
 TEST(TypeCollisionTest, ZeroedCollidingTypesHistogram) {

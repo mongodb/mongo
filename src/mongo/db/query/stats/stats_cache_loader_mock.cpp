@@ -29,9 +29,12 @@
 
 #include "mongo/db/query/stats/stats_cache_loader_mock.h"
 
-#include "mongo/db/namespace_string.h"
-#include "mongo/db/query/stats/collection_statistics.h"
-#include "mongo/stdx/thread.h"
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::stats {
 

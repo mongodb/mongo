@@ -31,8 +31,35 @@
 
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/idl/idl_parser.h"
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <list>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/util/partitioned.h"
+#include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/lru_key_value.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -49,61 +76,6 @@ REGISTER_DOCUMENT_SOURCE_WITH_FEATURE_FLAG(queryStats,
 
 namespace {
 
-TransformAlgorithm algFromString(std::string str) {
-    if (str == "hmac-sha-256") {
-        return kHmacSha256;
-    } else {
-        return kNone;
-    }
-}
-
-/**
- * Try to parse the algorithm property from the element.
- */
-boost::optional<TransformAlgorithm> parseAlgorithm(const BSONElement& el) {
-    if (el.fieldNameStringData() == "algorithm"_sd) {
-        auto type = el.type();
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << DocumentSourceQueryStats::kStageName
-                              << " algorithm parameter must be a string. Found type: "
-                              << typeName(type),
-                type == BSONType::String);
-        std::string algorithmStr = el.str();
-        TransformAlgorithm algorithm = algFromString(algorithmStr);
-        uassert(ErrorCodes::FailedToParse,
-                str::stream() << DocumentSourceQueryStats::kStageName
-                              << " algorithm currently supported is only 'hmac-sha-256'. Found: "
-                              << algorithmStr,
-                algorithm != TransformAlgorithm::kNone);
-        return algorithm;
-    }
-    return boost::none;
-}
-
-/**
- * Try to parse the `hmacKey' property from the element.
- */
-boost::optional<std::string> parseHmacKey(const BSONElement& el) {
-    if (el.fieldNameStringData() == "hmacKey"_sd) {
-        auto type = el.type();
-        if (el.isBinData(BinDataType::BinDataGeneral)) {
-            int len;
-            auto data = el.binData(len);
-            uassert(ErrorCodes::FailedToParse,
-                    str::stream() << DocumentSourceQueryStats::kStageName
-                                  << "hmacKey must be greater than or equal to 32 bytes",
-                    len >= 32);
-            return {{data, (size_t)len}};
-        }
-        uasserted(ErrorCodes::FailedToParse,
-                  str::stream()
-                      << DocumentSourceQueryStats::kStageName
-                      << " hmacKey parameter must be bindata of length 32 or greater. Found type: "
-                      << typeName(type));
-    }
-    return boost::none;
-}
-
 /**
  * Parse the spec object calling the `ctor` with the TransformAlgorithm enum algorithm and
  * std::string hmacKey arguments.
@@ -115,39 +87,18 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
                           << " value must be an object. Found: " << typeName(spec.type()),
             spec.type() == BSONType::Object);
     BSONObj obj = spec.embeddedObject();
-
-    TransformAlgorithm algorithm = TransformAlgorithm::kNone;
+    TransformAlgorithmEnum algorithm = TransformAlgorithmEnum::kNone;
     std::string hmacKey;
-    for (auto&& subObj : obj) {
-        auto field = subObj.fieldNameStringData();
-        if (field == "transformIdentifiers"_sd) {
-            auto transformIdentifiersObj = obj.getObjectField("transformIdentifiers"_sd);
-            for (auto&& el : transformIdentifiersObj) {
-                if (auto maybeAlgorithm = parseAlgorithm(el); maybeAlgorithm) {
-                    algorithm = *maybeAlgorithm;
-                } else if (auto maybeHmacKey = parseHmacKey(el); maybeHmacKey) {
-                    hmacKey = *maybeHmacKey;
-                } else {
-                    uasserted(ErrorCodes::FailedToParse,
-                              str::stream() << DocumentSourceQueryStats::kStageName
-                                            << " parameters to 'transformIdentifiers' may only "
-                                               "contain 'algorithm' or "
-                                               "'hmacKey' options. Found: "
-                                            << el.fieldName());
-                }
-            }
-            // If transformIdentifiers is present, we must have the algorithm field.
-            uassert(
-                ErrorCodes::FailedToParse,
-                str::stream()
-                    << DocumentSourceQueryStats::kStageName
-                    << " missing value for algorithm, which is required for 'transformIdentifiers'",
-                algorithm != TransformAlgorithm::kNone);
-        } else {
-            uasserted(ErrorCodes::FailedToParse,
-                      str::stream() << "$queryStats parameters object may only contain "
-                                       "'transformIdentifiers'. Found: "
-                                    << field.toString());
+    auto parsed = DocumentSourceQueryStatsSpec::parse(
+        IDLParserContext(DocumentSourceQueryStats::kStageName.toString()), obj);
+    boost::optional<TransformIdentifiersSpec> transformIdentifiers =
+        parsed.getTransformIdentifiers();
+
+    if (transformIdentifiers) {
+        algorithm = transformIdentifiers->getAlgorithm();
+        boost::optional<ConstDataRange> hmacKeyContainer = transformIdentifiers->getHmacKey();
+        if (hmacKeyContainer) {
+            hmacKey = std::string(hmacKeyContainer->data(), (size_t)hmacKeyContainer->length());
         }
     }
     return ctor(algorithm, hmacKey);
@@ -157,7 +108,7 @@ auto parseSpec(const BSONElement& spec, const Ctor& ctor) {
 
 std::unique_ptr<DocumentSourceQueryStats::LiteParsed> DocumentSourceQueryStats::LiteParsed::parse(
     const NamespaceString& nss, const BSONElement& spec) {
-    return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
+    return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return std::make_unique<DocumentSourceQueryStats::LiteParsed>(
             spec.fieldName(), algorithm, hmacKey);
     });
@@ -169,9 +120,9 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceQueryStats::createFromBson(
 
     uassert(ErrorCodes::InvalidNamespace,
             "$queryStats must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
-    return parseSpec(spec, [&](TransformAlgorithm algorithm, std::string hmacKey) {
+    return parseSpec(spec, [&](TransformAlgorithmEnum algorithm, std::string hmacKey) {
         return new DocumentSourceQueryStats(pExpCtx, algorithm, hmacKey);
     });
 }
@@ -236,9 +187,12 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
                             "hash"_attr = *key);
-                if (kDebugBuild) {
-                    tasserted(7349401,
-                              "Was not able to re-parse queryStats key when reading queryStats.");
+                if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
+                    auto keyString = std::to_string(*key);
+                    tasserted(
+                        7349401,
+                        "Was not able to re-parse queryStats key when reading queryStats. Status: "s +
+                            ex.toString() + " Hash: " + keyString);
                 }
             }
         }

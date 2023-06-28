@@ -27,12 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/storage/storage_options.h"
-
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/platform/compiler.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

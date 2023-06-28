@@ -31,14 +31,33 @@
 
 #include "mongo/db/change_stream_serverless_helpers.h"
 
-#include "mongo/db/catalog_raii.h"
+#include <memory>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace change_stream_serverless_helpers {
@@ -112,7 +131,7 @@ TenantSet getConfigDbTenants(OperationContext* opCtx) {
 
     auto dbNames = CollectionCatalog::get(opCtx)->getAllDbNames();
     for (auto&& dbName : dbNames) {
-        if (dbName.db() == DatabaseName::kConfig.db() && dbName.tenantId()) {
+        if (dbName.isConfigDB() && dbName.tenantId()) {
             tenantIds.insert(*dbName.tenantId());
         }
     }

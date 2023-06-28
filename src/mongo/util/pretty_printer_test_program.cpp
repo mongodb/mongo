@@ -33,9 +33,10 @@
 #include <string>
 #include <vector>
 
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/util/debugger.h"
 #include "mongo/util/decorable.h"
-
 
 #if defined(__clang__)
 #define clang_optnone __attribute__((optnone))
@@ -70,6 +71,15 @@ int clang_optnone main(int argc, char** argv) {
     intVec(d1) = {123, 213, 312};
     str1(d1) = "hello";
     str2(d1) = "world";
+    mongo::TenantId tenantId{mongo::OID{"6491a2112ef5c818703bf2a7"}};
+    mongo::DatabaseName dbName =
+        mongo::DatabaseName::createDatabaseName_forTest(boost::none, "foo");
+    mongo::DatabaseName dbNameWithTenantId =
+        mongo::DatabaseName::createDatabaseName_forTest(tenantId, "foo");
+    mongo::NamespaceString nss =
+        mongo::NamespaceString::createNamespaceString_forTest(boost::none, "foo.bar");
+    mongo::NamespaceString nssWithTenantId =
+        mongo::NamespaceString::createNamespaceString_forTest(tenantId, "foo.bar");
     mongo::breakpoint();
 
     return 0;

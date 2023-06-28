@@ -29,8 +29,17 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::sdam {

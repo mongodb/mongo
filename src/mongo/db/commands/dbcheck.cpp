@@ -28,29 +28,78 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <chrono>
+#include <compare>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <mutex>
+#include <ratio>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/auth/authorization_checks.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/catalog/health_log_interface.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/dbcheck.h"
+#include "mongo/db/repl/dbcheck_gen.h"
+#include "mongo/db/repl/dbcheck_idl.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/idl/command_generic_argument.h"
-#include "mongo/util/background.h"
-
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/background.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/progress_meter.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -197,9 +246,8 @@ std::unique_ptr<DbCheckRun> singleCollectionRun(OperationContext* opCtx,
 std::unique_ptr<DbCheckRun> fullDatabaseRun(OperationContext* opCtx,
                                             const DatabaseName& dbName,
                                             const DbCheckAllInvocation& invocation) {
-    uassert(ErrorCodes::InvalidNamespace,
-            "Cannot run dbCheck on local database",
-            dbName.db() != DatabaseName::kLocal.db());
+    uassert(
+        ErrorCodes::InvalidNamespace, "Cannot run dbCheck on local database", !dbName.isLocalDB());
 
     AutoGetDb agd(opCtx, dbName, MODE_IS);
     uassert(ErrorCodes::NamespaceNotFound,
@@ -276,7 +324,7 @@ std::unique_ptr<DbCheckRun> getRun(OperationContext* opCtx,
 std::shared_ptr<const CollectionCatalog> getConsistentCatalogAndSnapshot(OperationContext* opCtx) {
     // Loop until we get a consistent catalog and snapshot
     while (true) {
-        const auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
+        auto catalogBeforeSnapshot = CollectionCatalog::get(opCtx);
         opCtx->recoveryUnit()->preallocateSnapshot();
         const auto catalogAfterSnapshot = CollectionCatalog::get(opCtx);
         if (catalogBeforeSnapshot == catalogAfterSnapshot) {
@@ -330,7 +378,8 @@ private:
             return;
         }
 
-        const std::string curOpMessage = "Scanning namespace " + info.nss.toString();
+        const std::string curOpMessage =
+            "Scanning namespace " + NamespaceStringUtil::serialize(info.nss);
         ProgressMeterHolder progress;
         {
             AutoGetCollection coll(opCtx, info.nss, MODE_IS);
@@ -576,7 +625,7 @@ private:
         batch.setMd5(md5);
         batch.setMinKey(first);
         batch.setMaxKey(BSONKey(hasher->lastKey()));
-        batch.setReadTimestamp(readTimestamp);
+        batch.setReadTimestamp(*readTimestamp);
 
         // Send information on this batch over the oplog.
         BatchStats result;
@@ -653,11 +702,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
-        const bool isAuthorized = AuthorizationSession::get(opCtx->getClient())
-                                      ->isAuthorizedForActionsOnResource(
-                                          ResourcePattern::forAnyResource(), ActionType::dbCheck);
+        const bool isAuthorized =
+            AuthorizationSession::get(opCtx->getClient())
+                ->isAuthorizedForActionsOnResource(
+                    ResourcePattern::forAnyResource(dbName.tenantId()), ActionType::dbCheck);
         return isAuthorized ? Status::OK() : Status(ErrorCodes::Unauthorized, "Unauthorized");
     }
 
@@ -666,14 +716,7 @@ public:
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) {
         auto job = getRun(opCtx, dbName, cmdObj);
-        try {
-            (new DbCheckJob(dbName, std::move(job)))->go();
-        } catch (const DBException& e) {
-            result.append("ok", false);
-            result.append("err", e.toString());
-            return false;
-        }
-        result.append("ok", true);
+        (new DbCheckJob(dbName, std::move(job)))->go();
         return true;
     }
 } dbCheckCmd;

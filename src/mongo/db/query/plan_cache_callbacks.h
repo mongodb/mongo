@@ -29,8 +29,19 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <utility>
+
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/hex.h"
 
 namespace mongo {
 // The logging facility enforces the rule that logging should not be done in a header file. Since

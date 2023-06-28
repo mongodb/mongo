@@ -28,17 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/catalog/index_key_validate.h"
-
-#include <boost/optional.hpp>
+#include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <limits>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/index_key_validate.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/columns_access_method.h"
@@ -46,17 +65,26 @@
 #include "mongo/db/index/wildcard_key_generator.h"
 #include "mongo/db/index/wildcard_validation.h"
 #include "mongo/db/index_names.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/represent_as.h"
 #include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -135,7 +163,7 @@ BSONObj buildRepairedIndexSpec(
 
 Status validateKeyPattern(const BSONObj& key,
                           IndexDescriptor::IndexVersion indexVersion,
-                          bool inCollValidation) {
+                          bool checkFCV) {
     const ErrorCodes::Error code = ErrorCodes::CannotCreateIndex;
 
     if (key.objsize() > 2048)
@@ -158,7 +186,7 @@ Status validateKeyPattern(const BSONObj& key,
     // still be able to use the feature even if the FCV is downgraded.
     auto compoundWildcardIndexesAllowed =
         feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe();
-    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && !inCollValidation) {
+    if (serverGlobalParams.featureCompatibility.isVersionInitialized() && checkFCV) {
         compoundWildcardIndexesAllowed =
             feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabled(
                 serverGlobalParams.featureCompatibility);
@@ -336,7 +364,7 @@ BSONObj repairIndexSpec(const NamespaceString& ns,
 
 StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
                                       const BSONObj& indexSpec,
-                                      bool inCollValidation) {
+                                      bool checkFCV) {
     bool hasKeyPatternField = false;
     bool hasIndexNameField = false;
     bool hasNamespaceField = false;
@@ -389,8 +417,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
 
             // Here we always validate the key pattern according to the most recent rules, in order
             // to enforce that all new indexes have well-formed key patterns.
-            Status keyPatternValidateStatus = validateKeyPattern(
-                keyPattern, IndexDescriptor::kLatestIndexVersion, inCollValidation);
+            Status keyPatternValidateStatus =
+                validateKeyPattern(keyPattern, IndexDescriptor::kLatestIndexVersion, checkFCV);
             if (!keyPatternValidateStatus.isOK()) {
                 return keyPatternValidateStatus;
             }
@@ -738,10 +766,8 @@ StatusWith<BSONObj> validateIndexSpec(OperationContext* opCtx,
     }
 
     if (hasOriginalSpecField) {
-        StatusWith<BSONObj> modifiedOriginalSpec =
-            validateIndexSpec(opCtx,
-                              indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName),
-                              inCollValidation);
+        StatusWith<BSONObj> modifiedOriginalSpec = validateIndexSpec(
+            opCtx, indexSpec.getObjectField(IndexDescriptor::kOriginalSpecFieldName), checkFCV);
         if (!modifiedOriginalSpec.isOK()) {
             return modifiedOriginalSpec.getStatus();
         }
@@ -997,13 +1023,15 @@ bool isIndexAllowedInAPIVersion1(const IndexDescriptor& indexDesc) {
         !indexDesc.isSparse();
 }
 
-BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx, const BSONObj& indexSpecObj) {
+BSONObj parseAndValidateIndexSpecs(OperationContext* opCtx,
+                                   const BSONObj& indexSpecObj,
+                                   bool checkFCV) {
     constexpr auto k_id_ = "_id_"_sd;
     constexpr auto kStar = "*"_sd;
 
     BSONObj parsedIndexSpec = indexSpecObj;
 
-    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec);
+    auto indexSpecStatus = index_key_validate::validateIndexSpec(opCtx, parsedIndexSpec, checkFCV);
     uassertStatusOK(indexSpecStatus.getStatus().withContext(
         str::stream() << "Error in specification " << parsedIndexSpec.toString()));
 

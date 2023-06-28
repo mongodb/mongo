@@ -26,16 +26,33 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
+#include <iterator>
 #include <limits>
+#include <memory>
+#include <random>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/rand_utils_new.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/value_utils.h"
 #include "mongo/platform/decimal128.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo::stats {

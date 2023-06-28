@@ -27,22 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/filesystem/path.hpp>
+#include <fmt/format.h>
+#include <memory>
 
-#include "mongo/db/ftdc/ftdc_mongod.h"
+#include <boost/optional/optional.hpp>
 
-#include <boost/filesystem.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/constants.h"
 #include "mongo/db/ftdc/controller.h"
+#include "mongo/db/ftdc/ftdc_mongod.h"
 #include "mongo/db/ftdc/ftdc_mongod_gen.h"
 #include "mongo/db/ftdc/ftdc_server.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/transport_layer_ftdc_collector.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 

@@ -27,36 +27,67 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <functional>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/op_observer/op_observer_noop.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
 #include "mongo/db/repl/oplog_batcher_test_fixture.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
-#include "mongo/db/repl/tenant_migration_recipient_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_applier.h"
-#include "mongo/db/repl/tenant_oplog_batcher.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
+#include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/task_executor_test_fixture.h"
+#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -364,7 +395,7 @@ TEST_F(TenantOplogApplierTest, NoOpsForLargeTransaction) {
 
     // Makes entries with ts from range [2, 5).
     std::vector<OplogEntry> srcOps = makeMultiEntryTransactionOplogEntries(
-        2, _dbName.db(), /* prepared */ false, {innerOps1, innerOps2, innerOps3});
+        2, _dbName, /* prepared */ false, {innerOps1, innerOps2, innerOps3});
     pushOps(srcOps);
 
     auto writerPool = makeTenantMigrationWriterPool();
@@ -617,7 +648,7 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
             onInsertsCalled = true;
             // TODO Check that (nss.dbName() == _dbName) once the OplogEntry deserializer passes
             // "tid" to the NamespaceString constructor
-            ASSERT_EQUALS(nss.dbName().db(), _dbName.toStringWithTenantId_forTest());
+            ASSERT_EQUALS(nss.dbName().toString_forTest(), _dbName.toStringWithTenantId_forTest());
             ASSERT_EQUALS(nss.coll(), "bar");
             ASSERT_EQUALS(1, docs.size());
             ASSERT_BSONOBJ_EQ(docs[0], entry.getObject());
@@ -645,7 +676,8 @@ TEST_F(TenantOplogApplierTest, ApplyInsert_Success) {
 TEST_F(TenantOplogApplierTest, ApplyInserts_Grouped) {
     // TODO(SERVER-50256): remove nss_workaround, which is used to work around a bug where
     // the first operation assigned to a worker cannot be grouped.
-    NamespaceString nss_workaround(_dbName.toStringWithTenantId_forTest(), "a");
+    NamespaceString nss_workaround =
+        NamespaceString::createNamespaceString_forTest(_dbName.toStringWithTenantId_forTest(), "a");
     NamespaceString nss1 = NamespaceString::createNamespaceString_forTest(
         _dbName.toStringWithTenantId_forTest(), "bar");
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
@@ -895,7 +927,7 @@ TEST_F(TenantOplogApplierTest, ApplyDelete_Success) {
         ASSERT_TRUE(opCtx->lockState()->isCollectionLockedForMode(nss, MODE_IX));
         ASSERT_TRUE(opCtx->writesAreReplicated());
         ASSERT_FALSE(args.fromMigrate);
-        ASSERT_EQUALS(nss.dbName().db(), _dbName.toStringWithTenantId_forTest());
+        ASSERT_EQUALS(nss.dbName().toString_forTest(), _dbName.toStringWithTenantId_forTest());
         ASSERT_EQUALS(nss.coll(), "bar");
         ASSERT_EQUALS(uuid, coll->uuid());
     };
@@ -925,7 +957,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_CollExisting) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << uuid);
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -963,12 +995,12 @@ TEST_F(TenantOplogApplierTest, ApplyRenameCollCommand_CollExisting) {
     NamespaceString nss2 = NamespaceString::createNamespaceString_forTest(
         _dbName.toStringWithTenantId_forTest(), "bar");
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss2);
-    auto op =
-        BSON("op"
-             << "c"
-             << "ns" << nss1.getCommandNS().ns() << "wall" << Date_t() << "o"
-             << BSON("renameCollection" << nss1.ns() << "to" << nss2.ns() << "stayTemp" << false)
-             << "ts" << Timestamp(1, 1) << "ui" << uuid);
+    auto op = BSON("op"
+                   << "c"
+                   << "ns" << nss1.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
+                   << BSON("renameCollection" << nss1.ns_forTest() << "to" << nss2.ns_forTest()
+                                              << "stayTemp" << false)
+                   << "ts" << Timestamp(1, 1) << "ui" << uuid);
     bool applyCmdCalled = false;
     _opObserver->onRenameCollectionFn = [&](OperationContext* opCtx,
                                             const NamespaceString& fromColl,
@@ -1008,7 +1040,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_Success) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1050,7 +1082,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateIndexesCommand_Success) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("createIndexes" << nss.coll() << "v" << 2 << "key" << BSON("a" << 1) << "name"
                                      << "a_1")
              << "ts" << Timestamp(1, 1) << "ui" << uuid);
@@ -1097,7 +1129,7 @@ TEST_F(TenantOplogApplierTest, ApplyStartIndexBuildCommand_Failure) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("startIndexBuild" << nss.coll() << "v" << 2 << "key" << BSON("a" << 1)
                                              << "name"
                                              << "a_1")
@@ -1128,7 +1160,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1165,7 +1197,7 @@ TEST_F(TenantOplogApplierTest, ApplyCreateCollCommand_WrongNSS_Merge) {
     auto op =
         BSON("op"
              << "c"
-             << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+             << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
              << BSON("create" << nss.coll()) << "ts" << Timestamp(1, 1) << "ui" << UUID::gen());
     bool applyCmdCalled = false;
     _opObserver->onCreateCollectionFn = [&](OperationContext* opCtx,
@@ -1201,7 +1233,7 @@ TEST_F(TenantOplogApplierTest, ApplyDropIndexesCommand_IndexNotFound) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("dropIndexes" << nss.coll() << "index"
                                          << "a_1")
                    << "ts" << Timestamp(1, 1) << "ui" << uuid);
@@ -1242,7 +1274,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_IndexNotFound) {
     auto uuid = createCollectionWithUuid(_opCtx.get(), nss);
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("collMod" << nss.coll() << "index"
                                      << BSON("name"
                                              << "data_1"
@@ -1287,7 +1319,7 @@ TEST_F(TenantOplogApplierTest, ApplyCollModCommand_CollectionMissing) {
     UUID uuid(UUID::gen());
     auto op = BSON("op"
                    << "c"
-                   << "ns" << nss.getCommandNS().ns() << "wall" << Date_t() << "o"
+                   << "ns" << nss.getCommandNS().ns_forTest() << "wall" << Date_t() << "o"
                    << BSON("collMod" << nss.coll() << "index"
                                      << BSON("name"
                                              << "data_1"
@@ -1626,8 +1658,10 @@ TEST_F(TenantOplogApplierTest, ApplyResumeTokenInsertThenNoop_Success) {
 
 TEST_F(TenantOplogApplierTest, ApplyInsert_MultiKeyIndex) {
     createCollectionWithUuid(_opCtx.get(), NamespaceString::kSessionTransactionsTableNamespace);
-    NamespaceString indexedNss(_dbName.toStringWithTenantId_forTest(), "indexedColl");
-    NamespaceString nonIndexedNss(_dbName.toStringWithTenantId_forTest(), "nonIndexedColl");
+    NamespaceString indexedNss = NamespaceString::createNamespaceString_forTest(
+        _dbName.toStringWithTenantId_forTest(), "indexedColl");
+    NamespaceString nonIndexedNss = NamespaceString::createNamespaceString_forTest(
+        _dbName.toStringWithTenantId_forTest(), "nonIndexedColl");
     auto indexedCollUUID = createCollectionWithUuid(_opCtx.get(), indexedNss);
     createCollection(_opCtx.get(), nonIndexedNss, CollectionOptions());
 

@@ -27,14 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/db/commands.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/s/shard_metadata_util.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/type_shard_collection.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/db/s/type_shard_collection_gen.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {
@@ -59,7 +82,7 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
     ShardCollectionType setUpCollection() {
         ShardCollectionType shardCollectionType(
             BSON(ShardCollectionType::kNssFieldName
-                 << kNss.ns() << ShardCollectionType::kEpochFieldName
+                 << kNss.ns_forTest() << ShardCollectionType::kEpochFieldName
                  << maxCollPlacementVersion.epoch() << ShardCollectionType::kTimestampFieldName
                  << maxCollPlacementVersion.getTimestamp() << ShardCollectionType::kUuidFieldName
                  << uuid << ShardCollectionType::kKeyPatternFieldName << keyPattern.toBSON()
@@ -67,10 +90,11 @@ struct ShardMetadataUtilTest : public ShardServerTestFixture {
                  << ShardCollectionType::kUniqueFieldName << kUnique));
         shardCollectionType.setRefreshing(true);
 
-        ASSERT_OK(updateShardCollectionsEntry(operationContext(),
-                                              BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
-                                              shardCollectionType.toBSON(),
-                                              true /*upsert*/));
+        ASSERT_OK(updateShardCollectionsEntry(
+            operationContext(),
+            BSON(ShardCollectionType::kNssFieldName << kNss.ns_forTest()),
+            shardCollectionType.toBSON(),
+            true /*upsert*/));
 
         return shardCollectionType;
     }
@@ -196,7 +220,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
         assertGet(readShardCollectionsEntry(operationContext(), kNss));
 
     ASSERT_EQUALS(shardCollectionsEntry.getUuid(), uuid);
-    ASSERT_EQUALS(shardCollectionsEntry.getNss().ns(), kNss.ns());
+    ASSERT_EQUALS(shardCollectionsEntry.getNss().ns_forTest(), kNss.ns_forTest());
     ASSERT_EQUALS(shardCollectionsEntry.getEpoch(), maxCollPlacementVersion.epoch());
     ASSERT_EQUALS(shardCollectionsEntry.getTimestamp(), maxCollPlacementVersion.getTimestamp());
     ASSERT_BSONOBJ_EQ(shardCollectionsEntry.getKeyPattern().toBSON(), keyPattern.toBSON());
@@ -208,7 +232,7 @@ TEST_F(ShardMetadataUtilTest, PersistedRefreshSignalStartAndFinish) {
     // Signal refresh start again to make sure nothing changes
     ASSERT_OK(updateShardCollectionsEntry(
         operationContext(),
-        BSON(ShardCollectionType::kNssFieldName << kNss.ns()),
+        BSON(ShardCollectionType::kNssFieldName << kNss.ns_forTest()),
         BSON("$set" << BSON(ShardCollectionType::kRefreshingFieldName << true)),
         false));
 

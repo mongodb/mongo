@@ -27,19 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
+#include <limits>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_config_test.h"
 #include "mongo/db/server_options.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/safe_num.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

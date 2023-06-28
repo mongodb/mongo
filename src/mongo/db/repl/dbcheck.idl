@@ -172,7 +172,7 @@ structs:
         optional: true
       readTimestamp:
         type: timestamp
-        optional: true
+        optional: false
 
   DbCheckOplogCollection:
     description: "Oplog entry for dbCheck collection metadata"

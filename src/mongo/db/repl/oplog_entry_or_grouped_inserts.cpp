@@ -28,7 +28,11 @@
  */
 
 #include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/repl/optime.h"
 
 namespace mongo {
 namespace repl {

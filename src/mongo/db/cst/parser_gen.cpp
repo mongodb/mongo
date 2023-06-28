@@ -41,17 +41,32 @@
 // Unqualified %code blocks.
 #line 82 "grammar.yy"
 
-#include <boost/algorithm/string.hpp>
 #include <iterator>
+#include <memory>
 #include <utility>
+#include <variant>
 
+#include "boost/algorithm/string/split.hpp"
+#include "boost/core/addressof.hpp"
+#include "boost/function/function_base.hpp"
+#include "boost/iterator/iterator_facade.hpp"
+#include "boost/type_index/type_index_facade.hpp"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/db/cst/bson_lexer.h"
 #include "mongo/db/cst/c_node_disambiguation.h"
 #include "mongo/db/cst/c_node_validation.h"
+#include "mongo/db/cst/compound_key.h"
 #include "mongo/db/cst/key_fieldname.h"
+#include "mongo/db/cst/key_value.h"
+#include "mongo/db/cst/path.h"
 #include "mongo/db/query/util/make_data_structure.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 // Mandatory error function.
@@ -72,6 +87,7 @@ void ParserGen::error(const ParserGen::location_type& loc, const std::string& ms
 #if defined YYENABLE_NLS && YYENABLE_NLS
 #if ENABLE_NLS
 #include <libintl.h>  // FIXME: INFRINGES ON USER NAME SPACE.
+
 #define YY_(msgid) dgettext("bison-runtime", msgid)
 #endif
 #endif

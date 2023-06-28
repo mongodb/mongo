@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"

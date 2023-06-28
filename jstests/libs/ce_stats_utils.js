@@ -1,5 +1,5 @@
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load("jstests/libs/optimizer_utils.js");      // For checkCascadesOptimizerEnabled.
+load("jstests/libs/optimizer_utils.js");      // For checkCascadesFeatureFlagEnabled.
 
 /**
  * Returns a simplified skeleton of the physical plan including intervals & logical CE.
@@ -79,8 +79,8 @@ function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint
 function createHistogram(coll, key, options = {}) {
     // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
     // analyze command.
-    assert.commandWorked(
-        coll.getDB().adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
+    assert.commandWorked(coll.getDB().adminCommand(
+        {setParameter: 1, internalQueryFrameworkControl: "tryBonsaiExperimental"}));
 
     // Set up histogram for test collection.
     const res = coll.getDB().runCommand(Object.assign({analyze: coll.getName(), key}, options));
@@ -108,7 +108,7 @@ function createAndValidateHistogram({coll, expectedHistogram, empty = false, opt
  * relevant flags is restored after the test.
  */
 function runHistogramsTest(test) {
-    if (!checkCascadesOptimizerEnabled(db)) {
+    if (!checkCascadesFeatureFlagEnabled(db)) {
         jsTestLog("Skipping test because the optimizer is not enabled");
         return;
     }

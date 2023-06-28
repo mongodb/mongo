@@ -29,12 +29,22 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/db/fle_crud.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::fle {
 /**

@@ -29,8 +29,21 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/crypto/encryption_fields_gen.h"
+#include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
+#include "mongo/db/query/fle/query_rewriter_interface.h"
 
 namespace mongo::fle {
 /**

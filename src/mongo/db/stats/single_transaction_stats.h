@@ -29,8 +29,25 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <string>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/tick_source.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

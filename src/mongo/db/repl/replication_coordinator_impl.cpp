@@ -34,43 +34,66 @@
 
 #include "mongo/db/repl/replication_coordinator_impl.h"
 
-#include <algorithm>
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <ctime>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
 #include <functional>
-#include <limits>
+#include <iterator>
+#include <ostream>
+#include <type_traits>
+#include <variant>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/fetcher.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/client/read_preference_gen.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
 #include "mongo/db/catalog/local_oplog_info.h"
 #include "mongo/db/client.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/lock_stats.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/mongod_options_storage_gen.h"
 #include "mongo/db/prepare_conflict_tracker.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/always_allow_non_local_writes.h"
 #include "mongo/db/repl/check_quorum_for_config_change.h"
+#include "mongo/db/repl/data_replicator_external_state.h"
 #include "mongo/db/repl/data_replicator_external_state_initial_sync.h"
 #include "mongo/db/repl/hello_response.h"
 #include "mongo/db/repl/initial_syncer_factory.h"
 #include "mongo/db/repl/isself.h"
 #include "mongo/db/repl/last_vote.h"
+#include "mongo/db/repl/member_config_gen.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config_checks.h"
 #include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
@@ -78,43 +101,67 @@
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_coordinator_impl_gen.h"
 #include "mongo/db/repl/replication_metrics.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/transaction_oplog_application.h"
 #include "mongo/db/repl/update_position_args.h"
-#include "mongo/db/repl/vote_requester.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/serverless/serverless_operation_lock_registry.h"
+#include "mongo/db/session/internal_session_pool.h"
+#include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_local.h"
 #include "mongo/db/session/session_catalog.h"
-#include "mongo/db/shard_role.h"
+#include "mongo/db/session/session_killer.h"
 #include "mongo/db/shutdown_in_progress_quiesce_info.h"
 #include "mongo/db/storage/control/journal_flusher.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/db/write_concern.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/network_interface.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/metadata/oplog_query_metadata.h"
 #include "mongo/rpc/metadata/repl_set_metadata.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/transport/hello_metrics.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/net/cidr.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
 #include "mongo/util/synchronized_value.h"
 #include "mongo/util/testing_proctor.h"
 #include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
+#include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -540,7 +587,9 @@ bool ReplicationCoordinatorImpl::_startLoadLocalConfig(
                   "Throwing exception.");
     }
 
-    tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    if (_settings.isServerless()) {
+        tenant_migration_access_blocker::recoverTenantMigrationAccessBlockers(opCtx);
+    }
     ServerlessOperationLockRegistry::recoverLocks(opCtx);
     LOGV2(4280506, "Reconstructing prepared transactions");
     reconstructPreparedTransactions(opCtx,
@@ -3046,22 +3095,21 @@ bool ReplicationCoordinatorImpl::canAcceptNonLocalWrites() const {
 
 namespace {
 bool isSystemDotProfile(OperationContext* opCtx, const NamespaceStringOrUUID& nsOrUUID) {
-    if (auto ns = nsOrUUID.nss()) {
-        return ns->isSystemDotProfile();
-    } else {
-        auto uuid = nsOrUUID.uuid();
-        invariant(uuid, toStringForLogging(nsOrUUID));
-        if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, *uuid)) {
-            return ns->isSystemDotProfile();
-        }
+    if (nsOrUUID.isNamespaceString()) {
+        return nsOrUUID.nss().isSystemDotProfile();
     }
+
+    if (auto ns = CollectionCatalog::get(opCtx)->lookupNSSByUUID(opCtx, nsOrUUID.uuid())) {
+        return ns->isSystemDotProfile();
+    }
+
     return false;
 }
 }  // namespace
 
 bool ReplicationCoordinatorImpl::canAcceptWritesFor(OperationContext* opCtx,
                                                     const NamespaceStringOrUUID& nsOrUUID) {
-    if (!isReplEnabled() || nsOrUUID.dbName().db() == DatabaseName::kLocal.db()) {
+    if (!isReplEnabled() || nsOrUUID.dbName().isLocalDB()) {
         // Writes on stand-alone nodes or "local" database are always permitted.
         return true;
     }
@@ -3093,14 +3141,12 @@ bool ReplicationCoordinatorImpl::canAcceptWritesFor_UNSAFE(OperationContext* opC
         return true;
     }
 
-    if (auto ns = nsOrUUID.nss()) {
-        if (!ns->isOplog()) {
+    if (nsOrUUID.isNamespaceString()) {
+        if (!nsOrUUID.nss().isOplog()) {
             return true;
         }
     } else if (const auto& oplogCollection = LocalOplogInfo::get(opCtx)->getCollection()) {
-        auto uuid = nsOrUUID.uuid();
-        invariant(uuid, toStringForLogging(nsOrUUID));
-        if (oplogCollection->uuid() != *uuid) {
+        if (oplogCollection->uuid() != nsOrUUID.uuid()) {
             return true;
         }
     }
@@ -6391,6 +6437,16 @@ bool ReplicationCoordinatorImpl::isRetryableWrite(OperationContext* opCtx) const
     auto txnParticipant = TransactionParticipant::get(opCtx);
     return txnParticipant &&
         (!opCtx->inMultiDocumentTransaction() || txnParticipant.transactionIsOpen());
+}
+
+boost::optional<UUID> ReplicationCoordinatorImpl::getInitialSyncId(OperationContext* opCtx) {
+    BSONObj initialSyncId = _replicationProcess->getConsistencyMarkers()->getInitialSyncId(opCtx);
+    if (initialSyncId.hasField(InitialSyncIdDocument::k_idFieldName)) {
+        InitialSyncIdDocument initialSyncIdDoc =
+            InitialSyncIdDocument::parse(IDLParserContext("initialSyncId"), initialSyncId);
+        return initialSyncIdDoc.get_id();
+    }
+    return boost::none;
 }
 
 }  // namespace repl

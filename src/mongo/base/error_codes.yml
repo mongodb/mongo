@@ -533,6 +533,8 @@ error_codes:
 
     - {code: 401, name: ResumeTenantChangeStream}
 
+    - {code: 402, name: ResourceExhausted, categories: [RetriableError]}
+
     # Error codes 4000-8999 are reserved.
 
     # Non-sequential error codes for compatibility only)
@@ -558,6 +560,7 @@ error_codes:
     - {code: 13436,name: NotPrimaryOrSecondary,categories: [NotPrimaryError,RetriableError]}
     - {code: 14031,name: OutOfDiskSpace}
     - {code: 17280,name: OBSOLETE_KeyTooLong}
+    - {code: 28769,name: NamespaceCannotBeSharded}
     - {code: 46841,name: ClientMarkedKilled,categories: [Interruption,CancellationError]}
     - {code: 50768,name: NotARetryableWriteCommand}
     - {code: 50915,name: BackupCursorOpenConflictWithCheckpoint, categories: [RetriableError]}

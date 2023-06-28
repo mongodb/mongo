@@ -22,7 +22,8 @@ const dbName = 'testDB';
 const collName = 'coll';
 const timeField = "time";
 const metaField = "tag";
-const dateTime = ISODate("2021-07-12T16:00:00Z");
+const dateTime1 = ISODate("2021-07-12T16:00:00Z");
+const dateTime2 = ISODate("2021-07-13T16:00:00Z");
 
 const testDB = mongos.getDB(dbName);
 testDB.dropDatabase();
@@ -32,29 +33,29 @@ const arbitraryUpdatesEnabled = TimeseriesTest.arbitraryUpdatesEnabled(st.shard0
 
 const doc1 = {
     _id: 1,
-    [timeField]: dateTime,
+    [timeField]: dateTime1,
     [metaField]: {a: "A", b: "B"}
 };
 const doc2 = {
     _id: 2,
-    [timeField]: dateTime,
+    [timeField]: dateTime2,
     [metaField]: {c: "C", d: 2},
     f: [{"k": "K", "v": "V"}]
 };
 const doc3 = {
     _id: 3,
-    [timeField]: dateTime,
+    [timeField]: dateTime1,
     f: "F"
 };
 const doc4 = {
     _id: 4,
-    [timeField]: dateTime,
+    [timeField]: dateTime1,
     [metaField]: {a: "A", b: "B"},
     f: "F"
 };
 const doc5 = {
     _id: 5,
-    [timeField]: dateTime,
+    [timeField]: dateTime1,
     [metaField]: {a: "A", b: "B", c: "C"}
 };
 
@@ -197,6 +198,10 @@ function expectFailedUpdate(initialDocList) {
 //
 
 function testCaseMultiFalseUpdateFails({testUpdate}) {
+    if (arbitraryUpdatesEnabled) {
+        return;
+    }
+
     testUpdate({updates: [{q: {[metaField]: {b: "B"}}, u: {$set: {[metaField]: {b: "C"}}}}]},
                expectFailedUpdate([doc1]));
 }
@@ -385,7 +390,7 @@ function testCaseBatchUpdates({testUpdate}) {
         ],
         resultDocList: [{
             _id: 2,
-            [timeField]: dateTime,
+            [timeField]: dateTime1,
             [metaField]: 3,
             f: [{"k": "K", "v": "V"}],
         }],
@@ -433,7 +438,7 @@ function testCaseBatchUpdates({testUpdate}) {
         ],
         resultDocList: [{
             _id: 2,
-            [timeField]: dateTime,
+            [timeField]: dateTime1,
             [metaField]: {c: "C", d: 8},
             f: [{"k": "K", "v": "V"}],
         }],
@@ -485,7 +490,7 @@ function testCaseBatchUpdates({testUpdate}) {
             ],
             resultDocList: [{
                 _id: 2,
-                [timeField]: dateTime,
+                [timeField]: dateTime1,
                 [metaField]: {c: "C", d: 15},
                 f: [{"k": "K", "v": "V"}],
             }],
@@ -506,7 +511,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$rename: {[metaField + ".a"]: metaField + ".z"}},
             multi: true,
         }],
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: {z: "A", b: "B"}}, doc2],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: {z: "A", b: "B"}}, doc2],
         n: 1,
         pathToMetaFieldBeingUpdated: "a",
     });
@@ -519,7 +524,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$set: {[metaField]: {c: "C"}}},
             multi: true,
         }],
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: {c: "C"}}],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: {c: "C"}}],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -534,7 +539,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
         }],
         resultDocList: [
             doc1,
-            {_id: 2, [timeField]: dateTime, [metaField]: {c: 1, d: 2}, f: [{"k": "K", "v": "V"}]},
+            {_id: 2, [timeField]: dateTime2, [metaField]: {c: 1, d: 2}, f: [{"k": "K", "v": "V"}]},
             doc4,
             doc5
         ],
@@ -552,10 +557,15 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             multi: true,
         }],
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: {b: "B"}},
-            {_id: 2, [timeField]: dateTime, [metaField]: {c: "C", d: 2}, f: [{"k": "K", "v": "V"}]},
-            {_id: 4, [timeField]: dateTime, [metaField]: {b: "B"}, f: "F"},
-            {_id: 5, [timeField]: dateTime, [metaField]: {b: "B", c: "C"}}
+            {_id: 1, [timeField]: dateTime1, [metaField]: {b: "B"}},
+            {
+                _id: 2,
+                [timeField]: dateTime1,
+                [metaField]: {c: "C", d: 2},
+                f: [{"k": "K", "v": "V"}]
+            },
+            {_id: 4, [timeField]: dateTime1, [metaField]: {b: "B"}, f: "F"},
+            {_id: 5, [timeField]: dateTime1, [metaField]: {b: "B", c: "C"}}
         ],
         ordered: false,
         n: 3,
@@ -570,7 +580,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$set: {[metaField]: {c: "C"}}},
             multi: true,
         }],
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: {c: "C"}}],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: {c: "C"}}],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -583,7 +593,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$set: {[metaField]: {c: "C"}}},
             multi: true,
         }],
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: {c: "C"}}],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: {c: "C"}}],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -596,9 +606,12 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$inc: {[metaField + ".d"]: 10}},
             multi: true,
         }],
-        resultDocList: [
-            {_id: 2, [timeField]: dateTime, [metaField]: {c: "C", d: 12}, f: [{"k": "K", "v": "V"}]}
-        ],
+        resultDocList: [{
+            _id: 2,
+            [timeField]: dateTime2,
+            [metaField]: {c: "C", d: 12},
+            f: [{"k": "K", "v": "V"}]
+        }],
         n: 1,
         pathToMetaFieldBeingUpdated: "d",
     });
@@ -612,8 +625,8 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             multi: true,
         }],
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: {z: "Z"}},
-            {_id: 2, [timeField]: dateTime, [metaField]: {z: "Z"}, f: [{"k": "K", "v": "V"}]}
+            {_id: 1, [timeField]: dateTime1, [metaField]: {z: "Z"}},
+            {_id: 2, [timeField]: dateTime2, [metaField]: {z: "Z"}, f: [{"k": "K", "v": "V"}]}
         ],
         n: 2,
         pathToMetaFieldBeingUpdated: "",
@@ -624,7 +637,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
         initialDocList: [doc1],
         updates:
             [{q: {[metaField]: {a: "A", b: "B"}}, u: {$unset: {[metaField]: ""}}, multi: true}],
-        resultDocList: [{_id: 1, [timeField]: dateTime}],
+        resultDocList: [{_id: 1, [timeField]: dateTime1}],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -640,9 +653,9 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             },
         ],
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: {a: "A", b: "B", c: "C"}},
-            {_id: 4, [timeField]: dateTime, [metaField]: {a: "A", b: "B", c: "C"}, f: "F"},
-            {_id: 5, [timeField]: dateTime, [metaField]: {a: "A", b: "B", c: "C"}}
+            {_id: 1, [timeField]: dateTime1, [metaField]: {a: "A", b: "B", c: "C"}},
+            {_id: 4, [timeField]: dateTime1, [metaField]: {a: "A", b: "B", c: "C"}, f: "F"},
+            {_id: 5, [timeField]: dateTime1, [metaField]: {a: "A", b: "B", c: "C"}}
         ],
         n: 3,
         nModified: 2,
@@ -658,8 +671,8 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             multi: true
         }],
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: "a"},
-            {_id: 2, [timeField]: dateTime, [metaField]: "a", f: [{"k": "K", "v": "V"}]},
+            {_id: 1, [timeField]: dateTime1, [metaField]: "a"},
+            {_id: 2, [timeField]: dateTime2, [metaField]: "a", f: [{"k": "K", "v": "V"}]},
             doc3
         ],
         n: 2,
@@ -674,7 +687,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$set: {[metaField]: "a"}},
             multi: true
         }],
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: "a"}, doc2, doc3],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: "a"}, doc2, doc3],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -691,7 +704,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
                    expectFailedUpdate([doc1, doc2, doc3]));
 
         const nestedMetaObj =
-            {_id: 6, [timeField]: dateTime, [metaField]: {[metaField]: "A", a: 1}};
+            {_id: 6, [timeField]: dateTime1, [metaField]: {[metaField]: "A", a: 1}};
 
         // Query for documents using $jsonSchema with the metaField required and a required subfield
         // of the metaField with the same name as the metaField.
@@ -707,7 +720,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
                 u: {$set: {[metaField]: "a"}},
                 multi: true
             }],
-            resultDocList: [doc1, {_id: 6, [timeField]: dateTime, [metaField]: "a", a: 1}],
+            resultDocList: [doc1, {_id: 6, [timeField]: dateTime1, [metaField]: "a", a: 1}],
             n: 1,
             pathToMetaFieldBeingUpdated: "",
         });
@@ -742,7 +755,7 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
             u: {$set: {[metaField]: "a"}},
             multi: true
         }],
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: "a"}, doc2, doc3],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: "a"}, doc2, doc3],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -761,16 +774,18 @@ function testCaseValidMetaFieldUpdates({testUpdate}) {
         n: 0,
     });
 
-    // Do the same test case as above but with upsert:true, which should fail.
-    testUpdate({
-        updates: [{
-            q: {[metaField]: "Z"},
-            u: {$set: {[metaField]: 5}},
-            multi: true,
-            upsert: true,
-        }]
-    },
-               expectFailedUpdate([doc1, doc4, doc5]));
+    if (!arbitraryUpdatesEnabled) {
+        // Do the same test case as above but with upsert:true, which should fail.
+        testUpdate({
+            updates: [{
+                q: {[metaField]: "Z"},
+                u: {$set: {[metaField]: 5}},
+                multi: true,
+                upsert: true,
+            }]
+        },
+                   expectFailedUpdate([doc1, doc4, doc5]));
+    }
 }
 
 function testCaseUpdateWithLetDoc({testUpdate}) {
@@ -784,9 +799,9 @@ function testCaseUpdateWithLetDoc({testUpdate}) {
         }],
         letDoc: {oldVal: "A"},
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: "aaa"},
-            {_id: 4, [timeField]: dateTime, [metaField]: "aaa", f: "F"},
-            {_id: 5, [timeField]: dateTime, [metaField]: "aaa"}
+            {_id: 1, [timeField]: dateTime1, [metaField]: "aaa"},
+            {_id: 4, [timeField]: dateTime1, [metaField]: "aaa", f: "F"},
+            {_id: 5, [timeField]: dateTime1, [metaField]: "aaa"}
         ],
         n: 3,
         pathToMetaFieldBeingUpdated: "",
@@ -803,7 +818,7 @@ function testCaseUpdateWithLetDoc({testUpdate}) {
             multi: true,
         }],
         letDoc: {myVar: "aaa"},
-        resultDocList: [{_id: 1, [timeField]: dateTime, [metaField]: "$$myVar"}],
+        resultDocList: [{_id: 1, [timeField]: dateTime1, [metaField]: "$$myVar"}],
         n: 1,
         pathToMetaFieldBeingUpdated: "",
     });
@@ -825,9 +840,9 @@ function testCaseUpdateWithLetDoc({testUpdate}) {
         ],
         letDoc: {val1: "A", val2: "aaa"},
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: "bbb"},
-            {_id: 4, [timeField]: dateTime, [metaField]: "bbb", f: "F"},
-            {_id: 5, [timeField]: dateTime, [metaField]: "bbb"}
+            {_id: 1, [timeField]: dateTime1, [metaField]: "bbb"},
+            {_id: 4, [timeField]: dateTime1, [metaField]: "bbb", f: "F"},
+            {_id: 5, [timeField]: dateTime1, [metaField]: "bbb"}
         ],
         n: 6,
         pathToMetaFieldBeingUpdated: "",
@@ -835,9 +850,9 @@ function testCaseUpdateWithLetDoc({testUpdate}) {
 }
 
 function testCaseCollationUpdates({testUpdate}) {
-    const collationDoc1 = {_id: 1, [timeField]: dateTime, [metaField]: "café"};
-    const collationDoc2 = {_id: 2, [timeField]: dateTime, [metaField]: "cafe"};
-    const collationDoc3 = {_id: 3, [timeField]: dateTime, [metaField]: "cafE"};
+    const collationDoc1 = {_id: 1, [timeField]: dateTime1, [metaField]: "café"};
+    const collationDoc2 = {_id: 2, [timeField]: dateTime1, [metaField]: "cafe"};
+    const collationDoc3 = {_id: 3, [timeField]: dateTime1, [metaField]: "cafE"};
     const initialDocList = [collationDoc1, collationDoc2, collationDoc3];
 
     // Query on the metaField and modify the metaField using collation with strength level 1.
@@ -850,9 +865,9 @@ function testCaseCollationUpdates({testUpdate}) {
             collation: {locale: "fr", strength: 1},
         }],
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: "Updated"},
-            {_id: 2, [timeField]: dateTime, [metaField]: "Updated"},
-            {_id: 3, [timeField]: dateTime, [metaField]: "Updated"}
+            {_id: 1, [timeField]: dateTime1, [metaField]: "Updated"},
+            {_id: 2, [timeField]: dateTime1, [metaField]: "Updated"},
+            {_id: 3, [timeField]: dateTime1, [metaField]: "Updated"}
         ],
         n: 3,
         pathToMetaFieldBeingUpdated: "",
@@ -870,7 +885,7 @@ function testCaseCollationUpdates({testUpdate}) {
         }],
         resultDocList: [
             collationDoc1,
-            {_id: 2, [timeField]: dateTime, [metaField]: "Updated"},
+            {_id: 2, [timeField]: dateTime1, [metaField]: "Updated"},
             collationDoc3,
         ],
         n: 1,
@@ -880,9 +895,9 @@ function testCaseCollationUpdates({testUpdate}) {
 
 function testCaseNullUpdates({testUpdate}) {
     // Assumes shard key is meta.a.
-    const nullDoc = {_id: 1, [timeField]: dateTime, [metaField]: {a: null, b: 1}};
-    const missingDoc1 = {_id: 2, [timeField]: dateTime, [metaField]: {b: 1}};
-    const missingDoc2 = {_id: 3, [timeField]: dateTime, [metaField]: "foo"};
+    const nullDoc = {_id: 1, [timeField]: dateTime1, [metaField]: {a: null, b: 1}};
+    const missingDoc1 = {_id: 2, [timeField]: dateTime1, [metaField]: {b: 1}};
+    const missingDoc2 = {_id: 3, [timeField]: dateTime1, [metaField]: "foo"};
     const initialDocList = [nullDoc, missingDoc1, missingDoc2];
 
     // Query on the metaField and modify the metaField using collation with strength level 1.
@@ -894,9 +909,9 @@ function testCaseNullUpdates({testUpdate}) {
             multi: true,
         }],
         resultDocList: [
-            {_id: 1, [timeField]: dateTime, [metaField]: "Updated"},
-            {_id: 2, [timeField]: dateTime, [metaField]: "Updated"},
-            {_id: 3, [timeField]: dateTime, [metaField]: "Updated"},
+            {_id: 1, [timeField]: dateTime1, [metaField]: "Updated"},
+            {_id: 2, [timeField]: dateTime1, [metaField]: "Updated"},
+            {_id: 3, [timeField]: dateTime1, [metaField]: "Updated"},
         ],
         n: 3,
     });

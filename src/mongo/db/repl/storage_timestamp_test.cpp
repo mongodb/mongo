@@ -27,75 +27,165 @@
  *    it in the license file.
  */
 
+#include <boost/optional.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/container/detail/flat_tree.hpp"
+#include <boost/container/flat_set.hpp>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <cstddef>
 #include <fstream>  // IWYU pragma: keep
+#include <future>
+#include <initializer_list>
+#include <iterator>
+#include <list>
+#include <memory>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/document_validation.h"
 #include "mongo/db/catalog/drop_database.h"
 #include "mongo/db/catalog/drop_indexes.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/multi_index_block.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/index/index_build_interceptor.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/index/multikey_metadata_access_stats.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/index/skipped_record_tracker.h"
 #include "mongo/db/index_build_entry_helpers.h"
-#include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/multi_key_path_tracker.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/apply_ops.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/multiapplier.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_impl.h"
-#include "mongo/db/repl/oplog_applier_impl_test_fixture.h"
+#include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/oplog_entry_or_grouped_inserts.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_consistency_markers.h"
+#include "mongo/db/repl/replication_consistency_markers_gen.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
 #include "mongo/db/repl/replication_consistency_markers_mock.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/replication_recovery_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/repl/timestamp_block.h"
-#include "mongo/db/s/collection_sharding_state_factory_shard.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session/session.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
+#include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/snapshot_manager.h"
-#include "mongo/db/storage/storage_engine_impl.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/session_catalog_mongod_transaction_interface_impl.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/db/transaction/transaction_participant_gen.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/db/vector_clock.h"
 #include "mongo/db/vector_clock_mutable.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/executor/task_executor.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/future.h"  // IWYU pragma: keep
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/stacktrace.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -1784,7 +1874,8 @@ public:
         // no leftover collections carry-over.
         const NamespaceString nss =
             NamespaceString::createNamespaceString_forTest("unittestsDropDB.kvDropDatabase");
-        const NamespaceString sysProfile("unittestsDropDB.system.profile");
+        const NamespaceString sysProfile =
+            NamespaceString::createNamespaceString_forTest("unittestsDropDB.system.profile");
 
         std::string collIdent;
         std::string indexIdent;
@@ -2198,7 +2289,8 @@ TEST_F(StorageTimestampTest, TimestampMultiIndexBuildsDuringRename) {
 
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
 
-    NamespaceString renamedNss("unittestsRename.timestampMultiIndexBuildsDuringRename");
+    NamespaceString renamedNss = NamespaceString::createNamespaceString_forTest(
+        "unittestsRename.timestampMultiIndexBuildsDuringRename");
     create(renamedNss);
 
     // Save the pre-state idents so we can capture the specific ident related to index
@@ -2958,7 +3050,8 @@ TEST_F(StorageTimestampTest, ViewCreationSeparateTransaction) {
     auto storageEngine = _opCtx->getServiceContext()->getStorageEngine();
     auto durableCatalog = storageEngine->getCatalog();
 
-    const NamespaceString backingCollNss("unittests.backingColl");
+    const NamespaceString backingCollNss =
+        NamespaceString::createNamespaceString_forTest("unittests.backingColl");
     create(backingCollNss);
 
     const NamespaceString viewNss =
@@ -3160,7 +3253,9 @@ public:
     const StringData dbName = "unittest"_sd;
     const BSONObj oldObj = BSON("_id" << 0 << "a" << 1);
 
-    RetryableFindAndModifyTest() : nss(dbName, "retryableFindAndModifyTest") {
+    RetryableFindAndModifyTest()
+        : nss(NamespaceString::createNamespaceString_forTest(dbName,
+                                                             "retryableFindAndModifyTest")) {
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();
@@ -3224,8 +3319,6 @@ protected:
 };
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
     const auto criteria = BSON("_id" << 0);
@@ -3271,8 +3364,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     namespace mmb = mongo::mutablebson;
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
     // Create a new document representing BSONObj with the above contents.
     mmb::Document doc(bsonObj, mmb::Document::kInPlaceEnabled);
@@ -3331,8 +3422,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 }
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
@@ -3376,7 +3465,9 @@ public:
     const BSONObj doc = BSON("_id" << 1 << "TestValue" << 1);
     const BSONObj docKey = BSON("_id" << 1);
 
-    MultiDocumentTransactionTest() : nss(dbName, "multiDocumentTransactionTest") {
+    MultiDocumentTransactionTest()
+        : nss(NamespaceString::createNamespaceString_forTest(dbName,
+                                                             "multiDocumentTransactionTest")) {
         auto service = _opCtx->getServiceContext();
         auto sessionCatalog = SessionCatalog::get(service);
         sessionCatalog->reset_forTest();

@@ -32,9 +32,16 @@
  */
 
 #include "mongo/db/query/plan_ranker.h"
+
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/query/plan_ranker_util.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using namespace mongo;
 

@@ -27,25 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/util/assert_util.h"
-
-#include "mongo/db/exec/collection_scan.h"
-
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/collection_scan.h"
 #include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor_impl.h"
-#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -56,15 +75,17 @@ using std::unique_ptr;
 using std::vector;
 
 namespace {
-const char* getStageName(const CollectionPtr& coll, const CollectionScanParams& params) {
-    return (!coll->ns().isOplog() && (params.minRecord || params.maxRecord)) ? "CLUSTERED_IXSCAN"
-                                                                             : "COLLSCAN";
+const char* getStageName(const VariantCollectionPtrOrAcquisition& coll,
+                         const CollectionScanParams& params) {
+    return (!coll.getCollectionPtr()->ns().isOplog() && (params.minRecord || params.maxRecord))
+        ? "CLUSTERED_IXSCAN"
+        : "COLLSCAN";
 }
 }  // namespace
 
 
 CollectionScan::CollectionScan(ExpressionContext* expCtx,
-                               const CollectionPtr& collection,
+                               VariantCollectionPtrOrAcquisition collection,
                                const CollectionScanParams& params,
                                WorkingSet* workingSet,
                                const MatchExpression* filter)
@@ -72,6 +93,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
       _workingSet(workingSet),
       _filter((filter && !filter->isTriviallyTrue()) ? filter : nullptr),
       _params(params) {
+    const auto& collPtr = collection.getCollectionPtr();
     // Explain reports the direction of the collection scan.
     _specificStats.direction = params.direction;
     _specificStats.minRecord = params.minRecord;
@@ -81,10 +103,10 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         // The 'minRecord' and 'maxRecord' parameters are used for a special optimization that
         // applies only to forwards scans of the oplog and scans on clustered collections.
         invariant(!params.resumeAfterRecordId);
-        if (collection->ns().isOplogOrChangeCollection()) {
+        if (collPtr->ns().isOplogOrChangeCollection()) {
             invariant(params.direction == CollectionScanParams::FORWARD);
         } else {
-            invariant(collection->isClustered());
+            invariant(collPtr->isClustered());
         }
     }
 
@@ -94,7 +116,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
         tassert(6125000,
                 "Only collection scans on clustered collections may specify recordId "
                 "BoundInclusion policies",
-                collection->isClustered());
+                collPtr->isClustered());
 
         if (filter) {
             // The filter is applied after the ScanBoundInclusion is considered.
@@ -112,8 +134,7 @@ CollectionScan::CollectionScan(ExpressionContext* expCtx,
                 "max"_attr = (!_params.maxRecord) ? "none" : _params.maxRecord->toString());
     tassert(6521000,
             "Expected an oplog or a change collection with 'shouldTrackLatestOplogTimestamp'",
-            !_params.shouldTrackLatestOplogTimestamp ||
-                collection->ns().isOplogOrChangeCollection());
+            !_params.shouldTrackLatestOplogTimestamp || collPtr->ns().isOplogOrChangeCollection());
 
     if (params.assertTsHasNotFallenOff) {
         tassert(6521001,
@@ -139,13 +160,15 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
         return PlanStage::IS_EOF;
     }
 
-    if (_params.lowPriority && !_priority && opCtx()->getClient()->isFromUserConnection() &&
+    if (_params.lowPriority && !_priority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx()->getClient()->isFromUserConnection() &&
         opCtx()->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }
 
     boost::optional<Record> record;
     const bool needToMakeCursor = !_cursor;
+    const auto& collPtr = collectionPtr();
 
     const auto ret = handlePlanStageYield(
         expCtx(),
@@ -166,14 +189,13 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
                     // sure that we are using a fresh storage engine snapshot while waiting.
                     // Otherwise, we will end up reading from the snapshot where the oplog entries
                     // are not yet visible even after the wait.
-                    invariant(!_params.tailable && collection()->ns().isOplog());
+                    invariant(!_params.tailable && collPtr->ns().isOplog());
 
                     opCtx()->recoveryUnit()->abandonSnapshot();
-                    collection()->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(
-                        opCtx());
+                    collPtr->getRecordStore()->waitForAllEarlierOplogWritesToBeVisible(opCtx());
                 }
 
-                _cursor = collection()->getCursor(opCtx(), forward);
+                _cursor = collPtr->getCursor(opCtx(), forward);
 
                 if (!_lastSeenId.isNull()) {
                     invariant(_params.tailable);
@@ -254,7 +276,7 @@ PlanStage::StageState CollectionScan::doWork(WorkingSetID* out) {
 
         // For change collections, advance '_latestOplogEntryTimestamp' to the current snapshot
         // timestamp, i.e. the latest available timestamp in the global oplog.
-        if (_params.shouldTrackLatestOplogTimestamp && collection()->ns().isChangeCollection()) {
+        if (_params.shouldTrackLatestOplogTimestamp && collPtr->ns().isChangeCollection()) {
             setLatestOplogEntryTimestampToReadTimestamp();
         }
         _priority.reset();
@@ -282,7 +304,7 @@ void CollectionScan::setLatestOplogEntryTimestampToReadTimestamp() {
     // Since this method is only ever called when iterating a change collection, the following check
     // effectively disables optime advancement in Serverless, for reasons outlined in SERVER-76288.
     // TODO SERVER-76309: re-enable optime advancement to support sharding in Serverless.
-    if (collection()->ns().isChangeCollection()) {
+    if (collectionPtr()->ns().isChangeCollection()) {
         return;
     }
 
@@ -479,7 +501,8 @@ void CollectionScan::doDetachFromOperationContext() {
 }
 
 void CollectionScan::doReattachToOperationContext() {
-    if (_params.lowPriority && opCtx()->getClient()->isFromUserConnection() &&
+    if (_params.lowPriority && gDeprioritizeUnboundedUserCollectionScans.load() &&
+        opCtx()->getClient()->isFromUserConnection() &&
         opCtx()->lockState()->shouldWaitForTicket()) {
         _priority.emplace(opCtx()->lockState(), AdmissionContext::Priority::kLow);
     }

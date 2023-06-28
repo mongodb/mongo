@@ -124,6 +124,7 @@ env.Library(
         '$BUILD_DIR/mongo/db/session/logical_session_id_helpers',
         '$BUILD_DIR/mongo/db/storage/key_string',
         '$BUILD_DIR/mongo/db/transaction/transaction',
+        'dbhelpers',
         'index_builds_coordinator_interface',
         'query_exec',
         'shard_role',
@@ -364,11 +365,10 @@ env.Library(
     ],
 )
 
-# mongod options
 env.Library(
-    target="mongod_options",
+    target='mongod_options',
     source=[
-        "mongod_options.cpp",
+        'mongod_options.cpp',
         'mongod_options_general.idl',
         'mongod_options_legacy.idl',
         'mongod_options_replication.idl',
@@ -569,7 +569,8 @@ env.Library(
     target='change_stream_pre_images_collection_manager',
     source=[
         'change_stream_pre_images_collection_manager.cpp',
-        'change_stream_pre_images_truncate_markers.cpp'
+        'change_stream_pre_images_truncate_manager.cpp',
+        'change_stream_pre_images_truncate_markers_per_nsUUID.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/pipeline/change_stream_preimage',
@@ -594,10 +595,12 @@ env.CppUnitTest(
     target='change_stream_pre_images_manager_test',
     source=[
         'change_stream_pre_images_remover_test.cpp',
+        'change_stream_pre_images_truncate_manager_test.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/db/catalog/catalog_test_fixture',
         '$BUILD_DIR/mongo/db/catalog/collection_catalog',
+        '$BUILD_DIR/mongo/db/catalog/collection_crud',
         '$BUILD_DIR/mongo/db/op_observer/op_observer',
         '$BUILD_DIR/mongo/db/op_observer/op_observer_impl',
         '$BUILD_DIR/mongo/db/op_observer/oplog_writer_impl',
@@ -608,6 +611,7 @@ env.CppUnitTest(
         'change_stream_pre_images_collection_manager',
         'change_stream_serverless_helpers',
         'change_streams_cluster_parameter',
+        'shard_role',
     ],
 )
 
@@ -623,9 +627,9 @@ env.Library(
 )
 
 env.Library(
-    target="read_write_concern_defaults_mock",
+    target='read_write_concern_defaults_mock',
     source=[
-        "read_write_concern_defaults_cache_lookup_mock.cpp",
+        'read_write_concern_defaults_cache_lookup_mock.cpp',
     ],
     LIBDEPS=[
         'read_write_concern_defaults',
@@ -843,8 +847,6 @@ env.Library(
         'server_base',
         'stats/resource_consumption_metrics',
         'stats/timer_stats',
-        # TODO (SERVER-66896): Remove this dependency.
-        'storage/storage_engine_feature_flags',
         'timeseries/timeseries_options',
     ],
 )
@@ -1089,6 +1091,7 @@ env.Library(
     target='service_context_d',
     source=[
         'service_entry_point_mongod.cpp',
+        'transaction_resources_init_mongod.cpp',
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/transport/service_entry_point',
@@ -1116,7 +1119,7 @@ env.Library(
 env.Library(
     target='service_context_non_d',
     source=[
-        'transaction_resources_decoration_non_mongod.cpp',
+        'transaction_resources_init_non_mongod.cpp',
     ],
     LIBDEPS=[
         'service_context',
@@ -1759,7 +1762,6 @@ env.Library(
     LIBDEPS_PRIVATE=[
         'catalog/catalog_helpers',
         'catalog/collection_catalog',
-        'catalog/collection_crud',
         'catalog/collection_validation',
         'catalog/database_holder',
         'catalog/document_validation',
@@ -1984,6 +1986,19 @@ env.Library(
     ],
     LIBDEPS_PRIVATE=[
         'server_base',
+    ],
+)
+
+env.Library(
+    target='keys_collection_util',
+    source=[
+        'keys_collection_util.cpp',
+    ],
+    LIBDEPS_PRIVATE=[
+        '$BUILD_DIR/mongo/db/concurrency/exception_util',
+        'dbhelpers',
+        'keys_collection_document',
+        'shard_role',
     ],
 )
 
@@ -2477,6 +2492,7 @@ env.Library(
         'periodic_runner_job_abort_expired_transactions',
         'pipeline/change_stream_expired_pre_image_remover',
         'pipeline/process_interface/mongod_process_interface_factory',
+        'query/query_settings_manager',
         'query/stats/query_stats',
         'repl/drop_pending_collection_reaper',
         'repl/initial_syncer',
@@ -2812,16 +2828,5 @@ env.Benchmark(
     ],
     LIBDEPS=[
         '$BUILD_DIR/mongo/idl/idl_parser',
-    ],
-)
-
-env.Benchmark(
-    target='operation_cpu_timer_bm',
-    source=[
-        'operation_cpu_timer_bm.cpp',
-    ],
-    LIBDEPS=[
-        '$BUILD_DIR/mongo/db/concurrency/lock_manager',
-        'service_context',
     ],
 )

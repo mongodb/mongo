@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
-#include <iostream>
+#include <cstddef>
 
 #include "mongo/db/exec/sbe/values/slot_printer.h"
-#include "mongo/platform/basic.h"
 
 namespace mongo::sbe::value {
 

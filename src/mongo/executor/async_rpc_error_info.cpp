@@ -66,6 +66,21 @@ Status unpackRPCStatus(Status status) {
     return out;
 }
 
+Status unpackRPCStatusIgnoringWriteErrors(Status status) {
+    invariant(status == ErrorCodes::RemoteCommandExecutionError);
+    auto errorInfo = status.extraInfo<AsyncRPCErrorInfo>();
+    if (errorInfo->isLocal()) {
+        return errorInfo->asLocal();
+    }
+    invariant(errorInfo->isRemote());
+    auto remoteError = errorInfo->asRemote();
+    Status out = remoteError.getRemoteCommandResult();
+    if (out.isOK()) {
+        out = remoteError.getRemoteCommandWriteConcernError();
+    }
+    return out;
+}
+
 Status unpackRPCStatusIgnoringWriteConcernAndWriteErrors(Status status) {
     invariant(status == ErrorCodes::RemoteCommandExecutionError);
     auto errorInfo = status.extraInfo<AsyncRPCErrorInfo>();

@@ -29,6 +29,9 @@
 
 #include "mongo/db/query/stats/collection_statistics_mock.h"
 
+#include <map>
+#include <utility>
+
 namespace mongo::stats {
 
 CollectionStatisticsMock::CollectionStatisticsMock(double cardinality)

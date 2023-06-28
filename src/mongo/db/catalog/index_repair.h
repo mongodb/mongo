@@ -30,8 +30,15 @@
 #pragma once
 
 #include "mongo/base/status_with.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/catalog/validate_state.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string.h"
 
 namespace mongo {
 namespace index_repair {

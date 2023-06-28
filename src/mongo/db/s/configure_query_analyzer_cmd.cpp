@@ -27,22 +27,67 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/ddl_lock_manager.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/analyze_shard_key_documents_gen.h"
 #include "mongo/s/analyze_shard_key_util.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -52,7 +97,7 @@ namespace analyze_shard_key {
 
 namespace {
 
-constexpr int kMaxSampleRate = 50;
+constexpr int kMaxSamplesPerSecond = 50;
 
 /**
  * RAII type for the DDL lock. On a sharded cluster, the lock is the DDLLockManager collection lock.
@@ -67,24 +112,20 @@ public:
 
     ScopedDDLLock(OperationContext* opCtx, const NamespaceString& nss) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            auto ddlLockManager = DDLLockManager::get(opCtx);
-            auto dbDDLLock = ddlLockManager->lock(
-                opCtx, nss.db(), lockReason, DDLLockManager::kDefaultLockTimeout);
+            // TODO SERVER-77546 remove db lock once it's automatically acquired by the
+            // ScopedCollectionDDLLock
+            const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
+                opCtx, nss.dbName(), lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
-            // Check under the db lock if this is still the primary shard for the database.
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, nss.dbName());
-
-            _collDDLLock.emplace(ddlLockManager->lock(opCtx,
-                                                      NamespaceStringUtil::serialize(nss),
-                                                      lockReason,
-                                                      DDLLockManager::kDefaultLockTimeout));
+            _collDDLLock.emplace(
+                opCtx, nss, lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout);
         } else {
             _autoColl.emplace(opCtx, nss, MODE_IX);
         }
     }
 
 private:
-    boost::optional<DDLLockManager::ScopedLock> _collDDLLock;
+    boost::optional<DDLLockManager::ScopedCollectionDDLLock> _collDDLLock;
     boost::optional<AutoGetCollection> _autoColl;
 };
 
@@ -118,29 +159,34 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "configureQueryAnalyzer command is not supported on a configsvr mongod",
                     !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
+            uassert(ErrorCodes::IllegalOperation,
+                    "Cannot run configureQueryAnalyzer command directly against a shardsvr mongod",
+                    serverGlobalParams.clusterRole.has(ClusterRole::None) ||
+                        isInternalClient(opCtx) || TestingProctor::instance().isEnabled());
 
             const auto& nss = ns();
             const auto mode = request().getMode();
-            const auto sampleRate = request().getSampleRate();
+            const auto samplesPerSec = request().getSamplesPerSecond();
             const auto newConfig = request().getConfiguration();
 
             uassertStatusOK(validateNamespace(nss));
             if (mode == QueryAnalyzerModeEnum::kOff) {
                 uassert(ErrorCodes::InvalidOptions,
-                        "Cannot specify 'sampleRate' when 'mode' is \"off\"",
-                        !sampleRate);
+                        "Cannot specify 'samplesPerSecond' when 'mode' is \"off\"",
+                        !samplesPerSec);
             } else {
                 uassert(ErrorCodes::InvalidOptions,
                         str::stream()
-                            << "'sampleRate' must be specified when 'mode' is not \"off\"",
-                        sampleRate);
+                            << "'samplesPerSecond' must be specified when 'mode' is not \"off\"",
+                        samplesPerSec);
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream() << "'sampleRate' must be greater than 0",
-                        *sampleRate > 0);
+                        str::stream() << "'samplesPerSecond' must be greater than 0",
+                        *samplesPerSec > 0);
                 uassert(ErrorCodes::InvalidOptions,
-                        str::stream()
-                            << "'sampleRate' must be less than or equal to " << kMaxSampleRate,
-                        (*sampleRate <= kMaxSampleRate) || TestingProctor::instance().isEnabled());
+                        str::stream() << "'samplesPerSecond' must be less than or equal to "
+                                      << kMaxSamplesPerSecond,
+                        (*samplesPerSec <= kMaxSamplesPerSecond) ||
+                            TestingProctor::instance().isEnabled());
             }
 
             // Take the DDL lock to serialize this command with DDL commands.
@@ -157,7 +203,7 @@ public:
                   logAttrs(nss),
                   "collectionUUID"_attr = collUuid,
                   "mode"_attr = mode,
-                  "sampleRate"_attr = sampleRate);
+                  "samplesPerSecond"_attr = samplesPerSec);
 
             write_ops::FindAndModifyCommandRequest request(
                 NamespaceString::kConfigQueryAnalyzersNamespace);

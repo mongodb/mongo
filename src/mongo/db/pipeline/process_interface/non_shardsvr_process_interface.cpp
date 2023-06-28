@@ -29,19 +29,40 @@
 
 #include "mongo/db/pipeline/process_interface/non_shardsvr_process_interface.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <typeinfo>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/list_indexes.h"
 #include "mongo/db/catalog/rename_collection.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/ops/single_write_result_gen.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_exec.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_cursor.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

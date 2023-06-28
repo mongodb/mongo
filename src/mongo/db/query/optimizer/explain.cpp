@@ -29,11 +29,44 @@
 
 #include "mongo/db/query/optimizer/explain.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <compare>
+#include <functional>
+#include <iterator>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <set>
+#include <tuple>
+#include <type_traits>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/cascades/memo_defs.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/util/assert_util.h"
 
 

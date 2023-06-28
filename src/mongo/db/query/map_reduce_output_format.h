@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 /**

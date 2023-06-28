@@ -29,11 +29,20 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <stack>
+#include <utility>
+#include <vector>
 
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_path.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 

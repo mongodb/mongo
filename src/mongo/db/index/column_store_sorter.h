@@ -29,9 +29,25 @@
 
 #pragma once
 
+#include <cstddef>
+#include <exception>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/sorter/sorter.h"
+#include "mongo/db/sorter/sorter_gen.h"
+#include "mongo/db/sorter/sorter_stats.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 /**

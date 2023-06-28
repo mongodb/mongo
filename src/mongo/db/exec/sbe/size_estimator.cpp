@@ -29,6 +29,8 @@
 
 #include "mongo/db/exec/sbe/size_estimator.h"
 
+#include "mongo/bson/bsonelement.h"
+
 namespace mongo::sbe::size_estimator {
 
 size_t estimate(const IndexBounds& indexBounds) {

@@ -28,16 +28,22 @@
  */
 
 #include "mongo/db/pipeline/document_source_documents.h"
-#include "mongo/db/exec/projection_executor.h"
-#include "mongo/db/exec/projection_executor_builder.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_project.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/document_source_replace_root.h"
 #include "mongo/db/pipeline/document_source_unwind.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include "mongo/db/pipeline/expression.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

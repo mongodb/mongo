@@ -29,11 +29,8 @@
 
 #include "mongo/db/repl/repl_set_request_votes_args.h"
 
-#include "mongo/bson/util/bson_check.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/db/server_options.h"
 
 namespace mongo {
 namespace repl {

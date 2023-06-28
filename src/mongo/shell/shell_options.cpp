@@ -295,8 +295,7 @@ Status storeMongoShellOptions(const moe::Environment& params,
     }
 
     if (!shellGlobalParams.networkMessageCompressors.empty()) {
-        const auto ret =
-            storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
+        auto ret = storeMessageCompressionOptions(shellGlobalParams.networkMessageCompressors);
         if (!ret.isOK()) {
             return ret;
         }

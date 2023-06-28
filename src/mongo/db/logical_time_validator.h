@@ -31,7 +31,11 @@
 
 #include <memory>
 
+#include "mongo/base/status.h"
+#include "mongo/db/auth/cluster_auth_mode.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/signed_logical_time.h"
 #include "mongo/db/time_proof_service.h"
 #include "mongo/platform/mutex.h"
@@ -50,8 +54,8 @@ class KeysCollectionManager;
 class LogicalTimeValidator {
 public:
     // Decorate ServiceContext with LogicalTimeValidator instance.
-    static LogicalTimeValidator* get(ServiceContext* service);
-    static LogicalTimeValidator* get(OperationContext* ctx);
+    static std::shared_ptr<LogicalTimeValidator> get(ServiceContext* service);
+    static std::shared_ptr<LogicalTimeValidator> get(OperationContext* ctx);
     static void set(ServiceContext* service, std::unique_ptr<LogicalTimeValidator> validator);
 
     /**

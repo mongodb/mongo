@@ -29,18 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
 #include <stack>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 
 class AScopedConnection;
 class DBClientBase;
+
 class AggregateCommandRequest;
 
 /**
@@ -188,10 +205,6 @@ public:
 
     std::string originalHost() const {
         return _originalHost;
-    }
-
-    StringData getns() const {
-        return _ns.ns();
     }
 
     const NamespaceString& getNamespaceString() const {

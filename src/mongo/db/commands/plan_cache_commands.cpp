@@ -27,16 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/commands/plan_cache_commands.h"
-
+#include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::plan_cache_commands {
 
 StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
-                                                         StringData ns,
+                                                         const NamespaceString& nss,
                                                          const BSONObj& cmdObj) {
     // query - required
     BSONElement queryElt = cmdObj.getField("query");
@@ -85,13 +97,18 @@ StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx
     }
 
     // Create canonical query
-    auto findCommand = std::make_unique<FindCommandRequest>(NamespaceString{ns});
+    auto findCommand = std::make_unique<FindCommandRequest>(nss);
     findCommand->setFilter(queryObj.getOwned());
     findCommand->setSort(sortObj.getOwned());
     findCommand->setProjection(projObj.getOwned());
     findCommand->setCollation(collationObj.getOwned());
-    const ExtensionsCallbackReal extensionsCallback(
-        opCtx, findCommand->getNamespaceOrUUID().nss().get_ptr());
+
+    tassert(ErrorCodes::BadValue,
+            "Unsupported type UUID for namespace",
+            findCommand->getNamespaceOrUUID().isNamespaceString());
+    const ExtensionsCallbackReal extensionsCallback(opCtx,
+                                                    &findCommand->getNamespaceOrUUID().nss());
+
     const boost::intrusive_ptr<ExpressionContext> expCtx;
     auto statusWithCQ =
         CanonicalQuery::canonicalize(opCtx,

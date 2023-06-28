@@ -2,11 +2,9 @@
  * Tests the behavior of change streams in the presence of 'showExpandedEvents' flag.
  *
  * @tags: [
- *   requires_fcv_61,
  *   # The test assumes certain ordering of the events. The chunk migrations on a sharded collection
  *   # could break the test.
  *   assumes_unsharded_collection,
- *   featureFlagChangeStreamsFurtherEnrichedEvents,
  * ]
  */
 (function() {

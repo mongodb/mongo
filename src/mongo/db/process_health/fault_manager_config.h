@@ -28,11 +28,27 @@
  */
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <ostream>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/process_health/health_monitoring_server_parameters_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/basic.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/synchronized_value.h"
 
 
 namespace mongo {

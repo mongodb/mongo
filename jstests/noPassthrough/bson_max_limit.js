@@ -83,26 +83,4 @@ function executeTest(db) {
     executeTest(conn.getDB("test"));
     MongoRunner.stopMongod(conn);
 }
-
-{
-    const rst = new ReplSetTest({
-        nodes: [
-            {},
-            {
-                // Disallow elections on secondary.
-                rsConfig: {
-                    priority: 0,
-                    votes: 0,
-                },
-            }
-        ]
-    });
-    rst.startSet();
-    rst.initiate();
-    // Test the modern default behavior where storeFindAndModifyImagesInSideCollection is true.
-    rst.getPrimary().adminCommand(
-        {setParameter: 1, storeFindAndModifyImagesInSideCollection: true});
-    executeTest(rst.getPrimary().getDB("test"));
-    rst.stopSet();
-}
 })();

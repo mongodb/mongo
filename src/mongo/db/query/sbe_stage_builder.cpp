@@ -29,16 +29,47 @@
 
 #include "mongo/db/query/sbe_stage_builder.h"
 
-#include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/flat_hash_set.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <limits>
+#include <map>
+#include <numeric>
+#include <set>
+#include <string_view>
+#include <tuple>
+#include <type_traits>
 
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/docval_to_sbeval.h"
+#include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/match_path.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/column_scan.h"
 #include "mongo/db/exec/sbe/stages/filter.h"
+#include "mongo/db/exec/sbe/stages/hash_agg.h"
 #include "mongo/db/exec/sbe/stages/hash_join.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
 #include "mongo/db/exec/sbe/stages/makeobj.h"
@@ -48,32 +79,62 @@
 #include "mongo/db/exec/sbe/stages/sorted_merge.h"
 #include "mongo/db/exec/sbe/stages/union.h"
 #include "mongo/db/exec/sbe/stages/unique.h"
+#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/shard_filterer.h"
-#include "mongo/db/fts/fts_index_format.h"
+#include "mongo/db/exec/shard_filterer_impl.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/fts/fts_matcher.h"
+#include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/index/fts_access_method.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/expression_type.h"
 #include "mongo/db/matcher/match_expression_dependencies.h"
+#include "mongo/db/matcher/matcher_type_set.h"
 #include "mongo/db/pipeline/abt/field_map_builder.h"
+#include "mongo/db/pipeline/accumulation_statement.h"
+#include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
+#include "mongo/db/pipeline/dependencies.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_visitor.h"
+#include "mongo/db/pipeline/expression_walker.h"
+#include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/query/bind_input_params.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/query/expression_walker.h"
-#include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/query_utils.h"
 #include "mongo/db/query/sbe_stage_builder_abt_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_accumulator.h"
 #include "mongo/db/query/sbe_stage_builder_coll_scan.h"
+#include "mongo/db/query/sbe_stage_builder_eval_frame.h"
 #include "mongo/db/query/sbe_stage_builder_expression.h"
 #include "mongo/db/query/sbe_stage_builder_filter.h"
 #include "mongo/db/query/sbe_stage_builder_helpers.h"
 #include "mongo/db/query/sbe_stage_builder_index_scan.h"
 #include "mongo/db/query/sbe_stage_builder_projection.h"
 #include "mongo/db/query/shard_filterer_factory_impl.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/query/util/make_data_structure.h"
-#include "mongo/db/storage/execution_context.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/id_generator.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -206,13 +267,20 @@ void prepareSlotBasedExecutableTree(OperationContext* opCtx,
     // Populate/renew "shardFilterer" if there exists a "shardFilterer" slot. The slot value should
     // be set to Nothing in the plan cache to avoid extending the lifetime of the ownership filter.
     if (auto shardFiltererSlot = env->getSlotIfExists("shardFilterer"_sd)) {
-        const auto& collection = collections.getMainCollection();
-        tassert(6108307,
-                "Setting shard filterer slot on un-sharded collection",
-                collection.isSharded());
+        auto shardFilterer = [&]() -> std::unique_ptr<ShardFilterer> {
+            if (collections.isAcquisition()) {
+                return std::make_unique<ShardFiltererImpl>(
+                    *collections.getMainAcquisition()->getShardingFilter());
+            } else {
+                const auto& collection = collections.getMainCollection();
+                tassert(6108307,
+                        "Setting shard filterer slot on un-sharded collection",
+                        collection.isSharded());
 
-        ShardFiltererFactoryImpl shardFiltererFactory(collection);
-        auto shardFilterer = shardFiltererFactory.makeShardFilterer(opCtx);
+                ShardFiltererFactoryImpl shardFiltererFactory(collection);
+                return shardFiltererFactory.makeShardFilterer(opCtx);
+            }
+        }();
         env->resetSlot(*shardFiltererSlot,
                        sbe::value::TypeTags::shardFilterer,
                        sbe::value::bitcastFrom<ShardFilterer*>(shardFilterer.release()),
@@ -394,13 +462,18 @@ SlotBasedStageBuilder::SlotBasedStageBuilder(OperationContext* opCtx,
     // SERVER-52803: In the future if we need to gather more information from the QuerySolutionNode
     // tree, rather than doing one-off scans for each piece of information, we should add a formal
     // analysis pass here.
-    // NOTE: Currently, we assume that each query operates on at most one collection, so there can
-    // be only one STAGE_COLLSCAN node.
+    // Currently, we assume that each query operates on at most one collection, but a rooted $or
+    // queries can have more than one collscan stages with clustered collections.
     auto [node, ct] = getFirstNodeByType(solution.root(), STAGE_COLLSCAN);
-    const auto count = ct;
+    auto [_, orCt] = getFirstNodeByType(solution.root(), STAGE_OR);
+    const unsigned long numCollscanStages = ct;
+    const unsigned long numOrStages = orCt;
     tassert(7182000,
-            str::stream() << "Found " << count << " nodes of type COLLSCAN, expected one or zero",
-            count <= 1);
+            str::stream() << "Found " << numCollscanStages << " nodes of type COLLSCAN, and "
+                          << numOrStages
+                          << " nodes of type OR, expected less than one COLLSCAN nodes or at "
+                             "least one OR stage.",
+            numCollscanStages <= 1 || numOrStages > 0);
 
     if (node) {
         auto csn = static_cast<const CollectionScanNode*>(node);
@@ -645,13 +718,13 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
 std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder::buildCountScan(
     const QuerySolutionNode* root, const PlanStageReqs& reqs) {
     // COUNT_SCAN node doesn't expected to return index info.
-    tassert(8423394, "buildCountScan() does not support kReturnKey", !reqs.has(kReturnKey));
-    tassert(8423393, "buildCountScan() does not support kSnapshotId", !reqs.has(kSnapshotId));
-    tassert(8423392, "buildCountScan() does not support kIndexIdent", !reqs.has(kIndexIdent));
-    tassert(8423391, "buildCountScan() does not support kIndexKey", !reqs.has(kIndexKey));
+    tassert(5295800, "buildCountScan() does not support kReturnKey", !reqs.has(kReturnKey));
+    tassert(5295801, "buildCountScan() does not support kSnapshotId", !reqs.has(kSnapshotId));
+    tassert(5295802, "buildCountScan() does not support kIndexIdent", !reqs.has(kIndexIdent));
+    tassert(5295803, "buildCountScan() does not support kIndexKey", !reqs.has(kIndexKey));
     tassert(
-        8423390, "buildCountScan() does not support kIndexKeyPattern", !reqs.has(kIndexKeyPattern));
-    tassert(8423389, "buildCountScan() does not support kSortKey", !reqs.hasSortKeys());
+        5295804, "buildCountScan() does not support kIndexKeyPattern", !reqs.has(kIndexKeyPattern));
+    tassert(5295805, "buildCountScan() does not support kSortKey", !reqs.hasSortKeys());
 
     auto csn = static_cast<const CountScanNode*>(root);
 
@@ -660,28 +733,47 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto indexDescriptor = collection->getIndexCatalog()->findIndexByName(_state.opCtx, indexName);
     auto indexAccessMethod =
         collection->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
-    auto [lowKey, highKey] =
-        makeKeyStringPair(csn->startKey,
-                          csn->startKeyInclusive,
-                          csn->endKey,
-                          csn->endKeyInclusive,
-                          indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
-                          indexAccessMethod->getSortedDataInterface()->getOrdering(),
-                          true /* forward */);
 
-    auto [stage, planStageSlots, _] = generateSingleIntervalIndexScan(_state,
-                                                                      collection,
-                                                                      indexName,
-                                                                      indexDescriptor->keyPattern(),
-                                                                      true /* forward */,
-                                                                      std::move(lowKey),
-                                                                      std::move(highKey),
-                                                                      {} /* indexKeysToInclude */,
-                                                                      {} /* indexKeySlots */,
-                                                                      reqs,
-                                                                      _yieldPolicy,
-                                                                      csn->nodeId(),
-                                                                      false /* lowPriority */);
+    std::unique_ptr<KeyString::Value> lowKey, highKey;
+    if (csn->iets.empty()) {
+        std::tie(lowKey, highKey) =
+            makeKeyStringPair(csn->startKey,
+                              csn->startKeyInclusive,
+                              csn->endKey,
+                              csn->endKeyInclusive,
+                              indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
+                              indexAccessMethod->getSortedDataInterface()->getOrdering(),
+                              true /* forward */);
+    }
+
+    auto [stage, planStageSlots, indexScanBoundsSlots] =
+        generateSingleIntervalIndexScan(_state,
+                                        collection,
+                                        indexName,
+                                        indexDescriptor->keyPattern(),
+                                        true /* forward */,
+                                        std::move(lowKey),
+                                        std::move(highKey),
+                                        {} /* indexKeysToInclude */,
+                                        {} /* indexKeySlots */,
+                                        reqs,
+                                        _yieldPolicy,
+                                        csn->nodeId(),
+                                        false /* lowPriority */);
+
+    if (!csn->iets.empty()) {
+        tassert(7681500,
+                "lowKey and highKey runtime environment slots must be present",
+                indexScanBoundsSlots);
+        _state.data->indexBoundsEvaluationInfos.emplace_back(IndexBoundsEvaluationInfo{
+            csn->index,
+            indexAccessMethod->getSortedDataInterface()->getKeyStringVersion(),
+            indexAccessMethod->getSortedDataInterface()->getOrdering(),
+            1 /* direction */,
+            std::move(csn->iets),
+            {ParameterizedIndexScanSlots::SingleIntervalPlan{indexScanBoundsSlots->first,
+                                                             indexScanBoundsSlots->second}}});
+    }
 
     if (csn->index.multikey ||
         (indexDescriptor->getIndexType() == IndexType::INDEX_WILDCARD &&
@@ -2495,8 +2587,8 @@ sbe::value::SlotVector generateAccumulator(
                         str::stream()
                             << accStmt.expr.name << " accumulator must have an object argument",
                         objConst.isObject());
-                auto outputField =
-                    objConst.getDocument().toBson().getField(AccumulatorN::kFieldNameOutput);
+                auto objBson = objConst.getDocument().toBson();
+                auto outputField = objBson.getField(AccumulatorN::kFieldNameOutput);
                 if (outputField.ok()) {
                     auto [outputTag, outputVal] =
                         sbe::bson::convertFrom<false /* View */>(outputField);

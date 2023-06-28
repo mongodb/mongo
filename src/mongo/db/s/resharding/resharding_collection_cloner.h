@@ -29,18 +29,27 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/shard_key_pattern.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -52,6 +61,7 @@ class TaskExecutor;
 
 class OperationContext;
 class MongoProcessInterface;
+
 class ReshardingMetrics;
 class ServiceContext;
 

@@ -27,39 +27,44 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/idempotency_test_fixture.h"
-
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_validation.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
+#include "mongo/db/catalog/validate_results.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/index_builds_coordinator.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/internal_plans.h"
-#include "mongo/db/repl/bgsync.h"
-#include "mongo/db/repl/drop_pending_collection_reaper.h"
-#include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_applier.h"
-#include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/repl/idempotency_test_fixture.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_entry_test_helpers.h"
-#include "mongo/db/repl/oplog_interface_local.h"
-#include "mongo/db/repl/replication_consistency_markers_mock.h"
-#include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace repl {
@@ -360,7 +365,7 @@ std::vector<CollectionState> IdempotencyTest::validateAllCollections() {
     auto dbNames = catalog->getAllDbNames();
     for (auto& dbName : dbNames) {
         // Skip local database.
-        if (dbName.db() != DatabaseName::kLocal.db()) {
+        if (!dbName.isLocalDB()) {
             std::vector<NamespaceString> collectionNames;
             {
                 Lock::DBLock lk(_opCtx.get(), dbName, MODE_S);

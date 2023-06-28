@@ -29,8 +29,16 @@
 
 #include "mongo/db/query/ce/hinted_estimator.h"
 
+#include <type_traits>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/sel_tree_utils.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/partial_schema_requirements.h"
 
 namespace mongo::optimizer::ce {
 class HintedTransport {

@@ -29,9 +29,14 @@
 
 #include "mongo/bson/oid.h"
 
+#include <cstring>
+
+#include <absl/hash/hash.h>
+
 #include "mongo/base/parse_number.h"
 #include "mongo/platform/endian.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 

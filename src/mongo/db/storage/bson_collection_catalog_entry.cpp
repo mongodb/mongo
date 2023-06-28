@@ -29,13 +29,27 @@
 
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
 
+#include <boost/container/flat_set.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
-#include <numeric>
+#include <cstddef>
+#include <memory>
+#include <mutex>
+#include <string>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -266,7 +280,7 @@ BSONObj BSONCollectionCatalogEntry::MetaData::toBSON(bool hasExclusiveAccess) co
 }
 
 void BSONCollectionCatalogEntry::MetaData::parse(const BSONObj& obj) {
-    nss = NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+    nss = NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
         obj.getStringField("ns").toString());
 
     if (obj["options"].isABSONObj()) {

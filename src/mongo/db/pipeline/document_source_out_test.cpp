@@ -27,15 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <vector>
 
-#include <boost/intrusive_ptr.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregation_context_fixture.h"
 #include "mongo/db/pipeline/document_source_out.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -219,7 +235,8 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     // DatabaseNameUtil::serialize() instead
     // Assert the tenantId is not included in the serialized namespace.
     auto serialized = outSource->serialize().getDocument();
-    auto expectedDoc = Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().db()}};
+    auto expectedDoc =
+        Document{{"coll", targetColl}, {"db", expCtx->ns.dbName().toString_forTest()}};
     ASSERT_DOCUMENT_EQ(serialized["$out"].getDocument(), expectedDoc);
 
     // The tenantId for the outputNs should be the same as that on the expCtx despite outputting
@@ -231,7 +248,7 @@ TEST_F(DocumentSourceOutServerlessTest, CreateFromBSONContainsExpectedNamespaces
     ASSERT(outSource);
     ASSERT(outSource->getOutputNs().tenantId());
     ASSERT_EQ(*outSource->getOutputNs().tenantId(), *expCtx->ns.tenantId());
-    ASSERT_EQ(outSource->getOutputNs().dbName().db(), targetDb);
+    ASSERT_EQ(outSource->getOutputNs().dbName().toString_forTest(), targetDb);
 
     // Assert the tenantId is not included in the serialized namespace.
     serialized = outSource->serialize().getDocument();

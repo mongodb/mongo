@@ -54,7 +54,7 @@ namespace mongo {
 namespace {
 
 void insertOplogDocument(OperationContext* opCtx, Timestamp ts, StringData ns) {
-    AutoGetCollection coll(opCtx, NamespaceString{ns}, MODE_IX);
+    AutoGetCollection coll(opCtx, NamespaceString::createNamespaceString_forTest(ns), MODE_IX);
     WriteUnitOfWork wuow(opCtx);
     auto doc = BSON("ts" << ts);
     InsertStatement stmt;
@@ -1224,7 +1224,7 @@ public:
         OldClientContext ctx(
             &_opCtx, NamespaceString::createNamespaceString_forTest("unittests.DirectLocking"));
         _client.remove(NamespaceString::createNamespaceString_forTest("a.b"), BSONObj());
-        ASSERT_EQUALS("unittests", ctx.db()->name().db());
+        ASSERT_EQUALS("unittests", ctx.db()->name().toString_forTest());
     }
     const char* ns;
 };
@@ -1414,7 +1414,7 @@ public:
             CollectionOptions collectionOptions = unittest::assertGet(
                 CollectionOptions::parse(fromjson("{ capped : true, size : 2000, max: 10000 }"),
                                          CollectionOptions::parseForCommand));
-            NamespaceString nss(ns());
+            NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns());
             ASSERT(ctx.db()->userCreateNS(&_opCtx, nss, collectionOptions, false).isOK());
             wunit.commit();
         }
@@ -1593,11 +1593,12 @@ public:
         for (int k = 0; k < 5; ++k) {
             auto ts = Timestamp(1000, i++);
             insertOplogDocument(&_opCtx, ts, ns());
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setSort(BSON("$natural" << 1));
             unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
             for (unsigned j = -1; j < i; ++j) {
-                FindCommandRequest findRequestInner{NamespaceString{ns()}};
+                FindCommandRequest findRequestInner{
+                    NamespaceString::createNamespaceString_forTest(ns())};
                 findRequestInner.setFilter(BSON("ts" << GTE << Timestamp(1000, j)));
                 std::unique_ptr<DBClientCursor> c = _client.find(findRequestInner);
                 ASSERT(c->more());
@@ -1651,11 +1652,12 @@ public:
 
         for (int k = 0; k < 5; ++k) {
             insertOplogDocument(&_opCtx, Timestamp(1000, i++), ns());
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setSort(BSON("$natural" << 1));
             unsigned min = _client.find(findRequest)->next()["ts"].timestamp().getInc();
             for (unsigned j = -1; j < i; ++j) {
-                FindCommandRequest findRequestInner{NamespaceString{ns()}};
+                FindCommandRequest findRequestInner{
+                    NamespaceString::createNamespaceString_forTest(ns())};
                 findRequestInner.setFilter(BSON("ts" << GTE << Timestamp(1000, j)));
                 std::unique_ptr<DBClientCursor> c = _client.find(findRequestInner);
                 ASSERT(c->more());
@@ -1716,7 +1718,7 @@ public:
         }
 
         // Check oplog replay mode with empty collection.
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setFilter(BSON("ts" << GTE << Timestamp(1000, 50)));
         std::unique_ptr<DBClientCursor> c = _client.find(findRequest);
         ASSERT(!c->more());
@@ -1774,7 +1776,7 @@ public:
         insert(nss(), BSON("a" << 3));
         std::unique_ptr<DBClientCursor> cursor =
             _client.find(FindCommandRequest{NamespaceStringOrUUID{"unittests", *coll_opts.uuid}});
-        ASSERT_EQUALS(string(ns()), cursor->getns());
+        ASSERT_EQUALS(nss(), cursor->getNamespaceString());
         for (int i = 1; i <= 3; ++i) {
             ASSERT(cursor->more());
             BSONObj obj(cursor->next());
@@ -1928,7 +1930,7 @@ public:
         {
             // With five results and a batch size of 5, a cursor is created since we don't know
             // there are no more results.
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setBatchSize(5);
             std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
             ASSERT(c->more());
@@ -1942,7 +1944,7 @@ public:
         {
             // With a batchsize of 6 we know there are no more results so we don't create a
             // cursor.
-            FindCommandRequest findRequest{NamespaceString{ns()}};
+            FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
             findRequest.setBatchSize(6);
             std::unique_ptr<DBClientCursor> c = _client.find(std::move(findRequest));
             ASSERT(c->more());

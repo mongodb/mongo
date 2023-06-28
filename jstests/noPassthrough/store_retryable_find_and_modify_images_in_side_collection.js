@@ -1,6 +1,6 @@
 /**
  * Test that retryable findAndModify commands will store pre- and post- images in the appropriate
- * collections for `storeFindAndModifyImagesInSideCollection=true`.
+ * collections.
  *
  * @tags: [requires_replication]
  */
@@ -56,9 +56,6 @@ function assertRetryCommand(cmdResponse, retryResponse) {
 }
 
 function checkProfilingLogs(primary) {
-    assert.commandWorked(
-        primary.adminCommand({setParameter: 1, storeFindAndModifyImagesInSideCollection: true}));
-
     let db = primary.getDB('for_profiling');
     let configDB = primary.getDB('config');
     assert.commandWorked(db.user.insert({_id: 1}));
@@ -98,9 +95,6 @@ function checkProfilingLogs(primary) {
 }
 
 function runTests(lsid, mainConn, primary, secondary, docId) {
-    const setParam = {setParameter: 1, storeFindAndModifyImagesInSideCollection: true};
-    primary.adminCommand(setParam);
-
     let txnNumber = NumberLong(docId);
     let incrementTxnNumber = function() {
         txnNumber = NumberLong(txnNumber + 1);

@@ -29,9 +29,22 @@
 
 #pragma once
 
+#include <cstddef>
+#include <functional>
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/write_stage_common.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/profile_filter.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 

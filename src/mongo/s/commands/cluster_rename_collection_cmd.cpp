@@ -79,8 +79,9 @@ public:
 
             if (fromNss.isTimeseriesBucketsCollection() &&
                 !AuthorizationSession::get(opCtx->getClient())
-                     ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                        ActionType::setUserWriteBlockMode)) {
+                     ->isAuthorizedForActionsOnResource(
+                         ResourcePattern::forClusterResource(fromNss.tenantId()),
+                         ActionType::setUserWriteBlockMode)) {
                 uasserted(ErrorCodes::IllegalOperation,
                           "Renaming a timeseries collection is not allowed");
             }
@@ -103,8 +104,9 @@ public:
             renameCollRequest.setRenameCollectionRequest(renameCollReq);
             renameCollRequest.setAllowEncryptedCollectionRename(
                 AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::setUserWriteBlockMode));
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(fromNss.tenantId()),
+                        ActionType::setUserWriteBlockMode));
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
             auto swDbInfo = Grid::get(opCtx)->catalogCache()->getDatabase(opCtx, fromNss.db());

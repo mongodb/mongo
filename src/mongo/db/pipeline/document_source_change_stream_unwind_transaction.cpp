@@ -28,14 +28,40 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <string>
+#include <utility>
 
-#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/pipeline/change_stream_filter_helpers.h"
 #include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
+#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/document_source_change_stream_gen.h"
+#include "mongo/db/pipeline/document_source_change_stream_unwind_transaction.h"
+#include "mongo/db/pipeline/document_source_match.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

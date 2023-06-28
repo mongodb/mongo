@@ -40,7 +40,10 @@
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
 #include "mongo/db/ops/update.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
 #include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_applier_impl.h"
+#include "mongo/db/repl/oplog_applier_utils.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/shard_role.h"
@@ -212,7 +215,7 @@ protected:
     }
     int opCount() {
         return DBDirectClient(&_opCtx)
-            .find(FindCommandRequest{NamespaceString{cllNS()}})
+            .find(FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())})
             ->itcount();
     }
     void applyAllOperations() {
@@ -220,7 +223,8 @@ protected:
         std::vector<BSONObj> ops;
         {
             DBDirectClient db(&_opCtx);
-            auto cursor = db.find(FindCommandRequest{NamespaceString{cllNS()}});
+            auto cursor = db.find(
+                FindCommandRequest{NamespaceString::createNamespaceString_forTest(cllNS())});
             while (cursor->more()) {
                 ops.push_back(cursor->nextSafe());
             }
@@ -242,8 +246,19 @@ protected:
             // Handle the case of batched writes which generate command-type (applyOps) oplog
             // entries.
             if (entry.getOpType() == repl::OpTypeEnum::kCommand) {
-                uassertStatusOK(applyCommand_inlock(
-                    &_opCtx, ApplierOperation{&entry}, getOplogApplicationMode()));
+                std::vector<ApplierOperation> ops;
+                auto stmts = ApplyOps::extractOperations(entry);
+                for (auto& stmt : stmts) {
+                    ops.push_back(ApplierOperation(&stmt));
+                }
+                _opCtx.releaseAndReplaceRecoveryUnit();
+                uassertStatusOK(
+                    OplogApplierUtils::applyOplogBatchCommon(&_opCtx,
+                                                             &ops,
+                                                             getOplogApplicationMode(),
+                                                             true,
+                                                             true,
+                                                             &applyOplogEntryOrGroupedInserts));
             } else {
                 auto coll = acquireCollection(
                     &_opCtx, {nss(), {}, {}, AcquisitionPrerequisites::kWrite}, MODE_IX);
@@ -266,7 +281,7 @@ protected:
     }
     // These deletes don't get logged.
     void deleteAll(const char* ns) const {
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         ::mongo::writeConflictRetry(&_opCtx, "deleteAll", nss, [&] {
             Lock::GlobalWrite lk(&_opCtx);
             OldClientContext ctx(&_opCtx, nss);
@@ -342,15 +357,6 @@ protected:
         b.appendElements(fromjson(json));
         return b.obj();
     }
-
-private:
-    // Disable batched deletes. We use batched writes for the delete in the Remove() case which
-    // tries to group two deletes in one applyOps. It is illegal to batch writes outside a WUOW,
-    // so we disable batching for this test.
-    // TODO SERVER-69316: When featureFlagBatchMultiDeletes is removed, we want the Remove() test
-    // to issue two different applyOps deletes, or wrap the applyOps in a WUOW.
-    RAIIServerParameterControllerForTest _featureFlagController{"featureFlagBatchMultiDeletes",
-                                                                false};
 };
 
 
@@ -798,7 +804,7 @@ class MultiInc : public Recovering {
 public:
     std::string s() const {
         StringBuilder ss;
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("_id" << 1));
         std::unique_ptr<DBClientCursor> cc = _client.find(std::move(findRequest));
         bool first = true;

@@ -27,25 +27,75 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <cstdint>
+#include <deque>
+#include <iterator>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/change_collection_expired_documents_remover.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/change_stream_options_gen.h"
 #include "mongo/db/change_stream_options_manager.h"
 #include "mongo/db/change_stream_pre_image_util.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/change_stream_pre_images_truncate_markers_per_nsUUID.h"
 #include "mongo/db/change_stream_serverless_helpers.h"
 #include "mongo/db/change_streams_cluster_parameter_gen.h"
-#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
-#include "mongo/db/repl/oplog_entry_test_helpers.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/collection_truncate_markers.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/platform/basic.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -116,7 +166,56 @@ protected:
     const NamespaceString kPreImageEnabledCollection =
         NamespaceString::createNamespaceString_forTest("test.collection");
 
+    // All truncate markers require a creation method. Unless specifically testing the creation
+    // method, the creation method is arbitrary and should not impact post-initialisation behavior.
+    const CollectionTruncateMarkers::MarkersCreationMethod kArbitraryMarkerCreationMethod{
+        CollectionTruncateMarkers::MarkersCreationMethod::Scanning};
+
     PreImagesRemoverTest() : CatalogTestFixture(Options{}.useMockClock(true)) {}
+
+    ChangeStreamPreImage generatePreImage(const UUID& nsUUID, Timestamp ts) {
+        auto preImageId = ChangeStreamPreImageId(nsUUID, ts, 0);
+        const BSONObj doc = BSON("x" << 1);
+        auto operationTime = Date_t::fromDurationSinceEpoch(Seconds{ts.getSecs()});
+        return ChangeStreamPreImage(preImageId, operationTime, doc);
+    }
+
+    // Populates the pre-images collection with 'numRecords'. Generates pre-images with Timestamps 1
+    // millisecond apart starting at 'startOperationTime'.
+    void prePopulatePreImagesCollection(boost::optional<TenantId> tenantId,
+                                        const NamespaceString& nss,
+                                        int64_t numRecords,
+                                        Date_t startOperationTime) {
+        auto preImagesCollectionNss = NamespaceString::makePreImageCollectionNSS(tenantId);
+        auto opCtx = operationContext();
+        auto nsUUID = CollectionCatalog::get(opCtx)
+                          ->lookupCollectionByNamespace(operationContext(), nss)
+                          ->uuid();
+
+        std::vector<ChangeStreamPreImage> preImages;
+        for (int64_t i = 0; i < numRecords; i++) {
+            preImages.push_back(
+                generatePreImage(nsUUID, Timestamp{startOperationTime + Milliseconds{i}}));
+        }
+
+        std::vector<InsertStatement> preImageInsertStatements;
+        std::transform(preImages.begin(),
+                       preImages.end(),
+                       std::back_inserter(preImageInsertStatements),
+                       [](const auto& preImage) { return InsertStatement{preImage.toBSON()}; });
+
+        AutoGetCollection preImagesCollectionRaii(opCtx, preImagesCollectionNss, MODE_IX);
+        ASSERT(preImagesCollectionRaii);
+        WriteUnitOfWork wuow(opCtx);
+        auto& changeStreamPreImagesCollection = preImagesCollectionRaii.getCollection();
+
+        auto status = collection_internal::insertDocuments(opCtx,
+                                                           changeStreamPreImagesCollection,
+                                                           preImageInsertStatements.begin(),
+                                                           preImageInsertStatements.end(),
+                                                           nullptr);
+        wuow.commit();
+    };
 
     void insertPreImage(NamespaceString nss, Timestamp operationTime) {
         auto uuid = CollectionCatalog::get(operationContext())
@@ -125,17 +224,7 @@ protected:
         auto& manager = ChangeStreamPreImagesCollectionManager::get(getServiceContext());
         auto opCtx = operationContext();
         WriteUnitOfWork wuow(opCtx);
-        ChangeStreamPreImageId id;
-        id.setNsUUID(uuid);
-        id.setApplyOpsIndex(0);
-        id.setTs(operationTime);
-
-        ChangeStreamPreImage image;
-        BSONObjBuilder bsonObjBuilder;
-        bsonObjBuilder.append("x", 1);
-        image.setPreImage(bsonObjBuilder.obj());
-        image.setId(id);
-        image.setOperationTime(Date_t::fromDurationSinceEpoch(Seconds{operationTime.getSecs()}));
+        auto image = generatePreImage(uuid, operationTime);
         manager.insertPreImage(opCtx, boost::none, image);
         wuow.commit();
     }
@@ -211,6 +300,11 @@ protected:
         invariantStatusOK(storageInterface()->createCollection(
             operationContext(), kPreImageEnabledCollection, CollectionOptions{}));
     }
+
+    // A 'boost::none' tenantId implies a single tenant environment.
+    boost::optional<TenantId> nullTenantId() {
+        return boost::none;
+    }
 };
 
 // When 'expireAfterSeconds' is off, defaults to comparing the 'lastRecord's Timestamp of oldest
@@ -243,8 +337,12 @@ TEST_F(PreImagesRemoverTest, hasExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(
-        boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(nullTenantId() /* tenantId */,
+                                              std::move(initialMarkers),
+                                              0,
+                                              0,
+                                              100,
+                                              kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }
@@ -273,8 +371,12 @@ TEST_F(PreImagesRemoverTest, hasNoExcessMarkersExpiredAfterSecondsOff) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(
-        boost::none /* tenantId */, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(nullTenantId() /* tenantId */,
+                                              std::move(initialMarkers),
+                                              0,
+                                              0,
+                                              100,
+                                              kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
@@ -292,7 +394,8 @@ TEST_F(PreImagesRemoverTest, serverlessHasNoExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(
+        tenantId, std::move(initialMarkers), 0, 0, 100, kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_FALSE(excessMarkers);
 }
@@ -310,7 +413,8 @@ TEST_F(PreImagesRemoverTest, serverlessHasExcessMarkers) {
     std::deque<CollectionTruncateMarkers::Marker> initialMarkers{
         {numRecords, numBytes, lastRecordId, wallTime}};
 
-    PreImagesTruncateMarkersPerNsUUID markers(tenantId, std::move(initialMarkers), 0, 0, 100);
+    PreImagesTruncateMarkersPerNsUUID markers(
+        tenantId, std::move(initialMarkers), 0, 0, 100, kArbitraryMarkerCreationMethod);
     bool excessMarkers = hasExcessMarkers(opCtx, markers);
     ASSERT_TRUE(excessMarkers);
 }
@@ -446,4 +550,41 @@ TEST_F(PreImagesRemoverTest, EnsureNoMoreInternalScansWithTruncates) {
     ASSERT_EQ(passStats["docsDeleted"].numberLong(), 2);
     ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 3);
 }
+
+TEST_F(PreImagesRemoverTest, EnsureAllDocsEventualyTruncatedFromPrePopulatedCollection) {
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
+
+    auto clock = clockSource();
+    auto startOperationTime = clock->now();
+    auto numRecords = 1000;
+    prePopulatePreImagesCollection(
+        nullTenantId(), kPreImageEnabledCollection, numRecords, startOperationTime);
+
+    // Advance the clock to align with the most recent pre-image inserted.
+    clock->advance(Milliseconds{numRecords});
+
+    // Move the clock further ahead to simulate startup with a collection of expired pre-images.
+    clock->advance(Seconds{10});
+
+    setExpirationTime(Seconds{1});
+
+    auto passStats = performPass(Milliseconds{0});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), numRecords);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 1);
+}
+
+TEST_F(PreImagesRemoverTest, RemoverPassWithTruncateOnEmptyCollection) {
+    RAIIServerParameterControllerForTest truncateFeatureFlag{
+        "featureFlagUseUnreplicatedTruncatesForDeletions", true};
+
+    setExpirationTime(Seconds{1});
+
+    auto passStats = performPass(Milliseconds{0});
+    ASSERT_EQ(passStats["totalPass"].numberLong(), 1);
+    ASSERT_EQ(passStats["docsDeleted"].numberLong(), 0);
+    ASSERT_EQ(passStats["scannedInternalCollections"].numberLong(), 0);
+}
+
 }  // namespace mongo

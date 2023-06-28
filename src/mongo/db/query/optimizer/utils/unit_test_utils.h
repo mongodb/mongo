@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/query/ce/hinted_estimator.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/explain.h"
+#include "mongo/db/query/optimizer/metadata.h"
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/inline_auto_update.h"
 
 

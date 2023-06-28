@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 #pragma once
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <string>
+#include <utility>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/sdam/sdam.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/executor/network_interface.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 class StreamableReplicaSetMonitorErrorHandler {

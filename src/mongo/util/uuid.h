@@ -32,8 +32,6 @@
 #include <functional>
 #include <string>
 
-#include <MurmurHash3.h>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonelement.h"
@@ -41,6 +39,7 @@
 #include "mongo/bson/bsonobj.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
@@ -172,9 +171,7 @@ public:
      */
     struct Hash {
         std::size_t operator()(const UUID& uuid) const {
-            uint32_t hash;
-            MurmurHash3_x86_32(uuid._uuid.data(), UUID::kNumBytes, 0, &hash);
-            return hash;
+            return murmur3<sizeof(uint32_t)>(uuid.toCDR(), 0 /*seed*/);
         }
     };
 

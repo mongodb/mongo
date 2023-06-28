@@ -51,13 +51,13 @@
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
-#include "mongo/db/query/aggregate_request_shapifier.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain_common.h"
 #include "mongo/db/query/find_common.h"
 #include "mongo/db/query/fle/server_rewrite.h"
 #include "mongo/db/query/query_stats.h"
+#include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
@@ -275,7 +275,7 @@ std::vector<BSONObj> rebuildPipelineWithTimeSeriesGranularity(
  */
 std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     OperationContext* opCtx,
-    const StringMap<ExpressionContext::ResolvedNamespace>& resolvedNamespaces,
+    const stdx::unordered_set<NamespaceString>& involvedNamespaces,
     const NamespaceString& executionNss,
     AggregateCommandRequest& request,
     boost::optional<CollectionRoutingInfo> cri,
@@ -302,15 +302,20 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     // Build an ExpressionContext for the pipeline. This instantiates an appropriate collator,
     // includes all involved namespaces, and creates a shared MongoProcessInterface for use by
     // the pipeline's stages.
-    boost::intrusive_ptr<ExpressionContext> expCtx = makeExpressionContext(
-        opCtx, request, collationObj, uuid, resolvedNamespaces, hasChangeStream);
+    boost::intrusive_ptr<ExpressionContext> expCtx =
+        makeExpressionContext(opCtx,
+                              request,
+                              collationObj,
+                              uuid,
+                              resolveInvolvedNamespaces(involvedNamespaces),
+                              hasChangeStream);
 
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
         query_stats::registerRequest(expCtx, executionNss, [&]() {
-            return std::make_unique<query_stats::AggregateRequestShapifier>(
-                request, *pipeline, expCtx);
+            return std::make_unique<query_stats::AggregateKeyGenerator>(
+                request, *pipeline, expCtx, involvedNamespaces, executionNss);
         });
     }
     return pipeline;
@@ -357,6 +362,9 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
                           << AggregateCommandRequest::kFromMongosFieldName
                           << "] cannot be set to 'true' when sent to mongos",
             !request.getNeedsMerge() && !request.getFromMongos());
+    uassert(ErrorCodes::BadValue,
+            "Aggregate queries on mongoS may not request or provide a resume token",
+            !request.getRequestResumeToken() && !request.getResumeAfter());
 
     const auto isSharded = [](OperationContext* opCtx, const NamespaceString& nss) {
         const auto [resolvedNsCM, _] =
@@ -408,11 +416,10 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
         }
     }
 
-    auto resolvedNamespaces = resolveInvolvedNamespaces(involvedNamespaces);
     boost::intrusive_ptr<ExpressionContext> expCtx;
     const auto pipelineBuilder = [&]() {
         auto pipeline = parsePipelineAndRegisterQueryStats(opCtx,
-                                                           resolvedNamespaces,
+                                                           involvedNamespaces,
                                                            namespaces.executionNss,
                                                            request,
                                                            cri,
@@ -478,7 +485,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
 
         expCtx = make_intrusive<ExpressionContext>(
             opCtx, nullptr, namespaces.executionNss, boost::none, request.getLet());
-        expCtx->setResolvedNamespaces(resolvedNamespaces);
+        expCtx->addResolvedNamespaces(involvedNamespaces);
 
         // Skip query stats recording for queryable encryption queries.
         if (!shouldDoFLERewrite) {
@@ -487,8 +494,8 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // query_stats::registerRequest.
             query_stats::registerRequest(expCtx, namespaces.executionNss, [&]() {
                 auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
-                return std::make_unique<query_stats::AggregateRequestShapifier>(
-                    request, *pipeline, expCtx);
+                return std::make_unique<query_stats::AggregateKeyGenerator>(
+                    request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);
             });
         }
     }

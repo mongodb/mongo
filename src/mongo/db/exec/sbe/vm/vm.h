@@ -29,12 +29,28 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/inlined_vector.h>
+#include <absl/hash/hash.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cmath>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
+#include <limits>
 #include <memory>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/compare_numbers.h"
-#include "mongo/config.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/makeobj_spec.h"
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
@@ -43,8 +59,11 @@
 #include "mongo/db/exec/sbe/vm/label.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
-
-#include <absl/container/inlined_vector.h>
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 
 #if !defined(MONGO_CONFIG_DEBUG_BUILD)
 #define MONGO_COMPILER_ALWAYS_INLINE_OPT MONGO_COMPILER_ALWAYS_INLINE
@@ -670,6 +689,7 @@ enum class Builtin : uint8_t {
     bitTestMask,      // test bitwise mask & value is mask
     bitTestPosition,  // test BinData with a bit position list
     bsonSize,         // implements $bsonSize
+    strLenBytes,
     toUpper,
     toLower,
     coerceToBool,
@@ -780,6 +800,11 @@ enum class Builtin : uint8_t {
     aggMinN,
     aggMinNMerge,
     aggMinNFinalize,
+    aggRank,
+    aggRankColl,
+    aggDenseRank,
+    aggDenseRankColl,
+    aggRankFinalize,
 };
 
 std::string builtinToString(Builtin b);
@@ -904,6 +929,17 @@ enum AggStdDevValueElems {
     // This is actually not an index but represents the number of elements stored
     kSizeOfArray
 };
+
+/**
+ * This enum defines indices into an 'Array' that store state for rank expressions.
+ *
+ * The array contains three elements:
+ * - The element at index `kLastValue` is the last value.
+ * - The element at index `kLastRank` is the rank of the last value.
+ * - The element at index `kSameRankCount` is how many values are of the same rank as the last
+ * value.
+ */
+enum AggRankElems { kLastValue, kLastRank, kSameRankCount, kRankArraySize };
 
 /**
  * This enum defines indices into an 'Array' that returns the result of accumulators that track the
@@ -1598,6 +1634,7 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinBitTestMask(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinBitTestPosition(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinBsonSize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinStrLenBytes(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinToUpper(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinToLower(ArityType arity);
     FastTuple<bool, value::TypeTags, value::Value> builtinCoerceToBool(ArityType arity);
@@ -1710,6 +1747,11 @@ private:
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNMerge(ArityType arity);
     template <bool less>
     FastTuple<bool, value::TypeTags, value::Value> builtinAggMinMaxNFinalize(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRank(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRankColl(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDenseRank(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggDenseRankColl(ArityType arity);
+    FastTuple<bool, value::TypeTags, value::Value> builtinAggRankFinalize(ArityType arity);
 
     FastTuple<bool, value::TypeTags, value::Value> dispatchBuiltin(Builtin f, ArityType arity);
 

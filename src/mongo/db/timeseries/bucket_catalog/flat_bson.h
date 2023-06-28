@@ -29,13 +29,23 @@
 
 #pragma once
 
-#include "mongo/base/string_data.h"
-#include "mongo/bson/bsonelement.h"
-#include "mongo/util/string_map.h"
-
+#include <absl/container/node_hash_map.h>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <iterator>
 #include <memory>
 #include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
 #include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -183,6 +193,7 @@ public:
      * iteration, insertion and search capability for subelements.
      */
     class Obj {
+
     public:
         friend class FlatBSONStore;
 

@@ -32,6 +32,7 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace sbe {

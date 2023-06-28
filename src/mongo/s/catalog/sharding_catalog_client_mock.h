@@ -150,10 +150,15 @@ public:
 
     Status createDatabase(OperationContext* opCtx, StringData dbName, ShardId primaryShard);
 
-    StatusWith<std::vector<KeysCollectionDocument>> getNewKeys(
+    StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
         StringData purpose,
         const LogicalTime& newerThanThis,
+        repl::ReadConcernLevel readConcernLevel) override;
+
+    StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
+        OperationContext* opCtx,
+        StringData purpose,
         repl::ReadConcernLevel readConcernLevel) override;
 
     HistoricalPlacement getShardsThatOwnDataForCollAtClusterTime(

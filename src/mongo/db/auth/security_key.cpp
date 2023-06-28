@@ -28,23 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/security_key.h"
-
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/sasl_options.h"
 #include "mongo/db/auth/security_file.h"
+#include "mongo/db/auth/security_key.h"
 #include "mongo/db/auth/user.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/icu.h"
 #include "mongo/util/password_digest.h"
 

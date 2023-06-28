@@ -29,24 +29,43 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <map>
+#include <memory>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/field_ref_set.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/update/modifier_table.h"
 #include "mongo/db/update/object_replace_executor.h"
 #include "mongo/db/update/pipeline_executor.h"
+#include "mongo/db/update/update_executor.h"
+#include "mongo/db/update/update_node.h"
 #include "mongo/db/update/update_node_visitor.h"
 #include "mongo/db/update/update_object_node.h"
 #include "mongo/db/update/update_tree_executor.h"
 #include "mongo/db/update_index_data.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

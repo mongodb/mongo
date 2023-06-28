@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/repl/optime.h"
 

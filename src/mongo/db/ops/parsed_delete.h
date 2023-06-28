@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/base/status.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/parsed_writes_common.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

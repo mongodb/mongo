@@ -31,8 +31,10 @@
 
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/cst/bson_location.h"
 #include "mongo/db/cst/parser_gen.hpp"

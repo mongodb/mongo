@@ -736,7 +736,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                 auto swExpansion = runYAMLExpansion(
                     elementVal, str::stream() << key << "." << elementKey, configExpand);
                 if (swExpansion.isOK()) {
-                    const auto status = addPair(elementKey, swExpansion.getValue());
+                    auto status = addPair(elementKey, swExpansion.getValue());
                     if (!status.isOK()) {
                         return status;
                     }
@@ -746,7 +746,7 @@ Status YAMLNodeToValue(const YAML::Node& YAMLNode,
                 }  // else not an expansion block.
             }
 
-            const auto status = addPair(std::move(elementKey), elementVal);
+            auto status = addPair(std::move(elementKey), elementVal);
             if (!status.isOK()) {
                 return status;
             }

@@ -29,9 +29,23 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_state_registry.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <utility>
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
 
 namespace mongo::timeseries::bucket_catalog {
 
@@ -215,7 +229,8 @@ Status initializeBucketState(BucketStateRegistry& registry,
     } else if (conflictsWithReopening(it->second)) {
         // If the bucket is cleared or we are currently performing direct writes on it we cannot
         // initialize the bucket to a normal state.
-        return {ErrorCodes::WriteConflict, "Bucket may be stale"};
+        return {ErrorCodes::WriteConflict,
+                "Bucket initialization failed: conflict with an exisiting bucket"};
     }
 
     invariant(!isBucketStatePrepared(it->second));
@@ -241,6 +256,9 @@ StateChangeSucessful prepareBucketState(BucketStateRegistry& registry,
     if (conflictsWithInsertions(it->second)) {
         return StateChangeSucessful::kNo;
     }
+
+    // We cannot prepare an already prepared bucket.
+    invariant(!isBucketStatePrepared(it->second));
 
     it->second = BucketState::kPrepared;
     return StateChangeSucessful::kYes;

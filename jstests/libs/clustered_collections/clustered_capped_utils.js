@@ -308,12 +308,7 @@ var ClusteredCappedUtils = class {
             {getParameter: 1, "ttlMonitorBatchDeletes": 1}))["ttlMonitorBatchDeletes"];
         const ns = db.getName() + "." + collName;
 
-        const featureFlagBatchMultiDeletes = assert.commandWorked(db.adminCommand({
-            getParameter: 1,
-            "featureFlagBatchMultiDeletes": 1
-        }))["featureFlagBatchMultiDeletes"]["value"];
-
-        if (featureFlagBatchMultiDeletes && isBatched) {
+        if (isBatched) {
             const ops =
                 db.getSiblingDB("local")
                     .oplog.rs

@@ -29,6 +29,11 @@
 
 #include "mongo/db/profile_filter.h"
 
+#include <mutex>
+#include <utility>
+
+#include "mongo/platform/mutex.h"
+
 namespace mongo {
 
 static std::shared_ptr<ProfileFilter> defaultProfileFilter;

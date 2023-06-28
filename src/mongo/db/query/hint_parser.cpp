@@ -29,7 +29,11 @@
 
 #include "mongo/db/query/hint_parser.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

@@ -2,7 +2,6 @@
  * Tests for the approximate percentile expression semantics.
  * @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 (function() {
@@ -12,10 +11,10 @@ load("jstests/aggregation/extras/utils.js");
 
 const coll = db[jsTestName()];
 
-function testWithProject({doc, percentileSpec, expectedResult, msg}) {
+function testWithProject({doc, percentileSpec, letSpec, expectedResult, msg}) {
     coll.drop();
     coll.insert(doc);
-    const res = coll.aggregate([{$project: {p: percentileSpec}}]).toArray();
+    const res = coll.aggregate([{$project: {p: percentileSpec}}], {let : letSpec}).toArray();
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     assert.eq(expectedResult, res[0].p, msg + ` result: ${tojson(res)}`);
 }
@@ -100,6 +99,27 @@ testWithProject({
     percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x1", method: "approximate"}},
     expectedResult: [null, null, null],
     msg: "Multiple percentiles when single input expression resolves to a non-numeric scalar"
+});
+
+testWithProject({
+    doc: {x: [2, 1], y: 3},
+    percentileSpec: {
+        $percentile: {
+            p: [0.5, 0.9],
+            input: {$concatArrays: ["$x", [{$add: [42, "$y"]}]]},
+            method: "approximate"
+        }
+    },
+    expectedResult: [2, 42 + 3],
+    msg: "Input as complex expression"
+});
+
+testWithProject({
+    doc: {x: [2, 3, 1]},
+    percentileSpec: {$percentile: {p: "$$ps", input: "$x", method: "approximate"}},
+    letSpec: {ps: [0.1, 0.5, 0.9]},
+    expectedResult: [1, 2, 3],
+    msg: "'p' specified as a variable"
 });
 
 /**

@@ -29,11 +29,15 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <utility>
+#include <vector>
 
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo::cst_match_translation {
 

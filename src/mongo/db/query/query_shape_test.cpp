@@ -27,16 +27,31 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <cstdint>
+#include <memory>
+#include <s2cellid.h>
+#include <utility>
+#include <variant>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/matcher/parsed_match_expression_for_test.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/query/query_shape.h"
 #include "mongo/db/query/query_shape_test_gen.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {
@@ -524,46 +539,46 @@ TEST(QueryPredicateShape, OptimizedExprPredicates) {
 TEST(SortPatternShape, NormalSortPattern) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"a.b.c":1,"foo":-1})",
-        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({"a.b.c": 1, "foo": -1})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST(SortPatternShape, NaturalSortPattern) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: 1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: 1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: 1})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({$natural: -1})",
-        query_shape::extractSortShape(fromjson(R"({$natural: -1})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({$natural: -1})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST(SortPatternShape, NaturalSortPatternWithMeta) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
-        R"({$natural: 1, x: '?'})",
-        query_shape::extractSortShape(
-            fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"), expCtx, opts));
+        R"({$natural: 1, x: '?object'})",
+        query_shape::extractSortShape(fromjson(R"({$natural: 1, x: {$meta: "textScore"}})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 TEST(SortPatternShape, MetaPatternWithoutNatural) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
         R"({"normal":1,"$computed1":{"$meta":"textScore"}})",
-        query_shape::extractSortShape(
-            fromjson(R"({normal: 1, x: {$meta: "textScore"}})"), expCtx, opts));
+        query_shape::extractSortShape(fromjson(R"({normal: 1, x: {$meta: "textScore"}})"),
+                                      expCtx,
+                                      SerializationOptions::kDebugQueryShapeSerializeOptions));
 }
 
 // Here we have one test to ensure that the redaction policy is accepted and applied in the
@@ -571,8 +586,7 @@ TEST(SortPatternShape, MetaPatternWithoutNatural) {
 TEST(SortPatternShape, RespectsRedactionPolicy) {
     boost::intrusive_ptr<ExpressionContext> expCtx;
     expCtx = make_intrusive<ExpressionContextForTest>();
-    SerializationOptions opts;
-    opts.replacementForLiteralArgs = query_shape::kLiteralArgString;
+    SerializationOptions opts = SerializationOptions::kDebugQueryShapeSerializeOptions;
     opts.transformIdentifiers = true;
     opts.transformIdentifiersCallback = applyHmacForTest;
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT
@@ -600,8 +614,8 @@ TEST(QueryShapeIDL, ShapifyIDLStruct) {
                                {1, 2, 3, 4},
                                "field.path",
                                {"field.path.1", "fieldpath2"},
-                               NamespaceString{"db", "coll"},
-                               NamespaceString{"db", "coll"},
+                               NamespaceString::createNamespaceString_forTest("db", "coll"),
+                               NamespaceString::createNamespaceString_forTest("db", "coll"),
                                177,
                                true);
     ASSERT_BSONOBJ_EQ_AUTO(  // NOLINT

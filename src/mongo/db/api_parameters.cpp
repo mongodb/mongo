@@ -28,9 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/container_hash/extensions.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/api_parameters.h"
+#include "mongo/idl/idl_parser.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

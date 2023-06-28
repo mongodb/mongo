@@ -29,23 +29,30 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iosfwd>
 #include <string>
 #include <utility>
+#include <variant>
 #include <vector>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/cst/compound_key.h"
 #include "mongo/db/cst/key_fieldname.h"
 #include "mongo/db/cst/key_value.h"
 #include "mongo/db/cst/path.h"
+#include "mongo/platform/basic.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

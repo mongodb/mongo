@@ -30,9 +30,12 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
+#include "mongo/base/status.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

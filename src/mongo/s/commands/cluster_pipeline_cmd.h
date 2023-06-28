@@ -161,7 +161,7 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            Impl::doCheckAuthorization(opCtx, _privileges);
+            Impl::doCheckAuthorization(opCtx, _request, _privileges);
         }
 
         NamespaceString ns() const override {

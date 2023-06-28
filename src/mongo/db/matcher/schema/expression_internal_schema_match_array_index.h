@@ -30,10 +30,24 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
+#include <vector>
 
+#include "mongo/base/clonable_ptr.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_visitor.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/matcher/match_details.h"
+#include "mongo/db/query/serialization_options.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

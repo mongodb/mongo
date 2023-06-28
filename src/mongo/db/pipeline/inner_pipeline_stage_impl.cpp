@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/inner_pipeline_stage_impl.h"
 
 namespace mongo {
 InnerPipelineStageImpl::InnerPipelineStageImpl(const boost::intrusive_ptr<DocumentSource>& src,

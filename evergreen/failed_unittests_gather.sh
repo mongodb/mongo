@@ -6,7 +6,9 @@ cd src
 set -eou pipefail
 
 # Only run on unit test tasks so we don't target mongod binaries from cores.
-if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ] && [ "${task_name}" != "run_unittests_with_recording" ]; then
+if [ "${task_name}" != "run_unittests" ] && [ "${task_name}" != "run_dbtest" ] \
+  && [ "${task_name}" != "run_unittests_with_recording" ] \
+  && [[ ${task_name} != integration_tests* ]]; then
   exit 0
 fi
 
@@ -15,7 +17,7 @@ mkdir -p $unittest_bin_dir || true
 
 # Find all core files
 core_files=$(/usr/bin/find -H . \( -name "dump_*.core" -o -name "*.mdmp" \) 2> /dev/null)
-for core_file in $core_files; do
+while read -r core_file; do
   # A core file name does not always have the executable name that generated it.
   # See http://stackoverflow.com/questions/34801353/core-dump-filename-gets-thread-name-instead-of-executable-name-with-core-pattern
   # On platforms with GDB, we get the binary name from core file
@@ -63,7 +65,7 @@ for core_file in $core_files; do
     fi
 
   done
-done
+done <<< "${core_files}"
 
 # For recorded tests, use the text file to copy them over instead of relying on core dumps.
 has_recorded_failures=""

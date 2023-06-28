@@ -29,7 +29,18 @@
 
 #include "mongo/db/catalog/catalog_helper.h"
 
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/database_name.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 namespace mongo::catalog_helper {
 namespace {

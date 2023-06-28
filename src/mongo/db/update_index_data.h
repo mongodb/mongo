@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include <absl/container/btree_set.h>
+#include <string>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/field_ref.h"
-#include <absl/container/btree_set.h>
 
 namespace mongo {
 

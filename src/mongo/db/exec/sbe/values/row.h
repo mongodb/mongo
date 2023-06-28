@@ -29,11 +29,26 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/exec/sbe/values/slot_util.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/bufreader.h"
 
 namespace mongo {
 class BufReader;

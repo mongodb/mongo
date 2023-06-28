@@ -27,11 +27,24 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 
@@ -49,34 +62,29 @@ Status QueryFrameworkControl::setFromString(StringData value, const boost::optio
     // To enable Bonsai, the feature flag must be enabled. Here, we return an error to the user if
     // they try to set the framework control knob to use Bonsai while the feature flag is disabled.
     //
-    // Note that we only check if the feature flag is enabled ignoring FCV. If, for example, the FCV
-    // is not initialized, then we don't want to fail here.
-    //
     // The feature flag should be initialized by this point because
     // server_options_detail::applySetParameterOptions(std::map ...)
     // handles setParameters in alphabetical order, so "feature" comes before "internal".
 
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    bool enabledWithoutFCV =
-        feature_flags::gFeatureFlagCommonQueryFramework.isEnabledAndIgnoreFCVUnsafe();
     switch (newVal) {
         case QueryFrameworkControlEnum::kForceClassicEngine:
         case QueryFrameworkControlEnum::kTrySbeEngine:
             break;
         case QueryFrameworkControlEnum::kTryBonsai:
-            if (enabledWithoutFCV) {
+            if (feature_flags::gFeatureFlagCommonQueryFramework.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
                 break;
             }
             return {ErrorCodes::IllegalOperation,
                     "featureFlagCommonQueryFramework must be enabled to run with tryBonsai"};
+        case QueryFrameworkControlEnum::kTryBonsaiExperimental:
         case QueryFrameworkControlEnum::kForceBonsai:
-            if (enabledWithoutFCV && getTestCommandsEnabled()) {
+            if (getTestCommandsEnabled()) {
                 break;
             }
-            return {ErrorCodes::IllegalOperation,
-                    "featureFlagCommonQueryFramework and testCommands must be enabled to run with "
-                    "forceBonsai"};
+            return {
+                ErrorCodes::IllegalOperation,
+                "testCommands must be enabled to run with tryBonsaiExperimental or forceBonsai"};
     }
 
     _data = std::move(newVal);

@@ -27,22 +27,34 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <fmt/format.h>
+#include <memory>
 #include <string>
 #include <vector>
 
-#include <boost/filesystem/operations.hpp>
-#include <fmt/format.h>
-
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_import.h"
 #include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::repl::shard_merge_utils {
 
@@ -126,10 +138,7 @@ void cloneFile(OperationContext* opCtx,
 /**
  * Import a donor collection after its files have been cloned to a temp dir.
  */
-void wiredTigerImportFromBackupCursor(OperationContext* opCtx,
-                                      const UUID& migrationId,
-                                      const std::string& importPath,
-                                      std::vector<CollectionImportMetadata>&& metadatas);
+void wiredTigerImport(OperationContext* opCtx, const UUID& migrationId);
 
 /**
  * Send a "getMore" to keep a backup cursor from timing out.

@@ -29,18 +29,30 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
 #include <functional>
+#include <memory>
+#include <typeindex>
+#include <variant>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 /**
  * This file contains an abstract class that describes rewrites on agg Expressions and

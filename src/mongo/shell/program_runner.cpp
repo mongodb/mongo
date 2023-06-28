@@ -34,25 +34,30 @@
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/stream_buffer.hpp>
 #include <boost/iostreams/tee.hpp>
+#include <csignal>
 #include <fcntl.h>
 
 #ifdef _WIN32
 #include <io.h>
 #define SIGKILL 9
 #else
-#include <csignal>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/wait.h>
-#include <unistd.h>
 #endif
 
 #include "mongo/base/environment_buffer.h"
 #include "mongo/base/parse_number.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/text.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

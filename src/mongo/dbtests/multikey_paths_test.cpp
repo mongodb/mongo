@@ -53,7 +53,8 @@ const auto kIndexVersion = IndexDescriptor::IndexVersion::kV2;
  */
 class MultikeyPathsTest : public unittest::Test {
 public:
-    MultikeyPathsTest() : _nss("unittests.multikey_paths") {}
+    MultikeyPathsTest()
+        : _nss(NamespaceString::createNamespaceString_forTest("unittests.multikey_paths")) {}
 
     void setUp() final {
         AutoGetCollection autoColl(_opCtx.get(), _nss, MODE_IX);

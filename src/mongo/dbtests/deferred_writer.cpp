@@ -57,7 +57,8 @@ struct BSONObjCompare {
 };
 }  // namespace
 
-static const NamespaceString kTestNamespace("unittests", "deferred_writer_tests");
+static const NamespaceString kTestNamespace =
+    NamespaceString::createNamespaceString_forTest("unittests", "deferred_writer_tests");
 
 /**
  * For exception-safe code with DeferredWriter.

@@ -29,11 +29,31 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <variant>
+#include <vector>
+
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"
+#include "mongo/db/views/view.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -52,9 +72,19 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nssOrUUID.nss()),
+        : nss([nssOrUUID]() -> boost::optional<NamespaceString> {
+              if (nssOrUUID.isNamespaceString()) {
+                  return nssOrUUID.nss();
+              }
+              return boost::none;
+          }()),
           dbname(nssOrUUID.dbName()),
-          uuid(nssOrUUID.uuid()),
+          uuid([nssOrUUID]() -> boost::optional<UUID> {
+              if (nssOrUUID.isUUID()) {
+                  return nssOrUUID.uuid();
+              }
+              return boost::none;
+          }()),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -71,8 +101,8 @@ struct CollectionOrViewAcquisitionRequest {
         repl::ReadConcernArgs readConcern,
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView)
-        : nss(nss),
-          uuid(uuid),
+        : nss(std::move(nss)),
+          uuid(std::move(uuid)),
           placementConcern(placementConcern),
           readConcern(readConcern),
           operationType(operationType),
@@ -88,8 +118,8 @@ struct CollectionOrViewAcquisitionRequest {
         AcquisitionPrerequisites::OperationType operationType,
         AcquisitionPrerequisites::ViewMode viewMode = AcquisitionPrerequisites::kCanBeView);
 
+    // TODO(SERVER-78226): Replace the following with a type which can express "nss and uuid".
     boost::optional<NamespaceString> nss;
-
     boost::optional<DatabaseName> dbname;
     boost::optional<UUID> uuid;
 
@@ -146,6 +176,8 @@ struct CollectionAcquisitionRequest : public CollectionOrViewAcquisitionRequest 
         AcquisitionPrerequisites::OperationType operationType);
 };
 
+class ScopedCollectionOrViewAcquisition;
+
 class ScopedCollectionAcquisition {
 public:
     ScopedCollectionAcquisition(const mongo::ScopedCollectionAcquisition&) = delete;
@@ -156,6 +188,8 @@ public:
     }
 
     ~ScopedCollectionAcquisition();
+
+    explicit ScopedCollectionAcquisition(ScopedCollectionOrViewAcquisition&& other);
 
     ScopedCollectionAcquisition(OperationContext* opCtx,
                                 shard_role_details::AcquiredCollection& acquiredCollection)
@@ -234,8 +268,54 @@ private:
     const shard_role_details::AcquiredView& _acquiredView;
 };
 
-using ScopedCollectionOrViewAcquisition =
-    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition>;
+class ScopedCollectionOrViewAcquisition {
+public:
+    ScopedCollectionOrViewAcquisition(ScopedCollectionAcquisition&& collection)
+        : _collectionOrViewAcquisition(std::move(collection)) {}
+
+    ScopedCollectionOrViewAcquisition(ScopedViewAcquisition&& view)
+        : _collectionOrViewAcquisition(std::move(view)) {}
+
+    bool isCollection() const {
+        return std::holds_alternative<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    bool isView() const {
+        return std::holds_alternative<ScopedViewAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const ScopedCollectionAcquisition& getCollection() const {
+        invariant(isCollection());
+        return std::get<ScopedCollectionAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const CollectionPtr& getCollectionPtr() const {
+        if (isCollection()) {
+            return getCollection().getCollectionPtr();
+        } else {
+            return CollectionPtr::null;
+        }
+    }
+
+    const ScopedViewAcquisition& getView() const {
+        invariant(isView());
+        return std::get<ScopedViewAcquisition>(_collectionOrViewAcquisition);
+    }
+
+    const NamespaceString& nss() const {
+        if (isCollection()) {
+            return getCollection().nss();
+        } else {
+            return getView().nss();
+        }
+    }
+
+    friend class ScopedCollectionAcquisition;
+
+private:
+    std::variant<ScopedCollectionAcquisition, ScopedViewAcquisition, std::monostate>
+        _collectionOrViewAcquisition;
+};
 
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,

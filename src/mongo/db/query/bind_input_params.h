@@ -30,8 +30,11 @@
 #pragma once
 
 #include "mongo/db/exec/sbe/expressions/expression.h"
+#include "mongo/db/exec/sbe/expressions/runtime_environment.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/sbe_stage_builder.h"
 
 namespace mongo::input_params {

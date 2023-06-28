@@ -66,22 +66,15 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         auto* as = AuthorizationSession::get(opCtx->getClient());
 
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::serverStatus)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::replSetGetStatus)) {
-            return Status(ErrorCodes::Unauthorized, "Unauthorized");
-        }
-
-        if (!as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                  ActionType::connPoolStats)) {
+        if (!as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(dbName.tenantId()),
+                {ActionType::serverStatus,
+                 ActionType::replSetGetStatus,
+                 ActionType::connPoolStats})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 

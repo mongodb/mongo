@@ -27,24 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/db/pipeline/document_source.h"
-
-#include "mongo/platform/basic.h"
-
-#include <boost/filesystem.hpp>
-#include <fstream>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <climits>
+#include <ctime>
+#include <fmt/format.h>
+#include <fstream>  // IWYU pragma: keep
 #include <memory>
+
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/sorter/sorter.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
 
 
 namespace mongo {

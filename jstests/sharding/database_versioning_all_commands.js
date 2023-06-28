@@ -305,7 +305,21 @@ let testCases = {
     balancerStatus: {skip: "not on a user database"},
     balancerStop: {skip: "not on a user database"},
     buildInfo: {skip: "executes locally on mongos (not sent to any remote node)"},
-    bulkWrite: {skip: "not yet implemented"},
+    bulkWrite: {
+        // TODO SERVER-52419: Run this test and remove the skip.
+        // run: {
+        //     sendsDbVersion: true,
+        //     runsAgainstAdminDb: true,
+        //     command: function(dbName, collName) {
+        //         return {
+        //             bulkWrite: 1,
+        //             ops: [{insert: 0, document: {_id: 1}}],
+        //             nsInfo: [{ns: dbName + "." + collName}]
+        //         };
+        //     },
+        // }
+        skip: "requires feature flag"
+    },
     checkMetadataConsistency: {
         run: {
             sendsDbVersion: true,

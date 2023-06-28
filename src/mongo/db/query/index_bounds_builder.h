@@ -29,11 +29,21 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/hasher.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 
 namespace mongo {

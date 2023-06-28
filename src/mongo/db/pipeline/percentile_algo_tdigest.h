@@ -30,8 +30,13 @@
 #pragma once
 
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
+#include <iosfwd>
 #include <limits>
 #include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/percentile_algo.h"
 

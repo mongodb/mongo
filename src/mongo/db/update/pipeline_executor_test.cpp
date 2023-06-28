@@ -27,18 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
 
-#include "mongo/db/update/pipeline_executor.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/bson/mutable/algorithm.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
-#include "mongo/db/json.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/update/pipeline_executor.h"
 #include "mongo/db/update/update_node_test_fixture.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -643,6 +650,46 @@ TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath) {
             fromjson("{$v: 2, diff: {sf1: {sa: {sb: {sc: {a: true, u1: 'updatedVal'}}}}}}"));
         ASSERT_TRUE(getIndexAffectedFromLogEntry(result.oplogEntry));
     }
+}
+
+/**
+ * Verifies the fix for SERVER-76934 in the case where the original document has a duplicate field.
+ */
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath1) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {paddingField: 'largeValueString'}, k: {c: 1, c: 2, paddingField: "
+                 "'largeValueString'}}"));
+
+    auto doc = mutablebson::Document(preImage);
+    const std::vector<BSONObj> pipeline{
+        fromjson("{$replaceWith: {$literal: {f1: {paddingField: 'largeValueString'}, k: {c: 4, "
+                 "paddingField: 'largeValueString'}} }}")};
+    PipelineExecutor exec(expCtx, pipeline);
+    ASSERT_THROWS_CODE_AND_WHAT(exec.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                7693400,
+                                "Document already has a field named 'c'");
+}
+
+/**
+ * Verifies the fix for SERVER-76934 in the case where the pipeline tries to add a duplicate field.
+ */
+TEST_F(UpdateTestFixture, TestIndexesAffectedWithArraysAfterIndexPath2) {
+    boost::intrusive_ptr<ExpressionContextForTest> expCtx(new ExpressionContextForTest());
+    BSONObj preImage(
+        fromjson("{f1: {paddingField: 'largeValueString'}, k: {c: 1, paddingField: "
+                 "'largeValueString'}}"));
+
+    auto doc = mutablebson::Document(preImage);
+    const std::vector<BSONObj> pipeline{
+        fromjson("{$replaceWith: {$literal: {f1: {paddingField: 'largeValueString'}, k: {c: 4, c: "
+                 "5, paddingField: 'largeValueString'}} }}")};
+    PipelineExecutor exec(expCtx, pipeline);
+    ASSERT_THROWS_CODE_AND_WHAT(exec.applyUpdate(getApplyParams(doc.root())),
+                                AssertionException,
+                                7693400,
+                                "Document already has a field named 'c'");
 }
 
 }  // namespace

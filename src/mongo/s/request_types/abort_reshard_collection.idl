@@ -60,6 +60,7 @@ commands:
     namespace: type
     api_version: ""
     type: uuid
+    reply_type: OkReply
     fields:
       userCanceled:
         type: bool

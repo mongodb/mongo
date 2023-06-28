@@ -32,7 +32,11 @@
 #include <algorithm>
 #include <boost/algorithm/searching/boyer_moore.hpp>
 #include <boost/version.hpp>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/fts/unicode/byte_vector.h"
 #include "mongo/platform/bits.h"
 #include "mongo/shell/linenoise_utf8.h"

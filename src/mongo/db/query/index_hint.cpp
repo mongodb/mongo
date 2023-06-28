@@ -29,8 +29,14 @@
 
 #include "mongo/db/query/index_hint.h"
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

@@ -29,24 +29,58 @@
 
 #include "mongo/db/s/config/initial_split_policy.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <limits>
+#include <numeric>
+#include <random>
+#include <set>
+#include <string>
+#include <type_traits>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/pipeline/process_interface/shardsvr_process_interface.h"
-#include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/balancer/balancer_policy.h"
-#include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -31,6 +31,7 @@ echo "Now put the dist gnupg signing keys in ~root/.gnupg"
 
 import argparse
 import errno
+import git
 from glob import glob
 import os
 import re
@@ -750,10 +751,31 @@ def write_debian_changelog(path, spec, srcdir):
     os.chdir(srcdir)
     preamble = ""
     try:
+
+        git_repo = git.Repo(srcdir)
+        # get the original HEAD position of repo
+        head_commit_sha = git_repo.head.object.hexsha
+
+        # add and commit the uncommited changes
+        print("Commiting uncommited changes")
+        git_repo.git.add(all=True)
+        # only commit changes if there are any
+        if len(git_repo.index.diff("HEAD")) != 0:
+            with git_repo.git.custom_environment(GIT_COMMITTER_NAME="Evergreen",
+                                                 GIT_COMMITTER_EMAIL="evergreen@mongodb.com"):
+                git_repo.git.commit("--author='Evergreen <>'", "-m", "temp commit")
+
+        # original command to preserve functionality
+        # FIXME: make consistent with the rest of the code when we have more packaging testing
+        print("Getting changelog for specified gitspec:", spec.metadata_gitspec())
         sb = preamble + backtick([
             "sh", "-c",
             "git archive %s debian/changelog | tar xOf -" % spec.metadata_gitspec()
         ]).decode('utf-8')
+
+        # reset branch to original state
+        print("Resetting branch to original state")
+        git_repo.git.reset("--mixed", head_commit_sha)
     finally:
         os.chdir(oldcwd)
     lines = sb.split("\n")

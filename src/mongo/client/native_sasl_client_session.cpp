@@ -27,21 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <tuple>
 
-#include "mongo/client/native_sasl_client_session.h"
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/authenticate.h"
+#include "mongo/client/native_sasl_client_session.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_conversation.h"
 #include "mongo/client/sasl_plain_client_conversation.h"
 #include "mongo/client/sasl_scram_client_conversation.h"
 #include "mongo/client/scram_client_cache.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/sha1_block.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/util/str.h"
 
 #ifdef MONGO_CONFIG_SSL

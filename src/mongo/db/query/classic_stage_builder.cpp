@@ -28,21 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/classic_stage_builder.h"
-
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/client.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/and_hash.h"
 #include "mongo/db/exec/and_sorted.h"
 #include "mongo/db/exec/collection_scan.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/count_scan.h"
 #include "mongo/db/exec/distinct_scan.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/geo_near.h"
@@ -59,10 +69,27 @@
 #include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/text_match.h"
 #include "mongo/db/exec/text_or.h"
+#include "mongo/db/fts/fts_query_impl.h"
+#include "mongo/db/fts/fts_spec.h"
 #include "mongo/db/index/fts_access_method.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
-#include "mongo/db/s/collection_sharding_state.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/classic_stage_builder.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -72,6 +99,8 @@ namespace mongo::stage_builder {
 // could not be constructed.
 std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* root) {
     auto* const expCtx = _cq.getExpCtxRaw();
+
+    const auto& collectionPtr = _collection.getCollectionPtr();
 
     switch (root->getType()) {
         case STAGE_COLLSCAN: {
@@ -96,11 +125,11 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_IXSCAN: {
             const IndexScanNode* ixn = static_cast<const IndexScanNode*>(root);
 
-            invariant(_collection);
-            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, ixn->index.identifier.catalogName);
             invariant(descriptor,
-                      str::stream() << "Namespace: " << _collection->ns().toStringForErrorMsg()
+                      str::stream() << "Namespace: " << collectionPtr->ns().toStringForErrorMsg()
                                     << ", CanonicalQuery: " << _cq.toStringShortForErrorMsg()
                                     << ", IndexEntry: " << ixn->index.toString());
 
@@ -252,8 +281,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            invariant(_collection);
-            const IndexDescriptor* twoDIndex = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            const IndexDescriptor* twoDIndex = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, node->index.identifier.catalogName);
             invariant(twoDIndex);
 
@@ -269,8 +298,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             params.addPointMeta = node->addPointMeta;
             params.addDistMeta = node->addDistMeta;
 
-            invariant(_collection);
-            const IndexDescriptor* s2Index = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            const IndexDescriptor* s2Index = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, node->index.identifier.catalogName);
             invariant(s2Index);
 
@@ -292,8 +321,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         }
         case STAGE_TEXT_MATCH: {
             auto node = static_cast<const TextMatchNode*>(root);
-            tassert(5432200, "collection object is not provided", _collection);
-            auto catalog = _collection->getIndexCatalog();
+            tassert(5432200, "collection object is not provided", collectionPtr);
+            auto catalog = collectionPtr->getIndexCatalog();
             tassert(5432201, "index catalog is unavailable", catalog);
             auto desc = catalog->findIndexByName(_opCtx, node->index.identifier.catalogName);
             tassert(5432202,
@@ -324,20 +353,19 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
             const ShardingFilterNode* fn = static_cast<const ShardingFilterNode*>(root);
             auto childStage = build(fn->children[0].get());
 
-            auto scopedCss = CollectionShardingState::assertCollectionLockedAndAcquire(
-                _opCtx, _collection->ns());
+            auto shardFilterer = _collection.getShardingFilter(_opCtx);
+            invariant(shardFilterer,
+                      "Attempting to use shard filter when there's no shard filter available for "
+                      "the collection");
+
             return std::make_unique<ShardFilterStage>(
-                expCtx,
-                scopedCss->getOwnershipFilter(
-                    _opCtx, CollectionShardingState::OrphanCleanupPolicy::kDisallowOrphanCleanup),
-                _ws,
-                std::move(childStage));
+                expCtx, std::move(*shardFilterer), _ws, std::move(childStage));
         }
         case STAGE_DISTINCT_SCAN: {
             const DistinctNode* dn = static_cast<const DistinctNode*>(root);
 
-            invariant(_collection);
-            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, dn->index.identifier.catalogName);
             invariant(descriptor);
 
@@ -357,8 +385,8 @@ std::unique_ptr<PlanStage> ClassicStageBuilder::build(const QuerySolutionNode* r
         case STAGE_COUNT_SCAN: {
             const CountScanNode* csn = static_cast<const CountScanNode*>(root);
 
-            invariant(_collection);
-            auto descriptor = _collection->getIndexCatalog()->findIndexByName(
+            invariant(collectionPtr);
+            auto descriptor = collectionPtr->getIndexCatalog()->findIndexByName(
                 _opCtx, csn->index.identifier.catalogName);
             invariant(descriptor);
 

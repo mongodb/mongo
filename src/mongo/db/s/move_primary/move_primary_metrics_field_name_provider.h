@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/s/metrics/field_names/sharding_data_transform_instance_metrics_field_name_provider.h"
 #include "mongo/db/s/metrics/field_names/with_document_copy_approximation_field_name_overrides.h"
 #include "mongo/db/s/metrics/field_names/with_document_copy_count_field_name_overrides.h"

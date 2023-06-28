@@ -27,14 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/query/view_response_formatter.h"
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/view_response_formatter.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

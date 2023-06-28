@@ -53,6 +53,8 @@ executor:
       oplogSize: 1024
       set_parameters:
         enableTestCommands: 1
+        queryAnalysisSamplerConfigurationRefreshSecs: 1
+        queryAnalysisWriterIntervalSecs: 1
         # Setting this parameter to "1" disables cursor caching in WiredTiger, and sets the cache
         # size to "1" in MongoDB. This forces all resources to be released when done.
         wiredTigerCursorCacheSize: 1

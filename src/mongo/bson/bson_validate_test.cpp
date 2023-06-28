@@ -28,19 +28,42 @@
  */
 
 
-#include "mongo/base/status.h"
-#include "mongo/platform/basic.h"
+#include <cstdio>
+#include <cstring>
+#include <ctime>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bsoncolumnbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_type.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/platform/random.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

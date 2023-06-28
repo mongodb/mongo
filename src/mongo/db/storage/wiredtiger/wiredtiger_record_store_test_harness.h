@@ -27,11 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <wiredtiger.h>
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/record_store.h"
 #include "mongo/db/storage/record_store_test_harness.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/platform/basic.h"
 #include "mongo/unittest/temp_dir.h"
 #include "mongo/util/clock_source_mock.h"
 
@@ -80,11 +89,6 @@ public:
 private:
     unittest::TempDir _dbpath;
     ClockSourceMock _cs;
-
-    // Since WTKVEngine starts threads that require the global service context, we load
-    // the client observer for LockerNoop before creating the storage engine to avoid a
-    // potential data race (that might be reported by a tool like TSAN).
-    LockerNoopClientObserverRegisterer _lockerNoopClientObserverRegisterer;
     WiredTigerKVEngine _engine;
 };
 }  // namespace mongo

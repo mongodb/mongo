@@ -27,9 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/s/resharding/resharding_oplog_applier_metrics.h"
+
+#include <boost/optional/optional.hpp>
 
 namespace mongo {
 

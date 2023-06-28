@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
+#include <cstdint>
+#include <memory>
+#include <ostream>
+#include <utility>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/sbe_unittest.h"
-#include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/exec/sbe/vm/label.h"
 #include "mongo/db/exec/sbe/vm/vm.h"
 #include "mongo/db/exec/sbe/vm/vm_printer.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/unittest/unittest.h"
 
 namespace mongo::sbe {
 

@@ -29,12 +29,33 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/shared_array.hpp>
+#include <boost/smart_ptr/shared_array.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <map>
+#include <memory>
+#include <mutex>
+#include <set>
+#include <string>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

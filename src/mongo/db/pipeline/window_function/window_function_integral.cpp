@@ -28,7 +28,15 @@
  */
 
 #include "mongo/db/pipeline/window_function/window_function_integral.h"
-#include "mongo/db/pipeline/accumulator.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value_comparator.h"
 
 namespace mongo {
 

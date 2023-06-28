@@ -30,13 +30,19 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <utility>
 
 #include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
 #include "mongo/util/allocator.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

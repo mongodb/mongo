@@ -30,12 +30,18 @@
 #include "mongo/db/cluster_transaction_api.h"
 
 #include <fmt/format.h>
+#include <string>
 
-#include "mongo/executor/task_executor.h"
-#include "mongo/rpc/factory.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
-#include "mongo/rpc/reply_interface.h"
-#include "mongo/stdx/future.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/s/service_entry_point_mongos.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::txn_api::details {
 

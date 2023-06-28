@@ -28,10 +28,23 @@
  */
 #include "mongo/client/sdam/topology_state_machine.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstddef>
+#include <iostream>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/sdam/election_id_set_version_pair.h"
 #include "mongo/client/sdam/sdam_test_base.h"
 #include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/server_description_builder.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 
 namespace mongo::sdam {
 class TopologyStateMachineTestFixture : public SdamTestFixture {

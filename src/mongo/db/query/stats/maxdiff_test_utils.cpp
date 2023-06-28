@@ -29,8 +29,20 @@
 
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 
+#include <map>
+#include <memory>
+#include <ostream>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo::stats {
 

@@ -30,8 +30,12 @@
 
 #include <boost/optional.hpp>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+
 namespace mongo::sdam {
 
 // Comparable pair or ElectionId (term) and SetVersion.

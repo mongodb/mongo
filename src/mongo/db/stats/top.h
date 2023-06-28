@@ -34,10 +34,17 @@
  */
 
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <cstdint>
+#include <set>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/stats/operation_latency_histogram.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/rpc/message.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/string_map.h"
 
@@ -99,7 +106,7 @@ public:
 
 public:
     void record(OperationContext* opCtx,
-                StringData ns,
+                const NamespaceString& nss,
                 LogicalOp logicalOp,
                 LockType lockType,
                 long long micros,

@@ -27,21 +27,40 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <absl/hash/hash.h>
+#include <absl/strings/string_view.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional/optional.hpp>
+#include <cmath>
 
-#include "mongo/db/exec/sbe/values/value.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/compare_numbers.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/exec/js_function.h"
 #include "mongo/db/exec/sbe/makeobj_spec.h"
-#include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/util/print_options.h"
 #include "mongo/db/exec/sbe/values/bson.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/sort_spec.h"
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
 #include "mongo/db/exec/sbe/values/value_printer.h"
+#include "mongo/db/index/btree_key_generator.h"
+#include "mongo/db/index/sort_key_generator.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/query/sort_pattern.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/bufreader.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/pcre_util.h"
 

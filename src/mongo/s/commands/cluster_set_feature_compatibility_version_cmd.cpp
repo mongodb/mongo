@@ -99,7 +99,7 @@ public:
             auto response = uassertStatusOK(configShard->runCommandWithFixedRetryAttempts(
                 opCtx,
                 ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-                cmd.getDbName().db().toString(),
+                DatabaseNameUtil::serialize(cmd.getDbName()),
                 CommandHelpers::appendMajorityWriteConcern(cmd.toBSON({}),
                                                            opCtx->getWriteConcern()),
                 Shard::RetryPolicy::kIdempotent));
@@ -111,12 +111,12 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(
-                ErrorCodes::Unauthorized,
-                "Unauthorized",
-                AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::setFeatureCompatibilityVersion));
+            uassert(ErrorCodes::Unauthorized,
+                    "Unauthorized",
+                    AuthorizationSession::get(opCtx->getClient())
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::setFeatureCompatibilityVersion));
         }
 
         bool supportsWriteConcern() const override {

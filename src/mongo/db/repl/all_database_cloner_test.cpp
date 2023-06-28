@@ -28,20 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <ratio>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/client.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/all_database_cloner.h"
 #include "mongo/db/repl/initial_sync_cloner_test_fixture.h"
 #include "mongo/db/repl/replication_consistency_markers_impl.h"
-#include "mongo/db/repl/storage_interface.h"
-#include "mongo/db/repl/storage_interface_mock.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
@@ -97,14 +114,14 @@ TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyGlobalAdminBef
     auto databases = getDatabasesFromCloner(cloner.get());
 
     ASSERT_EQUALS(5u, databases.size());
-    ASSERT_EQUALS("admin", databases[0].db());
+    ASSERT_EQUALS("admin", databases[0].toString_forTest());
     ASSERT(!databases[0].tenantId());
-    ASSERT_EQUALS("admin", databases[1].db());
+    ASSERT_EQUALS("admin", databases[1].toString_forTest());
     ASSERT(databases[1].tenantId());
-    ASSERT_EQUALS("admin", databases[2].db());
+    ASSERT_EQUALS("admin", databases[2].toString_forTest());
     ASSERT(databases[2].tenantId());
-    ASSERT_EQUALS("a", databases[3].db());
-    ASSERT_EQUALS("aab", databases[4].db());
+    ASSERT_EQUALS("a", databases[3].toString_forTest());
+    ASSERT_EQUALS("aab", databases[4].toString_forTest());
 }
 
 TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyTenantAdminSetToFirst) {
@@ -137,14 +154,14 @@ TEST_F(AllDatabaseClonerTest, ListDatabaseStageSortsAdminCorrectlyTenantAdminSet
     auto databases = getDatabasesFromCloner(cloner.get());
 
     ASSERT_EQUALS(5u, databases.size());
-    ASSERT_EQUALS("admin", databases[0].db());
+    ASSERT_EQUALS("admin", databases[0].toString_forTest());
     ASSERT(!databases[0].tenantId());
-    ASSERT_EQUALS("admin", databases[1].db());
+    ASSERT_EQUALS("admin", databases[1].toString_forTest());
     ASSERT(databases[1].tenantId());
-    ASSERT_EQUALS("admin", databases[2].db());
+    ASSERT_EQUALS("admin", databases[2].toString_forTest());
     ASSERT(databases[2].tenantId());
-    ASSERT_EQUALS("a", databases[3].db());
-    ASSERT_EQUALS("aab", databases[4].db());
+    ASSERT_EQUALS("a", databases[3].toString_forTest());
+    ASSERT_EQUALS("aab", databases[4].toString_forTest());
 }
 
 
@@ -493,7 +510,7 @@ TEST_F(AllDatabaseClonerTest, AdminIsSetToFirst) {
     ASSERT_OK(cloner->run());
 
     auto databases = getDatabasesFromCloner(cloner.get());
-    ASSERT_EQUALS("admin", databases[0].db());
+    ASSERT_EQUALS("admin", databases[0].toString_forTest());
 
     _mockServer->setCommandReply(
         "listDatabases", fromjson("{ok:1, databases:[{name:'admin'}, {name:'a'}, {name:'b'}]}"));
@@ -503,7 +520,7 @@ TEST_F(AllDatabaseClonerTest, AdminIsSetToFirst) {
     ASSERT_OK(cloner->run());
 
     databases = getDatabasesFromCloner(cloner.get());
-    ASSERT_EQUALS("admin", databases[0].db());
+    ASSERT_EQUALS("admin", databases[0].toString_forTest());
 }
 
 TEST_F(AllDatabaseClonerTest, LocalIsRemoved) {
@@ -516,8 +533,8 @@ TEST_F(AllDatabaseClonerTest, LocalIsRemoved) {
 
     auto databases = getDatabasesFromCloner(cloner.get());
     ASSERT_EQUALS(2u, databases.size());
-    ASSERT_EQUALS("a", databases[0].db());
-    ASSERT_EQUALS("aab", databases[1].db());
+    ASSERT_EQUALS("a", databases[0].toString_forTest());
+    ASSERT_EQUALS("aab", databases[1].toString_forTest());
 
     _mockServer->setCommandReply(
         "listDatabases", fromjson("{ok:1, databases:[{name:'local'}, {name:'a'}, {name:'b'}]}"));
@@ -528,8 +545,8 @@ TEST_F(AllDatabaseClonerTest, LocalIsRemoved) {
 
     databases = getDatabasesFromCloner(cloner.get());
     ASSERT_EQUALS(2u, databases.size());
-    ASSERT_EQUALS("a", databases[0].db());
-    ASSERT_EQUALS("b", databases[1].db());
+    ASSERT_EQUALS("a", databases[0].toString_forTest());
+    ASSERT_EQUALS("b", databases[1].toString_forTest());
 }
 
 TEST_F(AllDatabaseClonerTest, DatabaseStats) {
@@ -566,9 +583,9 @@ TEST_F(AllDatabaseClonerTest, DatabaseStats) {
 
     auto databases = getDatabasesFromCloner(cloner.get());
     ASSERT_EQUALS(3u, databases.size());
-    ASSERT_EQUALS("admin", databases[0].db());
-    ASSERT_EQUALS("aab", databases[1].db());
-    ASSERT_EQUALS("a", databases[2].db());
+    ASSERT_EQUALS("admin", databases[0].toString_forTest());
+    ASSERT_EQUALS("aab", databases[1].toString_forTest());
+    ASSERT_EQUALS("a", databases[2].toString_forTest());
 
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.databasesCloned);
@@ -714,10 +731,10 @@ TEST_F(AllDatabaseClonerTest,
     DatabaseName aabWithTenantId = DatabaseName::createDatabaseName_forTest(tid, "aab");
     // Checks admin is first db.
     ASSERT_EQUALS(4u, databases.size());
-    ASSERT_EQUALS("admin", databases[0].db());
-    ASSERT_EQUALS("admin", databases[1].db());
-    ASSERT_EQUALS("aab", databases[2].db());
-    ASSERT_EQUALS("a", databases[3].db());
+    ASSERT_EQUALS("admin", databases[0].toString_forTest());
+    ASSERT_EQUALS("admin", databases[1].toString_forTest());
+    ASSERT_EQUALS("aab", databases[2].toString_forTest());
+    ASSERT_EQUALS("a", databases[3].toString_forTest());
 
     auto stats = cloner->getStats();
     ASSERT_EQUALS(0, stats.databasesCloned);

@@ -28,18 +28,28 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <openssl/err.h>
+#include <openssl/evp.h>
+#include <openssl/opensslv.h>
+#include <openssl/ossl_typ.h>
 #include <openssl/rand.h>
 #include <set>
+#include <string>
+#include <utility>
 
-#include "mongo/base/data_cursor.h"
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
-#include "mongo/platform/random.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/ssl_manager.h"
 #include "mongo/util/str.h"

@@ -29,7 +29,27 @@
 
 #pragma once
 
+#include <memory>
+#include <set>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinator_catalog.h"
+#include "mongo/db/s/transaction_coordinator_futures_util.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

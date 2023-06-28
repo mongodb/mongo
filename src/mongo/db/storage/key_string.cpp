@@ -28,22 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/key_string.h"
-
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <cfloat>
 #include <cmath>
+#include <cstdlib>
+#include <fmt/format.h>
+#include <limits>
+#include <memory>
+#include <set>
 #include <type_traits>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/sbe/values/value_builder.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/bits.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/endian.h"
 #include "mongo/platform/strnlen.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

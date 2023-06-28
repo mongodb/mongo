@@ -29,9 +29,19 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replication_consistency_markers.h"
 #include "mongo/db/repl/replication_consistency_markers_gen.h"
+#include "mongo/platform/mutex.h"
 
 namespace mongo {
 
@@ -51,8 +61,6 @@ class ReplicationConsistencyMarkersImpl : public ReplicationConsistencyMarkers {
 
 public:
     static constexpr StringData kDefaultMinValidNamespace = "local.replset.minvalid"_sd;
-    static constexpr StringData kDefaultOplogTruncateAfterPointNamespace =
-        "local.replset.oplogTruncateAfterPoint"_sd;
     static constexpr StringData kDefaultInitialSyncIdNamespace = "local.replset.initialSyncId"_sd;
 
     explicit ReplicationConsistencyMarkersImpl(StorageInterface* storageInterface);
@@ -162,6 +170,9 @@ private:
     // serialization that exists in setting the oplog truncate after point.
     boost::optional<Timestamp> _lastNoHolesOplogTimestamp;
     boost::optional<OpTimeAndWallTime> _lastNoHolesOplogOpTimeAndWallTime;
+
+    // Cached initialSyncId from last initial sync. Will only be set on startup or initial sync.
+    BSONObj _initialSyncId;
 };
 
 }  // namespace repl

@@ -27,18 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/plan_insert_listener.h"
-
 #include <memory>
+#include <string>
 
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/catalog/database_holder.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_insert_listener.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

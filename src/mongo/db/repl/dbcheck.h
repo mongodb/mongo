@@ -29,13 +29,32 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <limits>
 #include <memory>
+#include <string>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/health_log_gen.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_executor.h"
 #include "mongo/db/repl/dbcheck_gen.h"
+#include "mongo/db/repl/dbcheck_idl.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

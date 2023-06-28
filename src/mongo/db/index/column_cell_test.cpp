@@ -28,10 +28,22 @@
  */
 
 #include "mongo/db/index/column_cell.h"
+
+#include <cstdint>
+#include <cstring>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/storage/column_store.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/str.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 TEST(ColumnCell, AppendElementToCellTest) {

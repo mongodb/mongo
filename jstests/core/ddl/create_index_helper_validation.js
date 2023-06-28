@@ -10,20 +10,17 @@ assert.throws(() => coll.createIndexes(
                   /* keys */[{a: 1}],
                   /* options */ {},
                   /* commitQuorum */ "majority",
-                  {background: true},
                   {unique: true}));
 
 assert.throws(() => coll.createIndex(
                   /* keys */ {a: 1},
                   /* options */ {},
                   /* commitQuorum */ "majority",
-                  {background: true},
                   {unique: true}));
 
 assert.throws(() => coll.createIndex(
                   /* keys */ {a: 1},
                   /* options */ {},
                   /* commitQuorum */ "majority",
-                  {background: true},
                   {unique: true}));
 }());

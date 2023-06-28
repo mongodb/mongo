@@ -29,53 +29,47 @@
 
 #include "mongo/db/query/query_stats.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <climits>
+#include <list>
+
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/status_with.h"
 #include "mongo/crypto/hash_block.h"
 #include "mongo/crypto/sha256_block.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/exec/projection_executor_builder.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/pipeline/process_interface/stub_mongo_process_interface.h"
-#include "mongo/db/query/find_command.h"
-#include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/projection_ast_util.h"
-#include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_stats_util.h"
 #include "mongo/db/query/rate_limiting.h"
 #include "mongo/db/query/serialization_options.h"
-#include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/query/util/memory_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/client_metadata.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/system_clock_source.h"
-#include <optional>
+#include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
 namespace mongo {
 
 namespace query_stats {
-
-/**
- * Redacts all BSONObj field names as if they were paths, unless the field name is a special hint
- * operator.
- */
-namespace {
-
-boost::optional<std::string> getApplicationName(const OperationContext* opCtx) {
-    if (auto metadata = ClientMetadata::get(opCtx->getClient())) {
-        return metadata->getApplicationName().toString();
-    }
-    return boost::none;
-}
-}  // namespace
 
 CounterMetric queryStatsStoreSizeEstimateBytesMetric("queryStats.queryStatsStoreSizeEstimateBytes");
 
@@ -259,8 +253,6 @@ std::string sha256HmacStringDataHasher(std::string key, const StringData& sd) {
     return hashed.toString();
 }
 
-static const StringData replacementForLiteralArgs = "?"_sd;
-
 std::size_t hash(const BSONObj& obj) {
     return absl::hash_internal::CityHash64(obj.objdata(), obj.objsize());
 }
@@ -268,29 +260,19 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithm algorithm,
+                                              TransformAlgorithmEnum algorithm,
                                               std::string hmacKey) const {
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
-    switch (algorithm) {
-        case TransformAlgorithm::kHmacSha256:
-            options.transformIdentifiers = true;
-            options.transformIdentifiersCallback = [&](StringData sd) {
-                return sha256HmacStringDataHasher(hmacKey, sd);
-            };
-            break;
-        case TransformAlgorithm::kNone:
-            break;
-        default:
-            MONGO_UNREACHABLE;
-    }
-    return requestShapifier->makeQueryStatsKey(options, opCtx);
+    return keyGenerator->generate(
+        opCtx,
+        algorithm == TransformAlgorithmEnum::kHmacSha256
+            ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
+                  [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
+            : boost::none);
 }
 
 void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<RequestShapifier>(void)> makeShapifier) {
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
     auto opCtx = expCtx->opCtx;
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
@@ -304,13 +286,20 @@ void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
     if (!shouldCollect(opCtx->getServiceContext())) {
         return;
     }
-    SerializationOptions options;
-    options.literalPolicy = LiteralSerializationPolicy::kToDebugTypeString;
-    options.replacementForLiteralArgs = replacementForLiteralArgs;
     auto& opDebug = CurOp::get(opCtx)->debug();
-    opDebug.queryStatsRequestShapifier = makeShapifier();
-    opDebug.queryStatsStoreKeyHash =
-        hash(opDebug.queryStatsRequestShapifier->makeQueryStatsKey(options, expCtx));
+
+    if (opDebug.queryStatsKeyGenerator) {
+        // A find() request may have already registered the shapifier. Ie, it's a find command over
+        // a non-physical collection, eg view, which is implemented by generating an agg pipeline.
+        LOGV2_DEBUG(7198700,
+                    2,
+                    "Query stats request shapifier already registered",
+                    "collection"_attr = collection);
+        return;
+    }
+
+    opDebug.queryStatsKeyGenerator = makeKeyGenerator();
+    opDebug.queryStatsStoreKeyHash = opDebug.queryStatsKeyGenerator->hash();
 }
 
 QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
@@ -323,7 +312,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx) {
 
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     std::unique_ptr<KeyGenerator> keyGenerator,
                      const uint64_t queryExecMicros,
                      const uint64_t firstResponseExecMicros,
                      const uint64_t docsReturned) {
@@ -338,12 +327,11 @@ void writeQueryStats(OperationContext* opCtx,
         metrics = *statusWithMetrics.getValue();
     } else {
         tassert(7315200,
-                "requestShapifier cannot be null when writing a new entry to the telemetry store",
-                requestShapifier != nullptr);
+                "keyGenerator cannot be null when writing a new entry to the telemetry store",
+                keyGenerator != nullptr);
         size_t numEvicted =
             queryStatsStore.put(*queryStatsKeyHash,
-                                std::make_shared<QueryStatsEntry>(std::move(requestShapifier),
-                                                                  CurOp::get(opCtx)->getNSS()),
+                                std::make_shared<QueryStatsEntry>(std::move(keyGenerator)),
                                 partitionLock);
         queryStatsEvictedMetric.increment(numEvicted);
         auto newMetrics = partitionLock->get(*queryStatsKeyHash);

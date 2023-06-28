@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/fts/fts_phrase_matcher.h"
 #include "mongo/db/fts/unicode/codepoints.h"
 

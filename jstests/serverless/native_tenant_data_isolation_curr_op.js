@@ -78,6 +78,7 @@ function assertCurrentOpCommandOutputDollarTenant(
 function checkNsSerializedCorrectly(
     featureFlagRequireTenantId, kTenantId, dbName, collectionName, cursorRes) {
     cursorRes.forEach(op => {
+        // TODO SERVER-74284: remove the feature flag check and else case
         if (featureFlagRequireTenantId) {
             // This case represents the upgraded state where we will not include the tenantId as the
             // db prefix.

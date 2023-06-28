@@ -30,21 +30,62 @@
 
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <algorithm>
+#include <cerrno>
+#include <cstdint>
+#include <cstring>
+#include <exception>
+#include <map>
+#include <memory>
+#include <new>
+#include <ostream>
+#include <stdexcept>
+#include <wiredtiger.h>
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/exception_util_gen.h"
 #include "mongo/db/global_settings.h"
-#include "mongo/db/server_options_general_gen.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/snapshot_window_options_gen.h"
+#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_kv_engine.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_parameters_gen.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_recovery_unit.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_component_settings.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kWiredTiger

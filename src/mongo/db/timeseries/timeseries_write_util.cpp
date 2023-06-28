@@ -29,23 +29,70 @@
 
 #include "mongo/db/timeseries/timeseries_write_util.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <string>
+#include <type_traits>
+#include <utility>
+
+#include "timeseries_index_schema_conversion_functions.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog/collection_operation_source.h"
 #include "mongo/db/catalog/collection_write_path.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/ops/write_ops_exec_util.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_identifiers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/execution_stats.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_catalog/reopening.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/update/document_diff_applier.h"
+#include "mongo/db/update/document_diff_serialization.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
-#include "timeseries_index_schema_conversion_functions.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decimal_counter.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries {
 namespace {
@@ -290,6 +337,29 @@ BSONObj makeNewDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batc
 
     return makeNewDocument(
         batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
+}
+
+BSONObj makeNewCompressedDocumentForWrite(std::shared_ptr<bucket_catalog::WriteBatch> batch,
+                                          const BSONObj& metadata,
+                                          const NamespaceString& nss,
+                                          StringData timeField) {
+    // Builds the data field of a bucket document.
+    StringDataMap<BSONObjBuilder> dataBuilders;
+    processTimeseriesMeasurements(
+        {batch->measurements.begin(), batch->measurements.end()}, metadata, dataBuilders);
+
+    BSONObj uncompressedDoc = makeNewDocument(
+        batch->bucketHandle.bucketId.oid, metadata, batch->min, batch->max, dataBuilders);
+
+    const bool validateCompression = gValidateTimeseriesCompression.load();
+    auto compressed =
+        timeseries::compressBucket(uncompressedDoc, timeField, nss, validateCompression);
+    if (compressed.compressedBucket) {
+        return *compressed.compressedBucket;
+    }
+
+    // Return the uncompressed document if compression has failed.
+    return uncompressedDoc;
 }
 
 BSONObj makeNewDocumentForWrite(
@@ -616,7 +686,6 @@ void performAtomicWrites(
 
     // Groups all operations in one or several chained oplog entries to ensure the writes are
     // replicated atomically.
-    // TODO(SERVER-76432): Handle the updateOne case for retryable writes.
     auto groupOplogEntries = !opCtx->getTxnNumber() && !insertOps.empty() && modificationOp;
     WriteUnitOfWork wuow{opCtx, groupOplogEntries};
 
@@ -641,7 +710,12 @@ void performAtomicWrites(
         std::vector<InsertStatement> insertStatements;
         for (auto& op : insertOps) {
             invariant(op.getDocuments().size() == 1);
-            insertStatements.emplace_back(op.getDocuments().front());
+            if (modificationOp) {
+                insertStatements.emplace_back(op.getDocuments().front());
+            } else {
+                // Appends the stmtId for upsert.
+                insertStatements.emplace_back(stmtId, op.getDocuments().front());
+            }
         }
         uassertStatusOK(collection_internal::insertDocuments(
             opCtx, coll, insertStatements.begin(), insertStatements.end(), &curOp->debug()));

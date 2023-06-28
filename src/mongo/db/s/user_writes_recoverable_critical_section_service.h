@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"

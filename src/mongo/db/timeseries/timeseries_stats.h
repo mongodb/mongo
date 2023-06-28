@@ -31,7 +31,10 @@
 
 #include <boost/optional.hpp>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo {
 /**

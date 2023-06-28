@@ -31,15 +31,19 @@
  * This file contains tests for mongo/db/query/index_bounds.cpp
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/query/index_bounds.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 using namespace mongo;
 

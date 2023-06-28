@@ -29,22 +29,59 @@
 
 #include "mongo/db/catalog/collection_catalog.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
+#include <map>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/index_spec.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
 #include "mongo/db/catalog/collection_mock.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_yield_restore.h"
+#include "mongo/db/catalog/index_build_block.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/concurrency/resource_catalog.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/index_names.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/resumable_index_builds_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/storage_engine.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -55,7 +92,7 @@ namespace {
 class CollectionCatalogTest : public ServiceContextMongoDTest {
 public:
     CollectionCatalogTest()
-        : nss("testdb", "testcol"),
+        : nss(NamespaceString::createNamespaceString_forTest("testdb", "testcol")),
           col(nullptr),
           colUUID(UUID::gen()),
           nextUUID(UUID::gen()),
@@ -318,15 +355,16 @@ TEST_F(CollectionCatalogTest, OnCreateCollection) {
 
 TEST_F(CollectionCatalogTest, LookupCollectionByUUID) {
     // Ensure the string value of the NamespaceString of the obtained Collection is equal to
-    // nss.ns().
-    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID)->ns().ns(), nss.ns());
+    // nss.ns_forTest().
+    ASSERT_EQUALS(catalog.lookupCollectionByUUID(opCtx.get(), colUUID)->ns().ns_forTest(),
+                  nss.ns_forTest());
     // Ensure lookups of unknown UUIDs result in null pointers.
     ASSERT(catalog.lookupCollectionByUUID(opCtx.get(), UUID::gen()) == nullptr);
 }
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
-    // Ensure the string value of the obtained NamespaceString is equal to nss.ns().
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns(), nss.ns());
+    // Ensure the string value of the obtained NamespaceString is equal to nss.ns_forTest().
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns_forTest(), nss.ns_forTest());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), UUID::gen()), boost::none);
 }
@@ -622,81 +660,6 @@ TEST_F(CollectionCatalogTest, DatabaseProfileLevel) {
               serverGlobalParams.defaultProfile + 1);
 }
 
-TEST_F(CollectionCatalogTest, GetAllCollectionNamesAndGetAllDbNamesWithUncommittedCollections) {
-    NamespaceString aColl = NamespaceString::createNamespaceString_forTest("dbA", "collA");
-    NamespaceString b1Coll = NamespaceString::createNamespaceString_forTest("dbB", "collB1");
-    NamespaceString b2Coll = NamespaceString::createNamespaceString_forTest("dbB", "collB2");
-    NamespaceString cColl = NamespaceString::createNamespaceString_forTest("dbC", "collC");
-    NamespaceString d1Coll = NamespaceString::createNamespaceString_forTest("dbD", "collD1");
-    NamespaceString d2Coll = NamespaceString::createNamespaceString_forTest("dbD", "collD2");
-    NamespaceString d3Coll = NamespaceString::createNamespaceString_forTest("dbD", "collD3");
-
-    std::vector<NamespaceString> nsss = {aColl, b1Coll, b2Coll, cColl, d1Coll, d2Coll, d3Coll};
-    for (auto& nss : nsss) {
-        std::shared_ptr<Collection> newColl = std::make_shared<CollectionMock>(nss);
-        catalog.registerCollection(opCtx.get(), std::move(newColl), boost::none);
-    }
-
-    // One dbName with only an invisible collection does not appear in dbNames. Use const_cast to
-    // modify the collection in the catalog inplace, this bypasses copy-on-write behavior.
-    auto invisibleCollA =
-        const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), aColl));
-    invisibleCollA->setCommitted(false);
-
-    Lock::DBLock dbLock(opCtx.get(), aColl.dbName(), MODE_S);
-    auto res = catalog.getAllCollectionNamesFromDb(
-        opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "dbA"));
-    ASSERT(res.empty());
-
-    std::vector<DatabaseName> dbNames = {
-        DatabaseName::createDatabaseName_forTest(boost::none, "dbB"),
-        DatabaseName::createDatabaseName_forTest(boost::none, "dbC"),
-        DatabaseName::createDatabaseName_forTest(boost::none, "dbD"),
-        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
-    ASSERT(catalog.getAllDbNames() == dbNames);
-
-    // One dbName with both visible and invisible collections is still visible.
-    std::vector<NamespaceString> dbDNss = {d1Coll, d2Coll, d3Coll};
-    for (auto& nss : dbDNss) {
-        // Test each combination of one collection in dbD being invisible while the other two are
-        // visible.
-        std::vector<NamespaceString> dCollList = dbDNss;
-        dCollList.erase(std::find(dCollList.begin(), dCollList.end(), nss));
-
-        // Use const_cast to modify the collection in the catalog inplace, this bypasses
-        // copy-on-write behavior.
-        auto invisibleCollD =
-            const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss));
-        invisibleCollD->setCommitted(false);
-
-        Lock::DBLock dbLock(opCtx.get(), d1Coll.dbName(), MODE_S);
-        res = catalog.getAllCollectionNamesFromDb(
-            opCtx.get(), DatabaseName::createDatabaseName_forTest(boost::none, "dbD"));
-        std::sort(res.begin(), res.end());
-        ASSERT(res == dCollList);
-
-        ASSERT(catalog.getAllDbNames() == dbNames);
-        invisibleCollD->setCommitted(true);
-    }
-
-    invisibleCollA->setCommitted(true);  // reset visibility.
-
-    // If all dbNames consist only of invisible collections, none of these dbs is visible.
-    for (auto& nss : nsss) {
-        // Use const_cast to modify the collection in the catalog inplace, this bypasses
-        // copy-on-write behavior.
-        auto invisibleColl =
-            const_cast<Collection*>(catalog.lookupCollectionByNamespace(opCtx.get(), nss));
-        invisibleColl->setCommitted(false);
-    }
-
-    std::vector<DatabaseName> dbList = {
-        DatabaseName::createDatabaseName_forTest(boost::none, "testdb")};
-    ASSERT(catalog.getAllDbNames() == dbList);
-
-    catalog.deregisterAllCollectionsAndViews(getServiceContext());
-}
-
 class ForEachCollectionFromDbTest : public CatalogTestFixture {
 public:
     void createTestData() {
@@ -881,7 +844,7 @@ public:
                           const NamespaceString& from,
                           const NamespaceString& to,
                           Timestamp timestamp) {
-        invariant(from.db() == to.db());
+        invariant(from == to);
 
         _setupDDLOperation(opCtx, timestamp);
         WriteUnitOfWork wuow(opCtx);
@@ -934,7 +897,7 @@ public:
         auto indexBuildBlock = std::make_unique<IndexBuildBlock>(
             writableColl->ns(), indexSpec, IndexBuildMethod::kForeground, UUID::gen());
         uassertStatusOK(indexBuildBlock->init(opCtx, writableColl, /*forRecover=*/false));
-        uassertStatusOK(indexBuildBlock->getEntry(opCtx, writableColl)
+        uassertStatusOK(indexBuildBlock->getWritableEntry(opCtx, writableColl)
                             ->accessMethod()
                             ->initializeAsEmpty(opCtx));
         wuow.commit();
@@ -1111,10 +1074,11 @@ private:
             uassertStatusOK(storageEngine->getCatalog()->createCollection(
                 opCtx, nss, options, /*allocateDefaultSpace=*/true));
         auto& catalogId = catalogIdRecordStorePair.first;
+        auto catalogEntry = DurableCatalog::get(opCtx)->getParsedCatalogEntry(opCtx, catalogId);
+        auto metadata = catalogEntry->metadata;
         std::shared_ptr<Collection> ownedCollection = Collection::Factory::get(opCtx)->make(
-            opCtx, nss, catalogId, options, std::move(catalogIdRecordStorePair.second));
+            opCtx, nss, catalogId, metadata, std::move(catalogIdRecordStorePair.second));
         ownedCollection->init(opCtx);
-        ownedCollection->setCommitted(false);
 
         // Adds the collection to the in-memory catalog.
         CollectionCatalog::get(opCtx)->onCreateCollection(opCtx, std::move(ownedCollection));
@@ -1245,10 +1209,24 @@ private:
             // The onCommit handler must be registered prior to the DDL operation so it's executed
             // before any onCommit handlers set up in the operation.
             if (!openSnapshotBeforeCommit) {
-                newOpCtx.get()->recoveryUnit()->onCommit(
-                    [&commitHandler](OperationContext*, boost::optional<Timestamp>) {
-                        commitHandler();
-                    });
+                // Need to use 'registerChangeForCatalogVisibility' so it can happen after storage
+                // engine commit but before the changes become visible in the catalog.
+                class ChangeForCatalogVisibility : public RecoveryUnit::Change {
+                public:
+                    ChangeForCatalogVisibility(std::function<void()> commitHandler)
+                        : callback(std::move(commitHandler)) {}
+
+                    void commit(OperationContext* opCtx, boost::optional<Timestamp>) final {
+                        callback();
+                    }
+
+                    void rollback(OperationContext* opCtx) final {}
+
+                    std::function<void()> callback;
+                };
+
+                newOpCtx.get()->recoveryUnit()->registerChangeForCatalogVisibility(
+                    std::make_unique<ChangeForCatalogVisibility>(commitHandler));
             }
 
             ddlOperation(newOpCtx.get());
@@ -1310,22 +1288,22 @@ private:
             ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, coll->uuid()), coll);
         } else {
             ASSERT(!coll);
-            if (auto nss = nssOrUUID.nss()) {
+            if (nssOrUUID.isNamespaceString()) {
                 auto catalogEntry =
-                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, *nss);
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByNss(opCtx, nssOrUUID.nss());
                 ASSERT(!catalogEntry);
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, *nss), coll);
-            } else if (auto uuid = nssOrUUID.uuid()) {
+                ASSERT_EQ(catalog->lookupCollectionByNamespace(opCtx, nssOrUUID.nss()), coll);
+            } else {
                 auto catalogEntry =
-                    DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, *uuid);
+                    DurableCatalog::get(opCtx)->scanForCatalogEntryByUUID(opCtx, nssOrUUID.uuid());
                 ASSERT(!catalogEntry);
 
                 // Lookups from the catalog should return the newly opened collection (in this case
                 // nullptr).
-                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, *uuid), coll);
+                ASSERT_EQ(catalog->lookupCollectionByUUID(opCtx, nssOrUUID.uuid()), coll);
             }
         }
 
@@ -2500,10 +2478,13 @@ TEST_F(CollectionCatalogTimestampTest,
     createCollection(opCtx.get(), originalNss, createOriginalCollectionTs);
     createCollection(opCtx.get(), targetNss, createTargetCollectionTs);
 
-    // We expect to find the UUID for the target collection
+    // We expect to find the UUID for the original collection
     UUID uuid = CollectionCatalog::get(opCtx.get())
-                    ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                    ->lookupCollectionByNamespace(opCtx.get(), originalNss)
                     ->uuid();
+    UUID uuidDropped = CollectionCatalog::get(opCtx.get())
+                           ->lookupCollectionByNamespace(opCtx.get(), targetNss)
+                           ->uuid();
 
     // When the snapshot is opened right after the rename is committed to the durable catalog, and
     // the openCollection looks for the targetNss, we find the original collection.
@@ -2514,6 +2495,8 @@ TEST_F(CollectionCatalogTimestampTest,
                 CollectionCatalog::get(opCtx.get())->lookupCollectionByUUID(opCtx.get(), uuid);
             ASSERT(coll);
             ASSERT_EQ(coll->ns(), targetNss);
+            ASSERT(!CollectionCatalog::get(opCtx.get())
+                        ->lookupCollectionByUUID(opCtx.get(), uuidDropped));
 
             ASSERT_EQ(CollectionCatalog::get(opCtx.get())->lookupNSSByUUID(opCtx.get(), uuid),
                       targetNss);

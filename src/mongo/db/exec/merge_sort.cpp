@@ -29,14 +29,18 @@
 
 #include "mongo/db/exec/merge_sort.h"
 
+#include <cstddef>
 #include <memory>
+#include <string>
+#include <utility>
 
-#include "mongo/db/exec/scoped_timer.h"
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

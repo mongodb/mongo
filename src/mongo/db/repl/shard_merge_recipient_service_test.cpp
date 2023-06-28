@@ -27,57 +27,88 @@
  *    it in the license file.
  */
 
-#include <fstream>
+#include <cstddef>
+#include <cstdint>
+#include <fstream>  // IWYU pragma: keep
+#include <iterator>
+#include <list>
 #include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/replica_set_monitor.h"
 #include "mongo/client/replica_set_monitor_protocol_test_util.h"
+#include "mongo/client/sdam/mock_topology_manager.h"
 #include "mongo/client/streamable_replica_set_monitor_for_testing.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
-#include "mongo/db/feature_compatibility_version_document_gen.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
 #include "mongo/db/op_observer/oplog_writer_impl.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog.h"
-#include "mongo/db/repl/oplog_buffer_collection.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_fetcher_mock.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_op_observer.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/shard_merge_recipient_op_observer.h"
 #include "mongo/db/repl/shard_merge_recipient_service.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
-#include "mongo/db/repl/tenant_file_importer_service.h"
+#include "mongo/db/repl/tenant_migration_access_blocker.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
 #include "mongo/db/repl/tenant_migration_state_machine_gen.h"
+#include "mongo/db/repl/tenant_migration_util.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/service_context_d_test_fixture.h"
-#include "mongo/db/session/session_txn_record_gen.h"
-#include "mongo/db/storage/backup_cursor_hooks.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
 #include "mongo/dbtests/mock/mock_replica_set.h"
-#include "mongo/executor/mock_network_fixture.h"
-#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
-#include "mongo/transport/transport_layer_manager.h"
-#include "mongo/transport/transport_layer_mock.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
-#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/ssl_util.h"
@@ -154,7 +185,8 @@ public:
 
         {
             auto opCtx = cc().makeOperationContext();
-            auto replCoord = std::make_unique<ReplicationCoordinatorMock>(serviceContext);
+            auto replCoord = std::make_unique<ReplicationCoordinatorMock>(
+                serviceContext, createServerlessReplSettings());
             ReplicationCoordinator::set(serviceContext, std::move(replCoord));
 
             repl::createOplog(opCtx.get());

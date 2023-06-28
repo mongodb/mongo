@@ -29,10 +29,13 @@
 
 #pragma once
 
-#include <cstdint>
-#include <string>
-
 #include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <utility>
+
+#include <boost/none.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"

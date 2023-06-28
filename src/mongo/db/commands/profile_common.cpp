@@ -27,17 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/commands/profile_common.h"
 #include "mongo/db/commands/profile_gen.h"
-#include "mongo/db/curop.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/profile_filter_impl.h"
+#include "mongo/db/profile_filter.h"
+#include "mongo/db/server_options.h"
 #include "mongo/idl/idl_parser.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -63,8 +74,8 @@ Status ProfileCmdBase::checkAuthForOperation(OperationContext* opCtx,
         }
     }
 
-    return authzSession->isAuthorizedForActionsOnResource(
-               ResourcePattern::forDatabaseName(dbName.db()), ActionType::enableProfiler)
+    return authzSession->isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(dbName),
+                                                          ActionType::enableProfiler)
         ? Status::OK()
         : Status(ErrorCodes::Unauthorized, "unauthorized");
 }

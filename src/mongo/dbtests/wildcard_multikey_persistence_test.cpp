@@ -200,7 +200,7 @@ protected:
         if (!pathProjection.isEmpty())
             bob << IndexDescriptor::kWildcardProjectionFieldName << pathProjection;
 
-        auto indexSpec = (bob << "v" << kIndexVersion << "background" << background).obj();
+        auto indexSpec = (bob << "v" << kIndexVersion).obj();
 
         Lock::DBLock dbLock(opCtx(), nss.dbName(), MODE_X);
         AutoGetCollection autoColl(opCtx(), nss, MODE_X);

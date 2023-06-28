@@ -58,8 +58,8 @@ void dropDatabase(OperationContext* opCtx, const NamespaceString& nss) {
 }
 
 bool collectionExists(OperationContext* opCtx, OldClientContext* ctx, StringData ns) {
-    return (bool)CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(opCtx,
-                                                                            NamespaceString(ns));
+    return (bool)CollectionCatalog::get(opCtx)->lookupCollectionByNamespace(
+        opCtx, NamespaceString::createNamespaceString_forTest(ns));
 }
 
 void createCollection(OperationContext* opCtx, const NamespaceString& nss) {
@@ -172,7 +172,7 @@ public:
         std::string ns = "unittests.rollback_create_collection";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
@@ -209,7 +209,7 @@ public:
         std::string ns = "unittests.rollback_drop_collection";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);
@@ -253,8 +253,10 @@ public:
             return;
         }
 
-        NamespaceString source("unittests.rollback_rename_collection_src");
-        NamespaceString target("unittests.rollback_rename_collection_dest");
+        NamespaceString source = NamespaceString::createNamespaceString_forTest(
+            "unittests.rollback_rename_collection_src");
+        NamespaceString target = NamespaceString::createNamespaceString_forTest(
+            "unittests.rollback_rename_collection_dest");
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
 
@@ -307,8 +309,10 @@ public:
             return;
         }
 
-        NamespaceString source("unittests.rollback_rename_droptarget_collection_src");
-        NamespaceString target("unittests.rollback_rename_droptarget_collection_dest");
+        NamespaceString source = NamespaceString::createNamespaceString_forTest(
+            "unittests.rollback_rename_droptarget_collection_src");
+        NamespaceString target = NamespaceString::createNamespaceString_forTest(
+            "unittests.rollback_rename_droptarget_collection_dest");
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
 
@@ -378,7 +382,8 @@ template <bool rollback, bool defaultIndexes>
 class ReplaceCollection {
 public:
     void run() {
-        NamespaceString nss("unittests.rollback_replace_collection");
+        NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittests.rollback_replace_collection");
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
@@ -436,7 +441,8 @@ template <bool rollback, bool defaultIndexes>
 class TruncateCollection {
 public:
     void run() {
-        NamespaceString nss("unittests.rollback_truncate_collection");
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            "unittests.rollback_truncate_collection");
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         dropDatabase(&opCtx, nss);
@@ -490,7 +496,7 @@ public:
         std::string ns = "unittests.rollback_create_index";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
@@ -532,7 +538,7 @@ public:
         std::string ns = "unittests.rollback_drop_index";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
@@ -586,7 +592,7 @@ public:
         std::string ns = "unittests.rollback_create_drop_index";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         dropDatabase(&opCtx, nss);
         createCollection(&opCtx, nss);
 
@@ -630,7 +636,7 @@ public:
         std::string ns = "unittests.rollback_create_collection_and_indexes";
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        NamespaceString nss(ns);
+        NamespaceString nss = NamespaceString::createNamespaceString_forTest(ns);
         dropDatabase(&opCtx, nss);
 
         Lock::DBLock dbXLock(&opCtx, nss.dbName(), MODE_X);

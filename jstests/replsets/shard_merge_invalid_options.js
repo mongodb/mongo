@@ -15,7 +15,7 @@ import {
 load("jstests/libs/fail_point_util.js");
 
 function runTest(nodeOptions) {
-    const rst = new ReplSetTest({nodes: 1, nodeOptions: nodeOptions});
+    const rst = new ReplSetTest({nodes: 1, serverless: true, nodeOptions: nodeOptions});
     rst.startSet();
     rst.initiate();
 

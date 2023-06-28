@@ -664,7 +664,6 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
 
     def gen_namespace_check(self, indented_writer, db_name, element):
         # type: (writer.IndentedTextWriter, str, str) -> None
-        indented_writer.write_line('invariant(_nssOrUUID.nss() || _nssOrUUID.uuid());')
         indented_writer.write_line(
             'auto collOrUUID = ctxt.checkAndAssertCollectionNameOrUUID(%s);' % (element))
         indented_writer.write_line(
@@ -672,8 +671,8 @@ class _CommandWithUUIDNamespaceTypeInfo(_CommandBaseTypeInfo):
             % (db_name, db_name))
         indented_writer.write_line(
             'uassert(ErrorCodes::InvalidNamespace, str::stream() << "Invalid namespace specified: "'
-            ' << _nssOrUUID.nss()->toStringForErrorMsg()'
-            ', _nssOrUUID.nss() ? _nssOrUUID.nss()->isValid() : true);')
+            ' << _nssOrUUID.toStringForErrorMsg()'
+            ', !_nssOrUUID.isNamespaceString() || _nssOrUUID.nss().isValid());')
 
 
 def get_struct_info(struct):

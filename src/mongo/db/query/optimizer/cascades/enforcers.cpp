@@ -29,8 +29,24 @@
 
 #include "mongo/db/query/optimizer/cascades/enforcers.h"
 
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
+#include "mongo/db/query/optimizer/containers.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/memo_utils.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer::cascades {
 

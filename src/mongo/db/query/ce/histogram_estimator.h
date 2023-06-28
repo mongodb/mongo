@@ -29,7 +29,19 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
+#include <tuple>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/collection_statistics.h"
 
 namespace mongo::optimizer::ce {

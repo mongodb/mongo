@@ -29,10 +29,35 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/catalog/validate_results.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/index/column_cell.h"
 #include "mongo/db/index/column_key_generator.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/resumable_index_builds_gen.h"
 #include "mongo/db/storage/column_store.h"
+#include "mongo/db/storage/ident.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/shared_buffer_fragment.h"
 
 namespace mongo {
 

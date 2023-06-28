@@ -29,16 +29,18 @@
 
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
 
+#include <set>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/db/exec/document_value/document.h"
-#include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
-#include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
-#include "mongo/db/pipeline/document_source.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo::change_stream_test_helper {

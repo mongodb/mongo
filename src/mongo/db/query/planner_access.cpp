@@ -28,34 +28,66 @@
  */
 
 
-#include "mongo/db/matcher/expression_algo.h"
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/planner_access.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <s2cellid.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
+#include <set>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
-#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fts/fts_index_format.h"
-#include "mongo/db/fts/fts_query_noop.h"
+#include "mongo/db/fts/fts_query.h"
+#include "mongo/db/fts/fts_query_impl.h"
 #include "mongo/db/fts/fts_spec.h"
+#include "mongo/db/fts/fts_util.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
-#include "mongo/db/matcher/expression_array.h"
+#include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_geo.h"
-#include "mongo/db/matcher/expression_text.h"
+#include "mongo/db/matcher/expression_leaf.h"
+#include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/expression_tree.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/index_bounds.h"
 #include "mongo/db/query/index_bounds_builder.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/indexability.h"
+#include "mongo/db/query/planner_access.h"
 #include "mongo/db/query/planner_wildcard_helpers.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_common.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/storage/key_format.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -134,7 +166,6 @@ std::vector<bool> canProvideSortWithMergeSort(
     }
     return shouldReverseScan;
 }
-
 }  // namespace
 
 namespace mongo {
@@ -432,7 +463,11 @@ void QueryPlannerAccess::handleRIDRangeMinMax(
 }
 
 std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
-    const CanonicalQuery& query, bool tailable, const QueryPlannerParams& params, int direction) {
+    const CanonicalQuery& query,
+    bool tailable,
+    const QueryPlannerParams& params,
+    int direction,
+    const MatchExpression* root) {
 
     // The following are expensive to look up, so only do it once for each.
     const mongo::NamespaceString nss = query.nss();
@@ -442,7 +477,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
     // Make the (only) node, a collection scan.
     auto csn = std::make_unique<CollectionScanNode>();
     csn->name = nss.ns().toString();
-    csn->filter = query.root()->clone();
+    csn->filter = root->clone();
     csn->tailable = tailable;
     csn->shouldTrackLatestOplogTimestamp =
         params.options & QueryPlannerParams::TRACK_LATEST_OPLOG_TS;
@@ -500,7 +535,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // Optimizes the start and end location parameters for a collection scan for an oplog
         // collection. Not compatible with $_resumeAfter so we do not optimize in that case.
         if (resumeAfterObj.isEmpty()) {
-            auto [minTs, maxTs] = extractTsRange(query.root());
+            auto [minTs, maxTs] = extractTsRange(root);
             if (minTs) {
                 assignRecordIdFromTimestamp(*minTs, &csn->minRecord);
                 if (assertMinTsHasNotFallenOffOplog) {
@@ -516,7 +551,7 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::makeCollectionScan(
         // collection after the first matching one must also match. To avoid wasting time
         // running the match expression on every document to be returned, we tell the
         // CollectionScan stage to stop applying the filter once it finds the first match.
-        if (isOplogTsLowerBoundPred(query.root())) {
+        if (isOplogTsLowerBoundPred(root)) {
             csn->stopApplyingFilterAfterFirstMatch = true;
         }
     }
@@ -1699,9 +1734,54 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
     const QueryPlannerParams& params) {
 
     const bool inArrayOperator = !ownedRoot;
-    std::vector<std::unique_ptr<QuerySolutionNode>> ixscanNodes;
-    if (!processIndexScans(query, root, inArrayOperator, indices, params, &ixscanNodes)) {
+    bool usedClusteredCollScan = false;
+    std::vector<std::unique_ptr<QuerySolutionNode>> scanNodes;
+    if (!processIndexScans(query, root, inArrayOperator, indices, params, &scanNodes)) {
         return nullptr;
+    }
+
+    // Check if we can use a CLUSTERED_IXSCAN on the remaining children if they have no plans.
+    // Since, the only clustered index currently supported is on '_id' if we are in an array
+    // operator, we know we won't make clustered collection scans.
+    if (!inArrayOperator && 0 != root->numChildren()) {
+        bool clusteredCollection = params.clusteredInfo.has_value();
+        const bool isTailable = query.getFindCommandRequest().getTailable();
+        if (clusteredCollection) {
+            auto clusteredScanDirection =
+                QueryPlannerCommon::determineClusteredScanDirection(query, params).value_or(1);
+            while (0 < root->numChildren()) {
+                usedClusteredCollScan = true;
+                MatchExpression* child = root->getChild(0);
+                std::unique_ptr<QuerySolutionNode> collScan =
+                    makeCollectionScan(query, isTailable, params, clusteredScanDirection, child);
+                // Confirm the collection scan node is a clustered collection scan.
+                CollectionScanNode* collScanNode = static_cast<CollectionScanNode*>(collScan.get());
+                if (!collScanNode->doClusteredCollectionScanClassic()) {
+                    return nullptr;
+                }
+
+                // Caching OR queries with collection scans is restricted, since it is challenging
+                // to determine which match expressions from the input query require a clustered
+                // collection scan. Therefore, we cannot correctly calculate the correct bounds for
+                // the query using the cached plan.
+                collScanNode->markNotEligibleForPlanCache();
+                scanNodes.push_back(std::move(collScan));
+                // Erase child from root.
+                root->getChildVector()->erase(root->getChildVector()->begin());
+            }
+        }
+
+        // If we have a clustered collection scan, then all index scan stages must be wrapped inside
+        // a 'FETCH'. This is to avoid having an unnecessary collection scan node inside a 'FETCH',
+        // since the documents will already be fetched.
+        // TODO SERVER-77867 investigate when we can avoid adding this 'FETCH' stage.
+        if (usedClusteredCollScan) {
+            for (size_t i = 0; i < scanNodes.size(); ++i) {
+                if (scanNodes[i]->getType() == STAGE_IXSCAN) {
+                    scanNodes[i] = std::make_unique<FetchNode>(std::move(scanNodes[i]));
+                }
+            }
+        }
     }
 
     // Unlike an AND, an OR cannot have filters hanging off of it.  We stop processing
@@ -1715,51 +1795,51 @@ std::unique_ptr<QuerySolutionNode> QueryPlannerAccess::buildIndexedOr(
         return nullptr;
     }
 
+    if (!wcp::expandWildcardFieldBounds(scanNodes)) {
+        return nullptr;
+    }
+
     // If all index scans are identical, then we collapse them into a single scan. This prevents
     // us from creating OR plans where the branches of the OR perform duplicate work.
-    ixscanNodes = collapseEquivalentScans(std::move(ixscanNodes));
+    scanNodes = collapseEquivalentScans(std::move(scanNodes));
 
     std::unique_ptr<QuerySolutionNode> orResult;
 
     // An OR of one node is just that node.
-    if (1 == ixscanNodes.size()) {
-        orResult = std::move(ixscanNodes[0]);
+    if (1 == scanNodes.size()) {
+        orResult = std::move(scanNodes[0]);
     } else {
         std::vector<bool> shouldReverseScan;
-        // (Ignore FCV check): This is intentional because we want clusters which have wildcard
-        // indexes still be able to use the feature even if the FCV is downgraded.
-        if (feature_flags::gFeatureFlagCompoundWildcardIndexes.isEnabledAndIgnoreFCVUnsafe() &&
-            wildcard_planning::canOnlyAnswerWildcardPrefixQuery(ixscanNodes)) {
-            // If we get here, we have a an OR of IXSCANs, one of which is a compound wildcard
-            // index, but at least one of them can only support a FETCH + IXSCAN on queries on the
-            // prefix. This means this plan will produce incorrect results.
-            return nullptr;
-        }
 
         if (query.getSortPattern()) {
-            // If all ixscanNodes can provide the sort, shouldReverseScan is populated with which
+            // If all 'scanNodes' can provide the sort, shouldReverseScan is populated with which
             // scans to reverse.
             shouldReverseScan =
-                canProvideSortWithMergeSort(ixscanNodes, query.getFindCommandRequest().getSort());
+                canProvideSortWithMergeSort(scanNodes, query.getFindCommandRequest().getSort());
         }
 
         if (!shouldReverseScan.empty()) {
+            // TODO SERVER-77601 remove this conditional once SBE supports sort keys in collection
+            // scans.
+            if (usedClusteredCollScan) {
+                return nullptr;
+            }
             // Each node can provide either the requested sort, or the reverse of the requested
             // sort.
-            invariant(ixscanNodes.size() == shouldReverseScan.size());
-            for (size_t i = 0; i < ixscanNodes.size(); ++i) {
+            invariant(scanNodes.size() == shouldReverseScan.size());
+            for (size_t i = 0; i < scanNodes.size(); ++i) {
                 if (shouldReverseScan[i]) {
-                    QueryPlannerCommon::reverseScans(ixscanNodes[i].get());
+                    QueryPlannerCommon::reverseScans(scanNodes[i].get());
                 }
             }
 
             auto msn = std::make_unique<MergeSortNode>();
             msn->sort = query.getFindCommandRequest().getSort();
-            msn->addChildren(std::move(ixscanNodes));
+            msn->addChildren(std::move(scanNodes));
             orResult = std::move(msn);
         } else {
             auto orn = std::make_unique<OrNode>();
-            orn->addChildren(std::move(ixscanNodes));
+            orn->addChildren(std::move(scanNodes));
             orResult = std::move(orn);
         }
     }

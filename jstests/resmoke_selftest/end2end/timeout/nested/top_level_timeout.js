@@ -6,9 +6,14 @@ rst.startSet();
 rst.initiate();
 
 function start() {
+    // The --originSuite argument is to trick the resmoke local invocation into passing
+    // because when we pass --taskId into resmoke it thinks that it is being ran in evergreen
+    // and cannot normally find an evergreen task associated with
+    // buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_nested_timeout.yml
     const resmokeCmd = 'python3 buildscripts/resmoke.py run ' +
         '--storageEngineCacheSizeGB=1 --dbpathPrefix=/data/db/selftest_inner ' +
         '--internalParam=test_archival --taskId=123 ' +
+        '--originSuite=resmoke_end2end_tests ' +
         '--internalParam=is_inner_level ' +
         '--basePort=20020 ' +
         '--suites=buildscripts/tests/resmoke_end2end/suites/resmoke_selftest_nested_timeout.yml ' +

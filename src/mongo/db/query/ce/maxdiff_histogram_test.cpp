@@ -27,22 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
-#include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
+#include <cstddef>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/ce/histogram_predicate_estimation.h"
 #include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/stats/array_histogram.h"
 #include "mongo/db/query/stats/max_diff.h"
 #include "mongo/db/query/stats/maxdiff_test_utils.h"
 #include "mongo/db/query/stats/rand_utils.h"
-#include "mongo/db/query/stats/rand_utils_new.h"
 #include "mongo/db/query/stats/scalar_histogram.h"
-#include "mongo/logv2/log_component.h"
-#include "mongo/logv2/log_component_settings.h"
-#include "mongo/logv2/log_severity.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/stats/value_utils.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/storage/key_string.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -60,31 +65,6 @@ using stats::ScalarHistogram;
 const double kTolerance = 0.001;
 
 class HistogramTest : public ServiceContextTest {};
-class HistogramTestLarge : public ServiceContextTest {};
-
-class TestObserver : public ServiceContext::ClientObserver {
-public:
-    TestObserver() = default;
-    ~TestObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "TestObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<TestObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
 
 static double estimateCard(const ScalarHistogram& hist, const int v, const EstimationType type) {
     const auto [tag, val] = makeInt64Value(v);

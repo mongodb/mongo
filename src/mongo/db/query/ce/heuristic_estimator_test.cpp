@@ -27,21 +27,27 @@
  *    it in the license file.
  */
 
-#include <string>
-
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
+
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/ce/test_utils.h"
-#include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
-#include "mongo/db/query/optimizer/cascades/memo.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
 #include "mongo/db/query/optimizer/defs.h"
-#include "mongo/db/query/optimizer/explain.h"
-#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/opt_phase_manager.h"
 #include "mongo/db/query/optimizer/props.h"
-#include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -61,7 +67,7 @@ protected:
     }
 };
 
-class CEHeuristicTest : public LockerNoopServiceContextTest {};
+class CEHeuristicTest : public ServiceContextTest {};
 
 TEST_F(CEHeuristicTest, CEWithoutOptimizationGtLtNum) {
     std::string query = "{a0 : {$gt : 14, $lt : 21}}";

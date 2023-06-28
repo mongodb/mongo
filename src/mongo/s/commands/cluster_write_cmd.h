@@ -77,6 +77,7 @@ public:
      */
     static bool handleWouldChangeOwningShardError(OperationContext* opCtx,
                                                   BatchedCommandRequest* request,
+                                                  const NamespaceString& nss,
                                                   BatchedCommandResponse* response,
                                                   BatchWriteExecStats stats);
 

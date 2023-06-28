@@ -29,7 +29,15 @@
 
 #pragma once
 
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/keys_collection_client.h"
+#include "mongo/db/keys_collection_document_gen.h"
+#include "mongo/db/logical_time.h"
 
 namespace mongo {
 
@@ -40,8 +48,8 @@ public:
     KeysCollectionClientSharded(ShardingCatalogClient*);
 
     /**
-     * Returns keys in the config server's admin.system.keys that match the given purpose and have
-     * an expiresAt value greater than newerThanThis. Uses readConcern level majority if possible.
+     * Returns internal keys for the given purpose and have an expiresAt value greater than
+     * newerThanThis on the config server. Uses readConcern level majority if possible.
      */
     StatusWith<std::vector<KeysCollectionDocument>> getNewInternalKeys(
         OperationContext* opCtx,
@@ -50,8 +58,7 @@ public:
         bool tryUseMajority) override;
 
     /**
-     * Returns validation-only keys copied from other clusters that match the given purpose.
-     * Currently, a sharded cluster never copies cluster time keys from other clusters.
+     * Returns all external (i.e. validation-only) keys for the given purpose on the config server.
      */
     StatusWith<std::vector<ExternalKeysCollectionDocument>> getAllExternalKeys(
         OperationContext* opCtx, StringData purpose) override;

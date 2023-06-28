@@ -29,9 +29,19 @@
 
 #pragma once
 
+#include <memory>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_executor_factory.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"

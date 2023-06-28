@@ -29,19 +29,72 @@
 
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_internal.h"
 
-#include <boost/utility/in_place_factory.hpp>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/container/small_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/iteration/iterate.hpp>
+#include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
+#include <climits>
+#include <limits>
+#include <list>
+#include <map>
+#include <set>
+#include <string>
+#include <tuple>
+#include <type_traits>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/operation_id.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/kv/kv_engine.h"
+#include "mongo/db/storage/storage_engine.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/bucket_catalog/bucket_catalog_helpers.h"
+#include "mongo/db/timeseries/bucket_catalog/bucket_metadata.h"
+#include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
+#include "mongo/db/timeseries/bucket_compression.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/timeseries/timeseries_global_options.h"
+#include "mongo/db/timeseries/timeseries_options.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo::timeseries::bucket_catalog::internal {
 namespace {
 MONGO_FAIL_POINT_DEFINE(alwaysUseSameBucketCatalogStripe);
 MONGO_FAIL_POINT_DEFINE(hangTimeseriesInsertBeforeReopeningBucket);
 MONGO_FAIL_POINT_DEFINE(hangWaitingForConflictingPreparedBatch);
+
+Mutex _bucketIdGenLock =
+    MONGO_MAKE_LATCH(HierarchicalAcquisitionLevel(0), "bucket_catalog_internal::_bucketIdGenLock");
+PseudoRandom _bucketIdGenPRNG(SecureRandom().nextInt64());
 
 OperationId getOpId(OperationContext* opCtx, CombineWithInsertsFromOtherClients combine) {
     switch (combine) {
@@ -417,7 +470,7 @@ StatusWith<std::reference_wrapper<Bucket>> reopenBucket(BucketCatalog& catalog,
     auto status = initializeBucketState(
         catalog.bucketStateRegistry, bucket->bucketId, bucket.get(), targetEra);
 
-    // Forward the WriteConflict when the bucket has been cleared or has a pending direct write.
+    // Forward the WriteConflict if the bucket has been cleared or has a pending direct write.
     if (!status.isOK()) {
         return status;
     }
@@ -791,12 +844,24 @@ void removeBucket(
     // we can remove the state from the catalog altogether.
     switch (mode) {
         case RemovalMode::kClose: {
-            // Ensure that we are in a state of pending compression (represented by a negative
-            // direct write counter).
             auto state = getBucketState(catalog.bucketStateRegistry, bucket.bucketId);
-            invariant(state.has_value());
-            invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
-            invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
+            if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                // When removing a closed bucket, the BucketStateRegistry may contain state for this
+                // bucket due to an untracked ongoing direct write (such as TTL delete).
+                if (state.has_value()) {
+                    invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()),
+                              bucketStateToString(*state));
+                    invariant(stdx::get<DirectWriteCounter>(state.value()) < 0,
+                              bucketStateToString(*state));
+                }
+            } else {
+                // Ensure that we are in a state of pending compression (represented by a negative
+                // direct write counter).
+                invariant(state.has_value());
+                invariant(stdx::holds_alternative<DirectWriteCounter>(state.value()));
+                invariant(stdx::get<DirectWriteCounter>(state.value()) < 0);
+            }
             break;
         }
         case RemovalMode::kAbort:
@@ -1058,7 +1123,7 @@ void expireIdleBuckets(BucketCatalog& catalog,
 }
 
 std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOptions& options) {
-    OID oid = OID::gen();
+    OID oid;
 
     // We round the measurement timestamp down to the nearest minute, hour, or day depending on the
     // granularity. We do this for two reasons. The first is so that if measurements come in
@@ -1070,28 +1135,29 @@ std::pair<OID, Date_t> generateBucketOID(const Date_t& time, const TimeseriesOpt
     int64_t const roundedSeconds = durationCount<Seconds>(roundedTime.toDurationSinceEpoch());
     oid.setTimestamp(roundedSeconds);
 
-    // Now, if we stopped here we could end up with bucket OID collisions. Consider the case where
-    // we have the granularity set to 'Hours'. This means we will round down to the nearest day, so
-    // any bucket generated on the same machine on the same day will have the same timestamp portion
-    // and unique instance portion of the OID. Only the increment will differ. Since we only use 3
-    // bytes for the increment portion, we run a serious risk of overflow if we are generating lots
-    // of buckets.
+    // Now, if we used the standard OID generation method for the remaining bytes we could end up
+    // with lots of bucket OID collisions. Consider the case where we have the granularity set to
+    // 'Hours'. This means we will round down to the nearest day, so any bucket generated on the
+    // same machine on the same day will have the same timestamp portion and unique instance portion
+    // of the OID. Only the increment would differ. Since we only use 3 bytes for the increment
+    // portion, we run a serious risk of overflow if we are generating lots of buckets.
     //
-    // To address this, we'll take the difference between the actual timestamp and the rounded
-    // timestamp and add it to the instance portion of the OID to ensure we can't have a collision.
-    // for timestamps generated on the same machine.
-    //
-    // This leaves open the possibility that in the case of step-down/step-up, we could get a
-    // collision if the old primary and the new primary have unique instance bits that differ by
-    // less than the maximum rounding difference. This is quite unlikely though, and can be resolved
-    // by restarting the new primary. It remains an open question whether we can fix this in a
-    // better way.
-    // TODO (SERVER-61412): Avoid time-series bucket OID collisions after election
-    auto instance = oid.getInstanceUnique();
-    uint32_t sum = DataView(reinterpret_cast<char*>(instance.bytes)).read<uint32_t>(1) +
-        (durationCount<Seconds>(time.toDurationSinceEpoch()) - roundedSeconds);
-    DataView(reinterpret_cast<char*>(instance.bytes)).write<uint32_t>(sum, 1);
+    // To address this, we'll instead use a PRNG to generate the rest of the bytes. With 8 bytes of
+    // randomness, we should have a pretty low chance of collisions. The limit of the birthday
+    // paradox converges to roughly the square root of the size of the space, so we would need a few
+    // billion buckets with the same timestamp to expect collisions. In the rare case that we do get
+    // a collision, we can (and do) simply regenerate the bucket _id at a higher level.
+    OID::InstanceUnique instance;
+    OID::Increment increment;
+    {
+        // We need to serialize access to '_bucketIdGenPRNG' since this instance is shared between
+        // all bucket_catalog operations, and not protected by the catalog or stripe locks.
+        stdx::unique_lock lk{_bucketIdGenLock};
+        _bucketIdGenPRNG.fill(instance.bytes, OID::kInstanceUniqueSize);
+        _bucketIdGenPRNG.fill(increment.bytes, OID::kIncrementSize);
+    }
     oid.setInstanceUnique(instance);
+    oid.setIncrement(increment);
 
     return {oid, roundedTime};
 }
@@ -1130,7 +1196,11 @@ Bucket& allocateBucket(BucketCatalog& catalog,
     stripe.openBucketsByKey[info.key].emplace(bucket);
 
     auto status = initializeBucketState(catalog.bucketStateRegistry, bucket->bucketId);
-    invariant(status.isOK());
+    if (!status.isOK()) {
+        stripe.openBucketsByKey[info.key].erase(bucket);
+        stripe.openBucketsById.erase(it);
+        throwWriteConflictException(status.reason());
+    }
 
     catalog.numberOfActiveBuckets.fetchAndAdd(1);
     if (info.openedDuetoMetadata) {
@@ -1302,6 +1372,15 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      ClosedBuckets& closedBuckets) {
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Remove the bucket from the bucket state registry.
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+
+        removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
+        return;
+    }
+
     bool error = false;
     try {
         closedBuckets.emplace_back(&catalog.bucketStateRegistry,
@@ -1320,6 +1399,15 @@ void closeOpenBucket(BucketCatalog& catalog,
                      WithLock stripeLock,
                      Bucket& bucket,
                      boost::optional<ClosedBucket>& closedBucket) {
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Remove the bucket from the bucket state registry.
+        stopTrackingBucketState(catalog.bucketStateRegistry, bucket.bucketId);
+
+        removeBucket(catalog, stripe, stripeLock, bucket, RemovalMode::kClose);
+        return;
+    }
+
     bool error = false;
     try {
         closedBucket = boost::in_place(&catalog.bucketStateRegistry,
@@ -1337,6 +1425,13 @@ void closeOpenBucket(BucketCatalog& catalog,
 void closeArchivedBucket(BucketStateRegistry& registry,
                          ArchivedBucket& bucket,
                          ClosedBuckets& closedBuckets) {
+    if (feature_flags::gTimeseriesAlwaysUseCompressedBuckets.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Remove the bucket from the bucket state registry.
+        stopTrackingBucketState(registry, bucket.bucketId);
+        return;
+    }
+
     try {
         closedBuckets.emplace_back(&registry, bucket.bucketId, bucket.timeField, boost::none);
     } catch (...) {

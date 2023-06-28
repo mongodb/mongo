@@ -29,17 +29,23 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
 #include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/count_command_gen.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/fle/query_rewriter_interface.h"
 #include "mongo/db/transaction/transaction_api.h"
 
@@ -48,6 +54,7 @@
  */
 namespace mongo {
 class FLETagQueryInterface;
+
 namespace fle {
 
 

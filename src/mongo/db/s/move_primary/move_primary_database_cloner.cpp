@@ -29,29 +29,53 @@
 
 #include "mongo/db/s/move_primary/move_primary_database_cloner.h"
 
+#include <algorithm>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/commands/list_collections_filter.h"
+#include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_list_catalog.h"
 #include "mongo/db/pipeline/document_source_match.h"
-#include "mongo/db/repl/cloner_utils.h"
-#include "mongo/db/repl/database_cloner_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/pipeline.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/move_primary/move_primary_collection_cloner.h"
-#include "mongo/db/vector_clock.h"
-#include "mongo/db/vector_clock_mutable.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/s/grid.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kMovePrimary
 
@@ -79,7 +103,7 @@ MovePrimaryDatabaseCloner::MovePrimaryDatabaseCloner(
           this,
           &MovePrimaryDatabaseCloner::listExistingCollectionsOnRecipientStage),
       _catalogClient(catalogClient) {
-    invariant(!_dbName.db().empty());
+    invariant(!_dbName.isEmpty());
     _opCtxHolder = cc().makeOperationContext();
     if (!_catalogClient) {
         _catalogClient = Grid::get(_opCtxHolder.get())->catalogClient();
@@ -169,15 +193,12 @@ MovePrimaryDatabaseCloner::listExistingCollectionsOnDonorStage() {
         if (collectionNamespace.isSystem() && !collectionNamespace.isReplicated()) {
             continue;
         }
-        LOGV2_DEBUG(7307501,
-                    2,
-                    "Allowing cloning of collection",
-                    "namespace"_attr = collectionNamespace.ns());
+        LOGV2_DEBUG(7307501, 2, "Allowing cloning of collection", logAttrs(collectionNamespace));
 
         bool canInsert = seen.insert(collectionNamespace).second;
         uassert(7307502,
                 str::stream() << "Donor collection list contains duplicate collection name "
-                              << "'" << collectionNamespace.ns(),
+                              << "'" << collectionNamespace.toStringForErrorMsg(),
                 canInsert);
     }
     return kContinueNormally;
@@ -196,15 +217,15 @@ MovePrimaryDatabaseCloner::listExistingCollectionsOnRecipientStage() {
         // Ensure no unsharded collection exists on the recipient if
         // the operation is not being resumed.
         uassert(7307503,
-                str::stream() << "Unsharded collection " << info.ns.ns()
+                str::stream() << "Unsharded collection " << info.ns.toStringForErrorMsg()
                               << " exists prior to data cloning on recipient",
                 (info.shardedColl || getSharedData()->getResumePhase() == ResumePhase::kDataSync));
 
         // Verify that the recipient collection exists on the donor with the same Namespace & UUID.
         auto donorColl = std::lower_bound(_donorCollections.begin(), _donorCollections.end(), info);
         uassert(7307504,
-                str::stream() << "Collection " << info.ns.ns() << " with UUID " << info.uuid
-                              << " exists on recipient but not on donor",
+                str::stream() << "Collection " << info.ns.toStringForErrorMsg() << " with UUID "
+                              << info.uuid << " exists on recipient but not on donor",
                 ((donorColl != _donorCollections.end()) && (donorColl->uuid == info.uuid) &&
                  (donorColl->ns == info.ns)));
 

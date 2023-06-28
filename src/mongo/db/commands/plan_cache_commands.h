@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/sbe_plan_cache.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::plan_cache_commands {
 
@@ -42,7 +49,7 @@ namespace mongo::plan_cache_commands {
  * that command represented as a CanonicalQuery.
  */
 StatusWith<std::unique_ptr<CanonicalQuery>> canonicalize(OperationContext* opCtx,
-                                                         StringData ns,
+                                                         const NamespaceString& nss,
                                                          const BSONObj& cmdObj);
 
 /**

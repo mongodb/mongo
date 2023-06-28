@@ -29,6 +29,11 @@
 
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
 
+#include <memory>
+
+#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/locker_impl.h"
+
 namespace mongo {
 
 LockerImplClientObserver::LockerImplClientObserver() = default;

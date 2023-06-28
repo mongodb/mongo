@@ -29,11 +29,14 @@
 
 #include "mongo/db/catalog/virtual_collection_impl.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/catalog/collection_impl.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/storage/external_record_store.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -57,6 +60,10 @@ std::shared_ptr<Collection> VirtualCollectionImpl::make(OperationContext* opCtx,
                                                         const CollectionOptions& options,
                                                         const VirtualCollectionOptions& vopts) {
     return std::make_shared<VirtualCollectionImpl>(
-        opCtx, nss, options, std::make_unique<ExternalRecordStore>(nss.ns(), options.uuid, vopts));
+        opCtx,
+        nss,
+        options,
+        std::make_unique<ExternalRecordStore>(
+            NamespaceStringUtil::serializeForCatalog(nss), options.uuid, vopts));
 }
 }  // namespace mongo

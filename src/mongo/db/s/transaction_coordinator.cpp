@@ -28,18 +28,55 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_set.h>
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/db/s/transaction_coordinator.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
+#include "mongo/db/s/server_transaction_coordinators_metrics.h"
+#include "mongo/db/s/single_transaction_coordinator_stats.h"
+#include "mongo/db/s/transaction_coordinator.h"
 #include "mongo/db/s/transaction_coordinator_metrics_observer.h"
+#include "mongo/db/s/transaction_coordinator_util.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock_mutable.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
@@ -238,6 +275,11 @@ TransactionCoordinator::TransactionCoordinator(
                     }
 
                     if (_decision->getDecision() == CommitDecision::kCommit) {
+                        auto affectedNamespacesSet = consensus.releaseAffectedNamespaces();
+                        _affectedNamespaces.reserve(affectedNamespacesSet.size());
+                        std::move(affectedNamespacesSet.begin(),
+                                  affectedNamespacesSet.end(),
+                                  std::back_inserter(_affectedNamespaces));
                         LOGV2_DEBUG(
                             22446,
                             3,
@@ -288,8 +330,12 @@ TransactionCoordinator::TransactionCoordinator(
                     return Future<repl::OpTime>::makeReady(repl::OpTime());
             }
 
-            return txn::persistDecision(
-                *_scheduler, _lsid, _txnNumberAndRetryCounter, *_participants, *_decision);
+            return txn::persistDecision(*_scheduler,
+                                        _lsid,
+                                        _txnNumberAndRetryCounter,
+                                        *_participants,
+                                        *_decision,
+                                        _affectedNamespaces);
         })
         .then([this](repl::OpTime opTime) {
             switch (_decision->getDecision()) {
@@ -411,6 +457,7 @@ void TransactionCoordinator::continueCommit(const TransactionCoordinatorDocument
         _participantsDurable = true;
         _decision = std::move(doc.getDecision());
     }
+    _affectedNamespaces = doc.getAffectedNamespaces().get_value_or({});
 
     _kickOffCommitPromise.emplaceValue();
 }

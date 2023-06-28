@@ -29,17 +29,33 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <iosfwd>
+#include <string>
 #include <tuple>
+#include <utility>
+#include <variant>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo {
 

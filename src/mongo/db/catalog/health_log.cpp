@@ -28,8 +28,14 @@
  */
 
 #include "mongo/db/catalog/health_log.h"
+
+#include <cstdint>
+#include <string>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/health_log_gen.h"
-#include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
 
 namespace mongo {

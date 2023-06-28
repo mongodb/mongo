@@ -30,17 +30,31 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <memory>
+#include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/oid.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/restriction_set.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

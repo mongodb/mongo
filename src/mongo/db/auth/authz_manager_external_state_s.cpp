@@ -27,23 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authz_manager_external_state_s.h"
-
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/shim.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authz_manager_external_state_s.h"
+#include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/authz_session_external_state_s.h"
 #include "mongo/db/auth/user_document_parser.h"
-#include "mongo/db/auth/user_management_commands_parser.h"
 #include "mongo/db/auth/user_name.h"
 #include "mongo/db/multitenancy.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/grid.h"
-#include "mongo/util/net/ssl_types.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

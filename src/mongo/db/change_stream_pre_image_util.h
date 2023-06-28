@@ -28,11 +28,18 @@
  */
 #pragma once
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/record_id_bound.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace change_stream_pre_image_util {
@@ -46,8 +53,6 @@ namespace change_stream_pre_image_util {
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime);
 
 /**
- * TODO SERVER-74981: Investigate whether there is a safer way to extract the Timestamp.
- *
  * Parses the 'ts' field from the 'ChangeStreamPreImageId' associated with the 'rid'. The 'rid' MUST
 be
  * generated from a pre-image.

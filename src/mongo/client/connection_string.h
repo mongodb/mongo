@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <compare>
 #include <memory>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -37,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"

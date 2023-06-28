@@ -24,7 +24,7 @@ in the source code repo
 
 - gpg sign the tarball
 
-- upload the resulting files to https://c-ares.haxx.se/download/
+- upload the resulting files to https://c-ares.org/download/
 
 - update `ares_version.h` for the next version
 

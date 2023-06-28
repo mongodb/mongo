@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/db/cursor_id.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_sync_shared_data.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

@@ -29,6 +29,9 @@
 
 
 #include "mongo/db/s/global_index/global_index_cumulative_metrics.h"
+
+#include <memory>
+
 #include "mongo/db/s/metrics/sharding_data_transform_metrics_test_fixture.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

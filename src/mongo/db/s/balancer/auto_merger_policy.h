@@ -29,7 +29,22 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/s/balancer/actions_stream_policy.h"
+#include "mongo/db/s/balancer/balancer_policy.h"
+#include "mongo/db/s/balancer/cluster_statistics.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

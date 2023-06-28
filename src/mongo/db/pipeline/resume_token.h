@@ -29,7 +29,13 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <iosfwd>
+#include <string>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"

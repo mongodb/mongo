@@ -109,8 +109,8 @@ void NetworkTestEnv::onFindCommand(OnFindCommandFunction func) {
             arr.append(obj);
         }
 
-        const NamespaceString nss =
-            NamespaceString(request.dbname, request.cmdObj.firstElement().String());
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
         BSONObjBuilder result;
         appendCursorResponseObject(0LL, nss, arr.arr(), boost::none, &result);
 
@@ -135,8 +135,8 @@ void NetworkTestEnv::onFindWithMetadataCommand(OnFindCommandWithMetadataFunction
             arr.append(obj);
         }
 
-        const NamespaceString nss =
-            NamespaceString(request.dbname, request.cmdObj.firstElement().String());
+        const NamespaceString nss = NamespaceString::createNamespaceString_forTest(
+            request.dbname, request.cmdObj.firstElement().String());
         BSONObjBuilder resultBuilder(std::move(metadata));
         appendCursorResponseObject(0LL, nss, arr.arr(), boost::none, &resultBuilder);
 

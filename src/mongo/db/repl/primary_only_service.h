@@ -29,25 +29,46 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
 #include <memory>
+#include <string>
 #include <unordered_set>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/client.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/lockable_adapter.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -444,7 +465,7 @@ private:
      * PrimaryOnlyService, constructs Instance objects for each document found, and schedules work
      * to run all the newly recreated Instances.
      */
-    void _rebuildInstances(long long term) noexcept;
+    void _rebuildInstances(long long term);
 
     /**
      * Schedules work to call the provided instance's 'run' method and inserts the new instance into
@@ -510,8 +531,11 @@ private:
 
     State _state = State::kPaused;  // (M)
 
-    // If reloading the state documents from disk fails, this Status gets set to a non-ok value and
-    // calls to lookup() or getOrCreate() will throw this status until the node steps down.
+    // If rebuilding the instances fails, for example due to a failure reloading the state documents
+    // from disk, this Status gets set to a non-ok value and calls to lookup() or getOrCreate() will
+    // throw this status until the node steps down. Note that this status must be populated with the
+    // relevant error before _setState is used to change the status to kRebuildFailed and waiters on
+    // _stateChangeCV are notified, as those waiters may attempt to read this status.
     Status _rebuildStatus = Status::OK();  // (M)
 
     // The term that this service is running under.
@@ -594,7 +618,7 @@ private:
 
     // Doesn't own the service, contains a pointer to the service owned by _servicesByName.
     // This is safe since services don't change after startup.
-    StringMap<PrimaryOnlyService*> _servicesByNamespace;
+    mongo::stdx::unordered_map<NamespaceString, PrimaryOnlyService*> _servicesByNamespace;
 };
 
 }  // namespace repl

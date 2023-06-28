@@ -28,11 +28,44 @@
  */
 
 #include "mongo/db/s/config/placement_history_cleaner.h"
+
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/sharding_util.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_namespace_placement_gen.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -127,7 +160,8 @@ void PlacementHistoryCleaner::runOnce(Client* client, size_t minPlacementHistory
         // The clean-up must always move the new initialization time forward.
         const auto match =
             BSON(NamespacePlacementType::kNssFieldName
-                 << ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker.ns()
+                 << NamespaceStringUtil::serialize(
+                        ShardingCatalogClient::kConfigPlacementHistoryInitializationMarker)
                  << NamespacePlacementType::kTimestampFieldName
                  << BSON("$gte" << earliestOplogTime->toBSON()));
 

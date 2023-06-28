@@ -31,26 +31,47 @@
 #include "mongo/db/exec/multi_plan.h"
 
 #include <algorithm>
-#include <cmath>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <deque>
+#include <fmt/format.h>
 #include <memory>
+#include <string>
+#include <utility>
+#include <variant>
 
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/exec/histogram_server_status_metric.h"
-#include "mongo/db/exec/scoped_timer.h"
 #include "mongo/db/exec/trial_period_utils.h"
-#include "mongo/db/exec/working_set_common.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/classic_plan_cache.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_explainer_factory.h"
 #include "mongo/db/query/plan_ranker.h"
 #include "mongo/db/query/plan_ranker_util.h"
+#include "mongo/db/query/plan_ranking_decision.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/histogram.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_proxy.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/str.h"
+#include "mongo/util/tick_source.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -109,7 +130,7 @@ HistogramServerStatusMetric classicNumPlansHistogram(
 }  // namespace
 
 MultiPlanStage::MultiPlanStage(ExpressionContext* expCtx,
-                               const CollectionPtr& collection,
+                               VariantCollectionPtrOrAcquisition collection,
                                CanonicalQuery* cq,
                                PlanCachingMode cachingMode)
     : RequiresCollectionStage(kStageType, expCtx, collection),
@@ -166,9 +187,9 @@ PlanStage::StageState MultiPlanStage::doWork(WorkingSetID* out) {
 
         LOGV2_DEBUG(20588, 5, "Best plan errored, switching to backup plan");
 
-        CollectionQueryInfo::get(collection())
+        CollectionQueryInfo::get(collectionPtr())
             .getPlanCache()
-            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collection()));
+            ->remove(plan_cache_key_factory::make<PlanCacheKey>(*_query, collectionPtr()));
 
         switchToBackupPlan();
         return _candidates[_bestPlanIdx].root->work(out);
@@ -206,7 +227,7 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
 
     const size_t numWorks =
         trial_period::getTrialPeriodMaxWorks(opCtx(),
-                                             collection(),
+                                             collectionPtr(),
                                              internalQueryPlanEvaluationWorks.load(),
                                              internalQueryPlanEvaluationCollFraction.load());
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_query);
@@ -270,8 +291,13 @@ Status MultiPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
         }
     }
 
+    const auto& coll = collection();
+    auto multipleCollection = coll.isAcquisition()
+        ? MultipleCollectionAccessor{coll.getAcquisition()}
+        : MultipleCollectionAccessor{coll.getCollectionPtr()};
+
     plan_cache_util::updatePlanCacheFromCandidates(expCtx()->opCtx,
-                                                   MultipleCollectionAccessor(collection()),
+                                                   std::move(multipleCollection),
                                                    _cachingMode,
                                                    *_query,
                                                    std::move(ranking),

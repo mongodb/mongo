@@ -27,28 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/meta/type_traits.h>
+#include <cmath>
+#include <tuple>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/pipeline/accumulation_statement.h"
-#include "mongo/db/pipeline/document_source_add_fields.h"
-#include "mongo/db/pipeline/document_source_project.h"
-#include "mongo/db/pipeline/document_source_set_window_fields.h"
-#include "mongo/db/pipeline/document_source_set_window_fields_gen.h"
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/stats/counters.h"
-
-#include "mongo/db/pipeline/window_function/partition_iterator.h"
-#include "mongo/db/pipeline/window_function/window_function_exec.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_derivative.h"
-#include "mongo/db/pipeline/window_function/window_function_exec_first_last.h"
+#include "mongo/db/pipeline/accumulator_percentile.h"
 #include "mongo/db/pipeline/window_function/window_function_expression.h"
 #include "mongo/db/pipeline/window_function/window_function_first_last_n.h"
 #include "mongo/db/pipeline/window_function/window_function_min_max.h"
 #include "mongo/db/pipeline/window_function/window_function_n_traits.h"
 #include "mongo/db/pipeline/window_function/window_function_percentile.h"
 #include "mongo/db/pipeline/window_function/window_function_top_bottom_n.h"
+#include "mongo/db/stats/counters.h"
 
 using boost::intrusive_ptr;
 using boost::optional;
@@ -80,17 +78,11 @@ REGISTER_STABLE_WINDOW_FUNCTION(
     (ExpressionN<WindowFunctionBottom,
                  AccumulatorTopBottomN<TopBottomSense::kBottom, true>>::parse));
 
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    percentile,
-    (window_function::ExpressionQuantile<AccumulatorPercentile>::parse),
-    feature_flags::gFeatureFlagApproxPercentiles,
-    AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_STABLE_WINDOW_FUNCTION(
+    percentile, (window_function::ExpressionQuantile<AccumulatorPercentile>::parse));
 
-REGISTER_WINDOW_FUNCTION_WITH_FEATURE_FLAG(
-    median,
-    (window_function::ExpressionQuantile<AccumulatorMedian>::parse),
-    feature_flags::gFeatureFlagApproxPercentiles,
-    AllowedWithApiStrict::kNeverInVersion1);
+REGISTER_STABLE_WINDOW_FUNCTION(median,
+                                (window_function::ExpressionQuantile<AccumulatorMedian>::parse));
 StringMap<Expression::ExpressionParserRegistration> Expression::parserMap;
 
 intrusive_ptr<Expression> Expression::parse(BSONObj obj,
@@ -404,11 +396,12 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
     BSONObj obj, const boost::optional<SortPattern>& sortBy, ExpressionContext* expCtx) {
 
     std::vector<double> ps;
-    int32_t method = -1;
+    PercentileMethod method = PercentileMethod::Approximate;
     boost::intrusive_ptr<::mongo::Expression> outputExpr;
     boost::intrusive_ptr<::mongo::Expression> initializeExpr;  // need for serializer.
     boost::optional<WindowBounds> bounds = WindowBounds::defaultBounds();
     auto name = AccumulatorTType::kName;
+
     for (auto&& elem : obj) {
         auto fieldName = elem.fieldNameStringData();
         if (fieldName == name) {
@@ -420,7 +413,9 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
             initializeExpr = std::move(accExpr.initializer);
 
             // Retrieve the values of 'ps' and 'method' from the accumulator's IDL parser.
-            std::tie(ps, method) = AccumulatorTType::parsePercentileAndMethod(elem);
+            std::tie(ps, method) = AccumulatorTType::parsePercentileAndMethod(
+                expCtx, elem, expCtx->variablesParseState);
+
         } else if (fieldName == kWindowArg) {
             bounds = WindowBounds::parse(elem, sortBy, expCtx);
         } else {
@@ -429,9 +424,9 @@ boost::intrusive_ptr<Expression> ExpressionQuantile<AccumulatorTType>::parse(
         }
     }
 
-    tassert(7455900,
-            str::stream() << "missing accumulator specification for " << name,
-            initializeExpr && outputExpr && !ps.empty() && method != -1);
+    uassert(7455900,
+            str::stream() << "Missing or incomplete accumulator specification for " << name,
+            initializeExpr && outputExpr && !ps.empty());
 
     return make_intrusive<ExpressionQuantile>(
         expCtx, std::string(name), std::move(outputExpr), initializeExpr, *bounds, ps, method);

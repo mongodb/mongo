@@ -29,14 +29,28 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/facilities/overload.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <limits>
+#include <string>
+#include <utility>
+#include <vector>
 #include <wiredtiger.h>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/catalog/import_options.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/durable_catalog.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -44,6 +58,7 @@ namespace mongo {
 class BSONObjBuilder;
 class OperationContext;
 class WiredTigerConfigParser;
+
 class WiredTigerKVEngine;
 class WiredTigerSession;
 class WiredTigerSessionCache;

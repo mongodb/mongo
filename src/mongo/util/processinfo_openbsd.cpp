@@ -31,6 +31,7 @@
 #include <cstdlib>
 #include <string>
 
+#ifndef _WIN32
 #include <kvm.h>
 #include <sys/file.h>
 #include <sys/mman.h>
@@ -39,11 +40,16 @@
 #include <sys/types.h>
 #include <sys/user.h>
 #include <sys/vmmeter.h>
-#include <unistd.h>
+#endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/util/scopeguard.h"
-#include "processinfo.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

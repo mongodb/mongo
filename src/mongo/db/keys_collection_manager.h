@@ -29,16 +29,23 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <functional>
 #include <memory>
+#include <string>
+#include <vector>
 
 #include "mongo/base/status_with.h"
 #include "mongo/db/key_generator.h"
 #include "mongo/db/keys_collection_cache.h"
 #include "mongo/db/keys_collection_document_gen.h"
 #include "mongo/db/keys_collection_manager_gen.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/duration.h"

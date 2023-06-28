@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
@@ -36,6 +39,7 @@
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/internal_auth.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_client_session.h"

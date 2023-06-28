@@ -29,24 +29,45 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <set>
 #include <string>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/rollback.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/transaction/transaction_operations.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 struct InsertStatement;
-class OperationContext;
-
-namespace repl {
-class OpTime;
-}  // namespace repl
 
 struct OpTimeBundle {
     repl::OpTime writeOpTime;
@@ -64,21 +85,13 @@ struct OpTimeBundle {
 struct OpStateAccumulator : Decorable<OpStateAccumulator> {
     OpStateAccumulator() = default;
 
+    // Use either 'opTime' for non-insert operations or 'insertOpTimes', but not both.
     OpTimeBundle opTime;
+    std::vector<repl::OpTime> insertOpTimes;
 
 private:
     OpStateAccumulator(const OpStateAccumulator&) = delete;
     OpStateAccumulator& operator=(const OpStateAccumulator&) = delete;
-};
-
-struct InsertsOpStateAccumulator : Decorable<InsertsOpStateAccumulator> {
-    InsertsOpStateAccumulator() = default;
-
-    std::vector<repl::OpTime> opTimes;
-
-private:
-    InsertsOpStateAccumulator(const InsertsOpStateAccumulator&) = delete;
-    InsertsOpStateAccumulator& operator=(const InsertsOpStateAccumulator&) = delete;
 };
 
 enum class RetryableFindAndModifyLocation {
@@ -182,7 +195,6 @@ public:
         kTwoPhase,
     };
 
-
     virtual ~OpObserver() = default;
 
     // Used by the OpObserverRegistry to filter out CRUD operations.
@@ -258,7 +270,7 @@ public:
                            std::vector<InsertStatement>::const_iterator end,
                            std::vector<bool> fromMigrate,
                            bool defaultFromMigrate,
-                           InsertsOpStateAccumulator* opAccumulator = nullptr) = 0;
+                           OpStateAccumulator* opAccumulator = nullptr) = 0;
 
     virtual void onInsertGlobalIndexKey(OperationContext* opCtx,
                                         const NamespaceString& globalIndexNss,

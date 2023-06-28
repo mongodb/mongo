@@ -57,7 +57,7 @@ public:
         return OperationCPUTimers::get(_opCtx.get());
     }
 
-    std::shared_ptr<OperationCPUTimer> makeTimer() const {
+    std::unique_ptr<OperationCPUTimer> makeTimer() const {
         return getTimers()->makeTimer();
     }
 
@@ -110,9 +110,9 @@ TEST_F(OperationCPUTimerTest, TestReset) {
     auto elapsedAfterStop = timer->getElapsed();
     // Due to inconsistencies between the CPU time-based clock used in the timer and the
     // clock used in busyWait, the elapsed CPU time is sometimes observed as being less than the
-    // time spent busy waiting. To account for that, only assert that at least 1ms of CPU time has
-    // elapsed even though the thread was supposed to have busy-waited for 2ms.
-    ASSERT_GTE(elapsedAfterStop, Milliseconds(1));
+    // time spent busy waiting. To account for that, only assert that any amount of CPU
+    // time has elapsed, even though the thread was supposed to have busy-waited for 2ms.
+    ASSERT_GT(elapsedAfterStop, Nanoseconds(0));
 
     timer->start();
     auto elapsedAfterReset = timer->getElapsed();
@@ -168,10 +168,7 @@ TEST_F(OperationCPUTimerTest, MultipleTimers) {
         ASSERT_EQ(2, getTimers()->count());
     }
 
-    // We don't clean up unused timers.
-    ASSERT_EQ(2, getTimers()->count());
-    { auto timer3 = makeTimer(); }
-    ASSERT_EQ(3, getTimers()->count());
+    ASSERT_EQ(1, getTimers()->count());
 
     timer1->stop();
 

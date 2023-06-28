@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/multiapplier.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <memory>
+#include <mutex>
+#include <ostream>
 #include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/client.h"
-#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/multiapplier.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 
 namespace mongo {

@@ -133,7 +133,7 @@ public:
             return _collUuid;
         }
 
-        double getRate() const {
+        double getSamplesPerSecond() const {
             return _numTokensPerSecond;
         }
 
@@ -153,7 +153,7 @@ public:
          * Sets a new rate. Causes the bucket to be refilled with tokens created since last refill
          * time according to the previous rate.
          */
-        void refreshRate(double numTokensPerSecond);
+        void refreshSamplesPerSecond(double numTokensPerSecond);
 
     private:
         /**

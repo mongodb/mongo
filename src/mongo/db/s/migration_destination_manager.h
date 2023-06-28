@@ -29,35 +29,54 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/s/active_migrations_registry.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/migration_batch_fetcher.h"
+#include "mongo/db/s/migration_batch_inserter.h"
 #include "mongo/db/s/migration_recipient_recovery_document_gen.h"
 #include "mongo/db/s/migration_session_id.h"
 #include "mongo/db/s/session_catalog_migration_destination.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/chunk_manager.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
 class OperationContext;
+
 class StartChunkCloneRequest;
 class Status;
 struct WriteConcernOptions;

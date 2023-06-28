@@ -27,10 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/update/array_culling_node.h"
 #include "mongo/db/update/storage_validation.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

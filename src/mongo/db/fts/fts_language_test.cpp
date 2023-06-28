@@ -28,9 +28,12 @@
  */
 
 #include "mongo/db/fts/fts_language.h"
-#include "mongo/db/fts/fts_spec.h"
-#include "mongo/platform/basic.h"
-#include "mongo/unittest/unittest.h"
+
+#include <ostream>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

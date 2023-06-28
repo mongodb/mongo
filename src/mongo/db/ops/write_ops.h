@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -78,6 +87,9 @@ constexpr size_t kMaxWriteBatchSize = 100'000;
 // Limit the size that we write without yielding to 16MB / 64 (max expected number of indexes)
 constexpr size_t insertVectorMaxBytes = 256 * 1024;
 
+// This constant accounts for the size of an individual stmtId, as used for retryable writes.
+constexpr size_t kStmtIdSize = 4;
+
 /**
  * Retrieves the statement id for the write at the specified position in the write batch entries
  * array.
@@ -122,8 +134,30 @@ int getDeleteSizeEstimate(const BSONObj& q,
                           const boost::optional<UUID>& sampleId);
 
 /**
- * Set of utilities which return true if the estimated write size is greater than or equal to the
- * actual write size, false otherwise.
+ * Set of utilities which estimate the size, in bytes, of an insert/update/delete op with the given
+ * parameters, when serialized in the format used for the bulkWrite command.
+ */
+int getBulkWriteInsertSizeEstimate(const mongo::BSONObj& document);
+int getBulkWriteUpdateSizeEstimate(const BSONObj& filter,
+                                   const write_ops::UpdateModification& updateMods,
+                                   const boost::optional<mongo::BSONObj>& constants,
+                                   bool includeUpsertSupplied,
+                                   const boost::optional<mongo::BSONObj>& collation,
+                                   const boost::optional<std::vector<mongo::BSONObj>>& arrayFilters,
+                                   const BSONObj& hint,
+                                   const boost::optional<mongo::BSONObj>& sort,
+                                   boost::optional<StringData> returnValue,
+                                   const boost::optional<mongo::BSONObj>& returnFields);
+int getBulkWriteDeleteSizeEstimate(const BSONObj& filter,
+                                   const boost::optional<mongo::BSONObj>& collation,
+                                   const mongo::BSONObj& hint,
+                                   const boost::optional<mongo::BSONObj>& sort,
+                                   bool includeReturn,
+                                   const boost::optional<mongo::BSONObj>& returnFields);
+
+/**
+ * Set of utilities which return true if the estimated write size is greater than or equal to
+ * the actual write size, false otherwise.
  *
  * If the caller specifies 'unparsedRequest', these utilities will also return true if the request
  * used document sequences and the size estimate is greater than the maximum size of a BSONObj. This

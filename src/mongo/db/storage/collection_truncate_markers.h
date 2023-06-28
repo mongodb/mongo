@@ -29,13 +29,35 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <memory>
+#include <mutex>
+#include <type_traits>
+#include <utility>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -116,6 +138,9 @@ public:
 
     // The method used for creating the initial set of markers.
     enum class MarkersCreationMethod { EmptyCollection, Scanning, Sampling };
+
+    static StringData toString(MarkersCreationMethod creationMethod);
+
     // The initial set of markers to use when constructing the CollectionMarkers object.
     struct InitialSetOfMarkers {
         std::deque<Marker> markers;
@@ -132,25 +157,76 @@ public:
             : id(std::move(lastRecord)), wall(std::move(wallTime)) {}
     };
 
+    // Given the estimated collection 'dataSize' and 'numRecords', along with a target
+    // 'minBytesPerMarker' and the desired 'numRandomSamplesPerMarker' (if sampling is the chosen
+    // creation method), computes the initial creation method to try for the initialization.
+    //
+    // It's possible the initial creation method is not the actual creation method. However, it will
+    // be the first creation method tried. For example, if estimates of 'dataSize' and 'numRecords'
+    // are really far off, sampling may default back to scanning later on.
+    //
+    // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
+    // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
+    // reclaiming the oldest truncate markers.
+    static CollectionTruncateMarkers::MarkersCreationMethod computeInitialCreationMethod(
+        int64_t numRecords,
+        int64_t dataSize,
+        int64_t minBytesPerMarker,
+        boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
+
+    /**
+     * A collection iterator class meant to encapsulate how the collection is scanned/sampled. As
+     * the initialisation step is only concerned about getting either the next element of the
+     * collection or a random one, this allows the user to specify how to perform these steps. This
+     * allows one for example to avoid yielding and use raw cursors or to use the query framework so
+     * that yielding is performed and we don't affect server stability.
+     *
+     * If we were to use query framework scans here we would incur on a layering violation as the
+     * storage layer shouldn't have to interact with the query (higher) layer in here.
+     */
+    class CollectionIterator {
+    public:
+        // Returns the next element in the collection. Behaviour is the same as performing a normal
+        // collection scan.
+        virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() = 0;
+
+        // Returns a random document from the collection.
+        virtual boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() = 0;
+
+        virtual RecordStore* getRecordStore() const = 0;
+
+        // Reset the iterator. This will recreate any internal cursors used by the class so that
+        // calling getNext* will start from the beginning again.
+        virtual void reset(OperationContext* opCtx) = 0;
+
+        int64_t numRecords(OperationContext* opCtx) const {
+            return getRecordStore()->numRecords(opCtx);
+        }
+
+        int64_t dataSize(OperationContext* opCtx) const {
+            return getRecordStore()->dataSize(opCtx);
+        }
+    };
+
     // Creates the initial set of markers. This will decide whether to perform a collection scan or
     // sampling based on the size of the collection.
     //
-    // 'numberOfMarkersToKeepLegacy' exists solely to maintain legacy behavior of
-    // 'OplogTruncateMarkers' previously known as 'OplogStones'. It serves as the maximum number of
-    // truncate markers to keep before reclaiming the oldest truncate markers.
-    static InitialSetOfMarkers createFromExistingRecordStore(
+    // 'numberOfMarkersToKeepForOplog' exists solely to maintain legacy behavior of
+    // 'OplogTruncateMarkers'. It serves as the maximum number of truncate markers to keep before
+    // reclaiming the oldest truncate markers.
+    static InitialSetOfMarkers createFromCollectionIterator(
         OperationContext* opCtx,
-        RecordStore* rs,
+        CollectionIterator& collIterator,
         const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime,
-        boost::optional<int64_t> numberOfMarkersToKeepLegacy = boost::none);
+        boost::optional<int64_t> numberOfMarkersToKeepForOplog = boost::none);
 
     // Creates the initial set of markers by fully scanning the collection. The set of markers
     // returned will have correct metrics.
     static InitialSetOfMarkers createMarkersByScanning(
         OperationContext* opCtx,
-        RecordStore* rs,
+        CollectionIterator& collIterator,
         const NamespaceString& ns,
         int64_t minBytesPerMarker,
         std::function<RecordIdAndWallTime(const Record&)> getRecordIdAndWallTime);
@@ -160,7 +236,7 @@ public:
     // the collection's size and record count divided by the number of markers.
     static InitialSetOfMarkers createMarkersBySampling(
         OperationContext* opCtx,
-        RecordStore* rs,
+        CollectionIterator& collIterator,
         const NamespaceString& ns,
         int64_t estimatedRecordsPerMarker,
         int64_t estimatedBytesPerMarker,
@@ -168,21 +244,28 @@ public:
 
     void setMinBytesPerMarker(int64_t size);
 
+    static constexpr uint64_t kRandomSamplesPerMarker = 10;
+
     //
     // The following methods are public only for use in tests.
     //
 
-    size_t numMarkers() const {
+    size_t numMarkers_forTest() const {
         stdx::lock_guard<Latch> lk(_markersMutex);
         return _markers.size();
     }
 
-    int64_t currentBytes() const {
+    int64_t currentBytes_forTest() const {
         return _currentBytes.load();
     }
 
-    int64_t currentRecords() const {
+    int64_t currentRecords_forTest() const {
         return _currentRecords.load();
+    }
+
+    std::deque<Marker> getMarkers_forTest() const {
+        // Return a copy of the vector.
+        return _markers;
     }
 
 private:
@@ -196,8 +279,6 @@ private:
     // Method used to notify the implementation of a new marker being created. Implementations are
     // free to implement this however they see fit by overriding it. By default this is a no-op.
     virtual void _notifyNewMarkerCreation(){};
-
-    static constexpr uint64_t kRandomSamplesPerMarker = 10;
 
     // Minimum number of bytes the marker being filled should contain before it gets added to the
     // deque of collection markers.
@@ -286,6 +367,10 @@ public:
                                                         Date_t wallTime,
                                                         int64_t countInserted) final;
 
+    std::pair<const RecordId&, const Date_t&> getPartialMarker_forTest() const {
+        return {_lastHighestRecordId, _lastHighestWallTime};
+    }
+
 private:
     // Highest marker seen during the lifetime of the class. Modifications must happen
     // while holding '_lastHighestRecordMutex'.
@@ -299,13 +384,111 @@ private:
         return false;
     }
 
+    // Updates the highest seen RecordId and wall time if they are above the current ones.
+    void _updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
+
 protected:
     std::pair<const RecordId&, const Date_t&> getPartialMarker() const {
         return {_lastHighestRecordId, _lastHighestWallTime};
     }
 
-    // Updates the highest seen RecordId and wall time if they are above the current ones.
-    void _updateHighestSeenRecordIdAndWallTime(const RecordId& rId, Date_t wallTime);
+    void updateCurrentMarker(OperationContext* opCtx,
+                             int64_t bytesAdded,
+                             const RecordId& highestRecordId,
+                             Date_t highestWallTime,
+                             int64_t numRecordsAdded);
+};
+
+/**
+ * A Collection iterator meant to work with raw RecordStores. This iterator will not yield between
+ * calls to getNext()/getNextRandom().
+ *
+ * It is only safe to use when the user is not accepting any user operation. Some examples of when
+ * this class can be used are during oplog initialisation, repair, recovery, etc.
+ */
+class UnyieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
+public:
+    UnyieldableCollectionIterator(OperationContext* opCtx, RecordStore* rs) : _rs(rs) {
+        reset(opCtx);
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() final {
+        auto record = _directionalCursor->next();
+        if (!record) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(record->id), record->data.releaseToBson());
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final {
+        auto record = _randomCursor->next();
+        if (!record) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(record->id), record->data.releaseToBson());
+    }
+
+    virtual RecordStore* getRecordStore() const final {
+        return _rs;
+    }
+
+    virtual void reset(OperationContext* opCtx) final {
+        _directionalCursor = _rs->getCursor(opCtx);
+        _randomCursor = _rs->getRandomCursor(opCtx);
+    }
+
+private:
+    RecordStore* _rs;
+    std::unique_ptr<RecordCursor> _directionalCursor;
+    std::unique_ptr<RecordCursor> _randomCursor;
+};
+
+/**
+ * A collection iterator that can yield between calls to getNext()/getNextRandom()
+ */
+class YieldableCollectionIterator : public CollectionTruncateMarkers::CollectionIterator {
+public:
+    YieldableCollectionIterator(OperationContext* opCtx, VariantCollectionPtrOrAcquisition coll)
+        : _collection(coll) {
+        reset(opCtx);
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNext() final {
+        RecordId rId;
+        BSONObj doc;
+        if (_collScanExecutor->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(rId), std::move(doc));
+    }
+
+    virtual boost::optional<std::pair<RecordId, BSONObj>> getNextRandom() final {
+        RecordId rId;
+        BSONObj doc;
+        if (_sampleExecutor->getNext(&doc, &rId) == PlanExecutor::IS_EOF) {
+            return boost::none;
+        }
+        return std::make_pair(std::move(rId), std::move(doc));
+    }
+
+    virtual RecordStore* getRecordStore() const final {
+        return _collection.getCollectionPtr()->getRecordStore();
+    }
+
+    virtual void reset(OperationContext* opCtx) final {
+        _collScanExecutor =
+            InternalPlanner::collectionScan(opCtx,
+                                            _collection,
+                                            PlanYieldPolicy::YieldPolicy::YIELD_AUTO,
+                                            InternalPlanner::Direction::FORWARD);
+        _sampleExecutor = InternalPlanner::sampleCollection(
+            opCtx, _collection, PlanYieldPolicy::YieldPolicy::YIELD_AUTO);
+    }
+
+private:
+    VariantCollectionPtrOrAcquisition _collection;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _collScanExecutor;
+    std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> _sampleExecutor;
 };
 
 }  // namespace mongo

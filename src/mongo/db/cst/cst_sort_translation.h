@@ -29,12 +29,13 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 
 #include "mongo/db/cst/c_node.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo::cst_sort_translation {
 

@@ -29,24 +29,30 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/static_assert.hpp>
 #include <cfloat>
 #include <cinttypes>
+#include <climits>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <type_traits>
-
-#include <boost/optional.hpp>
-
-#include "mongo/bson/util/builder_fwd.h"
+#include <utility>
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/bits.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/decimal128.h"

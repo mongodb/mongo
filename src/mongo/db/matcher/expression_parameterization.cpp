@@ -31,6 +31,11 @@
 
 #include <cmath>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 void MatchExpressionParameterizationVisitor::visitBitTestExpression(BitTestMatchExpression* expr) {
     expr->setBitPositionsParamId(_context->nextInputParamId(expr));

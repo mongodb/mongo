@@ -28,12 +28,21 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <memory>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/abt/abt_translate_bm_fixture.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::optimizer {
 namespace {
@@ -49,7 +58,7 @@ public:
         QueryTestServiceContext testServiceContext;
         auto opCtx = testServiceContext.makeOperationContext();
 
-        auto nss = NamespaceString("test.bm");
+        auto nss = NamespaceString::createNamespaceString_forTest("test.bm");
         auto expCtx = make_intrusive<ExpressionContextForTest>(opCtx.get(), nss);
 
         std::unique_ptr<Pipeline, PipelineDeleter> parsedPipeline =

@@ -27,11 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/inlined_vector.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <utility>
 
-#include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/size_estimator.h"
+#include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo::sbe {
 LimitSkipStage::LimitSkipStage(std::unique_ptr<PlanStage> input,

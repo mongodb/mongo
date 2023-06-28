@@ -12,7 +12,7 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 load("jstests/sharding/analyze_shard_key/libs/sampling_current_op_and_server_status_common.js");
 
-const sampleRate = 10000;
+const samplesPerSecond = 10000;
 
 const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 const queryAnalysisWriterIntervalSecs = 1;
@@ -66,103 +66,181 @@ function runTest(conn, {rst, st}) {
     const collUuid0 = QuerySamplingUtil.getCollectionUuid(testDb, collName0);
     const collUuid1 = QuerySamplingUtil.getCollectionUuid(testDb, collName1);
 
-    conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", sampleRate});
-    conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", sampleRate});
+    jsTest.log(
+        "Test running a $listSampledQueries aggregate command while there are no sampled queries");
+    let actualSamples = adminDb.aggregate([{$listSampledQueries: {}}]).toArray();
+    assert.eq(actualSamples.length, 0);
+
+    conn.adminCommand({configureQueryAnalyzer: ns0, mode: "full", samplesPerSecond});
+    conn.adminCommand({configureQueryAnalyzer: ns1, mode: "full", samplesPerSecond});
     QuerySamplingUtil.waitForActiveSampling(ns0, collUuid0, {rst, st});
     QuerySamplingUtil.waitForActiveSampling(ns1, collUuid1, {rst, st});
 
-    // Create read samples on collection0.
     let expectedSamples = [];
-    assert.commandWorked(
-        testDb.runCommand({aggregate: collName0, pipeline: [{$match: {x: 1}}], cursor: {}}));
-    expectedSamples["aggregate"] = {
+    // Use this to identify expected samples later.
+    let sampleNum = -1;
+    const getSampleNum = (sample) => {
+        switch (sample.cmdName) {
+            case "aggregate":
+            case "count":
+            case "distinct":
+            case "find":
+                return sample.cmd.filter.sampleNum;
+            case "update":
+            case "delete":
+            case "findAndModify":
+                return sample.cmd.let.sampleNum;
+            default:
+                throw Error("Unexpected command name");
+        }
+    };
+
+    let numSamplesColl0 = 0;
+    let numSamplesColl1 = 0;
+
+    // Create read samples on collection0.
+    const aggregateFilter = {x: 1, sampleNum: ++sampleNum};
+    assert.commandWorked(testDb.runCommand(
+        {aggregate: collName0, pipeline: [{$match: aggregateFilter}], cursor: {}}));
+    expectedSamples[sampleNum] = {
         ns: ns0,
         collectionUuid: collUuid0,
         cmdName: "aggregate",
-        cmd: {filter: {x: 1}, collation: {locale: "simple"}}
+        cmd: {filter: aggregateFilter, collation: {locale: "simple"}}
     };
-    assert.commandWorked(testDb.runCommand({count: collName0, query: {x: -1}}));
-    expectedSamples["count"] =
-        {ns: ns0, collectionUuid: collUuid0, cmdName: "count", cmd: {filter: {x: -1}}};
-    assert.commandWorked(testDb.runCommand({distinct: collName0, key: "x", query: {x: 2}}));
-    expectedSamples["distinct"] =
-        {ns: ns0, collectionUuid: collUuid0, cmdName: "distinct", cmd: {filter: {x: 2}}};
-    assert.commandWorked(testDb.runCommand({find: collName0, filter: {x: -3}, collation: {}}));
-    expectedSamples["find"] = {
+    numSamplesColl0++;
+
+    const countFilter = {x: -1, sampleNum: ++sampleNum};
+    assert.commandWorked(testDb.runCommand({count: collName0, query: countFilter}));
+    expectedSamples[sampleNum] =
+        {ns: ns0, collectionUuid: collUuid0, cmdName: "count", cmd: {filter: countFilter}};
+    numSamplesColl0++;
+
+    const distinctFilter = {x: 2, sampleNum: ++sampleNum};
+    assert.commandWorked(testDb.runCommand({distinct: collName0, key: "x", query: distinctFilter}));
+    expectedSamples[sampleNum] =
+        {ns: ns0, collectionUuid: collUuid0, cmdName: "distinct", cmd: {filter: distinctFilter}};
+    numSamplesColl0++;
+
+    const findFilter = {x: -3, sampleNum: ++sampleNum};
+    assert.commandWorked(testDb.runCommand({find: collName0, filter: findFilter, collation: {}}));
+    expectedSamples[sampleNum] = {
         ns: ns0,
         collectionUuid: collUuid0,
         cmdName: "find",
-        cmd: {filter: {x: -3}, collation: {}}
+        cmd: {filter: findFilter, collation: {}}
     };
+    numSamplesColl0++;
 
     // Create write samples on collection1.
     const updateCmdObj = {
         update: collName1,
-        updates: [{q: {x: 4}, u: [{$set: {y: 1}}], multi: false}]
+        updates: [{q: {x: 4}, u: [{$set: {y: 1}}], multi: false}],
+        let : {sampleNum: ++sampleNum}
     };
     assert.commandWorked(testDb.runCommand(updateCmdObj));
-    expectedSamples["update"] = {
+    expectedSamples[sampleNum] = {
         ns: ns1,
         collectionUuid: collUuid1,
         cmdName: "update",
         cmd: Object.assign({}, updateCmdObj, {$db: dbName})
     };
-    const findAndModifyCmdObj =
-        {findAndModify: collName1, query: {x: 5}, sort: {x: 1}, update: {$set: {z: 1}}};
+    numSamplesColl1++;
+
+    const findAndModifyCmdObj = {
+        findAndModify: collName1,
+        query: {x: 5},
+        sort: {x: 1},
+        update: {$set: {z: 1}},
+        let : {sampleNum: ++sampleNum}
+    };
     assert.commandWorked(testDb.runCommand(findAndModifyCmdObj));
-    expectedSamples["findAndModify"] = {
+    expectedSamples[sampleNum] = {
         ns: ns1,
         collectionUuid: collUuid1,
         cmdName: "findAndModify",
         cmd: Object.assign({}, findAndModifyCmdObj, {$db: dbName})
     };
-    const deleteCmdObj = {delete: collName1, deletes: [{q: {x: -6}, limit: 1}]};
+    numSamplesColl1++;
+
+    const deleteCmdObj = {
+        delete: collName1,
+        deletes: [{q: {x: -6}, limit: 1}],
+        let : {sampleNum: ++sampleNum}
+    };
     assert.commandWorked(testDb.runCommand(deleteCmdObj));
-    expectedSamples["delete"] = {
+    expectedSamples[sampleNum] = {
         ns: ns1,
         collectionUuid: collUuid1,
         cmdName: "delete",
         cmd: Object.assign({}, deleteCmdObj, {$db: dbName})
     };
+    numSamplesColl1++;
 
+    jsTest.log("Test running a $listSampledQueries aggregate command that doesn't involve " +
+               "getMore commands");
     // Verify samples on both collections.
-    let response;
     assert.soon(() => {
-        response = assert.commandWorked(adminDb.runCommand(
-            {aggregate: 1, pipeline: [{$listSampledQueries: {}}, {$sort: {ns: 1}}], cursor: {}}));
-        return response.cursor.firstBatch.length == 7;
+        actualSamples = adminDb.aggregate([{$listSampledQueries: {}}, {$sort: {ns: 1}}]).toArray();
+        return actualSamples.length >= (numSamplesColl0 + numSamplesColl1);
     });
-    let samples = response.cursor.firstBatch;
-    samples.forEach((sample) => {
+    assert.eq(actualSamples.length, numSamplesColl0 + numSamplesColl1);
+    actualSamples.forEach((sample) => {
         AnalyzeShardKeyUtil.validateSampledQueryDocument(sample);
-        QuerySamplingUtil.assertSubObject(sample, expectedSamples[sample.cmdName]);
+        QuerySamplingUtil.assertSubObject(sample, expectedSamples[getSampleNum(sample)]);
     });
 
     // Verify that listing for collection0 returns only collection0 samples.
     assert.soon(() => {
-        response = assert.commandWorked(adminDb.runCommand(
-            {aggregate: 1, pipeline: [{$listSampledQueries: {namespace: ns0}}], cursor: {}}));
-        return response.cursor.firstBatch.length == 4;
+        actualSamples = adminDb.aggregate([{$listSampledQueries: {namespace: ns0}}]).toArray();
+        return actualSamples.length >= numSamplesColl0;
     });
-    samples = response.cursor.firstBatch;
-    samples.forEach((sample) => {
+    assert.eq(actualSamples.length, numSamplesColl0);
+    actualSamples.forEach((sample) => {
         AnalyzeShardKeyUtil.validateSampledQueryDocument(sample);
-        QuerySamplingUtil.assertSubObject(sample, expectedSamples[sample.cmdName]);
+        QuerySamplingUtil.assertSubObject(sample, expectedSamples[getSampleNum(sample)]);
     });
 
     // Verify that listing for collection1 returns only collection1 samples.
     assert.soon(() => {
-        response = assert.commandWorked(adminDb.runCommand(
-            {aggregate: 1, pipeline: [{$listSampledQueries: {namespace: ns1}}], cursor: {}}));
-        return response.cursor.firstBatch.length == 3;
+        actualSamples = adminDb.aggregate([{$listSampledQueries: {namespace: ns1}}]).toArray();
+        return actualSamples.length >= numSamplesColl1;
     });
-    samples = response.cursor.firstBatch;
-    samples.forEach((sample) => {
+    assert.eq(actualSamples.length, numSamplesColl1);
+    actualSamples.forEach((sample) => {
         AnalyzeShardKeyUtil.validateSampledQueryDocument(sample);
-        QuerySamplingUtil.assertSubObject(sample, expectedSamples[sample.cmdName]);
+        QuerySamplingUtil.assertSubObject(sample, expectedSamples[getSampleNum(sample)]);
     });
 
-    // Verify that running on a database other than "admin" results in error.
+    jsTest.log("Test running a $listSampledQueries aggregate command that involves getMore " +
+               "commands");
+    // Make the number of sampled queries larger than the batch size so that getMore commands are
+    // required when $listSampledQueries is run.
+    const batchSize = 101;
+    for (let i = 0; i < 250; i++) {
+        const sign = (i % 2 == 0) ? 1 : -1;
+        const findFilter = {x: sign * 7, sampleNum: ++sampleNum};
+        assert.commandWorked(
+            testDb.runCommand({find: collName1, filter: findFilter, collation: {}}));
+        expectedSamples[sampleNum] = {
+            ns: ns1,
+            collectionUuid: collUuid1,
+            cmdName: "find",
+            cmd: {filter: findFilter, collation: {}}
+        };
+        numSamplesColl1++;
+    }
+    assert.soon(() => {
+        actualSamples = adminDb.aggregate([{$listSampledQueries: {}}], {batchSize}).toArray();
+        return actualSamples.length >= expectedSamples.length;
+    });
+    assert.eq(actualSamples.length, expectedSamples.length);
+    actualSamples.forEach((sample) => {
+        AnalyzeShardKeyUtil.validateSampledQueryDocument(sample);
+        QuerySamplingUtil.assertSubObject(sample, expectedSamples[getSampleNum(sample)]);
+    });
+
+    jsTest.log("Test that running on a database other than \"admin\" results in error");
     assert.commandFailedWithCode(
         testDb.runCommand({aggregate: 1, pipeline: [{$listSampledQueries: {}}], cursor: {}}),
         ErrorCodes.InvalidNamespace);

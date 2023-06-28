@@ -27,8 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/stdx/thread.h"
-#include "mongo/util/exit_code.h"
 
 #include <condition_variable>
 #include <csetjmp>
@@ -41,10 +39,17 @@
 #ifndef _WIN32
 #include <sys/types.h>
 #include <sys/wait.h>
+#endif
+
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/exit_code.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 
-#include "mongo/platform/compiler.h"
 
 #if !MONGO_HAS_SIGALTSTACK
 

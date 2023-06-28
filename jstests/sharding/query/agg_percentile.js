@@ -2,7 +2,6 @@
  * Tests that $percentile is computed correctly for sharded collections.
  * @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 

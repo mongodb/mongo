@@ -29,10 +29,12 @@
 
 #include "mongo/db/exec/sbe/values/sbe_pattern_value_cmp.h"
 
+#include <cstdint>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/bson/dotted_path_support.h"
-#include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/sbe/values/bson.h"
 #include "mongo/db/exec/sbe/values/value.h"
 

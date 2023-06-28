@@ -29,6 +29,21 @@
 
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
 
+#include <cstdint>
+#include <map>
+#include <string>
+#include <vector>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
+
 
 namespace mongo::optimizer {
 

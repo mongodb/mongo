@@ -27,6 +27,7 @@
  *    it in the license file.
  */
 
+#include "mongo/db/operation_context.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
 
 namespace mongo {

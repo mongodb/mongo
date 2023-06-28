@@ -34,7 +34,11 @@
 #include "mongo/db/baton.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/functional.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/waitable.h"
 
 namespace mongo {
 

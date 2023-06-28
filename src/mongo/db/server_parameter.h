@@ -35,15 +35,32 @@
  * rather parameters should be defined in .idl files.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <functional>
+#include <map>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_SERVER_PARAMETER_REGISTER(name) \
@@ -91,6 +108,7 @@ enum class ServerParameterType {
 
 class FeatureFlag;
 class ServerParameterSet;
+
 class OperationContext;
 
 template <typename U>

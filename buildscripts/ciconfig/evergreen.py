@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import datetime
 import distutils.spawn
+import os
+import subprocess
+import sys
+import time
 from typing import Set, List, Optional
 
 import yaml
@@ -21,17 +25,22 @@ def parse_evergreen_file(path, evergreen_binary="evergreen"):
     """Read an Evergreen file and return EvergreenProjectConfig instance."""
     if evergreen_binary:
         if not distutils.spawn.find_executable(evergreen_binary):
-            raise EnvironmentError(
-                "Executable '{}' does not exist or is not in the PATH.".format(evergreen_binary))
+            default_evergreen_location = os.path.expanduser(os.path.join("~", "evergreen"))
+            if os.path.exists(default_evergreen_location):
+                evergreen_binary = default_evergreen_location
+            elif os.path.exists(f"{default_evergreen_location}.exe"):
+                evergreen_binary = f"{default_evergreen_location}.exe"
+            else:
+                raise EnvironmentError(
+                    "Executable '{}' does not exist or is not in the PATH.".format(
+                        evergreen_binary))
 
         # Call 'evergreen evaluate path' to pre-process the project configuration file.
-        cmd = runcommand.RunCommand(evergreen_binary)
-        cmd.add("evaluate")
-        cmd.add_file(path)
-        error_code, output = cmd.execute()
-        if error_code:
-            raise RuntimeError("Unable to evaluate {}: {}".format(path, output))
-        config = yaml.safe_load(output)
+        cmd = [evergreen_binary, "evaluate", path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode:
+            raise RuntimeError("Unable to evaluate {}: {}".format(path, result.stdout))
+        config = yaml.safe_load(result.stdout)
     else:
         with open(path, "r") as fstream:
             config = yaml.safe_load(fstream)
@@ -59,6 +68,7 @@ class EvergreenProjectConfig(object):
         self.distro_names = set()
         for variant in self.variants:
             self.distro_names.update(variant.distro_names)
+        self.functions = self._conf["functions"]
 
     @property
     def task_names(self) -> List[str]:

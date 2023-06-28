@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/repl/timestamp_block.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/db/storage/recovery_unit.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

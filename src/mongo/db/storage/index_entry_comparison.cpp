@@ -26,17 +26,25 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/index_entry_comparison.h"
-
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <limits>
 #include <ostream>
 
-#include "mongo/db/jsobj.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/text.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 namespace mongo {
 

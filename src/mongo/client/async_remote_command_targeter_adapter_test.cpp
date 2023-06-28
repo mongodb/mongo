@@ -28,15 +28,22 @@
  */
 
 #include "mongo/client/async_remote_command_targeter_adapter.h"
+
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/client/remote_command_targeter_rs.h"
-#include "mongo/unittest/unittest.h"
-#include <cstddef>
-#include <memory>
-#include <vector>
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace async_rpc {

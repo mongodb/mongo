@@ -27,15 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/oid.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/security_token_gen.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/rpc/op_msg_test.h"
@@ -58,7 +56,7 @@ BSONObj makeSecurityToken(const UserName& userName) {
         .getOwned();
 }
 
-class SecurityTokenMetadataTest : public LockerNoopServiceContextTest {
+class SecurityTokenMetadataTest : public ServiceContextTest {
 protected:
     void setUp() final {
         client = getServiceContext()->makeClient("test");

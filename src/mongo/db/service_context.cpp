@@ -28,30 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/service_context.h"
-
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <exception>
 #include <list>
 #include <memory>
 
-#include "mongo/base/init.h"
-#include "mongo/bson/bsonobj.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/db/client.h"
 #include "mongo/db/default_baton.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/processinfo.h"
-#include "mongo/util/str.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/system_tick_source.h"
-#include <iostream>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -293,7 +300,7 @@ ServiceContext::UniqueOperationContext ServiceContext::makeOperationContext(Clie
     batonGuard.dismiss();
 
     {
-        stdx::lock_guard lk(_mutex);
+        stdx::lock_guard lk(_clientByOpIdMutex);
         bool clientByOperationContextInsertionSuccessful =
             _clientByOperationId.insert({opCtx->getOpID(), client}).second;
         invariant(clientByOperationContextInsertionSuccessful);
@@ -317,7 +324,8 @@ void ServiceContext::OperationContextDeleter::operator()(OperationContext* opCtx
 }
 
 LockedClient ServiceContext::getLockedClient(OperationId id) {
-    stdx::lock_guard lk(_mutex);
+    stdx::lock_guard lk(_clientByOpIdMutex);
+
     auto it = _clientByOperationId.find(id);
     if (it == _clientByOperationId.end()) {
         return {};
@@ -394,7 +402,7 @@ void ServiceContext::_delistOperation(OperationContext* opCtx) noexcept {
     // its client to prevent situations that another thread could use the service context to get a
     // hold of an `opCtx` that has been removed from its client.
     {
-        stdx::lock_guard lk(_mutex);
+        stdx::lock_guard lk(_clientByOpIdMutex);
         if (_clientByOperationId.erase(opCtx->getOpID()) != 1) {
             // Another thread has already delisted this `opCtx`.
             return;

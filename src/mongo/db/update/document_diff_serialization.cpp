@@ -27,17 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/update/document_diff_serialization.h"
-
-#include <fmt/format.h>
-#include <stack>
-
-#include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
 #include <boost/container/flat_map.hpp>
 #include <boost/container/static_vector.hpp>
+#include <boost/container/vector.hpp>
+#include <fmt/format.h>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/algo/detail/set_difference.hpp"
+#include <boost/move/algo/move.hpp>
+#include <boost/none.hpp>
+#include <functional>
+#include <limits>
+#include <stack>
+#include <type_traits>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/update/document_diff_serialization.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace diff_tree {
@@ -80,7 +95,9 @@ Node* DocumentSubDiffNode::addChild(StringData fieldName, std::unique_ptr<Node> 
     sizeTracker.addEntry(fieldName.size(), nodePtr);
 
     auto result = children.insert({fieldName.toString(), std::move(node)});
-    invariant(result.second);
+    uassert(7693400,
+            str::stream() << "Document already has a field named '" << fieldName << "'",
+            result.second);
     StringData storedFieldName = result.first->first;
     switch (nodePtr->type()) {
         case (NodeType::kArray):

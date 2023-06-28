@@ -1,9 +1,9 @@
 /**
- * Tests that tenant migration fails upon observing retryable internal transaction writes.
+ * Tests that tenant migration and shard merge fails upon observing retryable internal transaction
+ * writes.
  *
  * @tags: [
  *   incompatible_with_macos,
- *   incompatible_with_shard_merge,
  *   incompatible_with_windows_tls,
  *   requires_majority_read_concern,
  *   requires_persistence,

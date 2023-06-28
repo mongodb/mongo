@@ -27,31 +27,44 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <climits>
+#include <cmath>
+#include <fmt/format.h>
+#include <limits>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/config.h"
-#include "mongo/crypto/fle_crypto.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/db/pipeline/accumulator.h"
 #include "mongo/db/pipeline/accumulator_multi.h"
 #include "mongo/db/pipeline/expression.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/db/query/collation/collator_interface_mock.h"
-#include "mongo/dbtests/dbtests.h"
-#include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/db/pipeline/expression_dependencies.h"
+#include "mongo/db/record_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/decimal128.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/summation.h"
 #include "mongo/util/time_support.h"
-#include <limits>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

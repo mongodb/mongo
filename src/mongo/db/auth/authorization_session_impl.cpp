@@ -28,30 +28,63 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/auth/authorization_session_impl.h"
-
-#include <array>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/shim.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/access_checks_gen.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
+#include "mongo/db/auth/action_type_gen.h"
+#include "mongo/db/auth/auth_name.h"
+#include "mongo/db/auth/authorization_session_impl.h"
 #include "mongo/db/auth/authz_session_external_state.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern_search_list.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/bson/dotted_path_support.h"
 #include "mongo/db/client.h"
+#include "mongo/db/list_collections_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/read_through_cache.h"
 #include "mongo/util/str.h"
 #include "mongo/util/testing_proctor.h"
 
@@ -427,15 +460,17 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
     // return a vector of the minimum privileges required to bootstrap
     // a system and add the first user.
     if (_externalState->shouldAllowLocalhost()) {
-        ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(ADMIN_DBNAME);
-        ActionSet setupAdminUserActionSet;
-        setupAdminUserActionSet.addAction(ActionType::createUser);
-        setupAdminUserActionSet.addAction(ActionType::grantRole);
-        Privilege setupAdminUserPrivilege = Privilege(adminDBResource, setupAdminUserActionSet);
 
-        ResourcePattern externalDBResource = ResourcePattern::forDatabaseName("$external");
-        Privilege setupExternalUserPrivilege =
-            Privilege(externalDBResource, ActionType::createUser);
+        const DatabaseName kAdminDB =
+            DatabaseName::createDatabaseNameForAuth(boost::none, ADMIN_DBNAME);
+        const ResourcePattern adminDBResource = ResourcePattern::forDatabaseName(kAdminDB);
+        const ActionSet setupAdminUserActionSet{ActionType::createUser, ActionType::grantRole};
+        Privilege setupAdminUserPrivilege(adminDBResource, setupAdminUserActionSet);
+
+        const DatabaseName kExternalDB =
+            DatabaseName::createDatabaseNameForAuth(boost::none, "$external"_sd);
+        const ResourcePattern externalDBResource = ResourcePattern::forDatabaseName(kExternalDB);
+        Privilege setupExternalUserPrivilege(externalDBResource, ActionType::createUser);
 
         ActionSet setupServerConfigActionSet;
 
@@ -453,7 +488,7 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
         setupServerConfigActionSet.addAction(ActionType::replSetGetStatus);
         setupServerConfigActionSet.addAction(ActionType::issueDirectShardOperations);
         Privilege setupServerConfigPrivilege =
-            Privilege(ResourcePattern::forClusterResource(), setupServerConfigActionSet);
+            Privilege(ResourcePattern::forClusterResource(boost::none), setupServerConfigActionSet);
 
         Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupAdminUserPrivilege);
         Privilege::addPrivilegeToPrivilegeVector(&defaultPrivileges, setupExternalUserPrivilege);
@@ -484,7 +519,7 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(
     const NamespaceStringOrUUID& nss) {
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
 
-    if (nss.uuid()) {
+    if (nss.isUUID()) {
         return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
                                                 ActionType::useUUID);
     }
@@ -497,8 +532,8 @@ bool AuthorizationSessionImpl::isAuthorizedToCreateRole(const RoleName& roleName
     // A user is allowed to create a role under either of two conditions.
 
     // The user may create a role if the authorization system says they are allowed to.
-    if (isAuthorizedForActionsOnResource(ResourcePattern::forDatabaseName(roleName.getDB()),
-                                         ActionType::createRole)) {
+    if (isAuthorizedForActionsOnResource(
+            ResourcePattern::forDatabaseName(roleName.getDatabaseName()), ActionType::createRole)) {
         return true;
     }
 
@@ -566,17 +601,19 @@ bool AuthorizationSessionImpl::isAuthorizedToChangeAsUser(const UserName& userNa
         return false;
     }
 
-    auth::ResourcePatternSearchList search(ResourcePattern::forDatabaseName(userName.getDB()));
+    auth::ResourcePatternSearchList search(
+        ResourcePattern::forDatabaseName(userName.getDatabaseName()));
     return std::any_of(search.cbegin(), search.cend(), [&user, &actionType](const auto& pattern) {
         return user->getActionsForResource(pattern).contains(actionType);
     });
 }
 
 StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListCollections(
-    StringData dbname, const BSONObj& cmdObj) {
+    const ListCollections& cmd) {
+    const auto& dbname = cmd.getDbName();
     _contract.addAccessCheck(AccessCheckEnum::kCheckAuthorizedToListCollections);
 
-    if (cmdObj["authorizedCollections"].trueValue() && cmdObj["nameOnly"].trueValue() &&
+    if (cmd.getAuthorizedCollections() && cmd.getNameOnly() &&
         AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(dbname)) {
         return PrivilegeVector();
     }
@@ -589,7 +626,7 @@ StatusWith<PrivilegeVector> AuthorizationSessionImpl::checkAuthorizedToListColle
     }
 
     return Status(ErrorCodes::Unauthorized,
-                  str::stream() << "Not authorized to list collections on db: " << dbname);
+                  str::stream() << "Not authorized to list collections on db: " << dbname.db());
 }
 
 bool AuthorizationSessionImpl::isAuthenticatedAsUserWithRole(const RoleName& roleName) {
@@ -636,21 +673,6 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     auto swUser = getAuthorizationManager().reacquireUser(opCtx, currentUser);
     if (!swUser.isOK()) {
         auto& status = swUser.getStatus();
-        // If an LDAP user is no longer in the cache and cannot be acquired from the cache's
-        // backing LDAP host, it should be cleared from _authenticatedUser. This
-        // guarantees that no operations can be performed until the LDAP host comes back up.
-        // TODO SERVER-72678 avoid this edge case hack when rearchitecting user acquisition.
-        if (name.getDB() == DatabaseName::kExternal.db() &&
-            currentUser->getUserRequest().mechanismData.empty()) {
-            clearUser();
-            LOGV2(5914804,
-                  "Removed external user from session cache of user information because of "
-                  "error status",
-                  "user"_attr = name,
-                  "status"_attr = status);
-            return;
-        }
-
         switch (status.code()) {
             case ErrorCodes::UserNotFound: {
                 // User does not exist anymore.
@@ -729,8 +751,10 @@ void AuthorizationSessionImpl::_refreshUserInfoAsNeeded(OperationContext* opCtx)
     updateUser(std::move(user));
 }
 
-bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringData db) {
+bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(
+    const DatabaseName& dbname) {
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedForAnyActionOnAnyResourceInDB);
+    const auto& tenantId = dbname.tenantId();
 
     if (_externalState->shouldIgnoreAuthChecks()) {
         return true;
@@ -742,25 +766,25 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
 
     const auto& user = _authenticatedUser.value();
     // First lookup any Privileges on this database specifying Database resources
-    if (user->hasActionsForResource(ResourcePattern::forDatabaseName(db))) {
+    if (user->hasActionsForResource(ResourcePattern::forDatabaseName(dbname))) {
         return true;
     }
 
     // Any resource will match any collection in the database
-    if (user->hasActionsForResource(ResourcePattern::forAnyResource())) {
+    if (user->hasActionsForResource(ResourcePattern::forAnyResource(tenantId))) {
         return true;
     }
 
     // Any resource will match any system_buckets collection in the database
-    if (user->hasActionsForResource(ResourcePattern::forAnySystemBuckets()) ||
-        user->hasActionsForResource(ResourcePattern::forAnySystemBucketsInDatabase(db))) {
+    if (user->hasActionsForResource(ResourcePattern::forAnySystemBuckets(tenantId)) ||
+        user->hasActionsForResource(ResourcePattern::forAnySystemBucketsInDatabase(dbname))) {
         return true;
     }
 
     // If the user is authorized for anyNormalResource, then they implicitly have access
     // to most databases.
-    if (db != DatabaseName::kLocal.db() && db != DatabaseName::kConfig.db() &&
-        user->hasActionsForResource(ResourcePattern::forAnyNormalResource())) {
+    if (!dbname.isLocalDB() && !dbname.isConfigDB() &&
+        user->hasActionsForResource(ResourcePattern::forAnyNormalResource(tenantId))) {
         return true;
     }
 
@@ -768,28 +792,29 @@ bool AuthorizationSessionImpl::isAuthorizedForAnyActionOnAnyResourceInDB(StringD
     // iterate all privileges, until we see something that could reside in the target database.
     auto map = user->getPrivileges();
     for (const auto& privilege : map) {
+        const auto& privRsrc = privilege.first;
+
         // If the user has a Collection privilege, then they're authorized for this resource
         // on all databases.
-        if (privilege.first.isCollectionPattern()) {
+        if (privRsrc.isCollectionPattern()) {
             return true;
         }
 
         // User can see system_buckets in any database so we consider them to have permission in
         // this database
-        if (privilege.first.isAnySystemBucketsCollectionInAnyDB()) {
+        if (privRsrc.isAnySystemBucketsCollectionInAnyDB()) {
             return true;
         }
 
         // If the user has an exact namespace privilege on a collection in this database, they
         // have access to a resource in this database.
-        if (privilege.first.isExactNamespacePattern() && privilege.first.databaseToMatch() == db) {
+        if (privRsrc.isExactNamespacePattern() && (privRsrc.dbNameToMatch() == dbname)) {
             return true;
         }
 
         // If the user has an exact namespace privilege on a system.buckets collection in this
         // database, they have access to a resource in this database.
-        if (privilege.first.isExactSystemBucketsCollection() &&
-            privilege.first.databaseToMatch() == db) {
+        if (privRsrc.isExactSystemBucketsCollection() && (privRsrc.dbNameToMatch() == dbname)) {
             return true;
         }
     }

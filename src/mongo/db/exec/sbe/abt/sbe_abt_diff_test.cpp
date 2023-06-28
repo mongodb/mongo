@@ -27,9 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_impl.h"
+#include <algorithm>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/abt/sbe_abt_test_util.h"
-#include "mongo/unittest/temp_dir.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer {
 namespace {
@@ -123,30 +135,6 @@ static bool compareSBEABTAgainstPipeline(const TestContextFn& fn,
 
     return result;
 }
-
-class TestObserver : public ServiceContext::ClientObserver {
-public:
-    TestObserver() = default;
-    ~TestObserver() = default;
-
-    void onCreateClient(Client* client) final {}
-
-    void onDestroyClient(Client* client) final {}
-
-    void onCreateOperationContext(OperationContext* opCtx) override {
-        opCtx->setLockState(std::make_unique<LockerImpl>(opCtx->getServiceContext()));
-    }
-
-    void onDestroyOperationContext(OperationContext* opCtx) final {}
-};
-
-const ServiceContext::ConstructorActionRegisterer clientObserverRegisterer{
-    "TestObserver",
-    [](ServiceContext* service) {
-        service->registerClientObserver(std::make_unique<TestObserver>());
-    },
-    [](ServiceContext* serviceContext) {
-    }};
 
 TEST_F(NodeSBE, DiffTestBasic) {
     const auto contextFn = [this]() {

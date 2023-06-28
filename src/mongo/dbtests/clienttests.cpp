@@ -46,7 +46,7 @@ using std::vector;
 
 class Base {
 public:
-    Base(string coll) : _nss("test." + coll) {
+    Base(string coll) : _nss(NamespaceString::createNamespaceString_forTest("test." + coll)) {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
@@ -161,7 +161,7 @@ public:
 
         ASSERT_OK(dbtests::createIndex(&opCtx, ns(), BSON("a" << 1 << "b" << 1)));
 
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("a" << 1 << "b" << 1));
         unique_ptr<DBClientCursor> c = db.find(std::move(findRequest));
         ASSERT_EQUALS(1111, c->itcount());
@@ -180,7 +180,7 @@ public:
             db.insert(nss(), BSON("i" << i));
         }
 
-        FindCommandRequest findRequest{NamespaceString{ns()}};
+        FindCommandRequest findRequest{NamespaceString::createNamespaceString_forTest(ns())};
         findRequest.setSort(BSON("i" << 1));
         std::unique_ptr<DBClientCursor> c = db.find(std::move(findRequest));
 
@@ -223,7 +223,8 @@ public:
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
         DBDirectClient db(&opCtx);
-        const NamespaceString nss("unittests.clienttests.create");
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittests.clienttests.create");
         db.createCollection(nss);
         BSONObj info;
         ASSERT(db.runCommand(nss.dbName(),

@@ -37,18 +37,11 @@ feature_flags:
       version: 5.1
       shouldBeFCVGated: true
 
-    featureFlagChangeStreamsFurtherEnrichedEvents:
-      description: "Feature flag for enabling the reshardCollection and refineCollectionShardKey events, as well as enhancements to the updateDescription field for update events"
-      cpp_varname: gFeatureFlagChangeStreamsFurtherEnrichedEvents
-      default: true
-      version: 6.1
-      shouldBeFCVGated: true
-
     featureFlagCommonQueryFramework:
       description: "Feature flag for allowing use of Cascades-based query optimizer"
       cpp_varname: gFeatureFlagCommonQueryFramework
       default: false
-      shouldBeFCVGated: true
+      shouldBeFCVGated: false
 
     featureFlagBucketUnpackWithSort:
       description: "Enables a time-series optimization that allows for partially-blocking sort on time"
@@ -89,20 +82,6 @@ feature_flags:
       version: 7.0
       shouldBeFCVGated: true
 
-    featureFlagShardedSearchCustomSort:
-      description: "Feature flag to enable user specified sort for sharded $search queries."
-      cpp_varname: gFeatureFlagShardedSearchCustomSort
-      default: true
-      version: 7.0
-      shouldBeFCVGated: true
-
-    featureFlagApproxPercentiles:
-      description: "Feature flag to enable approximate $percentile accumulator/expression."
-      cpp_varname: gFeatureFlagApproxPercentiles
-      default: true
-      version: 7.0
-      shouldBeFCVGated: true
-
     featureFlagSearchBatchSizeLimit:
       description: "Feature flag to enable the search batchsize and limit optimization."
       cpp_varname: gFeatureFlagSearchBatchSizeLimit
@@ -121,4 +100,11 @@ feature_flags:
       description: "Feature flag for enabling persistent query settings"
       cpp_varname: gFeatureFlagQuerySettings
       default: false
+      shouldBeFCVGated: true
+
+    featureFlagVectorSearchPublicPreview:
+      description: "Feature flag to enable vector search for public preview."
+      cpp_varname: gFeatureFlagVectorSearchPublicPreview
+      default: false
+      # TODO SERVER-78294 Toggle this once we've backported the feature.
       shouldBeFCVGated: true

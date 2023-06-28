@@ -30,17 +30,23 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/tenant_id.h"
 
 namespace mongo {
 
 class Privilege;
 class TenantId;
+
 using PrivilegeVector = std::vector<Privilege>;
 
 namespace auth {

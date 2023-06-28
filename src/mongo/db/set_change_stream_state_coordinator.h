@@ -29,10 +29,24 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
+#include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/primary_only_service_util.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/set_change_stream_state_coordinator_gen.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/platform/basic.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 

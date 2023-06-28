@@ -27,14 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/field_ref.h"
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update_index_data.h"
-
 #include "mongo/stdx/variant.h"
-#include "mongo/util/overloaded_visitor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo::doc_diff {

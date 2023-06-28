@@ -109,6 +109,7 @@ commands:
             indexVersion:
                 type: CollectionIndexes
                 description: "Collection index version with uuid"
+        reply_type: OkReply
 
     _configsvrCommitIndex:
         command_name: _configsvrCommitIndex

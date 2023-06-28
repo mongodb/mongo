@@ -60,7 +60,7 @@ createIndex();
 jsTestLog('Waiting for index build to complete');
 IndexBuildTest.waitForIndexBuildToStop(testDB, coll.getName(), 'a_1');
 
-IndexBuildTest.assertIndexes(coll, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(coll, 1, ['_id_']);
 
 rst.stopSet();
 })();

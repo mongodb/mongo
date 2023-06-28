@@ -18,16 +18,21 @@ int
 __wt_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
     WT_CONNECTION_IMPL *conn;
-
-    conn = S2C(session);
+    uint64_t bucket, hash;
 
     __wt_verbose(session, WT_VERB_BLKCACHE, "close: %s", block->name);
 
+    conn = S2C(session);
     __wt_spin_lock(session, &conn->block_lock);
     if (block->ref > 0 && --block->ref > 0) {
         __wt_spin_unlock(session, &conn->block_lock);
         return (0);
     }
+
+    /* Make the block unreachable. */
+    hash = __wt_hash_city64(block->name, strlen(block->name));
+    bucket = hash & (conn->hash_size - 1);
+    WT_CONN_BLOCK_REMOVE(conn, block, bucket);
     __wt_spin_unlock(session, &conn->block_lock);
 
     /* You can't close files during a checkpoint. */
@@ -37,6 +42,7 @@ __wt_bm_close_block(WT_SESSION_IMPL *session, WT_BLOCK *block)
     if (block->sync_on_checkpoint)
         WT_RET(__wt_fsync(session, block->fh, true));
 
+    /* If fsync fails WT panics so failure to reach __wt_block_close() is irrelevant. */
     return (__wt_block_close(session, block));
 }
 

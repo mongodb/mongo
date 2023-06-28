@@ -28,20 +28,59 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/uncommitted_catalog_updates.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/txn_two_phase_commit_cmds_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
+#include "mongo/db/s/transaction_coordinator_structures.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTransaction
 
@@ -67,19 +106,8 @@ public:
         return true;
     }
 
-    class PrepareTimestamp {
-    public:
-        PrepareTimestamp(Timestamp timestamp) : _timestamp(std::move(timestamp)) {}
-        void serialize(BSONObjBuilder* bob) const {
-            bob->append("prepareTimestamp", _timestamp);
-        }
-
-    private:
-        Timestamp _timestamp;
-    };
-
     using Request = PrepareTransaction;
-    using Response = PrepareTimestamp;
+    using Response = PrepareReply;
 
     class Invocation final : public InvocationBase {
     public:
@@ -166,16 +194,18 @@ public:
                     uasserted(ErrorCodes::HostUnreachable,
                               "returning network error because failpoint is on");
                 }
-                return PrepareTimestamp(prepareOpTime.getTimestamp());
+                return createResponse(prepareOpTime.getTimestamp(),
+                                      txnParticipant.affectedNamespaces());
             }
 
-            const auto prepareTimestamp = txnParticipant.prepareTransaction(opCtx, {});
+            auto [prepareTimestamp, affectedNamespaces] =
+                txnParticipant.prepareTransaction(opCtx, {});
             if (MONGO_unlikely(participantReturnNetworkErrorForPrepareAfterExecutingPrepareLogic
                                    .shouldFail())) {
                 uasserted(ErrorCodes::HostUnreachable,
                           "returning network error because failpoint is on");
             }
-            return PrepareTimestamp(std::move(prepareTimestamp));
+            return createResponse(std::move(prepareTimestamp), std::move(affectedNamespaces));
         }
 
     private:
@@ -187,12 +217,21 @@ public:
             return NamespaceString(request().getDbName());
         }
 
+        Response createResponse(Timestamp prepareTimestamp,
+                                std::vector<NamespaceString> affectedNamespaces) {
+            Response response;
+            response.setPrepareTimestamp(std::move(prepareTimestamp));
+            response.setAffectedNamespaces(std::move(affectedNamespaces));
+            return response;
+        }
+
         void doCheckAuthorization(OperationContext* opCtx) const override {
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
-                                                             ActionType::internal}));
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal}));
         }
     };
 

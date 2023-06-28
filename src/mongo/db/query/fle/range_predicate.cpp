@@ -29,16 +29,26 @@
 
 #include "range_predicate.h"
 
+#include <algorithm>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <functional>
 #include <iterator>
+#include <utility>
 
-#include "mongo/crypto/encryption_fields_gen.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_tags.h"
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_expr.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/pipeline/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/fle/encrypted_predicate.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo::fle {
 

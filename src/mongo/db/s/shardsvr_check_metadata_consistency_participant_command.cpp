@@ -28,19 +28,72 @@
  */
 
 
+#include <algorithm>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/clientcursor.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/cursor_response_gen.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/ddl_lock_manager.h"
 #include "mongo/db/s/metadata_consistency_util.h"
 #include "mongo/db/s/sharding_state.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/s/query/cluster_client_cursor.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -120,7 +173,6 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
     }();
 
     static constexpr StringData kLockReason{"checkMetadataConsistency::indexCheck"_sd};
-    auto ddlLockManager = DDLLockManager::get(opCtx);
     auto catalogCache = Grid::get(opCtx)->catalogCache();
 
     std::vector<MetadataInconsistencyItem> indexIncons;
@@ -128,10 +180,8 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
         const auto& nss = coll.getNss();
 
         // Serialize with concurrent DDL operations that modify indexes
-        const auto collectionDDLLock = ddlLockManager->lock(opCtx,
-                                                            NamespaceStringUtil::serialize(nss),
-                                                            kLockReason,
-                                                            DDLLockManager::kDefaultLockTimeout);
+        const DDLLockManager::ScopedCollectionDDLLock collectionDDLLock{
+            opCtx, nss, kLockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
         AggregateCommandRequest aggRequest{nss, rawPipelineStages};
 
@@ -259,7 +309,8 @@ public:
                 repl::ReadConcernArgs::get(opCtx),
                 ReadPreferenceSetting::get(opCtx),
                 request().toBSON({}),
-                {Privilege(ResourcePattern::forClusterResource(), ActionType::internal)}};
+                {Privilege(ResourcePattern::forClusterResource(nss.tenantId()),
+                           ActionType::internal)}};
 
             const auto batchSize = [&]() -> long long {
                 const auto& cursorOpts = request().getCursor();
@@ -385,8 +436,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
     };
 

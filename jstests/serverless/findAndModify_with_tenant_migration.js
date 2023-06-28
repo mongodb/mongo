@@ -4,11 +4,12 @@
  * @tags: [requires_fcv_52, serverless]
  */
 
+import {ShardedServerlessTest} from "jstests/serverless/libs/sharded_serverless_test.js";
+
 (function() {
 "use strict";
 
 load("jstests/libs/fail_point_util.js");
-load("jstests/serverless/serverlesstest.js");
 load('jstests/concurrency/fsm_libs/worker_thread.js');
 
 function donorStartMigrationCmd(tenantID, realConnUrl) {
@@ -25,7 +26,7 @@ const kCollName = 'foo';
 
 let findAndModifyCmd = {findAndModify: kCollName, update: {$set: {y: 1}}, upsert: true};
 
-let st = new ServerlessTest();
+let st = new ShardedServerlessTest();
 
 let adminDB = st.rs0.getPrimary().getDB('admin');
 

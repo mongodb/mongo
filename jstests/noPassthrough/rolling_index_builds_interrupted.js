@@ -50,7 +50,6 @@ IndexBuildTest.buildIndexOnNodeAsStandalone(
 replTest.awaitNodesAgreeOnPrimary(
     replTest.kDefaultTimeoutMS, replTest.nodes, replTest.getNodeId(primary));
 
-// TODO(SERVER-71768): fix the index build stall.
 jsTestLog('Build index on the primary as part of the replica set: ' + primary.host);
 let createIdx = IndexBuildTest.startIndexBuild(
     primary, primaryColl.getFullName(), {x: 1}, {name: 'x_1'}, [ErrorCodes.Interrupted]);
@@ -81,7 +80,6 @@ assert.commandWorked(primaryDB.killOp(opId));
 
 createIdx();
 
-// TODO(SERVER-71768): Check dbHash.
 TestData.skipCheckDBHashes = true;
 replTest.stopSet();
 }());

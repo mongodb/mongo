@@ -28,14 +28,16 @@
  */
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 #include <vector>
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/service_context_test_fixture.h"
 
 namespace mongo {
 
-class FTDCTest : public LockerNoopServiceContextTest {
+class FTDCTest : public ServiceContextTest {
 public:
     FTDCTest();
 };

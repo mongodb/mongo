@@ -29,8 +29,20 @@
 
 #include "mongo/db/query/cost_model/cost_estimator_impl.h"
 
+#include <cmath>
+#include <cstddef>
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo::cost_model {

@@ -29,15 +29,26 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/json.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/read_write_concern_provenance.h"
 #include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

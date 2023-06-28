@@ -29,11 +29,21 @@
 
 #include "mongo/db/server_parameter.h"
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

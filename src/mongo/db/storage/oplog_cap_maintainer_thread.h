@@ -31,6 +31,7 @@
 
 #include <string>
 
+#include "mongo/db/auth/cluster_auth_mode.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/util/background.h"
 

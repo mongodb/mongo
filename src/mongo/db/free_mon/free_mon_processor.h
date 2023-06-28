@@ -28,14 +28,23 @@
  */
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+// IWYU pragma: no_include "cxxabi.h"
 #include <cstdint>
 #include <deque>
 #include <memory>
+#include <mutex>
 #include <ratio>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
 #include "mongo/db/free_mon/free_mon_message.h"
 #include "mongo/db/free_mon/free_mon_network.h"
@@ -45,6 +54,10 @@
 #include "mongo/db/free_mon/free_mon_storage_gen.h"
 #include "mongo/db/ftdc/collector.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/random.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/future.h"

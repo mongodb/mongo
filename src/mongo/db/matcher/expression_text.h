@@ -29,9 +29,17 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/fts/fts_query.h"
 #include "mongo/db/fts/fts_query_impl.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_text_base.h"
+#include "mongo/db/matcher/expression_visitor.h"
+#include "mongo/db/matcher/match_details.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 

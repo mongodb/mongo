@@ -28,9 +28,12 @@
  */
 
 #include <cmath>
-#include <cstdlib>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/mirroring_sampler.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

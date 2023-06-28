@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <string>
 #include <vector>
 
@@ -40,6 +41,7 @@
 namespace mongo {
 
 class BSONObj;
+
 class ChunkRange;
 class NamespaceString;
 class OperationContext;

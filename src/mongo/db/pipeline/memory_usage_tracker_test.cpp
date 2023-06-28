@@ -28,8 +28,9 @@
  */
 
 #include "mongo/db/pipeline/memory_usage_tracker.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

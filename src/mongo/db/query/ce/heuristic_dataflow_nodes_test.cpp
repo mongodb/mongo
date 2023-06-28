@@ -27,13 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/test_utils.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/cascades/interfaces.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/props.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/syntax/syntax.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::optimizer::ce {
 namespace {
@@ -61,7 +77,7 @@ bool isRootNodeFn(const ABT& node) {
     return node.is<RootNode>();
 }
 
-class CEDataflowTest : public LockerNoopServiceContextTest {};
+class CEDataflowTest : public ServiceContextTest {};
 
 TEST_F(CEDataflowTest, EstimateTrivialNodes) {
     DataflowCETester t;

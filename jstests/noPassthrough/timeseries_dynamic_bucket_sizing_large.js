@@ -15,6 +15,7 @@
 "use strict";
 
 load("jstests/core/timeseries/libs/timeseries.js");
+load("jstests/libs/feature_flag_util.js");
 
 const defaultBucketMaxSize = 128000;                                           //  125 KB
 const minWiredTigerCacheSizeGB = 0.256;                                        //  256 MB
@@ -32,6 +33,10 @@ replSet.startSet({setParameter: {timeseriesBucketMaxSize: defaultBucketMaxSize}}
 replSet.initiate();
 
 const db = replSet.getPrimary().getDB(jsTestName());
+
+const alwaysUseCompressedBuckets =
+    FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets");
+
 let coll = db.getCollection('t');
 coll.drop();
 
@@ -110,7 +115,9 @@ const initializeBuckets = function(numOfBuckets = 1) {
 
     expectedBucketCount++;
     numBucketsClosedDueToSize++;
-    numCompressedBuckets++;
+    if (!alwaysUseCompressedBuckets) {
+        numCompressedBuckets++;
+    }
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
@@ -140,7 +147,9 @@ const initializeBuckets = function(numOfBuckets = 1) {
     // We create one bucket for 'meta2', fill it up and create another one for future insertions.
     expectedBucketCount += 2;
     numBucketsClosedDueToSize++;
-    numCompressedBuckets++;
+    if (!alwaysUseCompressedBuckets) {
+        numCompressedBuckets++;
+    }
 
     timeseriesStats = assert.commandWorked(coll.stats()).timeseries;
     assert.eq(timeseriesStats.bucketCount, expectedBucketCount, formatStatsLog(timeseriesStats));
@@ -201,7 +210,9 @@ const initializeBuckets = function(numOfBuckets = 1) {
     assert.eq(timeseriesStats.numBucketsClosedDueToSize, 0, formatStatsLog(timeseriesStats));
     assert.eq(
         timeseriesStats.numBucketsClosedDueToCachePressure, 1, formatStatsLog(timeseriesStats));
-    assert.eq(timeseriesStats.numCompressedBuckets, 1, formatStatsLog(timeseriesStats));
+    assert.eq(timeseriesStats.numCompressedBuckets,
+              alwaysUseCompressedBuckets ? 0 : 1,
+              formatStatsLog(timeseriesStats));
 })();
 
 replSet.stopSet();

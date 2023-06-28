@@ -29,15 +29,35 @@
 
 #include "mongo/db/query/optimizer/utils/utils.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <initializer_list>
+#include <istream>
+#include <iterator>
+#include <memory>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/syntax/expr.h"
 #include "mongo/db/query/optimizer/syntax/path.h"
 #include "mongo/db/query/optimizer/syntax/syntax.h"
 #include "mongo/db/query/optimizer/utils/ce_math.h"
 #include "mongo/db/query/optimizer/utils/interval_utils.h"
 #include "mongo/db/query/optimizer/utils/path_utils.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
 
 
 namespace mongo::optimizer {
@@ -1121,7 +1141,8 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
                                        const QueryHints& hints,
                                        const ConstFoldFn& constFold,
                                        const IndexCollationSpec& indexCollationSpec,
-                                       CandidateIndexEntry& entry) {
+                                       CandidateIndexEntry& entry,
+                                       const bool isMultiIndexPlan) {
     auto& fieldProjMap = entry._fieldProjectionMap;
     auto& eqPrefixes = entry._eqPrefixes;
     auto& correlatedProjNames = entry._correlatedProjNames;
@@ -1253,9 +1274,13 @@ static bool computeCandidateIndexEntry(PrefixId& prefixId,
 
     entry._residualRequirements = residualReqs.finish();
 
-    if (entry._intervalPrefixSize == 0 && !entry._residualRequirements) {
-        // Need to encode at least one query requirement in the index bounds.
-        return false;
+    if (entry._intervalPrefixSize == 0) {
+        if (!entry._residualRequirements || isMultiIndexPlan) {
+            // Need to encode at least one query requirement in the index bounds. Also, if an
+            // unbound index is part of a multi-index plan, discard it as it could be more expensive
+            // than a single collection scan.
+            return false;
+        }
     }
 
     return true;
@@ -1282,7 +1307,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                          const PartialSchemaRequirements& reqMap,
                                          const ScanDefinition& scanDef,
                                          const QueryHints& hints,
-                                         const ConstFoldFn& constFold) {
+                                         const ConstFoldFn& constFold,
+                                         const bool isMultiIndexPlan) {
     // A candidate index is one that can directly satisfy the SargableNode, without using
     // any other indexes. Typically a disjunction would require unioning two different indexes,
     // so we bail out if there's a nontrivial disjunction here.
@@ -1338,7 +1364,8 @@ CandidateIndexes computeCandidateIndexes(PrefixId& prefixId,
                                                             hints,
                                                             constFold,
                                                             indexDef.getCollationSpec(),
-                                                            entry);
+                                                            entry,
+                                                            isMultiIndexPlan);
 
             if (success && entry._eqPrefixes.size() >= hints._minIndexEqPrefixes) {
                 result.push_back(std::move(entry));

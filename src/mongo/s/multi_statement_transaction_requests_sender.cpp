@@ -85,7 +85,7 @@ MultiStatementTransactionRequestsSender::MultiStatementTransactionRequestsSender
       _ars(std::make_unique<AsyncRequestsSender>(
           opCtx,
           std::move(executor),
-          dbName.db(),
+          DatabaseNameUtil::serialize(dbName),
           attachTxnDetails(opCtx, requests),
           readPreference,
           retryPolicy,
@@ -106,7 +106,7 @@ bool MultiStatementTransactionRequestsSender::done() {
 }
 
 AsyncRequestsSender::Response MultiStatementTransactionRequestsSender::next() {
-    const auto response = _ars->next();
+    auto response = _ars->next();
     processReplyMetadata(_opCtx, response);
     return response;
 }

@@ -29,9 +29,26 @@
 
 #include "mongo/db/s/forwardable_operation_metadata.h"
 
+#include <boost/optional.hpp>
+#include <mutex>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/client.h"
 #include "mongo/db/write_block_bypass.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata_gen.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

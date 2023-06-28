@@ -29,18 +29,45 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/cancelable_operation_context.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/process_interface/mongo_process_interface.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_observer.h"
 #include "mongo/db/s/resharding/resharding_metrics.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/executor/async_rpc.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_tags.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/resharding/common_types_gen.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace resharding {
@@ -83,10 +110,12 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc);
 
-void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             ReshardingMetrics* metrics,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc,
-                                             boost::optional<Status> abortReason = boost::none);
+boost::optional<ReshardingCoordinatorDocument>
+removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+    OperationContext* opCtx,
+    ReshardingMetrics* metrics,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
 
 class ReshardingCoordinatorExternalState {
@@ -111,23 +140,16 @@ public:
     boost::optional<CollectionIndexes> getCatalogIndexVersionForCommit(OperationContext* opCtx,
                                                                        const NamespaceString& nss);
 
-    virtual void sendCommandToShards(OperationContext* opCtx,
-                                     StringData dbName,
-                                     const BSONObj& command,
-                                     const std::vector<ShardId>& shardIds,
-                                     const std::shared_ptr<executor::TaskExecutor>& executor) = 0;
+    template <typename CommandType>
+    void sendCommandToShards(OperationContext* opCtx,
+                             std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts,
+                             const std::vector<ShardId>& shardIds);
 };
 
 class ReshardingCoordinatorExternalStateImpl final : public ReshardingCoordinatorExternalState {
 public:
     ParticipantShardsAndChunks calculateParticipantShardsAndChunks(
         OperationContext* opCtx, const ReshardingCoordinatorDocument& coordinatorDoc) override;
-
-    void sendCommandToShards(OperationContext* opCtx,
-                             StringData dbName,
-                             const BSONObj& command,
-                             const std::vector<ShardId>& shardIds,
-                             const std::shared_ptr<executor::TaskExecutor>& executor) override;
 };
 
 /**
@@ -139,7 +161,8 @@ public:
         : _stepdownToken(stepdownToken),
           _abortSource(CancellationSource(stepdownToken)),
           _abortToken(_abortSource.token()),
-          _commitMonitorCancellationSource(CancellationSource(_abortToken)) {}
+          _commitMonitorCancellationSource(CancellationSource(_abortToken)),
+          _quiesceCancellationSource(CancellationSource(_stepdownToken)) {}
 
     /**
      * Returns whether the any token has been canceled.
@@ -176,6 +199,10 @@ public:
         _commitMonitorCancellationSource.cancel();
     }
 
+    void cancelQuiescePeriod() {
+        _quiesceCancellationSource.cancel();
+    }
+
     const CancellationToken& getStepdownToken() {
         return _stepdownToken;
     }
@@ -186,6 +213,10 @@ public:
 
     CancellationToken getCommitMonitorToken() {
         return _commitMonitorCancellationSource.token();
+    }
+
+    CancellationToken getCancelQuiesceToken() {
+        return _quiesceCancellationSource.token();
     }
 
 private:
@@ -203,6 +234,10 @@ private:
     // The source created by inheriting from the abort token.
     // Provides the means to cancel the commit monitor (e.g., due to receiving the commit command).
     CancellationSource _commitMonitorCancellationSource;
+
+    // A source created by inheriting from the stepdown token.
+    // Provides the means to cancel the quiesce period.
+    CancellationSource _quiesceCancellationSource;
 };
 
 class ReshardingCoordinator;
@@ -245,6 +280,8 @@ public:
      * between operations interrupted due to stepdown or abort. Callers who wish to confirm that
      * the abort successfully went through should follow up with an inspection on the resharding
      * coordinator docs to ensure that they are empty.
+     *
+     * This call skips quiesce periods for all aborted coordinators.
      */
     void abortAllReshardCollection(OperationContext* opCtx);
 
@@ -272,8 +309,9 @@ public:
 
     /**
      * Attempts to cancel the underlying resharding operation using the abort token.
+     * If 'skipQuiescePeriod' is set, will also skip the quiesce period used to allow retries.
      */
-    void abort();
+    void abort(bool skipQuiescePeriod = false);
 
     /**
      * Replace in-memory representation of the CoordinatorDoc
@@ -299,6 +337,14 @@ public:
      */
     SharedSemiFuture<void> getCoordinatorDocWrittenFuture() const {
         return _coordinatorDocWrittenPromise.getFuture();
+    }
+
+    /**
+     * Returns a Future that will be resolved when the service has finished its quiesce period
+     * and deleted the coordinator document.
+     */
+    SharedSemiFuture<void> getQuiescePeriodFinishedFuture() const {
+        return _quiescePeriodFinishedPromise.getFuture();
     }
 
     boost::optional<BSONObj> reportForCurrentOp(
@@ -384,6 +430,12 @@ private:
      */
     ExecutorFuture<void> _runReshardingOp(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
+
+    /**
+     * Keep the instance in a quiesced state in order to handle retries.
+     */
+    ExecutorFuture<void> _quiesce(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+                                  Status status);
 
     /**
      * Does the following writes:
@@ -475,14 +527,26 @@ private:
         boost::optional<Status> abortReason = boost::none);
 
     /**
+     * Updates the entry for this resharding operation in config.reshardingOperations to the
+     * quiesced state, or removes it if quiesce isn't being done.  Removes the resharding fields
+     * from the catalog entries.
+     */
+    void _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        OperationContext* opCtx, boost::optional<Status> abortReason = boost::none);
+
+    /**
      * Sends the command to the specified participants asynchronously.
      */
+    template <typename CommandType>
     void _sendCommandToAllParticipants(
-        const std::shared_ptr<executor::ScopedTaskExecutor>& executor, const BSONObj& command);
+        const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
+        std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
+    template <typename CommandType>
     void _sendCommandToAllDonors(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                 const BSONObj& command);
+                                 std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
+    template <typename CommandType>
     void _sendCommandToAllRecipients(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                     const BSONObj& command);
+                                     std::shared_ptr<async_rpc::AsyncRPCOptions<CommandType>> opts);
 
     /**
      * Sends '_flushRoutingTableCacheUpdatesWithWriteConcern' to ensure donor state machine creation
@@ -598,6 +662,9 @@ private:
     // Promise that is fulfilled when the chain of work kicked off by run() has completed.
     SharedPromise<void> _completionPromise;
 
+    // Promise that is fulfilled when the quiesce period is finished
+    SharedPromise<void> _quiescePeriodFinishedPromise;
+
     // Callback handle for scheduled work to handle critical section timeout.
     boost::optional<executor::TaskExecutor::CallbackHandle> _criticalSectionTimeoutCbHandle;
 
@@ -608,7 +675,15 @@ private:
 
     // Used to catch the case when an abort() is called but the cancellation source (_ctHolder) has
     // not been initialized.
-    bool _abortCalled{false};
+    enum AbortType {
+        kNoAbort = 0,
+        kAbortWithQuiesce,
+        kAbortSkipQuiesce
+    } _abortCalled{AbortType::kNoAbort};
+
+    // If we recovered a completed resharding coordinator (quiesced) on failover, the
+    // resharding status when it actually ran.
+    boost::optional<Status> _originalReshardingStatus;
 };
 
 }  // namespace mongo

@@ -31,11 +31,14 @@
  * Tests for columnar/SBE integration.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/db/exec/sbe/sbe_plan_stage_test.h"
 #include "mongo/db/exec/sbe/values/columnar.h"
-#include "mongo/db/storage/column_store.h"
+#include "mongo/db/query/sbe_stage_builder_helpers.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::sbe {
 void makeObjFromColumns(std::vector<MockTranslatedCell>& cells, value::Object& out) {

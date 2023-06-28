@@ -29,6 +29,10 @@
 
 #include "mongo/db/pipeline/abt/expr_algebrizer_context.h"
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/db/query/optimizer/syntax/expr.h"
+
 namespace mongo::optimizer {
 
 ExpressionAlgebrizerContext::ExpressionAlgebrizerContext(const bool assertExprSort,

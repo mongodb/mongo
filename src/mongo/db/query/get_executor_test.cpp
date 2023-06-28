@@ -33,22 +33,37 @@
 
 #include "mongo/db/query/get_executor.h"
 
-#include <boost/optional.hpp>
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
 #include <string>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor.h"
 #include "mongo/db/exec/projection_executor_builder.h"
-#include "mongo/db/json.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/projection_parser.h"
 #include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_test_service_context.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/unordered_set.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/str.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 
 using namespace mongo;
 

@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/map_reduce_gen.h"
+#include "mongo/db/commands/map_reduce_out_options.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/pipeline.h"
 
 namespace mongo::map_reduce_common {

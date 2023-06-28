@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
-#include "mongo/db/query/query_knobs_gen.h"
-#include "mongo/db/server_options.h"
 #include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 

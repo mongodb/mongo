@@ -28,61 +28,115 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <boost/optional.hpp>
+#include <cstdint>
 #include <functional>
+#include <memory>
+#include <mutex>
+#include <set>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/bson/mutable/algorithm.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/config.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/mechanism_scram.h"
+#include "mongo/crypto/sha1_block.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/audit.h"
 #include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/address_restriction.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/auth_options_gen.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/builtin_roles.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/privilege_format.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/role_name.h"
 #include "mongo/db/auth/sasl_options.h"
+#include "mongo/db/auth/umc_info_command_arg.h"
 #include "mongo/db/auth/user.h"
 #include "mongo/db/auth/user_document_parser.h"
 #include "mongo/db/auth/user_management_commands_parser.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/run_aggregate.h"
-#include "mongo/db/commands/test_commands.h"
+#include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/commands/user_management_commands_common.h"
 #include "mongo/db/commands/user_management_commands_gen.h"
-#include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/multitenancy.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/icu.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/read_through_cache.h"
 #include "mongo/util/sequence_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
@@ -1053,7 +1107,7 @@ void CmdUMCTyped<CreateUserCommand>::Invocation::typedRun(OperationContext* opCt
             cmd.getCommandParameter().find('\0') == std::string::npos);
     UserName userName(cmd.getCommandParameter(), dbname);
 
-    const bool isExternal = dbname.db() == DatabaseName::kExternal.db();
+    const bool isExternal = dbname.isExternalDB();
     uassert(ErrorCodes::BadValue,
             "Must provide a 'pwd' field for all user documents, except those"
             " with '$external' as the user's source db",
@@ -1290,7 +1344,9 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
     audit::logDropAllUsersFromDatabase(client, dbname.db());
 
     auto swNumRemoved = removePrivilegeDocuments(
-        opCtx, BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname.db()), dbname.tenantId());
+        opCtx,
+        BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname.serializeWithoutTenantPrefix()),
+        dbname.tenantId());
 
     // Must invalidate even on bad status - what if the write succeeded but the GLE failed?
     authzManager->invalidateUsersFromDB(opCtx, dbname);
@@ -1455,8 +1511,8 @@ UsersInfoReply CmdUMCTyped<UsersInfoCommand, UMCInfoParams>::Invocation::typedRu
         if (arg.isAllForAllDBs()) {
             // Leave the pipeline unconstrained, we want to return every user.
         } else if (arg.isAllOnCurrentDB()) {
-            pipeline.push_back(
-                BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME << dbname.db())));
+            pipeline.push_back(BSON("$match" << BSON(AuthorizationManager::USER_DB_FIELD_NAME
+                                                     << dbname.serializeWithoutTenantPrefix())));
         } else {
             invariant(arg.isExact());
             BSONArrayBuilder usersMatchArray;
@@ -1545,7 +1601,7 @@ void CmdUMCTyped<CreateRoleCommand>::Invocation::typedRun(OperationContext* opCt
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles in the $external database",
-            dbname.db() != DatabaseName::kExternal.db());
+            !dbname.isExternalDB());
 
     uassert(ErrorCodes::BadValue,
             "Cannot create roles with the same name as a built-in role",
@@ -2016,7 +2072,8 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
     DropAllRolesFromDatabaseReply reply;
     const auto dropRoleOps = [&](UMCTransaction& txn) -> Status {
-        auto roleMatch = BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname.db());
+        auto roleMatch =
+            BSON(AuthorizationManager::ROLE_DB_FIELD_NAME << dbname.serializeWithoutTenantPrefix());
         auto rolesMatch = BSON("roles" << roleMatch);
 
         // Remove these roles from all users
@@ -2031,7 +2088,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
         // Remove these roles from all other roles
         swCount = txn.update(rolesNSS(dbname.tenantId()),
-                             BSON("roles.db" << dbname.db()),
+                             BSON("roles.db" << dbname.serializeWithoutTenantPrefix()),
                              BSON("$pull" << rolesMatch));
         if (!swCount.isOK()) {
             return useDefaultCode(swCount.getStatus(), ErrorCodes::RoleModificationFailed)

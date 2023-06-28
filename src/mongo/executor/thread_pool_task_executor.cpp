@@ -732,34 +732,22 @@ StatusWith<TaskExecutor::CallbackHandle> ThreadPoolTaskExecutor::scheduleExhaust
                 return;
             }
 
-            if (cbState->canceled.load()) {
-                // Release any resources the callback function is holding
-                TaskExecutor::CallbackFn callback = [](const CallbackArgs&) {
-                };
-                std::swap(cbState->callback, callback);
-
-                _networkInProgressQueue.erase(cbState->iter);
-                cbState->exhaustErased.store(1);
-
-                if (cbState->exhaustIter) {
-                    _poolInProgressQueue.erase(cbState->exhaustIter.value());
-                    cbState->exhaustIter = boost::none;
-                }
-
-                return;
-            }
-
             // Swap the callback function with the new one
             CallbackFn newCb = [cb, scheduledRequest, response](const CallbackArgs& cbData) {
                 remoteCommandFinished(cbData, cb, scheduledRequest, response);
             };
             swap(cbState->callback, newCb);
 
-            // If this is the last response, invoke the non-exhaust path. This will mark cbState as
-            // finished and remove the task from _networkInProgressQueue
-            if (!response.moreToCome) {
+            // If this is the last response, or command was cancelled, invoke the non-exhaust path.
+            // This will mark cbState as finished and remove the task from _networkInProgressQueue.
+            if (!response.moreToCome || cbState->canceled.load()) {
                 _networkInProgressQueue.erase(cbState->iter);
                 cbState->exhaustErased.store(1);
+
+                if (cbState->canceled.load() && cbState->exhaustIter) {
+                    _poolInProgressQueue.erase(cbState->exhaustIter.value());
+                    cbState->exhaustIter = boost::none;
+                }
 
                 WorkQueue result;
                 result.emplace_front(cbState);

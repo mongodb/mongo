@@ -29,6 +29,8 @@
 
 #include "mongo/embedded/embedded.h"
 
+#include <boost/filesystem.hpp>
+
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/config.h"
@@ -39,7 +41,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/fsync_locked.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/op_observer/op_observer_impl.h"
@@ -73,10 +74,7 @@
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/time_support.h"
 
-#include <boost/filesystem.hpp>
-
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
-
 
 namespace mongo {
 namespace embedded {
@@ -147,7 +145,6 @@ ServiceContext::ConstructorActionRegisterer collectionShardingStateFactoryRegist
 }  // namespace
 
 using logv2::LogComponent;
-using std::endl;
 
 void shutdown(ServiceContext* srvContext) {
     {
@@ -291,12 +288,12 @@ ServiceContext* initialize(const char* yaml_config) {
 
     {
         std::stringstream ss;
-        ss << endl;
-        ss << "*********************************************************************" << endl;
-        ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << endl;
-        ss << " Create this directory or give existing directory in --dbpath." << endl;
-        ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << endl;
-        ss << "*********************************************************************" << endl;
+        ss << std::endl;
+        ss << "*********************************************************************" << std::endl;
+        ss << " ERROR: dbpath (" << storageGlobalParams.dbpath << ") does not exist." << std::endl;
+        ss << " Create this directory or give existing directory in --dbpath." << std::endl;
+        ss << " See http://dochub.mongodb.org/core/startingandstoppingmongo" << std::endl;
+        ss << "*********************************************************************" << std::endl;
         uassert(50677, ss.str().c_str(), boost::filesystem::exists(storageGlobalParams.dbpath));
     }
 

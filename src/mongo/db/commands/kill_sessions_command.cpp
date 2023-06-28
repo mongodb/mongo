@@ -27,25 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/db/auth/action_set.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/crypto/sha256_block.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/auth/user.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/kill_sessions.h"
 #include "mongo/db/session/kill_sessions_common.h"
-#include "mongo/db/session/kill_sessions_local.h"
-#include "mongo/db/session/logical_session_cache.h"
-#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/kill_sessions_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
-#include "mongo/db/stats/top.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/read_through_cache.h"
 
 namespace mongo {
 
@@ -108,7 +121,7 @@ public:
     }
 
     virtual bool run(OperationContext* opCtx,
-                     const DatabaseName&,
+                     const DatabaseName& dbName,
                      const BSONObj& cmdObj,
                      BSONObjBuilder& result) override {
         IDLParserContext ctx("KillSessionsCmd");
@@ -122,7 +135,8 @@ public:
             auto lsids = makeLogicalSessionIds(
                 ksc.getKillSessions(),
                 opCtx,
-                {Privilege{ResourcePattern::forClusterResource(), ActionType::killAnySession}});
+                {Privilege{ResourcePattern::forClusterResource(dbName.tenantId()),
+                           ActionType::killAnySession}});
 
             patterns.reserve(lsids.size());
             for (const auto& lsid : lsids) {

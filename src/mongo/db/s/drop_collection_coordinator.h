@@ -29,9 +29,28 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/drop_collection.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/s/drop_collection_coordinator_document_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_service.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/namespace_string_util.h"
 
 namespace mongo {
 
@@ -89,11 +108,13 @@ private:
 
     void _freezeMigrations(std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _enterCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                               const CancellationToken& token);
 
     void _commitDropCollection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
 
-    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor);
+    void _exitCriticalSection(std::shared_ptr<executor::ScopedTaskExecutor> executor,
+                              const CancellationToken& token);
 };
 
 }  // namespace mongo

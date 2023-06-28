@@ -29,8 +29,12 @@
 
 #pragma once
 
-#include "mongo/db/storage/bson_collection_catalog_entry.h"
 #include <map>
+#include <memory>
+
+#include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/storage/bson_collection_catalog_entry.h"
 
 namespace mongo {
 class Collection;

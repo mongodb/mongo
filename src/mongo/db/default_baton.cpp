@@ -28,12 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <utility>
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/db/client.h"
 #include "mongo/db/default_baton.h"
-
 #include "mongo/db/operation_context.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

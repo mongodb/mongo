@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <array>
+#include <cstdint>
 
 #include "mongo/base/secure_allocator.h"
-
-#include <array>
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 

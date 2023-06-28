@@ -63,7 +63,8 @@ using boost::intrusive_ptr;
 using std::unique_ptr;
 using std::vector;
 
-static const NamespaceString nss("unittests.documentsourcetests");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.documentsourcetests");
 static const BSONObj metaTextScore = BSON("$meta"
                                           << "textScore");
 
@@ -312,7 +313,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterTimeout)
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
@@ -356,7 +357,7 @@ TEST_F(DocumentSourceCursorTest, NonAwaitDataCursorShouldErrorAfterTimeout) {
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
@@ -408,7 +409,7 @@ TEST_F(DocumentSourceCursorTest, TailableAwaitDataCursorShouldErrorAfterBeingKil
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());
@@ -451,7 +452,7 @@ TEST_F(DocumentSourceCursorTest, NormalCursorShouldErrorAfterBeingKilled) {
     auto filter = BSON("a" << 1);
     auto matchExpression = uassertStatusOK(MatchExpressionParser::parse(filter, ctx()));
     auto collectionScan = std::make_unique<CollectionScan>(ctx().get(),
-                                                           readLock.getCollection(),
+                                                           &readLock.getCollection(),
                                                            collScanParams,
                                                            workingSet.get(),
                                                            matchExpression.get());

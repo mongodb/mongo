@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <memory>
+#include <mutex>
+#include <utility>
 
-#include "mongo/db/operation_context_group.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/operation_context.h"
+#include "mongo/db/operation_context_group.h"
 #include "mongo/db/service_context.h"
 
 namespace mongo {

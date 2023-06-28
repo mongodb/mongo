@@ -29,15 +29,29 @@
 
 #pragma once
 
-#include "mongo/db/session/kill_sessions.h"
-
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/kill_sessions_gen.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/session_killer.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

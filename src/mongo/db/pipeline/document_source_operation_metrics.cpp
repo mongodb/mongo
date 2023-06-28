@@ -27,15 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <map>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/pipeline/document_source_operation_metrics.h"
-
-#include "mongo/db/pipeline/lite_parsed_document_source.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/stats/operation_resource_consumption_gen.h"
+#include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/util/net/socket_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -95,7 +100,7 @@ intrusive_ptr<DocumentSource> DocumentSourceOperationMetrics::createFromBson(
     const NamespaceString& nss = pExpCtx->ns;
     uassert(ErrorCodes::InvalidNamespace,
             "$operationMetrics must be run against the 'admin' database with {aggregate: 1}",
-            nss.db() == DatabaseName::kAdmin.db() && nss.isCollectionlessAggregateNS());
+            nss.isAdminDB() && nss.isCollectionlessAggregateNS());
 
     uassert(ErrorCodes::BadValue,
             "The $operationMetrics stage specification must be an object",

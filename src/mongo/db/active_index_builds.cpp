@@ -27,13 +27,27 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <boost/iterator/transform_iterator.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <mutex>
+#include <string>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/db/active_index_builds.h"
 #include "mongo/db/catalog/index_builds_manager.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
-
-#include <boost/iterator/transform_iterator.hpp>
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -44,7 +58,11 @@ ActiveIndexBuilds::~ActiveIndexBuilds() {
     invariant(_allIndexBuilds.empty());
 }
 
-void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext* opCtx) {
+void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown() {
+    waitForAllIndexBuildsToStop(OperationContext::notInterruptible());
+}
+
+void ActiveIndexBuilds::waitForAllIndexBuildsToStop(Interruptible* interruptible) {
     stdx::unique_lock<Latch> lk(_mutex);
 
     // All index builds should have been signaled to stop via the ServiceContext.
@@ -66,7 +84,7 @@ void ActiveIndexBuilds::waitForAllIndexBuildsToStopForShutdown(OperationContext*
     auto pred = [this]() {
         return _allIndexBuilds.empty();
     };
-    _indexBuildsCondVar.wait(lk, pred);
+    interruptible->waitForConditionOrInterrupt(_indexBuildsCondVar, lk, pred);
 }
 
 void ActiveIndexBuilds::assertNoIndexBuildInProgress() const {
@@ -133,6 +151,11 @@ StatusWith<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getIndexBuil
         return {ErrorCodes::NoSuchKey, str::stream() << "No index build with UUID: " << buildUUID};
     }
     return it->second;
+}
+
+std::vector<std::shared_ptr<ReplIndexBuildState>> ActiveIndexBuilds::getAllIndexBuilds() const {
+    stdx::unique_lock<Latch> lk(_mutex);
+    return _filterIndexBuilds_inlock(lk, [](const auto& replState) { return true; });
 }
 
 void ActiveIndexBuilds::unregisterIndexBuild(
@@ -216,7 +239,7 @@ Status ActiveIndexBuilds::registerIndexBuild(
     return Status::OK();
 }
 
-size_t ActiveIndexBuilds::getActiveIndexBuilds() const {
+size_t ActiveIndexBuilds::getActiveIndexBuildsCount() const {
     stdx::unique_lock<Latch> lk(_mutex);
     return _allIndexBuilds.size();
 }

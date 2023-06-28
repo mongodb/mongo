@@ -28,33 +28,49 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <boost/optional.hpp>
+#include <iosfwd>
 #include <memory>
+#include <ratio>
+#include <set>
+#include <string>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/client/sasl_client_authenticate.h"
-#include "mongo/db/auth/authentication_metrics.h"
 #include "mongo/db/auth/authentication_session.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/authz_manager_external_state_mock.h"
-#include "mongo/db/auth/authz_session_external_state_mock.h"
-#include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/auth/sasl_commands_gen.h"
+#include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/sasl_options.h"
-#include "mongo/db/client.h"
+#include "mongo/db/auth/sasl_payload.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/commands/authentication_commands.h"
-#include "mongo/db/server_options.h"
-#include "mongo/logv2/attribute_storage.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/base64.h"
-#include "mongo/util/sequence_util.h"
-#include "mongo/util/str.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kAccessControl
 

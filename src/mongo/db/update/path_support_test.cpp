@@ -29,27 +29,37 @@
 
 #include "mongo/db/update/path_support.h"
 
-#include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement_comparator.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
 #include "mongo/bson/mutable/algorithm.h"
+#include "mongo/bson/mutable/const_element.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/bson/mutable/mutable_bson_test_utils.h"
 #include "mongo/db/field_ref.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/str.h"
 
 namespace {

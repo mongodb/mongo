@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <string>
+
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/member_id.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_set_heartbeat_response.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -128,11 +133,6 @@ public:
     // Was this member up for the last heartbeat?
     bool up() const {
         return _health > 0;
-    }
-    // Was this member up for the last hearbeeat
-    // (or we haven't received the first heartbeat yet)
-    bool maybeUp() const {
-        return _health != 0;
     }
 
     OpTime getLastAppliedOpTime() const {

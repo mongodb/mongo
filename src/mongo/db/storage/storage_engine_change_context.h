@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include <memory>
 #include <shared_mutex>
 
 #include "mongo/db/operation_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_change_lock.h"
 #include "mongo/db/storage/storage_engine.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_set.h"
 

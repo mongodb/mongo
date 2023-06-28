@@ -29,22 +29,9 @@
 
 #include "mongo/db/s/move_primary/move_primary_collection_cloner.h"
 
+#include <memory>
+
 #include "mongo/base/string_data.h"
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/commands/list_collections_filter.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops_exec.h"
-#include "mongo/db/repl/cloner_utils.h"
-#include "mongo/db/repl/database_cloner_gen.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
-#include "mongo/db/s/operation_sharding_state.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/metadata/repl_set_metadata.h"
-#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kMovePrimary
 

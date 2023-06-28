@@ -27,7 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/repl/oplog_buffer_proxy.h"
 #include "mongo/util/assert_util.h"

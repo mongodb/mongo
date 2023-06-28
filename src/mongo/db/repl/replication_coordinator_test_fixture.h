@@ -29,17 +29,33 @@
 
 #pragma once
 
+#include <functional>
+#include <memory>
 #include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_impl.h"
+#include "mongo/db/repl/topology_coordinator.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -49,8 +65,10 @@ struct HostAndPort;
 namespace repl {
 
 class ReplSetConfig;
+
 class ReplicationCoordinatorExternalStateMock;
 class ReplicationCoordinatorImpl;
+
 class StorageInterfaceMock;
 class TopologyCoordinator;
 

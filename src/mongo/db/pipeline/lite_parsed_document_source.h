@@ -29,11 +29,20 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <functional>
 #include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/commands/server_status_metric.h"
@@ -41,7 +50,10 @@
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -192,13 +204,13 @@ public:
     }
 
     /**
-     * Returns true if the involved namespace 'nss' is allowed to be sharded. The behavior is to
-     * allow by default and stages should opt-out if foreign collections are not allowed to be
-     * sharded.
+     * Returns Status::OK() if the involved namespace 'nss' is allowed to be sharded. The behavior
+     * is to allow by default. Stages should opt-out if foreign collections are not allowed to be
+     * sharded by returning a Status with a message explaining why.
      */
-    virtual bool allowShardedForeignCollection(NamespaceString nss,
-                                               bool inMultiDocumentTransaction) const {
-        return true;
+    virtual Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                                  bool inMultiDocumentTransaction) const {
+        return Status::OK();
     }
 
     /**
@@ -326,8 +338,8 @@ public:
         stdx::unordered_set<NamespaceString>& nssSet) const override;
     bool allowedToPassthroughFromMongos() const override;
 
-    bool allowShardedForeignCollection(NamespaceString nss,
-                                       bool inMultiDocumentTransaction) const override;
+    Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                          bool inMultiDocumentTransaction) const override;
 
     const std::vector<LiteParsedPipeline>& getSubPipelines() const override {
         return _pipelines;

@@ -31,7 +31,30 @@ const caseInsensitiveCollation = {
     caseLevel: false
 };
 
-function runTest(conn, {isUnique, isShardedColl, st}) {
+function setMongodServerParametersReplicaSet(rst, params) {
+    rst.nodes.forEach(node => {
+        assert.commandWorked(node.adminCommand(Object.assign({setParameter: 1}, params)));
+    });
+}
+
+function setMongodServerParametersShardedCluster(st, params) {
+    st._rs.forEach(rst => {
+        setMongodServerParametersReplicaSet(rst, params);
+    });
+}
+
+function setMongodServerParameters({st, rst, params}) {
+    if (st) {
+        setMongodServerParametersShardedCluster(st, params);
+    } else if (rst) {
+        setMongodServerParametersReplicaSet(rst, params);
+    }
+}
+
+function runTest(conn, {isHashed, isUnique, isShardedColl, st, rst}) {
+    assert(!isHashed || !isUnique);
+    jsTest.log("Testing the test cases for " + tojson({isHashed, isUnique, isShardedColl}));
+
     const dbName = "testDb";
     const collName = "testColl";
     const ns = dbName + "." + collName;
@@ -45,9 +68,9 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
 
     const indexOptions =
         Object.assign({collation: simpleCollation}, isUnique ? {unique: true} : {});
-    assert.commandWorked(coll.createIndex({a: 1}, indexOptions));
-    assert.commandWorked(coll.createIndex({"a.y": 1}, indexOptions));
-    assert.commandWorked(coll.createIndex({"a.y.ii": 1}, indexOptions));
+    assert.commandWorked(coll.createIndex({a: isHashed ? "hashed" : 1}, indexOptions));
+    assert.commandWorked(coll.createIndex({"a.y": isHashed ? "hashed" : 1}, indexOptions));
+    assert.commandWorked(coll.createIndex({"a.y.ii": isHashed ? "hashed" : 1}, indexOptions));
 
     if (isShardedColl) {
         assert(!isUnique,
@@ -82,9 +105,17 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
         coll.insert({a: {x: 2, y: {i: 2, ii: new Array(kSize10MB).join("D"), iii: 2}, z: 2}, b: 2},
                     {writeConcern}));
 
+    const testCases = [];
+
     // Verify the analyzeShardKey command truncates large primitive type fields.
-    const res0 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {"a.y.ii": 1}}));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res0, {
+    const cmdObj0 = {
+        analyzeShardKey: ns,
+        key: {"a.y.ii": 1},
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    };
+    const expectedMetrics0 = {
         numDocs: 5,
         isUnique,
         numDistinctValues: 5,
@@ -105,11 +136,18 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
             },
         ],
         numMostCommonValues
-    });
+    };
+    testCases.push({cmdObj: cmdObj0, expectedMetrics: expectedMetrics0});
 
     // Verify the analyzeShardKey command truncates large primitive type subfields.
-    const res1 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {"a.y": 1}}));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res1, {
+    const cmdObj1 = {
+        analyzeShardKey: ns,
+        key: {"a.y": 1},
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    };
+    const expectedMetrics1 = {
         numDocs: 5,
         isUnique,
         numDistinctValues: 5,
@@ -148,11 +186,18 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
             },
         ],
         numMostCommonValues
-    });
+    };
+    testCases.push({cmdObj: cmdObj1, expectedMetrics: expectedMetrics1});
 
     // Verify the analyzeShardKey command truncates large object type subfields.
-    const res2 = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: {a: 1}}));
-    AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res2, {
+    const cmdObj2 = {
+        analyzeShardKey: ns,
+        key: {a: 1},
+        // Skip calculating the read and write distribution metrics since they are not needed by
+        // this test.
+        readWriteDistribution: false
+    };
+    const expectedMetrics2 = {
         numDocs: 5,
         isUnique,
         numDistinctValues: 5,
@@ -176,26 +221,62 @@ function runTest(conn, {isUnique, isShardedColl, st}) {
             },
         ],
         numMostCommonValues
-    });
+    };
+    testCases.push({cmdObj: cmdObj2, expectedMetrics: expectedMetrics2});
+
+    const sufficientAccumulatorBytesLimitParams = {
+        internalQueryTopNAccumulatorBytes: kSize10MB * 15,
+    };
+    const insufficientAccumulatorBytesLimitParams = {
+        internalQueryTopNAccumulatorBytes: kSize10MB,
+    };
+
+    for (let {cmdObj, expectedMetrics} of testCases) {
+        jsTest.log("Testing " + tojson({isHashed, isUnique, isShardedColl, cmdObj}));
+
+        setMongodServerParameters({st, rst, params: sufficientAccumulatorBytesLimitParams});
+        let res = conn.adminCommand(cmdObj);
+        assert.commandWorked(res);
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics,
+                                                            expectedMetrics);
+
+        setMongodServerParameters({st, rst, params: insufficientAccumulatorBytesLimitParams});
+        res = conn.adminCommand(cmdObj);
+        if (isUnique || isHashed) {
+            assert.commandWorked(res);
+            AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics,
+                                                                expectedMetrics);
+        } else {
+            // The aggregation pipeline that the analyzeShardKey command uses to calculate the
+            // cardinality and frequency metrics when the supporting index is not unique contains
+            // a $group stage with $topN. The small size limit for $topN would therefore cause
+            // the analyzeShardKey command to fail with an ExceededMemoryLimit error when the
+            // index (i.e. values to group and sort) is not hashed.
+            assert.commandFailedWithCode(res, ErrorCodes.ExceededMemoryLimit);
+        }
+    }
 
     assert(coll.drop());
 }
 
 const setParameterOpts = {
     analyzeShardKeyNumMostCommonValues: numMostCommonValues,
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"})
 };
 
 {
     const st =
         new ShardingTest({shards: 2, rs: {nodes: numNodesPerRS, setParameter: setParameterOpts}});
 
-    runTest(st.s, {isUnique: true, isShardedColl: false});
-    runTest(st.s, {isUnique: false, isShardedColl: false});
-    runTest(st.s, {isUnique: false, isShardedColl: true, st});
+    runTest(st.s, {isHashed: false, isUnique: true, isShardedColl: false, st});
+    runTest(st.s, {isHashed: false, isUnique: false, isShardedColl: false, st});
+    // Not testing unique hashed index since hashed indexes cannot have a uniqueness constraint.
+    runTest(st.s, {isHashed: true, isUnique: false, isShardedColl: false, st});
+
+    // Not testing unique b-tree index since uniqueness can't be maintained unless the shard key
+    // is prefix of the candidate shard keys.
+    runTest(st.s, {isHashed: false, isUnique: false, isShardedColl: true, st});
+    // Not testing unique hashed index since hashed indexes cannot have a uniqueness constraint.
+    runTest(st.s, {isHashed: true, isUnique: false, isShardedColl: true, st});
 
     st.stop();
 }
@@ -207,8 +288,10 @@ const setParameterOpts = {
     rst.initiate();
     const primary = rst.getPrimary();
 
-    runTest(primary, {isUnique: true, isShardedColl: false});
-    runTest(primary, {isUnique: false, isShardedColl: false});
+    runTest(primary, {isHashed: false, isUnique: true, isShardedColl: false, rst});
+    runTest(primary, {isHashed: false, isUnique: false, isShardedColl: false, rst});
+    // Not testing unique hashed index since hashed indexes cannot have a uniqueness constraint.
+    runTest(primary, {isHashed: true, isUnique: false, isShardedColl: false, rst});
 
     rst.stopSet();
 }

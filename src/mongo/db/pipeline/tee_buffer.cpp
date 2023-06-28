@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/tee_buffer.h"
-
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/pipeline/tee_buffer.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

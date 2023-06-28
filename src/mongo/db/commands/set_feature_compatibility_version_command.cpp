@@ -28,80 +28,113 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <functional>
+#include <map>
+#include <memory>
+#include <ostream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/crypto/fle_crypto.h"
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_cursor.h"
 #include "mongo/db/audit.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/coll_mod.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_catalog_helper.h"
-#include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/drop_collection.h"
 #include "mongo/db/catalog/drop_indexes.h"
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/catalog/index_catalog_impl.h"
+#include "mongo/db/catalog_raii.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/set_feature_compatibility_version_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/drop_gen.h"
 #include "mongo/db/feature_compatibility_version_documentation.h"
-#include "mongo/db/feature_compatibility_version_parser.h"
-#include "mongo/db/global_settings.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/persistent_task_store.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/read_write_concern_defaults.h"
 #include "mongo/db/repl/primary_only_service.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/repl_settings.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/shard_merge_recipient_service.h"
 #include "mongo/db/repl/tenant_migration_donor_service.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
-#include "mongo/db/s/migration_coordinator_document_gen.h"
-#include "mongo/db/s/range_deletion_util.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
-#include "mongo/db/s/resharding/resharding_donor_recipient_common.h"
 #include "mongo/db/s/shard_authoritative_catalog_gen.h"
-#include "mongo/db/s/sharding_cluster_parameters_gen.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
 #include "mongo/db/s/sharding_ddl_coordinator_service.h"
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
-#include "mongo/db/session/session_catalog.h"
-#include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
-#include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/idl/cluster_server_parameter_gen.h"
+#include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog/type_collection_gen.h"
 #include "mongo/s/catalog/type_config_version.h"
-#include "mongo/s/catalog/type_index_catalog.h"
-#include "mongo/s/grid.h"
-#include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/stdx/unordered_set.h"
-#include "mongo/util/exit.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 #include "mongo/util/version/releases.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -128,6 +161,7 @@ MONGO_FAIL_POINT_DEFINE(hangDowngradingBeforeIsCleaningServerMetadata);
 MONGO_FAIL_POINT_DEFINE(failAfterReachingTransitioningState);
 MONGO_FAIL_POINT_DEFINE(hangAtSetFCVStart);
 MONGO_FAIL_POINT_DEFINE(failAfterSendingShardsToDowngradingOrUpgrading);
+MONGO_FAIL_POINT_DEFINE(hangAfterBlockingIndexBuildsForFcvDowngrade);
 
 /**
  * Ensures that only one instance of setFeatureCompatibilityVersion can run at a given time.
@@ -201,6 +235,24 @@ void dropDistLockCollections(OperationContext* opCtx) {
     }
 }
 
+// TODO SERVER-78330 remove this.
+void deleteShardingStateRecoveryDoc(OperationContext* opCtx) {
+    DBDirectClient client(opCtx);
+    const auto commandResponse = client.runCommand([&] {
+        write_ops::DeleteCommandRequest deleteOp(NamespaceString::kServerConfigurationNamespace);
+        deleteOp.setDeletes(
+            {[&] {
+                write_ops::DeleteOpEntry entry;
+                entry.setQ(BSON("_id"
+                                << "minOpTimeRecovery"));
+                entry.setMulti(false);
+                return entry;
+            }()});
+        return deleteOp.serialize({});
+    }());
+    uassertStatusOK(getStatusFromWriteCommandReply(commandResponse->getCommandReply()));
+}
+
 void uassertStatusOKIgnoreNSNotFound(Status status) {
     if (status.isOK() || status == ErrorCodes::NamespaceNotFound) {
         return;
@@ -256,11 +308,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                    ActionType::setFeatureCompatibilityVersion)) {
+                 ->isAuthorizedForActionsOnResource(
+                     ResourcePattern::forClusterResource(dbName.tenantId()),
+                     ActionType::setFeatureCompatibilityVersion)) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
 
@@ -401,6 +454,9 @@ public:
                         "Failing setFeatureCompatibilityVersion before reaching the FCV "
                         "transitional stage due to 'failBeforeTransitioning' failpoint set",
                         !failBeforeTransitioning.shouldFail());
+
+                ScopedPostFCVDocumentUpdateActions postUpdateAction =
+                    _prepareTransitionalState(opCtx, actualVersion, requestedVersion);
 
                 // We pass boost::none as the setIsCleaningServerMetadata argument in order to
                 // indicate that we don't want to override the existing isCleaningServerMetadata FCV
@@ -613,7 +669,9 @@ private:
                                   const multiversion::FeatureCompatibilityVersion requestedVersion,
                                   boost::optional<Timestamp> changeTimestamp) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            _cancelServerlessMigrations(opCtx);
+            if (repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
+                _cancelServerlessMigrations(opCtx);
+            }
             _maybeMigrateAuditConfig(opCtx, requestedVersion, changeTimestamp);
             return;
         }
@@ -623,6 +681,7 @@ private:
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             // Config server role actions.
             _maybeMigrateAuditConfig(opCtx, requestedVersion, changeTimestamp);
+            _dropReshardingCoordinatorUniqueIndex(opCtx, requestedVersion);
         }
 
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
@@ -661,12 +720,16 @@ private:
         if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer)) {
             const auto actualVersion = serverGlobalParams.featureCompatibility.getVersion();
             _cleanupConfigVersionOnUpgrade(opCtx, requestedVersion, actualVersion);
-            _setOnCurrentShardSinceFieldOnChunks(opCtx, requestedVersion, actualVersion);
-            // Depends on _setOnCurrentShardSinceFieldOnChunks()
             _initializePlacementHistory(opCtx, requestedVersion, actualVersion);
             _dropConfigMigrationsCollection(opCtx);
-            _setShardedClusterCardinalityParam(opCtx, requestedVersion);
         }
+
+        if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
+            // Delete any possible leftover ShardingStateRecovery document.
+            // TODO SERVER-78330 remove this.
+            deleteShardingStateRecoveryDoc(opCtx);
+        }
+
         _removeRecordPreImagesCollectionOption(opCtx);
     }
 
@@ -683,6 +746,38 @@ private:
                         "Upgrading to FCV wth audit config cluster parameter enabled, migrating "
                         "audit config to cluster parameter.");
             audit::migrateOldToNew(opCtx, changeTimestamp);
+        }
+    }
+
+    void _dropReshardingCoordinatorUniqueIndex(
+        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
+        // There is no need to re-create this index on upgrade, as the index is no longer
+        // needed to ensure resharding operations are unique.
+        const auto& [fromVersion, _] =
+            getTransitionFCVFromAndTo(serverGlobalParams.featureCompatibility.getVersion());
+        if (resharding::gFeatureFlagReshardingImprovements
+                .isEnabledOnTargetFCVButDisabledOnOriginalFCV(requestedVersion, fromVersion)) {
+            LOGV2(7760401,
+                  "Upgrading to FCV wth resharding improvements parameter enabled, "
+                  "dropping resharding coordinator unique index.");
+            try {
+                // The index name is included literally here to avoid creating a
+                // construction-order catastrophe with the static std::string
+                // kReshardingCoordinatorActiveIndexName
+                auto reply = dropIndexes(opCtx,
+                                         NamespaceString::kConfigReshardingOperationsNamespace,
+                                         boost::none,
+                                         "ReshardingCoordinatorActiveIndex");
+                LOGV2_DEBUG(
+                    7760402, 2, "Dropped resharding coordinator index", "reply"_attr = reply);
+            } catch (ExceptionFor<ErrorCodes::NamespaceNotFound>&) {
+                LOGV2_DEBUG(
+                    7760403, 2, "Resharding coordinator collection did not exist during upgrade.");
+            } catch (ExceptionFor<ErrorCodes::IndexNotFound>&) {
+                LOGV2_DEBUG(7760404,
+                            2,
+                            "Resharding coordinator 'active' index did not exist during upgrade.");
+            }
         }
     }
 
@@ -783,58 +878,6 @@ private:
             if (indexCatalogNss == NamespaceString::kShardIndexCatalogNamespace) {
                 uassertStatusOK(sharding_util::createShardCollectionCatalogIndexes(opCtx));
             }
-        }
-    }
-
-    void _setShardedClusterCardinalityParam(
-        OperationContext* opCtx, const multiversion::FeatureCompatibilityVersion requestedVersion) {
-        if (feature_flags::gClusterCardinalityParameter.isEnabledOnVersion(requestedVersion)) {
-            // Get current cluster parameter value so that we don't run SetClusterParameter
-            // extraneously
-            auto* clusterParameters = ServerParameterSet::getClusterParameterSet();
-            auto* clusterCardinalityParam =
-                clusterParameters->get<ClusterParameterWithStorage<ShardedClusterCardinalityParam>>(
-                    "shardedClusterCardinalityForDirectConns");
-            auto currentValue =
-                clusterCardinalityParam->getValue(boost::none).getHasTwoOrMoreShards();
-
-            // config.shards is stable during FCV changes, so query that to discover the current
-            // number of shards.
-            DBDirectClient client(opCtx);
-            FindCommandRequest findRequest{NamespaceString::kConfigsvrShardsNamespace};
-            findRequest.setLimit(2);
-            auto numShards = client.find(std::move(findRequest))->itcount();
-            bool expectedValue = numShards >= 2;
-
-            if (expectedValue == currentValue) {
-                return;
-            }
-
-            ConfigsvrSetClusterParameter configsvrSetClusterParameter(
-                BSON("shardedClusterCardinalityForDirectConns"
-                     << BSON("hasTwoOrMoreShards" << expectedValue)));
-            configsvrSetClusterParameter.setDbName(DatabaseName::kAdmin);
-
-            const auto shardRegistry = Grid::get(opCtx)->shardRegistry();
-            const auto cmdResponse =
-                uassertStatusOK(shardRegistry->getConfigShard()->runCommandWithFixedRetryAttempts(
-                    opCtx,
-                    ReadPreferenceSetting(ReadPreference::PrimaryOnly),
-                    DatabaseName::kAdmin.toString(),
-                    configsvrSetClusterParameter.toBSON({}),
-                    Shard::RetryPolicy::kIdempotent));
-            uassertStatusOK(Shard::CommandResponse::getEffectiveStatus(std::move(cmdResponse)));
-        }
-    }
-
-    // TODO (SERVER-72791): Remove once FCV 7.0 becomes last-lts.
-    void _setOnCurrentShardSinceFieldOnChunks(
-        OperationContext* opCtx,
-        const multiversion::FeatureCompatibilityVersion requestedVersion,
-        const multiversion::FeatureCompatibilityVersion actualVersion) {
-        if (feature_flags::gAutoMerger.isEnabledOnTargetFCVButDisabledOnOriginalFCV(
-                requestedVersion, actualVersion)) {
-            ShardingCatalogManager::get(opCtx)->setOnCurrentShardSinceFieldOnChunks(opCtx);
         }
     }
 
@@ -967,7 +1010,8 @@ private:
     // This helper function is for any actions that should be done before taking the FCV full
     // transition lock in S mode.
     void _prepareToDowngradeActions(OperationContext* opCtx) {
-        if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
+        if (serverGlobalParams.clusterRole.has(ClusterRole::None) &&
+            repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless()) {
             _cancelServerlessMigrations(opCtx);
             return;
         }
@@ -1253,18 +1297,79 @@ private:
         }
     }
 
+    /**
+     * May contain actions to perfom after the FCV document update. Execution occurs when the object
+     * goes out of scope.
+     */
+    using ScopedPostFCVDocumentUpdateActions = ScopeGuard<std::function<void()>>;
+
+    /**
+     * Actions to be performed before the FCV document is set into upgrading or downgrading
+     * transitional state. The returned object may contain post-update actions which are executed
+     * when it goes out of scope, so it must be properly scoped to expire after the FCV document has
+     * been updated. The assumption is that the provided opCtx is still valid by the time the action
+     * is executed.
+     */
+    ScopedPostFCVDocumentUpdateActions _prepareTransitionalState(
+        OperationContext* opCtx,
+        multiversion::FeatureCompatibilityVersion actualVersion,
+        multiversion::FeatureCompatibilityVersion requestedVersion) {
+
+        std::function<void()> unblockNewIndexBuilds;
+
+        // TODO (SERVER-68290): Remove index build abort due to FCV downgrade once the
+        // feature flag is removed.
+        if (feature_flags::gIndexBuildGracefulErrorHandling
+                .isDisabledOnTargetFCVButEnabledOnOriginalFCV(requestedVersion, actualVersion)) {
+            invariant(requestedVersion < actualVersion);
+            const auto reason = fmt::format("FCV downgrade in progress, from {} to {}.",
+                                            toString(actualVersion),
+                                            toString(requestedVersion));
+
+            const auto indexBuildsCoord = IndexBuildsCoordinator::get(opCtx);
+            // Block new index builds before writing the transitional FCV state, which will cause
+            // new feature flag checks to consider it disabled.
+            indexBuildsCoord->setNewIndexBuildsBlocked(true, reason);
+            // New index builds will be unblocked after ScopedPostFCVDocumentUpdateActions goes out
+            // of scope once the FCV document has been updated.
+            unblockNewIndexBuilds = [indexBuildsCoord] {
+                indexBuildsCoord->setNewIndexBuildsBlocked(false);
+            };
+
+            if (hangAfterBlockingIndexBuildsForFcvDowngrade.shouldFail()) {
+                LOGV2(7738704, "Hanging for failpoint hangAfterBlockingIndexBuildsForFcvDowngrade");
+                hangAfterBlockingIndexBuildsForFcvDowngrade.pauseWhileSet(opCtx);
+            }
+
+            // While new index builds are blocked, abort all existing index builds and wait for
+            // them.
+            indexBuildsCoord->abortAllIndexBuildsWithReason(opCtx, reason);
+            // Some index builds might already be committing or aborting, in which case the above
+            // call does not wait for them. Wait for the rest of the index builds.
+            indexBuildsCoord->waitForAllIndexBuildsToStop(opCtx);
+        }
+
+        const auto postUpdateActions = [unblockNewIndexBuilds =
+                                            std::move(unblockNewIndexBuilds)]() {
+            if (unblockNewIndexBuilds) {
+                unblockNewIndexBuilds();
+            }
+        };
+
+        return {postUpdateActions};
+    }
+
     // _prepareToDowngrade performs all actions and checks that need to be done before proceeding to
-    // make any metadata changes as part of FCV downgrade. Any new feature specific downgrade
-    // code should be placed in the helper functions:
+    // make any metadata changes as part of FCV downgrade. Any new feature specific downgrade code
+    // should be placed in the helper functions:
     // * _prepareToDowngradeActions: Any downgrade actions that should be done before taking the FCV
     // full transition lock in S mode should go in this function.
     // * _userCollectionsUassertsForDowngrade: for any checks on user data or settings that will
     // uassert if users need to manually clean up user data or settings.
     // When doing feature flag checking for downgrade, we should check the feature flag is enabled
     // on current FCV and will be disabled after downgrade by using
-    // isDisabledOnTargetFCVButEnabledOnOriginalFCV(targetFCV, originalFCV)
-    // Please read the comments on those helper functions for more details on what should be placed
-    // in each function.
+    // isDisabledOnTargetFCVButEnabledOnOriginalFCV(targetFCV, originalFCV) Please read the comments
+    // on those helper functions for more details on what should be placed in each function.
     void _prepareToDowngrade(OperationContext* opCtx,
                              const SetFeatureCompatibilityVersion& request,
                              boost::optional<Timestamp> changeTimestamp) {
@@ -1370,35 +1475,33 @@ private:
 
     /**
      * Abort all serverless migrations active on this node, for both donors and recipients.
-     * Called after reaching an upgrading or downgrading state.
+     * Called after reaching an upgrading or downgrading state for nodes with ClusterRole::None.
+     * Must only be called in serverless mode.
      */
     void _cancelServerlessMigrations(OperationContext* opCtx) {
+        invariant(repl::ReplicationCoordinator::get(opCtx)->getSettings().isServerless());
         invariant(serverGlobalParams.featureCompatibility.isUpgradingOrDowngrading());
-        if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
-            auto donorService = checked_cast<TenantMigrationDonorService*>(
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
-            donorService->abortAllMigrations(opCtx);
+        auto donorService = checked_cast<TenantMigrationDonorService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(TenantMigrationDonorService::kServiceName));
+        donorService->abortAllMigrations(opCtx);
 
-            auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
-                repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                    ->lookupServiceByName(repl::TenantMigrationRecipientService::
-                                              kTenantMigrationRecipientServiceName));
-            recipientService->abortAllMigrations(opCtx);
+        auto recipientService = checked_cast<repl::TenantMigrationRecipientService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(
+                    repl::TenantMigrationRecipientService::kTenantMigrationRecipientServiceName));
+        recipientService->abortAllMigrations(opCtx);
 
-            if (getGlobalReplSettings().isServerless()) {
-                auto splitDonorService = checked_cast<ShardSplitDonorService*>(
-                    repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                        ->lookupServiceByName(ShardSplitDonorService::kServiceName));
-                splitDonorService->abortAllSplits(opCtx);
+        auto splitDonorService = checked_cast<ShardSplitDonorService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(ShardSplitDonorService::kServiceName));
+        splitDonorService->abortAllSplits(opCtx);
 
-                auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
-                    repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
-                        ->lookupServiceByName(
-                            repl::ShardMergeRecipientService::kShardMergeRecipientServiceName));
-                mergeRecipientService->abortAllMigrations(opCtx);
-            }
-        }
+        auto mergeRecipientService = checked_cast<repl::ShardMergeRecipientService*>(
+            repl::PrimaryOnlyServiceRegistry::get(opCtx->getServiceContext())
+                ->lookupServiceByName(
+                    repl::ShardMergeRecipientService::kShardMergeRecipientServiceName));
+        mergeRecipientService->abortAllMigrations(opCtx);
     }
 
     /**

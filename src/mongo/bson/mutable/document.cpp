@@ -27,18 +27,21 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/bson/mutable/document.h"
-
-#include <cstdlib>
-#include <cstring>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <limits>
+#include <new>
 #include <type_traits>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo {

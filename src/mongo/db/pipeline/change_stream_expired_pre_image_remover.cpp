@@ -28,15 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
 
 #include "change_stream_expired_pre_image_remover.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/change_stream_pre_images_collection_manager.h"
+#include "mongo/db/client.h"
+#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/background.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

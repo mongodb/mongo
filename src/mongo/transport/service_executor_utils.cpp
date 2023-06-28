@@ -33,6 +33,11 @@
 #include <functional>
 #include <memory>
 
+#if !defined(_WIN32)
+#include <sys/resource.h>
+#endif
+
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/transport/service_executor.h"
@@ -41,8 +46,7 @@
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/thread_safety_context.h"
 
-#if !defined(_WIN32)
-#include <sys/resource.h>
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
 #endif
 

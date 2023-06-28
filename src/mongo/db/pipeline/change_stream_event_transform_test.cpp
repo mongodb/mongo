@@ -27,25 +27,35 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <vector>
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/document_value_test_util.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/exec/document_value/value_comparator.h"
-#include "mongo/db/matcher/schema/expression_internal_schema_object_match.h"
-#include "mongo/db/multitenancy_gen.h"
-#include "mongo/db/pipeline/aggregation_context_fixture.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/change_stream_event_transform.h"
-#include "mongo/db/pipeline/change_stream_rewrite_helpers.h"
 #include "mongo/db/pipeline/change_stream_test_helpers.h"
-#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/intrusive_counter.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -191,7 +201,7 @@ TEST(ChangeStreamEventTransformTest, TestUpdateTransformWithTenantId) {
         );
 
     Document expectedNamespace =
-        Document{{"db", nssWithTenant.dbName().db()}, {"coll", nssWithTenant.coll()}};
+        Document{{"db", nssWithTenant.dbName().toString_forTest()}, {"coll", nssWithTenant.coll()}};
 
     auto changeStreamDoc = applyTransformation(updateField, nssWithTenant);
     auto outputNs = changeStreamDoc[DocumentSourceChangeStream::kNamespaceField].getDocument();
@@ -236,13 +246,14 @@ TEST(ChangeStreamEventTransformTest, TestRenameTransformWithTenantId) {
                        testUuid()                                                // uuid
         );
 
-    Document expectedDoc{{DocumentSourceChangeStream::kNamespaceField,
-                          Document{{"db", renameFrom.dbName().db()}, {"coll", renameFrom.coll()}}},
-                         {DocumentSourceChangeStream::kRenameTargetNssField,
-                          Document{{"db", renameTo.dbName().db()}, {"coll", renameTo.coll()}}},
-                         {DocumentSourceChangeStream::kOperationDescriptionField,
-                          Document{BSON("to" << BSON("db" << renameTo.dbName().db() << "coll"
-                                                          << renameTo.coll()))}}};
+    Document expectedDoc{
+        {DocumentSourceChangeStream::kNamespaceField,
+         Document{{"db", renameFrom.dbName().toString_forTest()}, {"coll", renameFrom.coll()}}},
+        {DocumentSourceChangeStream::kRenameTargetNssField,
+         Document{{"db", renameTo.dbName().toString_forTest()}, {"coll", renameTo.coll()}}},
+        {DocumentSourceChangeStream::kOperationDescriptionField,
+         Document{BSON("to" << BSON("db" << renameTo.dbName().toString_forTest() << "coll"
+                                         << renameTo.coll()))}}};
 
     auto changeStreamDoc = applyTransformation(renameField, renameFrom);
     auto renameDoc = Document{
@@ -295,7 +306,7 @@ TEST(ChangeStreamEventTransformTest, TestDropDatabaseTransformWithTenantId) {
                                       testUuid()                   // uuid
     );
 
-    Document expectedNamespace = Document{{"db", dbToDrop.dbName().db()}};
+    Document expectedNamespace = Document{{"db", dbToDrop.dbName().toString_forTest()}};
 
     auto changeStreamDoc = applyTransformation(dropDbField, dbToDrop);
     auto outputNs = changeStreamDoc[DocumentSourceChangeStream::kNamespaceField].getDocument();
@@ -335,7 +346,7 @@ TEST(ChangeStreamEventTransformTest, TestCreateTransformWithTenantId) {
     );
 
     Document expectedNamespace =
-        Document{{"db", nssWithTenant.dbName().db()}, {"coll", nssWithTenant.coll()}};
+        Document{{"db", nssWithTenant.dbName().toString_forTest()}, {"coll", nssWithTenant.coll()}};
 
     auto changeStreamDoc = applyTransformation(createField, nssWithTenant);
     auto outputNs = changeStreamDoc[DocumentSourceChangeStream::kNamespaceField].getDocument();
@@ -380,7 +391,8 @@ TEST(ChangeStreamEventTransformTest, TestCreateViewTransformWithTenantId) {
                                                 << "pipeline" << viewPipeline),  // o
                                      testUuid());                                // uuid
 
-    Document expectedNamespace = Document{{"db", viewNss.dbName().db()}, {"coll", viewNss.coll()}};
+    Document expectedNamespace =
+        Document{{"db", viewNss.dbName().toString_forTest()}, {"coll", viewNss.coll()}};
 
     auto changeStreamDoc = applyTransformation(
         createView, NamespaceString::makeCollectionlessAggregateNSS(viewNss.dbName()));

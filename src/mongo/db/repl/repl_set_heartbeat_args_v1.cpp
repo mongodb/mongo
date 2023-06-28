@@ -27,14 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
-
-#include "mongo/bson/util/bson_check.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/repl/repl_set_heartbeat_args_v1.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace repl {

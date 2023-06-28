@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <string>
+
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/validate_results.h"

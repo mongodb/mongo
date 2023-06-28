@@ -27,16 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <algorithm>
+#include <boost/cstdint.hpp>
+#include <cstdint>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/json.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/parsed_distinct.h"
 #include "mongo/db/query/query_test_service_context.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -146,7 +161,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                                          << "testcoll"
                                          << "key"
                                          << "x"
-                                         << "collation"
+                                         << "hint" << BSON("b" << 5) << "collation"
                                          << BSON("locale"
                                                  << "en_US")
                                          << "readConcern"
@@ -182,6 +197,7 @@ TEST(ParsedDistinctTest, ConvertToAggregationWithAllOptions) {
                       BSON("readPreference"
                            << "secondary"));
     ASSERT_EQUALS(ar.getValue().getMaxTimeMS().value_or(0), 100u);
+    ASSERT_BSONOBJ_EQ(ar.getValue().getHint().value_or(BSONObj()), fromjson("{ b : 5 }"));
 
     std::vector<BSONObj> expectedPipeline{
         BSON("$replaceRoot" << BSON(

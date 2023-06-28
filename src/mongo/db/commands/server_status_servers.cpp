@@ -27,16 +27,31 @@
  *    it in the license file.
  */
 
-#include "mongo/config.h"
+#include <memory>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/stats/counters.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/transport/message_compressor_registry.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor_fixed.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/net/hostname_canonicalization.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_types.h"
 
 namespace mongo {
 namespace {

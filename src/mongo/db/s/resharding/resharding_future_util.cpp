@@ -27,9 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr.hpp>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/db/s/resharding/resharding_future_util.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
 
 namespace mongo::resharding {
 

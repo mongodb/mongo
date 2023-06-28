@@ -8,6 +8,8 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
+
 const collPrefix = "validate_timeseries_minmax";
 const bucketPrefix = "system.buckets.validate_timeseries_minmax";
 let collName = "validate_timeseries_minmax";
@@ -257,35 +259,39 @@ assert(res.warnings.length == 1, tojson(res));
 assert(res.nNonCompliantDocuments == 1, tojson(res));
 
 // Tests collections with 'control.version' : 2.
-jsTestLog("Running validate on a version 2 bucket with incorrect 'max' object field.");
-setUpCollection(lotsOfData);
-coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
-bucket.updateOne({"meta.sensorId": 2, "control.version": 2}, {"$set": {"control.max.temp": 800}});
-res = bucket.validate();
-assert(res.valid, tojson(res));
-assert.eq(res.nNonCompliantDocuments, 1);
-assert.eq(res.warnings.length, 1);
+if (!FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
+    // TODO SERVER-77454: Investigate re-enabling this.
+    jsTestLog("Running validate on a version 2 bucket with incorrect 'max' object field.");
+    setUpCollection(lotsOfData);
+    coll = db.getCollection(collName);
+    bucket = db.getCollection(bucketName);
+    bucket.updateOne({"meta.sensorId": 2, "control.version": 2},
+                     {"$set": {"control.max.temp": 800}});
+    res = bucket.validate();
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 1);
+    assert.eq(res.warnings.length, 1);
 
-// "Checks no errors are thrown with a valid closed bucket."
-jsTestLog(
-    "Running validate on a version 2 bucket with everything correct, checking that no warnings are found.");
-setUpCollection(lotsOfData);
-coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
-res = bucket.validate();
-assert(res.valid, tojson(res));
-assert.eq(res.nNonCompliantDocuments, 0);
-assert.eq(res.warnings.length, 0);
+    // "Checks no errors are thrown with a valid closed bucket."
+    jsTestLog(
+        "Running validate on a version 2 bucket with everything correct, checking that no warnings are found.");
+    setUpCollection(lotsOfData);
+    coll = db.getCollection(collName);
+    bucket = db.getCollection(bucketName);
+    res = bucket.validate();
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 0);
+    assert.eq(res.warnings.length, 0);
 
-// "Checks no errors are thrown with a valid closed bucket with skipped data fields."
-jsTestLog(
-    "Running validate on a correct version 2 bucket with skipped data fields, checking that no warnings are found.");
-setUpCollection(skipFieldData);
-coll = db.getCollection(collName);
-bucket = db.getCollection(bucketName);
-res = bucket.validate();
-assert(res.valid, tojson(res));
-assert.eq(res.nNonCompliantDocuments, 0);
-assert.eq(res.warnings.length, 0);
+    // "Checks no errors are thrown with a valid closed bucket with skipped data fields."
+    jsTestLog(
+        "Running validate on a correct version 2 bucket with skipped data fields, checking that no warnings are found.");
+    setUpCollection(skipFieldData);
+    coll = db.getCollection(collName);
+    bucket = db.getCollection(bucketName);
+    res = bucket.validate();
+    assert(res.valid, tojson(res));
+    assert.eq(res.nNonCompliantDocuments, 0);
+    assert.eq(res.warnings.length, 0);
+}
 })();

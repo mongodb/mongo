@@ -28,19 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <mutex>
+#include <utility>
 
-#include "mongo/db/ops/write_ops_retryability.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/bson/util/bson_extract.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/client.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_retryability.h"
 #include "mongo/db/repl/image_collection_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/redaction.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -262,7 +280,10 @@ SingleWriteResult parseOplogEntryForUpdate(const repl::OplogEntry& entry) {
         BSONObjBuilder upserted;
         upserted.append(entry.getObject()["_id"]);
         res.setUpsertedId(upserted.obj());
-    } else if (entry.getOpType() == repl::OpTypeEnum::kUpdate) {
+    } else if (entry.getOpType() == repl::OpTypeEnum::kUpdate ||
+               entry.getOpType() == repl::OpTypeEnum::kDelete) {
+        // Time-series updates could generate an oplog of type "kDelete". It also implies one
+        // user-level measurement is modified.
         res.setN(1);
         res.setNModified(1);
     } else if (entry.getOpType() == repl::OpTypeEnum::kNoop) {

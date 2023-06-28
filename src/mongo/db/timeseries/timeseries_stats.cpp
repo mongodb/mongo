@@ -29,7 +29,10 @@
 
 #include "mongo/db/timeseries/timeseries_stats.h"
 
+#include <utility>
+
 #include "mongo/db/catalog/collection.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

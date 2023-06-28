@@ -30,8 +30,14 @@
 
 #include <memory>
 
-#include "mongo/client/global_conn_pool.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/client/replica_set_monitor_manager.h"
+#include "mongo/client/sdam/topology_description.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

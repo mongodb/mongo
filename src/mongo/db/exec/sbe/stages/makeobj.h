@@ -29,9 +29,27 @@
 
 #pragma once
 
+#include <cstddef>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/inlined_vector.h>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/sbe/makeobj_enums.h"
+#include "mongo/db/exec/sbe/stages/plan_stats.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/util/indexed_string_vector.h"
 
 namespace mongo::sbe {

@@ -27,15 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <unicode/coll.h>
+#include <utility>
+
+#include <unicode/locid.h>
+#include <unicode/utypes.h>
 
 #include "mongo/db/query/collation/collator_interface_icu.h"
-
-#include <iomanip>
-#include <iostream>
-#include <unicode/coll.h>
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace {
 

@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <functional>
+#include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/pipeline/expression_context.h"

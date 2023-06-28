@@ -27,19 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/idhack.h"
-
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/projection.h"
-#include "mongo/db/exec/scoped_timer.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/index/btree_access_method.h"
+#include "mongo/db/index/index_access_method.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/plan_executor_impl.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/index_entry_comparison.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -53,7 +60,7 @@ const char* IDHackStage::kStageType = "IDHACK";
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          CanonicalQuery* query,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         VariantCollectionPtrOrAcquisition collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
@@ -65,7 +72,7 @@ IDHackStage::IDHackStage(ExpressionContext* expCtx,
 IDHackStage::IDHackStage(ExpressionContext* expCtx,
                          const BSONObj& key,
                          WorkingSet* ws,
-                         const CollectionPtr& collection,
+                         VariantCollectionPtrOrAcquisition collection,
                          const IndexDescriptor* descriptor)
     : RequiresIndexStage(kStageType, expCtx, collection, descriptor, ws),
       _workingSet(ws),
@@ -91,7 +98,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
         [&] {
             // Look up the key by going directly to the index.
             auto recordId = indexAccessMethod()->asSortedData()->findSingle(
-                opCtx(), collection(), indexDescriptor()->getEntry(), _key);
+                opCtx(), collectionPtr(), indexDescriptor()->getEntry(), _key);
 
             // Key not found.
             if (recordId.isNull()) {
@@ -108,7 +115,7 @@ PlanStage::StageState IDHackStage::doWork(WorkingSetID* out) {
             member->recordId = std::move(recordId);
             _workingSet->transitionToRecordIdAndIdx(id);
 
-            const auto& coll = collection();
+            const auto& coll = collectionPtr();
             if (!_recordCursor)
                 _recordCursor = coll->getCursor(opCtx());
 

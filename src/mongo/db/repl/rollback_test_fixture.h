@@ -29,21 +29,52 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/drop_pending_collection_reaper.h"
+#include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/oplog_interface.h"
 #include "mongo/db/repl/oplog_interface_mock.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/repl/replication_process.h"
+#include "mongo/db/repl/replication_recovery.h"
 #include "mongo/db/repl/rollback_source.h"
 #include "mongo/db/repl/storage_interface_impl.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_severity.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -200,7 +231,7 @@ public:
             nsOrUUID.uuid() == _setCollectionCountStatusUUID) {
             return *_setCollectionCountStatus;
         }
-        _newCounts[*nsOrUUID.uuid()] = newCount;
+        _newCounts[nsOrUUID.uuid()] = newCount;
         return Status::OK();
     }
 

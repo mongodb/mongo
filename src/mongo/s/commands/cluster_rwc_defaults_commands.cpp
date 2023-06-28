@@ -94,11 +94,12 @@ public:
     }
 
     Status checkAuthForOperation(OperationContext* opCtx,
-                                 const DatabaseName&,
+                                 const DatabaseName& dbName,
                                  const BSONObj&) const override {
         if (!AuthorizationSession::get(opCtx->getClient())
-                 ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
-                                                      ActionType::setDefaultRWConcern})) {
+                 ->isAuthorizedForPrivilege(
+                     Privilege{ResourcePattern::forClusterResource(dbName.tenantId()),
+                               ActionType::setDefaultRWConcern})) {
             return Status(ErrorCodes::Unauthorized, "Unauthorized");
         }
         return Status::OK();
@@ -167,8 +168,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForPrivilege(Privilege{ResourcePattern::forClusterResource(),
-                                                             ActionType::getDefaultRWConcern}));
+                        ->isAuthorizedForPrivilege(Privilege{
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::getDefaultRWConcern}));
         }
 
         NamespaceString ns() const override {

@@ -29,15 +29,27 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/collection_scan_common.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_bounds_builder.h"
+#include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/index_tag.h"
 #include "mongo/db/query/interval_evaluation_tree.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 
@@ -101,12 +113,17 @@ namespace mongo {
 class QueryPlannerAccess {
 public:
     /**
-     * Return a CollectionScanNode that scans as requested in 'query'.
+     * Return a CollectionScanNode that scans as requested in 'query'. The function will return a
+     * collection scan with 'root' as the filter. This was needed to support rooted $OR queries that
+     * use this helper to build clustered collection scans. In this case, the 'root' will be the
+     * child branch of the $OR expression. In all other cases 'root' should be the 'root' of
+     * 'query'.
      */
     static std::unique_ptr<QuerySolutionNode> makeCollectionScan(const CanonicalQuery& query,
                                                                  bool tailable,
                                                                  const QueryPlannerParams& params,
-                                                                 int direction);
+                                                                 int direction,
+                                                                 const MatchExpression* root);
 
     /**
      * Return a plan that uses the provided index as a proxy for a collection scan.
@@ -377,6 +394,10 @@ private:
      * of index scans.  As such, the processing for AND and OR is almost identical.
      *
      * Does not take ownership of 'root' but may remove children from it.
+     *
+     * If 'inArrayOperator' is true, then 'root' will be left unmodified.
+     * If 'inArrayOperator' is false, then the children of 'root' that are processed will be removed
+     * from 'root'.
      */
     static bool processIndexScans(const CanonicalQuery& query,
                                   MatchExpression* root,

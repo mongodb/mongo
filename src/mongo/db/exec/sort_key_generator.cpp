@@ -28,20 +28,15 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/exec/sort_key_generator.h"
-
 #include <memory>
+#include <utility>
 #include <vector>
 
-#include "mongo/bson/bsonobj_comparator.h"
-#include "mongo/db/catalog/collection.h"
-#include "mongo/db/exec/scoped_timer.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
+#include "mongo/db/exec/sort_key_generator.h"
 #include "mongo/db/exec/working_set.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/matcher/extensions_callback_noop.h"
-#include "mongo/db/query/collation/collator_interface.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

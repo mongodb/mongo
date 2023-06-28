@@ -29,6 +29,8 @@
 
 #include "rate_limiting.h"
 
+#include "mongo/util/system_clock_source.h"
+
 namespace mongo {
 RateLimiting::RateLimiting(RequestCount samplingRate, Milliseconds timePeriod)
     : _clockSource(SystemClockSource::get()),

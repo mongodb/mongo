@@ -33,7 +33,6 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
-#include <vector>
 
 namespace mongo::async_rpc {
 namespace detail {
@@ -83,16 +82,35 @@ public:
                     clientOperationKey);
                 return exec->scheduleRemoteCommandOnAny(executorRequest, token, std::move(baton));
             })
-            .onError([targetsUsed](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
-                // If there was a scheduling error or other local error before the
-                // command was accepted by the executor.
-                return Status{AsyncRPCErrorInfo(s, *targetsUsed),
-                              "Remote command execution failed"};
-            })
-            .then([targetsUsed](TaskExecutor::ResponseOnAnyStatus r) {
+            .onError(
+                [targetsUsed, targeter](Status s) -> StatusWith<TaskExecutor::ResponseOnAnyStatus> {
+                    if (targetsUsed->size()) {
+                        // TODO SERVER-78148 Mirrors AsyncRequestsSender in that the first target is
+                        // used. The assumption that the first target triggers the error is wrong
+                        // and will be changed as part of the TODO.
+                        targeter->onRemoteCommandError((*targetsUsed)[0], s).get();
+                    }
+                    // If there was a scheduling error or other local error before the
+                    // command was accepted by the executor.
+                    return Status{AsyncRPCErrorInfo(s, *targetsUsed),
+                                  "Remote command execution failed"};
+                })
+            .then([targetsUsed, targeter](TaskExecutor::ResponseOnAnyStatus r) {
                 auto s = makeErrorIfNeeded(r, *targetsUsed);
+                // Update targeter for errors.
+                if (!s.isOK() && s.code() == ErrorCodes::RemoteCommandExecutionError) {
+                    auto extraInfo = s.extraInfo<AsyncRPCErrorInfo>();
+                    if (extraInfo->isLocal()) {
+                        targeter->onRemoteCommandError(*(r.target), extraInfo->asLocal()).get();
+                    } else {
+                        targeter
+                            ->onRemoteCommandError(*(r.target),
+                                                   extraInfo->asRemote().getRemoteCommandResult())
+                            .get();
+                    }
+                }
                 uassertStatusOK(s);
-                return AsyncRPCInternalResponse{r.data, r.target.get()};
+                return AsyncRPCInternalResponse{r.data, r.target.get(), *r.elapsed};
             });
     }
 };

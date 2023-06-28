@@ -136,7 +136,7 @@ void SessionsCollectionSharded::refreshSessions(OperationContext* opCtx,
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        cluster::write(opCtx, request, &stats, &response);
+        cluster::write(opCtx, request, nullptr /* nss */, &stats, &response);
         uassertStatusOK(response.toStatus());
     };
 
@@ -155,7 +155,7 @@ void SessionsCollectionSharded::removeRecords(OperationContext* opCtx,
         BatchedCommandResponse response;
         BatchWriteExecStats stats;
 
-        cluster::write(opCtx, request, &stats, &response);
+        cluster::write(opCtx, request, nullptr, &stats, &response);
         uassertStatusOK(response.toStatus());
     };
 

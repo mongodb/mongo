@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -36,11 +38,16 @@
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/free_mon/free_mon_message.h"
 #include "mongo/db/free_mon/free_mon_network.h"
 #include "mongo/db/free_mon/free_mon_processor.h"
+#include "mongo/db/ftdc/collector.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/duration.h"
 

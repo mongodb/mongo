@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/requires_collection_stage.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/index/index_access_method.h"
 #include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/plan_executor.h"
 
 namespace mongo {
 
@@ -50,7 +55,7 @@ class RequiresIndexStage : public RequiresCollectionStage {
 public:
     RequiresIndexStage(const char* stageType,
                        ExpressionContext* expCtx,
-                       const CollectionPtr& collection,
+                       VariantCollectionPtrOrAcquisition collection,
                        const IndexDescriptor* indexDescriptor,
                        WorkingSet* workingSet);
 

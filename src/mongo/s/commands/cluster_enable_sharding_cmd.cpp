@@ -70,9 +70,10 @@ public:
             const auto dbName = getDbName();
 
             auto catalogCache = Grid::get(opCtx)->catalogCache();
-            ScopeGuard purgeDatabaseOnExit([&] { catalogCache->purgeDatabase(dbName); });
+            ScopeGuard purgeDatabaseOnExit(
+                [&] { catalogCache->purgeDatabase(DatabaseNameUtil::serialize(dbName)); });
 
-            ConfigsvrCreateDatabase configsvrCreateDatabase{dbName.toString()};
+            ConfigsvrCreateDatabase configsvrCreateDatabase{DatabaseNameUtil::serialize(dbName)};
             configsvrCreateDatabase.setDbName(DatabaseName::kAdmin);
             configsvrCreateDatabase.setPrimaryShardId(request().getPrimaryShard());
 
@@ -91,16 +92,19 @@ public:
 
             auto createDbResponse = ConfigsvrCreateDatabaseResponse::parse(
                 IDLParserContext("configsvrCreateDatabaseResponse"), response.response);
-            catalogCache->onStaleDatabaseVersion(dbName, createDbResponse.getDatabaseVersion());
+            catalogCache->onStaleDatabaseVersion(DatabaseNameUtil::serialize(dbName),
+                                                 createDbResponse.getDatabaseVersion());
             purgeDatabaseOnExit.dismiss();
         }
 
     private:
-        StringData getDbName() const {
-            return request().getCommandParameter();
+        DatabaseName getDbName() const {
+            const auto& cmd = request();
+            return DatabaseNameUtil::deserialize(cmd.getDbName().tenantId(),
+                                                 cmd.getCommandParameter());
         }
         NamespaceString ns() const override {
-            return {getDbName(), ""};
+            return NamespaceString(getDbName());
         }
 
         bool supportsWriteConcern() const override {

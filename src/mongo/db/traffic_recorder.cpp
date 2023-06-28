@@ -27,24 +27,43 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <fstream>  // IWYU pragma: keep
+#include <limits>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
 
-#include "mongo/db/traffic_recorder.h"
-#include "mongo/db/traffic_recorder_gen.h"
-
-#include <boost/filesystem/operations.hpp>
-#include <fstream>
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/data_builder.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_type_terminated.h"
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/db/traffic_recorder.h"
+#include "mongo/db/traffic_recorder_gen.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 

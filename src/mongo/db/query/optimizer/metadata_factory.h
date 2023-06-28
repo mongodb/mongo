@@ -29,7 +29,12 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/metadata.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 
 
 namespace mongo::optimizer {

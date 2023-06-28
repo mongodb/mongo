@@ -50,5 +50,6 @@ feature_flags:
     featureFlagUpdateOneWithoutShardKey:
         description: Feature flag to enable updateOne, deleteOne, and findAndModify without a shard key or _id equality in their filter against a sharded collection.
         cpp_varname: gFeatureFlagUpdateOneWithoutShardKey
-        default: false
+        default: true
+        version: 7.1
         shouldBeFCVGated: true

@@ -100,7 +100,7 @@ public:
 
                 auto cmdResponse = executeCommandAgainstDatabasePrimary(
                     opCtx,
-                    dbName.db(),
+                    DatabaseNameUtil::serialize(dbName),
                     dbInfo,
                     CommandHelpers::appendMajorityWriteConcern(dropDatabaseCommand.toBSON({}),
                                                                opCtx->getWriteConcern()),

@@ -27,23 +27,38 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/container/small_vector.hpp>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
+// IWYU pragma: no_include "boost/move/detail/iterator_to_raw_pointer.hpp"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
-#include "mongo/db/query/internal_plans.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/status_with.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/eof.h"
 #include "mongo/db/exec/fetch.h"
 #include "mongo/db/exec/idhack.h"
 #include "mongo/db/exec/index_scan.h"
+#include "mongo/db/exec/limit.h"
+#include "mongo/db/exec/multi_iterator.h"
 #include "mongo/db/exec/update_stage.h"
 #include "mongo/db/exec/upsert_stage.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/get_executor.h"
+#include "mongo/db/query/internal_plans.h"
 #include "mongo/db/query/plan_executor_factory.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -144,6 +159,38 @@ CollectionScanParams createCollectionScanParams(
     return params;
 }
 }  // namespace
+
+std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::sampleCollection(
+    OperationContext* opCtx,
+    VariantCollectionPtrOrAcquisition collection,
+    PlanYieldPolicy::YieldPolicy yieldPolicy,
+    boost::optional<int64_t> numSamples) {
+    const auto& collectionPtr = collection.getCollectionPtr();
+    invariant(collectionPtr);
+
+    std::unique_ptr<WorkingSet> ws = std::make_unique<WorkingSet>();
+
+    auto expCtx = make_intrusive<ExpressionContext>(
+        opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
+
+    auto rsRandCursor = collectionPtr->getRecordStore()->getRandomCursor(opCtx);
+    std::unique_ptr<PlanStage> root =
+        std::make_unique<MultiIteratorStage>(expCtx.get(), ws.get(), collection);
+    static_cast<MultiIteratorStage*>(root.get())->addIterator(std::move(rsRandCursor));
+
+    if (numSamples) {
+        auto samples = *numSamples;
+        invariant(samples >= 0,
+                  "Number of samples must be >= 0, otherwise LimitStage it will never end");
+        root = std::make_unique<LimitStage>(expCtx.get(), samples, ws.get(), std::move(root));
+    }
+
+    auto statusWithPlanExecutor = plan_executor_factory::make(
+        expCtx, std::move(ws), std::move(root), collection, yieldPolicy, false);
+
+    invariant(statusWithPlanExecutor.isOK());
+    return std::move(statusWithPlanExecutor.getValue());
+}
 
 std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::collectionScan(
     OperationContext* opCtx,
@@ -459,7 +506,7 @@ std::unique_ptr<PlanExecutor, PlanExecutor::Deleter> InternalPlanner::updateWith
         opCtx, std::unique_ptr<CollatorInterface>(nullptr), collectionPtr->ns());
 
     auto idHackStage =
-        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), collectionPtr, descriptor);
+        std::make_unique<IDHackStage>(expCtx.get(), key, ws.get(), &collection, descriptor);
 
     const bool isUpsert = params.request->isUpsert();
     auto root = (isUpsert ? std::make_unique<UpsertStage>(
@@ -487,7 +534,7 @@ std::unique_ptr<PlanStage> InternalPlanner::_collectionScan(
     const auto& collection = *coll;
     invariant(collection);
 
-    return std::make_unique<CollectionScan>(expCtx.get(), collection, params, ws, filter);
+    return std::make_unique<CollectionScan>(expCtx.get(), coll, params, ws, filter);
 }
 
 std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
@@ -513,10 +560,10 @@ std::unique_ptr<PlanStage> InternalPlanner::_indexScan(
     params.shouldDedup = descriptor->getEntry()->isMultikey(expCtx->opCtx, collection);
 
     std::unique_ptr<PlanStage> root =
-        std::make_unique<IndexScan>(expCtx.get(), collection, std::move(params), ws, nullptr);
+        std::make_unique<IndexScan>(expCtx.get(), coll, std::move(params), ws, nullptr);
 
     if (InternalPlanner::IXSCAN_FETCH & options) {
-        root = std::make_unique<FetchStage>(expCtx.get(), ws, std::move(root), nullptr, collection);
+        root = std::make_unique<FetchStage>(expCtx.get(), ws, std::move(root), nullptr, coll);
     }
 
     return root;

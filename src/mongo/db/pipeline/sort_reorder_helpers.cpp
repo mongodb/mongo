@@ -29,6 +29,27 @@
 
 #include "mongo/db/pipeline/sort_reorder_helpers.h"
 
+#include <algorithm>
+#include <iterator>
+#include <list>
+#include <map>
+#include <utility>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/matcher/expression_algo.h"
+#include "mongo/db/pipeline/dependencies.h"
+#include "mongo/db/pipeline/document_source_graph_lookup.h"
+#include "mongo/db/pipeline/document_source_lookup.h"
+#include "mongo/db/pipeline/document_source_sort.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/intrusive_counter.h"
+
 namespace mongo {
 
 bool checkModifiedPathsSortReorder(const SortPattern& sortPattern,

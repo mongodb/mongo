@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/block_compressor.h"
-
 #include <zlib.h>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/ftdc/block_compressor.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

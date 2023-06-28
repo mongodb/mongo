@@ -97,8 +97,8 @@ public:
              BSONObjBuilder& result) override {
         const NamespaceString nss{parseNs(dbName, cmdObj)};
 
-        BSONObjBuilder cmdBuilder(
-            BSON("_configsvrRepairShardedCollectionChunksHistory" << nss.ns()));
+        BSONObjBuilder cmdBuilder(BSON("_configsvrRepairShardedCollectionChunksHistory"
+                                       << NamespaceStringUtil::serialize(nss)));
         if (cmdObj["force"].booleanSafe())
             cmdBuilder.appendBool("force", true);
 

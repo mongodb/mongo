@@ -27,13 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/db/storage/sorted_data_interface_test_harness.h"
-
 #include <memory>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/db/storage/sorted_data_interface.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/storage/sorted_data_interface_test_harness.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {
@@ -61,6 +71,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -92,6 +103,7 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -122,6 +134,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdLong) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -149,6 +162,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -180,6 +194,7 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -216,6 +231,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -245,6 +261,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
@@ -281,6 +298,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
@@ -310,6 +328,7 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
     }
 }
@@ -345,6 +364,7 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
     }
 }
@@ -376,6 +396,7 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
     }
 }

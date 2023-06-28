@@ -29,10 +29,20 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/oid.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

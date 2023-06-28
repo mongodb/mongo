@@ -29,11 +29,20 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/index/multikey_paths.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {

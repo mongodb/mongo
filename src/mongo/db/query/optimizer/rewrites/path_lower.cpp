@@ -29,6 +29,19 @@
 
 #include "mongo/db/query/optimizer/rewrites/path_lower.h"
 
+#include <set>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
+
 
 namespace mongo::optimizer {
 

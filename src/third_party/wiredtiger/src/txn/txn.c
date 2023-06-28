@@ -1129,6 +1129,10 @@ __txn_resolve_prepared_update_chain(WT_SESSION_IMPL *session, WT_UPDATE *upd, bo
 
     /* Resolve the prepared update to be a committed update. */
     __txn_resolve_prepared_update(session, upd);
+
+    /* Sleep for 100ms in the prepared resolution path if configured. */
+    if (FLD_ISSET(S2C(session)->timing_stress_flags, WT_TIMING_STRESS_PREPARE_RESOLUTION_2))
+        __wt_sleep(0, 100000);
     WT_STAT_CONN_INCR(session, txn_prepared_updates_committed);
 }
 
@@ -1497,6 +1501,7 @@ __txn_mod_compare(const void *a, const void *b)
 int
 __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
 {
+    WT_CACHE *cache;
     WT_CONFIG_ITEM cval;
     WT_CONNECTION_IMPL *conn;
     WT_CURSOR *cursor;
@@ -1514,6 +1519,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
     bool cannot_fail, locked, prepare, readonly, update_durable_ts;
 
     conn = S2C(session);
+    cache = conn->cache;
     cursor = NULL;
     txn = session->txn;
     txn_global = &conn->txn_global;
@@ -1651,7 +1657,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  * transaction timestamp. Those records should already have the original time window
                  * when they are inserted into the history store.
                  */
-                if (conn->cache->hs_fileid != 0 && op->btree->id == conn->cache->hs_fileid)
+                if (cache->hs_fileid != 0 && op->btree->id == cache->hs_fileid)
                     break;
 
                 __wt_txn_op_set_timestamp(session, op);
@@ -1672,7 +1678,7 @@ __wt_txn_commit(WT_SESSION_IMPL *session, const char *cfg[])
                  * the total mod_count.
                  */
                 if ((i * 36) % txn->mod_count == 0)
-                    __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION, NULL);
+                    __wt_timing_stress(session, WT_TIMING_STRESS_PREPARE_RESOLUTION_1, NULL);
 
 #ifdef HAVE_DIAGNOSTIC
                 ++prepare_count;

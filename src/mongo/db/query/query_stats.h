@@ -29,18 +29,35 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <limits>
+#include <memory>
+#include <string>
+#include <utility>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/partitioned_cache.h"
 #include "mongo/db/query/plan_explainer.h"
-#include "mongo/db/query/request_shapifier.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 #include "mongo/db/query/util/memory_util.h"
 #include "mongo/db/service_context.h"
-#include <cstdint>
-#include <memory>
+#include "mongo/db/views/view.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 
@@ -52,9 +69,6 @@ using BSONNumeric = long long;
 }  // namespace
 
 namespace query_stats {
-
-/** The type of algorithm to be used for transformIdentifiers */
-enum TransformAlgorithm { kHmacSha256, kNone };
 
 /**
  * An aggregated metric stores a compressed view of data. It balances the loss of information
@@ -95,17 +109,15 @@ struct AggregatedMetric {
 };
 
 extern CounterMetric queryStatsStoreSizeEstimateBytesMetric;
+const auto kKeySize = sizeof(std::size_t);
 // Used to aggregate the metrics for one query stats key over all its executions.
 class QueryStatsEntry {
 public:
-    QueryStatsEntry(std::unique_ptr<RequestShapifier> requestShapifier, NamespaceStringOrUUID nss)
-        : firstSeenTimestamp(Date_t::now()),
-          requestShapifier(std::move(requestShapifier)),
-          nss(nss) {
+    QueryStatsEntry(std::unique_ptr<KeyGenerator> keyGenerator)
+        : firstSeenTimestamp(Date_t::now()), keyGenerator(std::move(keyGenerator)) {
         // Increment by size of query stats store key (hash returns size_t) and value
         // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.increment(sizeof(QueryStatsEntry) +
-                                                         sizeof(std::size_t));
+        queryStatsStoreSizeEstimateBytesMetric.increment(kKeySize + size());
     }
 
     QueryStatsEntry(QueryStatsEntry& entry) = delete;
@@ -115,8 +127,7 @@ public:
     ~QueryStatsEntry() {
         // Decrement by size of query stats store key (hash returns size_t) and value
         // (QueryStatsEntry)
-        queryStatsStoreSizeEstimateBytesMetric.decrement(sizeof(QueryStatsEntry) +
-                                                         sizeof(std::size_t));
+        queryStatsStoreSizeEstimateBytesMetric.decrement(kKeySize + size());
     }
 
     BSONObj toBSON() const {
@@ -131,13 +142,17 @@ public:
         return builder.obj();
     }
 
+    int64_t size() {
+        return sizeof(*this) + (keyGenerator ? keyGenerator->size() : 0);
+    }
+
     /**
      * Generate the queryStats key for this entry's request. If algorithm is not
      * TransformAlgorithm::kNone, any identifying information (field names, namespace) will be
      * anonymized.
      */
     BSONObj computeQueryStatsKey(OperationContext* opCtx,
-                                 TransformAlgorithm algorithm,
+                                 TransformAlgorithmEnum algorithm,
                                  std::string hmacKey) const;
 
     /**
@@ -173,13 +188,10 @@ public:
     AggregatedMetric docsReturned;
 
     /**
-     * The RequestShapifier that can generate the query stats key for this request.
+     * The KeyGenerator that can generate the query stats key for this request.
      */
-    std::unique_ptr<RequestShapifier> requestShapifier;
-
-    NamespaceStringOrUUID nss;
+    std::unique_ptr<KeyGenerator> keyGenerator;
 };
-
 struct TelemetryPartitioner {
     // The partitioning function for use with the 'Partitioned' utility.
     std::size_t operator()(const std::size_t k, const std::size_t nPartitions) const {
@@ -189,11 +201,7 @@ struct TelemetryPartitioner {
 
 struct QueryStatsStoreEntryBudgetor {
     size_t operator()(const std::size_t key, const std::shared_ptr<QueryStatsEntry>& value) {
-        // The buget estimator for <key,value> pair in LRU cache accounts for the size of the key
-        // and the size of the metrics, including the bson object used for generating the telemetry
-        // key at read time.
-
-        return sizeof(QueryStatsEntry) + sizeof(std::size_t);
+        return sizeof(decltype(key)) + value->size();
     }
 };
 using QueryStatsStore = PartitionedCache<std::size_t,
@@ -233,7 +241,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  *   optimizing it, in order to preserve the user's input for the query shape.
  * - Calling this affects internal state. It should be called exactly once for each request for
  *   which query stats may be collected.
- * - The std::function argument to construct an abstracted RequestShapifier is provided to break
+ * - The std::function argument to construct an abstracted KeyGenerator is provided to break
  *   library cycles so this library does not need to know how to parse everything. It is done as a
  *   deferred construction callback to ensure that this feature does not impact performance if
  *   collecting stats is not needed due to the feature being disabled or the request being rate
@@ -241,7 +249,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  */
 void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
                      const NamespaceString& collection,
-                     std::function<std::unique_ptr<RequestShapifier>(void)> makeShapifier);
+                     std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator);
 
 /**
  * Writes query stats to the query stats store for the operation identified by `queryStatsKeyHash`.
@@ -255,7 +263,7 @@ void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
  */
 void writeQueryStats(OperationContext* opCtx,
                      boost::optional<size_t> queryStatsKeyHash,
-                     std::unique_ptr<RequestShapifier> requestShapifier,
+                     std::unique_ptr<KeyGenerator> keyGenerator,
                      uint64_t queryExecMicros,
                      uint64_t firstResponseExecMicros,
                      uint64_t docsReturned);

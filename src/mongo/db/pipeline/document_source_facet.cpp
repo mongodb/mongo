@@ -27,24 +27,32 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/pipeline/document_source_facet.h"
-
+// IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <list>
 #include <memory>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/document_source_facet.h"
 #include "mongo/db/pipeline/document_source_tee_consumer.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/field_path.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/tee_buffer.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 

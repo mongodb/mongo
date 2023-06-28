@@ -29,23 +29,43 @@
 
 #include "mongo/client/dbclient_cursor.h"
 
+#include <boost/cstdint.hpp>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <ostream>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_base.h"
 #include "mongo/db/client.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
-#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/metadata.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/scopeguard.h"
@@ -341,7 +361,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(nsOrUuid),
       _isInitialized(true),
-      _ns(nsOrUuid.nss() ? *nsOrUuid.nss() : NamespaceString(nsOrUuid.dbName())),
+      _ns(nsOrUuid.isNamespaceString() ? nsOrUuid.nss() : NamespaceString{nsOrUuid.dbName()}),
       _cursorId(cursorId),
       _isExhaust(isExhaust),
       _operationTime(operationTime),
@@ -354,7 +374,7 @@ DBClientCursor::DBClientCursor(DBClientBase* client,
     : _client(client),
       _originalHost(_client->getServerAddress()),
       _nsOrUuid(findRequest.getNamespaceOrUUID()),
-      _ns(_nsOrUuid.nss() ? *_nsOrUuid.nss() : NamespaceString(_nsOrUuid.dbName())),
+      _ns(_nsOrUuid.isNamespaceString() ? _nsOrUuid.nss() : NamespaceString{_nsOrUuid.dbName()}),
       _batchSize(findRequest.getBatchSize().value_or(0)),
       _findRequest(std::move(findRequest)),
       _readPref(readPref),

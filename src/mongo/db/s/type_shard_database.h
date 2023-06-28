@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/s/type_shard_database_gen.h"
 
 namespace mongo {

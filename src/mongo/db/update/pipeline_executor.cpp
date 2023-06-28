@@ -27,20 +27,36 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <list>
+#include <typeinfo>
 
-#include "mongo/db/update/pipeline_executor.h"
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/bson/mutable/element.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/document_source_queue.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/pipeline/stage_constraints.h"
 #include "mongo/db/pipeline/variable_validation.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/pipeline/variables.h"
 #include "mongo/db/update/document_diff_calculator.h"
 #include "mongo/db/update/object_replace_executor.h"
-#include "mongo/db/update/storage_validation.h"
+#include "mongo/db/update/pipeline_executor.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

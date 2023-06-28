@@ -29,14 +29,34 @@
 
 #include "mongo/db/s/global_index/global_index_inserter.h"
 
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
 #include <fmt/format.h>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/global_index/global_index_util.h"
 #include "mongo/db/s/global_index_crud_commands_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/transaction/transaction_api.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/grid.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/out_of_line_executor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kGlobalIndex
 

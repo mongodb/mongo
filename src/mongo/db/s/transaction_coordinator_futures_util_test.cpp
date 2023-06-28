@@ -27,14 +27,41 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <numeric>
+#include <set>
+#include <string>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/db/s/transaction_coordinator_futures_util.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_mock.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace txn {
@@ -421,7 +448,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsOK) {
         kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 1));
     ASSERT(!future.isReady());
 
-    const auto objResponse = BSON("ok" << 1 << "responseData" << 2);
+    auto objResponse = BSON("ok" << 1 << "responseData" << 2);
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_BSONOBJ_EQ(BSON("TestCommand" << 1), request.cmdObj);
         return objResponse;
@@ -439,7 +466,7 @@ TEST_F(AsyncWorkSchedulerTest, ScheduledRemoteCommandRespondsNotOK) {
         kShardIds[1], ReadPreferenceSetting{ReadPreference::PrimaryOnly}, BSON("TestCommand" << 2));
     ASSERT(!future.isReady());
 
-    const auto objResponse = BSON("ok" << 0 << "responseData" << 3);
+    auto objResponse = BSON("ok" << 0 << "responseData" << 3);
     onCommand([&](const executor::RemoteCommandRequest& request) {
         ASSERT_BSONOBJ_EQ(BSON("TestCommand" << 2), request.cmdObj);
         return objResponse;

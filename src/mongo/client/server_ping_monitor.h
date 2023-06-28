@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_listener.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

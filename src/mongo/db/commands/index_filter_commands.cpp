@@ -28,32 +28,52 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
+#include <memory>
+#include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/catalog/collection.h"
-#include "mongo/db/catalog/database.h"
-#include "mongo/db/client.h"
 #include "mongo/db/commands/index_filter_commands.h"
 #include "mongo/db/commands/plan_cache_commands.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_real.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/canonical_query_encoder.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/query/query_settings_decoration.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -221,7 +241,7 @@ Status ClearFilters::clear(OperationContext* opCtx,
     // - clear index filters for single query shape when a query shape is described in the
     //   command arguments.
     if (cmdObj.hasField("query")) {
-        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns().ns(), cmdObj);
+        auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns(), cmdObj);
         if (!statusWithCQ.isOK()) {
             return statusWithCQ.getStatus();
         }
@@ -364,7 +384,7 @@ Status SetFilter::set(OperationContext* opCtx,
         }
     }
 
-    auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns().ns(), cmdObj);
+    auto statusWithCQ = plan_cache_commands::canonicalize(opCtx, collection->ns(), cmdObj);
     if (!statusWithCQ.isOK()) {
         return statusWithCQ.getStatus();
     }

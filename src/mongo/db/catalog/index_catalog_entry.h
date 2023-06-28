@@ -31,7 +31,10 @@
 
 #include <boost/optional.hpp>
 #include <functional>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
@@ -47,11 +50,14 @@ namespace mongo {
 
 class CollatorInterface;
 class Collection;
+
 class CollectionPtr;
 class CollectionCatalogEntry;
+
 class Ident;
 class IndexAccessMethod;
 class SortedDataIndexAccessMethod;
+
 class IndexBuildInterceptor;
 class IndexDescriptor;
 class MatchExpression;

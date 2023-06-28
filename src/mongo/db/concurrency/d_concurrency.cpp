@@ -29,16 +29,20 @@
 
 #include "mongo/db/concurrency/d_concurrency.h"
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <string>
-#include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

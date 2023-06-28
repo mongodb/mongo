@@ -8,7 +8,7 @@ Publishing Information
 ----------------------
 
 All known and public c-ares vulnerabilities will be listed on [the c-ares web
-site](https://c-ares.haxx.se/vulns.html).
+site](https://c-ares.org/vulns.html).
 
 Security vulnerabilities should not be entered in the project's public bug
 tracker unless the necessary configuration is in place to limit access to the

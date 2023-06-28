@@ -30,16 +30,44 @@
 
 #include "mongo/db/timeseries/timeseries_index_schema_conversion_functions.h"
 
-#include "mongo/db/catalog/index_catalog_impl.h"
+#include <algorithm>
+#include <boost/container/small_vector.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_algo.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/logv2/log.h"
 #include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -106,9 +134,10 @@ StatusWith<BSONObj> createBucketsSpecFromTimeseriesSpec(const TimeseriesOptions&
             if (!elem.isNumber()) {
                 return {ErrorCodes::BadValue,
                         str::stream()
-                            << "Invalid index spec for time-series collection: "
-                            << redact(timeseriesIndexSpecBSON)
-                            << ". Indexes on the time field must be ascending or descending "
+                            << "Invalid " << (isShardKeySpec ? "shard key" : "index spec")
+                            << " for time-series collection: " << redact(timeseriesIndexSpecBSON)
+                            << ". " << (isShardKeySpec ? "Shard keys" : "Indexes")
+                            << " on the time field must be ascending or descending "
                                "(numbers only): "
                             << elem};
             }

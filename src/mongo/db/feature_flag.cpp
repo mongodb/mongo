@@ -29,7 +29,15 @@
 
 #include "mongo/db/feature_flag.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status_with.h"
+#include "mongo/db/feature_compatibility_version_parser.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/version/releases.h"
 
 namespace mongo {

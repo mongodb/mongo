@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <cstdint>
 
-#include "mongo/db/exec/trial_period_utils.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/exec/trial_period_utils.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo::trial_period {
 size_t getTrialPeriodMaxWorks(OperationContext* opCtx,

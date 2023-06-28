@@ -73,7 +73,7 @@ public:
 private:
     boost::intrusive_ptr<ExpressionContextForTest> _expCtx;
     EncryptedCollScanMode _mode{EncryptedCollScanMode::kUseIfNeeded};
-    NamespaceString _mockNss{"mock"_sd};
+    NamespaceString _mockNss = NamespaceString::createNamespaceString_forTest("mock"_sd);
     boost::optional<NamespaceString> _mockOptionalNss;
 };
 

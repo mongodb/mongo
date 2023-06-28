@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/namespace_string.h"
 
-#include <ostream>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/server_options.h"
-#include "mongo/util/str.h"
+// IWYU pragma: no_include "mongo/db/namespace_string_reserved.def.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {
@@ -53,32 +56,6 @@ constexpr auto fle2EccSuffix = ".ecc"_sd;
 constexpr auto fle2EcocSuffix = ".ecoc"_sd;
 
 }  // namespace
-
-
-NamespaceString NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(StringData ns) {
-    if (!gMultitenancySupport) {
-        return NamespaceString(boost::none, ns);
-    }
-
-    auto tenantDelim = ns.find('_');
-    auto collDelim = ns.find('.');
-    // If the first '_' is after the '.' that separates the db and coll names, the '_' is part
-    // of the coll name and is not a db prefix.
-    if (tenantDelim == std::string::npos || collDelim < tenantDelim) {
-        return NamespaceString(boost::none, ns);
-    }
-
-    auto swOID = OID::parse(ns.substr(0, tenantDelim));
-    if (swOID.getStatus() == ErrorCodes::BadValue) {
-        // If we fail to parse an OID, either the size of the substring is incorrect, or there is an
-        // invalid character. This indicates that the db has the "_" character, but it does not act
-        // as a delimeter for a tenantId prefix.
-        return NamespaceString(boost::none, ns);
-    }
-
-    const TenantId tenantId(swOID.getValue());
-    return NamespaceString(tenantId, ns.substr(tenantDelim + 1, ns.size() - 1 - tenantDelim));
-}
 
 bool NamespaceString::isListCollectionsCursorNS() const {
     return coll() == listCollectionsCursorCol;
@@ -435,11 +412,14 @@ NamespaceString NamespaceString::getTimeseriesViewNamespace() const {
 }
 
 bool NamespaceString::isImplicitlyReplicated() const {
-    if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() || isChangeCollection()) {
-        // Implicitly replicated namespaces are replicated, although they only replicate a subset of
-        // writes.
-        invariant(isReplicated());
-        return true;
+    if (db() == DatabaseName::kConfig.db()) {
+        if (isChangeStreamPreImagesCollection() || isConfigImagesCollection() ||
+            isChangeCollection()) {
+            // Implicitly replicated namespaces are replicated, although they only replicate a
+            // subset of writes.
+            invariant(isReplicated());
+            return true;
+        }
     }
 
     return false;
@@ -464,33 +444,20 @@ bool NamespaceString::isReplicated() const {
     return true;
 }
 
-Status NamespaceStringOrUUID::isNssValid() const {
-    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
-        // _nss is set and not valid.
-        if (!nss->isValid()) {
-            return {ErrorCodes::InvalidNamespace,
-                    fmt::format("Namespace {} is not a valid collection name",
-                                nss->toStringForErrorMsg())};
-        }
-    }
-
-    return Status::OK();
-}
-
 std::string NamespaceStringOrUUID::toStringForErrorMsg() const {
-    if (const NamespaceString* nss = get_if<NamespaceString>(&_nssOrUUID)) {
-        return nss->toStringForErrorMsg();
+    if (isNamespaceString()) {
+        return nss().toStringForErrorMsg();
     }
 
-    return get<1>(get<UUIDWithDbName>(_nssOrUUID)).toString();
+    return uuid().toString();
 }
 
 std::string toStringForLogging(const NamespaceStringOrUUID& nssOrUUID) {
-    if (auto nss = nssOrUUID.nss()) {
-        return toStringForLogging(nss.get());
-    } else {
-        return nssOrUUID.uuid()->toString();
+    if (nssOrUUID.isNamespaceString()) {
+        return toStringForLogging(nssOrUUID.nss());
     }
+
+    return nssOrUUID.uuid().toString();
 }
 
 void NamespaceStringOrUUID::serialize(BSONObjBuilder* builder, StringData fieldName) const {

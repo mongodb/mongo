@@ -28,11 +28,10 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
 #include "mongo/db/catalog/index_catalog.h"
-#include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/storage/storage_parameters_gen.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 

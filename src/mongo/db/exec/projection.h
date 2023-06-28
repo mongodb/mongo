@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/projection_executor.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 /**

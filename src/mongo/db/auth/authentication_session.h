@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
+#include <utility>
 
-#include <boost/optional.hpp>
-
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/sasl_mechanism_registry.h"
 #include "mongo/db/auth/user_name.h"
+#include "mongo/db/client.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

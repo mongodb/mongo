@@ -81,7 +81,6 @@ ERROR_ID_NO_ARRAY_ENUM = "ID0035"
 ERROR_ID_ENUM_BAD_TYPE = "ID0036"
 ERROR_ID_ENUM_BAD_INT_VAUE = "ID0037"
 ERROR_ID_ENUM_NON_UNIQUE_VALUES = "ID0038"
-ERROR_ID_ENUM_NON_CONTINUOUS_RANGE = "ID0039"
 ERROR_ID_BAD_COMMAND_NAMESPACE = "ID0041"
 ERROR_ID_FIELD_NO_COMMAND = "ID0042"
 ERROR_ID_NO_ARRAY_OF_CHAIN = "ID0043"
@@ -612,13 +611,6 @@ class ParserContext(object):
         """Add an error for an enum having duplicate values."""
         self._add_error(location, ERROR_ID_ENUM_NON_UNIQUE_VALUES,
                         "Enum '%s' has duplicate values, all values must be unique" % (enum_name))
-
-    def add_enum_non_continuous_range_error(self, location, enum_name):
-        # type: (common.SourceLocation, str) -> None
-        """Add an error for an enum having duplicate values."""
-        self._add_error(location, ERROR_ID_ENUM_NON_CONTINUOUS_RANGE,
-                        ("Enum '%s' has non-continuous integer variables, enums must have a " +
-                         "continuous range of integer variables.") % (enum_name))
 
     def add_bad_command_namespace_error(self, location, command_name, command_namespace,
                                         valid_commands):

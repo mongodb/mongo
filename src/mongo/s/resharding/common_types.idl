@@ -49,6 +49,7 @@ enums:
             kBlockingWrites: "blocking-writes"
             kAborting: "aborting"
             kCommitting: "committing"
+            kQuiesced: "quiesced"
             kDone: "done"
 
     DonorState:
@@ -72,6 +73,7 @@ enums:
             kAwaitingFetchTimestamp: "awaiting-fetch-timestamp"
             kCreatingCollection: "creating-collection"
             kCloning: "cloning"
+            kBuildingIndex: "building-index"
             kApplying: "applying"
             kError: "error"
             kStrictConsistency: "strict-consistency"
@@ -120,6 +122,11 @@ structs:
                 type: date
                 description: "Operation start time."
                 optional: true
+            userReshardingUUID:
+                type: uuid
+                optional: true
+                description: >-
+                    The resharding UUID provided by the user, used to identify retries.
 
     AbortReason:
         description: "Not meant to be used directly. Only use internal fields."

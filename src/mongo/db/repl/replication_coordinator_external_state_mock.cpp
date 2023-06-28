@@ -28,17 +28,18 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
 #include <memory>
+#include <mutex>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/oid.h"
-#include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/oplog_buffer_blocking_queue.h"
+#include "mongo/db/repl/replication_coordinator_external_state_mock.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/sequence_util.h"
 

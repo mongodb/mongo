@@ -285,3 +285,8 @@ NSS_CONSTANT(kConfigVersionNamespace, DatabaseName::kConfig, "version"_sd)
 
 // Namespace used for storing mongos info on the CSRS.
 NSS_CONSTANT(kConfigMongosNamespace, DatabaseName::kConfig, "mongos"_sd)
+
+// Namespace used for oplog truncate after point.
+NSS_CONSTANT(kDefaultOplogTruncateAfterPointNamespace,
+             DatabaseName::kLocal,
+             "replset.oplogTruncateAfterPoint"_sd)

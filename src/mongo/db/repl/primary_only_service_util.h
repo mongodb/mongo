@@ -29,8 +29,25 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/primary_only_service.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/scoped_task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 
 namespace mongo {
 

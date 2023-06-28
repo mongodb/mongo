@@ -29,19 +29,26 @@
 
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 
-#include <fstream>
+#include <absl/container/node_hash_map.h>
+#include <cstddef>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/abt/utils.h"
 #include "mongo/db/query/ce/heuristic_estimator.h"
 #include "mongo/db/query/ce/hinted_estimator.h"
 #include "mongo/db/query/cost_model/cost_estimator_impl.h"
 #include "mongo/db/query/cost_model/cost_model_manager.h"
+#include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"
 #include "mongo/db/query/optimizer/metadata.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
-#include "mongo/unittest/framework.h"
-#include "mongo/util/str_escape.h"
+#include "mongo/db/query/optimizer/syntax/path.h"
+#include "mongo/db/query/optimizer/utils/const_fold_interface.h"
 
 
 namespace mongo::optimizer {

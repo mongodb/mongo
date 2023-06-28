@@ -55,7 +55,8 @@ using unittest::assertGet;
 
 namespace QueryStageCachedPlan {
 
-static const NamespaceString nss("unittests.QueryStageCachedPlan");
+static const NamespaceString nss =
+    NamespaceString::createNamespaceString_forTest("unittests.QueryStageCachedPlan");
 
 namespace {
 std::unique_ptr<CanonicalQuery> canonicalQueryFromFilterObj(OperationContext* opCtx,
@@ -158,7 +159,7 @@ public:
         }
 
         CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                        collection,
+                                        &collection,
                                         &_ws,
                                         cq,
                                         plannerParams,
@@ -213,7 +214,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanFailureMemoryLimitExceeded) {
     // High enough so that we shouldn't trigger a replan based on works.
     const size_t decisionWorks = 50;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     &_ws,
                                     cq.get(),
                                     plannerParams,
@@ -267,7 +268,7 @@ TEST_F(QueryStageCachedPlan, QueryStageCachedPlanHitMaxWorks) {
     }
 
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection.getCollection(),
+                                    &collection.getCollection(),
                                     &_ws,
                                     cq.get(),
                                     plannerParams,
@@ -487,7 +488,7 @@ TEST_F(QueryStageCachedPlan, ThrowsOnYieldRecoveryWhenIndexIsDroppedBeforePlanSe
 
     const size_t decisionWorks = 10;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection,
+                                    &collection,
                                     &_ws,
                                     cq.get(),
                                     plannerParams,
@@ -531,7 +532,7 @@ TEST_F(QueryStageCachedPlan, DoesNotThrowOnYieldRecoveryWhenIndexIsDroppedAferPl
 
     const size_t decisionWorks = 10;
     CachedPlanStage cachedPlanStage(_expCtx.get(),
-                                    collection,
+                                    &collection,
                                     &_ws,
                                     cq.get(),
                                     plannerParams,

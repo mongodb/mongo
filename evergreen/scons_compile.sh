@@ -60,6 +60,64 @@ if [ "${generating_for_ninja}" = "true" ] && [ "Windows_NT" = "$OS" ]; then
 fi
 activate_venv
 
+# if build_patch_id is passed, try to download binaries from specified
+# evergreen patch.
+# This is purposfully before the venv setup so we do not touch the venv deps
+if [ -n "${build_patch_id}" ]; then
+  echo "build_patch_id detected, trying to skip task"
+  if [ "${task_name}" = "compile_dist_test" ] || [ "${task_name}" = "compile_dist_test_half" ]; then
+    echo "Skipping ${task_name} compile without downloading any files"
+    exit 0
+  fi
+
+  # On windows we change the extension to zip
+  if [ -z "${ext}" ]; then
+    ext="tgz"
+  fi
+
+  extra_db_contrib_args=""
+
+  # get the platform of the dist archive. This is needed if
+  # db-contrib-tool cannot autodetect the platform of the ec2 instance.
+  regex='MONGO_DISTMOD=([a-z0-9]*)'
+  if [[ ${compile_flags} =~ ${regex} ]]; then
+    extra_db_contrib_args="${extra_db_contrib_args} --platform=${BASH_REMATCH[1]}"
+  fi
+
+  if [ "${task_name}" = "archive_dist_test" ]; then
+    file_name="mongodb-binaries.${ext}"
+    invocation="db-contrib-tool setup-repro-env ${build_patch_id} \
+      --variant=${compile_variant} --extractDownloads=False \
+      --binariesName=${file_name} --installDir=./ ${extra_db_contrib_args}"
+  fi
+
+  if [ "${task_name}" = "archive_dist_test_debug" ]; then
+    file_name="mongo-debugsymbols.${ext}"
+    invocation="db-contrib-tool setup-repro-env ${build_patch_id} \
+      --variant=${compile_variant} --extractDownloads=False \
+      --debugsymbolsName=${file_name} --installDir=./ \
+      --skipBinaries --downloadSymbols ${extra_db_contrib_args}"
+  fi
+
+  if [ -n "${invocation}" ]; then
+    setup_db_contrib_tool
+
+    echo "db-contrib-tool invocation: ${invocation}"
+    eval ${invocation}
+    if [ $? -ne 0 ]; then
+      echo "Could not retrieve files with db-contrib-tool"
+      exit 1
+    fi
+    echo "Downloaded: ${file_name}"
+    mv "${build_patch_id}/${file_name}" "${file_name}"
+    echo "Moved ${file_name} to the correct location"
+    echo "Skipping ${task_name} compile"
+    exit 0
+  fi
+
+  echo "Could not skip ${task_name} compile, compiling as normal"
+fi
+
 set -o pipefail
 eval ${compile_env} $python ./buildscripts/scons.py \
   ${compile_flags} ${task_compile_flags} ${task_compile_flags_extra} \

@@ -29,10 +29,16 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/replica_set_monitor_server_parameters.h"
 #include "mongo/client/replica_set_monitor_server_parameters_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/platform/basic.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

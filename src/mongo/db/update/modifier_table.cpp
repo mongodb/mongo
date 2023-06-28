@@ -33,9 +33,12 @@
 #include <string>
 #include <utility>
 
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/simple_string_data_comparator.h"
-#include "mongo/base/status.h"
+#include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/db/update/addtoset_node.h"
 #include "mongo/db/update/arithmetic_node.h"
 #include "mongo/db/update/bit_node.h"
@@ -49,6 +52,7 @@
 #include "mongo/db/update/rename_node.h"
 #include "mongo/db/update/set_node.h"
 #include "mongo/db/update/unset_node.h"
+#include "mongo/db/update/update_node.h"
 
 namespace mongo {
 

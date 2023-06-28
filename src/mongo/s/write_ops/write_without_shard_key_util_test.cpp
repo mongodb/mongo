@@ -29,6 +29,7 @@
 
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
@@ -407,7 +408,8 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingReplacementUpdate) {
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
+        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 3, x: 2 }"));
 }
 
@@ -427,7 +429,8 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingLetConstantAndPipeli
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
+        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: 'foo', y: 3 }"));
 }
 
@@ -446,7 +449,8 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingArrayFilterAndModifi
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
+        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: [ { a: 93 } ] }"));
 }
 
@@ -471,7 +475,8 @@ TEST_F(ProduceUpsertDocumentTest, produceUpsertDocumentUsingCollation) {
     updateCommandRequest.setUpdates({entry});
     UpdateRequest updateRequest(updateCommandRequest.getUpdates().front());
 
-    auto doc = write_without_shard_key::generateUpsertDocument(getOpCtx(), updateRequest);
+    auto [doc, _] = write_without_shard_key::generateUpsertDocument(
+        getOpCtx(), updateRequest, /*timeseriesOptions=*/boost::none, /*comparator=*/nullptr);
     ASSERT_BSONOBJ_EQ(doc, fromjson("{ _id: 4, x: [ { a: 'FOO' }, { a: 'FOO' }, { a: 'foo' } ] }"));
 }
 

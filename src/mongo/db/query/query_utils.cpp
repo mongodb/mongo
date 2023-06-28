@@ -30,7 +30,24 @@
 
 #include "mongo/db/query/query_utils.h"
 
+#include <algorithm>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/exec/sbe/match_path.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/pipeline/field_path.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/projection.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -89,17 +106,6 @@ bool isQuerySbeCompatible(const CollectionPtr* collection, const CanonicalQuery*
         return part.fieldPath &&
             !sbe::MatchPath(part.fieldPath->fullPath()).hasNumericPathComponents();
     });
-}
-
-bool isQueryPlanSbeCompatible(const QuerySolution* root) {
-    tassert(7061701, "Expected QuerySolution pointer to not be nullptr", root);
-
-    // (Ignore FCV check): This is intentional because we always want to use this feature once the
-    // feature flag is enabled.
-    const bool sbeFull = feature_flags::gFeatureFlagSbeFull.isEnabledAndIgnoreFCVUnsafe();
-    const bool isNotCountScan = !root->hasNode(StageType::STAGE_COUNT_SCAN);
-
-    return isNotCountScan || sbeFull;
 }
 
 }  // namespace mongo

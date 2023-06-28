@@ -29,16 +29,36 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <compare>
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/repl/member_config.h"
+#include "mongo/db/repl/member_id.h"
+#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/repl_set_config_gen.h"
 #include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/db/write_concern_options.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/time_support.h"
 

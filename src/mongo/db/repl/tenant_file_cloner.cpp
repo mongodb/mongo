@@ -28,19 +28,42 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fstream>  // IWYU pragma: keep
+#include <memory>
+#include <mutex>
+#include <type_traits>
+#include <utility>
 
-#include <fstream>
+#include <boost/filesystem/path.hpp>
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/aggregation_request_helper.h"
-#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/tenant_file_cloner.h"
 #include "mongo/db/repl/tenant_migration_shard_merge_util.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log.h"
-
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 

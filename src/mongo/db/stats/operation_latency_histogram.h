@@ -29,7 +29,9 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
 
 namespace mongo {

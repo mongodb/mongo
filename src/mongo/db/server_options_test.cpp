@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/config.h"
 
-#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
-#include <unistd.h>
-#endif
+#include <boost/algorithm/string/join.hpp>
+#include <boost/filesystem.hpp>
+
 #ifndef _WIN32
 #include <cstdlib>
 #include <sys/types.h>
@@ -42,12 +41,10 @@
 #include <TargetConditionals.h>
 #endif
 
-#include <boost/algorithm/string/join.hpp>
-#include <boost/filesystem.hpp>
-
 #include "mongo/base/init.h"
 #include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/config.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
@@ -61,6 +58,10 @@
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/scopeguard.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

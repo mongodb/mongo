@@ -29,39 +29,52 @@
 
 #include "mongo/db/commands.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
 #include <string>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_extra_info.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/algorithm.h"
 #include "mongo/bson/mutable/document.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/auth/privilege.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/test_commands_enabled.h"
-#include "mongo/db/curop.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/error_labels.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/command_generic_argument.h"
 #include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/factory.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/rpc/rewrite_state_change_errors.h"
 #include "mongo/rpc/write_concern_error_detail.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/transport/session.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/safe_num.h"
 #include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
@@ -297,7 +310,7 @@ NamespaceString CommandHelpers::parseNsCollectionRequired(const DatabaseName& db
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "collection name has invalid type " << typeName(first.type()),
             first.canonicalType() == canonicalizeBSONType(mongo::String));
-    const NamespaceString nss(
+    NamespaceString nss(
         NamespaceStringUtil::parseNamespaceFromRequest(dbName, first.valueStringData()));
     uassert(ErrorCodes::InvalidNamespace,
             str::stream() << "Invalid namespace specified '" << nss.toStringForErrorMsg() << "'",
@@ -336,10 +349,9 @@ NamespaceString CommandHelpers::parseNsFromCommand(const DatabaseName& dbName,
 }
 
 ResourcePattern CommandHelpers::resourcePatternForNamespace(const NamespaceString& ns) {
-    const auto& nss = NamespaceStringUtil::serialize(ns);
-    if (!NamespaceString::validCollectionComponent(nss)) {
-        // TODO (SERVER-76195) pass a NamespaceString/object directly here instead of StringData.
-        return ResourcePattern::forDatabaseName(nss);
+    if (!NamespaceString::validCollectionComponent(ns)) {
+        const auto nss = NamespaceStringUtil::serialize(ns);
+        return ResourcePattern::forDatabaseName(ns.dbName());
     }
     return ResourcePattern::forExactNamespace(ns);
 }
@@ -574,7 +586,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << dbName.toStringForErrorMsg()
                           << "' database in a transaction.",
-            dbName.db() != DatabaseName::kLocal.db());
+            !dbName.isLocalDB());
 
     uassert(ErrorCodes::OperationNotSupportedInTransaction,
             str::stream() << "Cannot run command against the '" << nss.toStringForErrorMsg()
@@ -589,7 +601,7 @@ void CommandHelpers::canUseTransactions(const NamespaceString& nss,
     } else {
         uassert(ErrorCodes::OperationNotSupportedInTransaction,
                 "Cannot run command against the config database in a transaction.",
-                dbName.db() != DatabaseName::kConfig.db());
+                !dbName.isConfigDB());
     }
 }
 

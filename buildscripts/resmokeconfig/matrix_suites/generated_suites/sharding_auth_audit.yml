@@ -45,6 +45,7 @@ selector:
   - jstests/sharding/movechunk_parallel.js
   - jstests/sharding/migration_critical_section_concurrency.js
   - jstests/sharding/mongod_returns_no_cluster_time_without_keys.js
+  - jstests/sharding/cluster_time_across_add_shard.js
   - jstests/sharding/set_user_write_block_mode.js
   roots:
   - jstests/sharding/**/*.js

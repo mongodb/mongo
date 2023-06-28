@@ -28,21 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <cerrno>
+#include <exception>
+#include <memory>
+#include <string>
+#include <system_error>
 
-#include "mongo/db/storage/storage_engine_lock_file.h"
-
-#include <boost/filesystem.hpp>
+#ifndef _WIN32
 #include <fcntl.h>
-#include <ostream>
-#include <sstream>
 #include <sys/file.h>
 #include <sys/stat.h>
-#include <sys/types.h>
-#include <unistd.h>
+#endif
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/storage/storage_engine_lock_file.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

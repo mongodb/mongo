@@ -27,13 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <boost/algorithm/string.hpp>
+#include <absl/container/node_hash_map.h>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/core/addressof.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <list>
+#include <memory>
+#include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
 #include "mongo/db/cst/bson_lexer.h"
+#include "mongo/db/cst/c_node.h"
 #include "mongo/db/cst/parser_gen.hpp"
+#include "mongo/platform/decimal128.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

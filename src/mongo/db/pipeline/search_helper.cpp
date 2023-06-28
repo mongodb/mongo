@@ -28,9 +28,18 @@
  */
 
 #include "mongo/db/pipeline/search_helper.h"
-#include "mongo/db/pipeline/dependencies.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+#include <list>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/variables.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 ServiceContext::Decoration<std::unique_ptr<SearchDefaultHelperFunctions>> getSearchHelpers =

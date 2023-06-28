@@ -6,8 +6,6 @@
 (function() {
 'use strict';
 
-load("jstests/libs/feature_flag_util.js");
-
 var st = new ShardingTest({shards: 1, config: 2});
 
 let coll = st.config.settings;
@@ -28,9 +26,7 @@ assert.commandFailed(coll.update({_id: "notARealSetting"}, {$set: {value: 10}}, 
 // Updates that match the schema are accepted
 // No schema is enforced for balancer, automerge, and ReadWriteConcernDefaults
 assert.commandWorked(coll.update({_id: "balancer"}, {$set: {anything: true}}, {upsert: true}));
-if (FeatureFlagUtil.isEnabled(st.config, "AutoMerger")) {
-    assert.commandWorked(coll.update({_id: "automerge"}, {$set: {anything: true}}, {upsert: true}));
-}
+assert.commandWorked(coll.update({_id: "automerge"}, {$set: {anything: true}}, {upsert: true}));
 assert.commandWorked(
     coll.update({_id: "ReadWriteConcernDefaults"}, {$set: {anything: true}}, {upsert: true}));
 // Schema enforces chunksize to be a number (not an int), so doubles will be accepted and the

@@ -28,8 +28,22 @@
  */
 
 #include "mongo/db/query/optimizer/rewrites/const_eval.h"
+
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+
 #include "mongo/db/exec/sbe/values/arith_common.h"
-#include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/comparison_op.h"
+#include "mongo/db/query/optimizer/utils/strong_alias.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 bool ConstEval::optimize(ABT& n) {

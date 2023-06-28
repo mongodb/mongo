@@ -28,23 +28,58 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <variant>
 
-#include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_options_gen.h"
+#include "mongo/crypto/fle_stats.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/rename_collection_gen.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/drop_gen.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/fle_crud.h"
+#include "mongo/db/s/cleanup_structured_encryption_data_coordinator.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/shard_filtering_metadata_refresh.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/router_role.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 
@@ -457,13 +492,13 @@ boost::optional<BSONObj> CleanupStructuredEncryptionDataCoordinator::reportForCu
     auto bob = basicReportBuilder();
 
     stdx::lock_guard lg{_docMutex};
-    bob.append("escNss", _doc.getEscNss().ns());
-    bob.append("ecocNss", _doc.getEcocNss().ns());
+    bob.append("escNss", NamespaceStringUtil::serialize(_doc.getEscNss()));
+    bob.append("ecocNss", NamespaceStringUtil::serialize(_doc.getEcocNss()));
     bob.append("ecocUuid", _doc.getEcocUuid() ? _doc.getEcocUuid().value().toString() : "none");
-    bob.append("ecocRenameNss", _doc.getEcocRenameNss().ns());
+    bob.append("ecocRenameNss", NamespaceStringUtil::serialize(_doc.getEcocRenameNss()));
     bob.append("ecocRenameUuid",
                _doc.getEcocRenameUuid() ? _doc.getEcocRenameUuid().value().toString() : "none");
-    bob.append("escDeletesNss", _doc.getEscDeletesNss().ns());
+    bob.append("escDeletesNss", NamespaceStringUtil::serialize(_doc.getEscDeletesNss()));
     bob.append("escDeletesUuid",
                _doc.getEscDeletesUuid() ? _doc.getEscDeletesUuid().value().toString() : "none");
     return bob.obj();

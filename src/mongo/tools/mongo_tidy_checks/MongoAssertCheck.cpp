@@ -59,7 +59,9 @@ AST_MATCHER(Expr, isAssertMacroExpansion) {
         // Check if the file name contains "assert.h"
         // <cassert> will also be caught because it redirects to assert.h
         auto FileName = SM.getFilename(SM.getSpellingLoc(MacroLoc));
-        return llvm::StringRef(FileName).contains("assert.h");
+
+        return llvm::StringRef(FileName).contains("assert.h") &&
+            !llvm::StringRef(FileName).contains("src/mongo/unittest/assert.h");
     }
     return false;
 }

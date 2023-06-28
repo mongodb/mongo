@@ -29,16 +29,26 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
+#include <memory>
+#include <string>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
-#include "mongo/db/concurrency/exception_util.h"
-#include "mongo/db/dbhelpers.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/global_index.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/global_index_crud_commands_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {
@@ -74,8 +84,9 @@ public:
             uassert(ErrorCodes::Unauthorized,
                     "Unauthorized",
                     AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                           ActionType::internal));
+                        ->isAuthorizedForActionsOnResource(
+                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                            ActionType::internal));
         }
 
         bool supportsWriteConcern() const override {

@@ -34,16 +34,33 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/index/multikey_paths.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/repl/collection_bulk_loader.h"
+#include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/storage_interface.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/storage/key_string.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {
@@ -67,13 +84,6 @@ public:
     Status insertDocuments(std::vector<BSONObj>::const_iterator begin,
                            std::vector<BSONObj>::const_iterator end) override;
     Status commit() override;
-
-    std::string toString() const override {
-        return toBSON().toString();
-    };
-    BSONObj toBSON() const override {
-        return BSONObj();
-    };
 
     std::shared_ptr<CollectionMockStats> stats;
 

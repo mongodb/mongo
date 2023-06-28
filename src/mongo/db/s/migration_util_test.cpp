@@ -27,26 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/client/remote_command_targeter_factory_mock.h"
-#include "mongo/client/remote_command_targeter_mock.h"
+#include <initializer_list>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/repl/wait_for_majority_service.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/collection_sharding_runtime_test.cpp"
 #include "mongo/db/s/migration_util.h"
-#include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/range_deletion_util.h"
-#include "mongo/db/s/shard_filtering_metadata_refresh.h"
-#include "mongo/db/s/shard_server_catalog_cache_loader.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/s/catalog/sharding_catalog_client_mock.h"
-#include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/catalog_cache_loader_mock.h"
-#include "mongo/s/database_version.h"
-#include "mongo/util/future.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

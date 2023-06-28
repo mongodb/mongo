@@ -30,20 +30,29 @@
 
 #include "wiredtiger_import.h"
 
-#include <boost/filesystem.hpp>
 #include <fmt/format.h>
 #include <wiredtiger.h>
 
-#include "mongo/base/status.h"
-#include "mongo/bson/bsonmisc.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/storage/bson_collection_catalog_entry.h"
-#include "mongo/db/storage/storage_options.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_util.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/database_name_util.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -181,7 +190,7 @@ std::vector<CollectionImportMetadata> wiredTigerRollbackToStableAndGetMetadata(
         WT_ITEM catalogValue;
         uassertWTOK(mdbCatalogCursor->get_value(mdbCatalogCursor, &catalogValue), session);
         BSONObj rawCatalogEntry(static_cast<const char*>(catalogValue.data));
-        NamespaceString ns(NamespaceString::parseFromStringExpectTenantIdInMultitenancyMode(
+        NamespaceString ns(NamespaceStringUtil::parseFromStringExpectTenantIdInMultitenancyMode(
             rawCatalogEntry.getStringField("ns")));
         if (!shouldImport(ns, migrationId)) {
             LOGV2_DEBUG(6113801, 1, "Not importing donor collection", "ns"_attr = ns);

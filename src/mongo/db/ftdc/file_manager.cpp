@@ -28,21 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/ftdc/file_manager.h"
-
-#include <boost/filesystem.hpp>
+#include <algorithm>
+#include <cstdio>
+#include <cstring>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/ftdc/config.h"
 #include "mongo/db/ftdc/constants.h"
+#include "mongo/db/ftdc/file_manager.h"
 #include "mongo/db/ftdc/file_reader.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"

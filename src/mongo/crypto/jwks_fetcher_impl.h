@@ -29,9 +29,11 @@
 
 #pragma once
 
-#include "mongo/crypto/jwks_fetcher.h"
+#include <string>
 
 #include "mongo/base/string_data.h"
+#include "mongo/crypto/jwks_fetcher.h"
+#include "mongo/crypto/jwt_types_gen.h"
 
 namespace mongo::crypto {
 

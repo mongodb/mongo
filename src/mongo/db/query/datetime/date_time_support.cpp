@@ -28,21 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <absl/container/flat_hash_map.h>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <cstring>
 #include <limits>
 #include <memory>
+#include <ostream>
+#include <ratio>
 #include <timelib.h>
+#include <utility>
 
-#include "mongo/db/query/datetime/date_time_support.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/parse_number.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/query/datetime/date_time_support.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/overflow_arithmetic.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/str.h"
 

@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #include "mongo/platform/basic.h"
 
 #include "mongo/shell/mongo_main.h"
@@ -51,9 +50,9 @@
 #include "mongo/client/sasl_aws_client_options.h"
 #include "mongo/client/sasl_oidc_client_params.h"
 #include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/sasl_command_constants.h"
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/wire_version.h"
@@ -96,7 +95,9 @@
 #define isatty _isatty
 #define fileno _fileno
 #else
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>
+#endif
 #endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
@@ -717,9 +718,8 @@ int mongo_main(int argc, char* argv[]) {
         mongo::shell_utils::RecordMyLocation(argv[0]);
 
         mongo::runGlobalInitializersOrDie(std::vector<std::string>(argv, argv + argc));
-        auto serviceContextHolder = ServiceContext::make();
-        serviceContextHolder->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-        setGlobalServiceContext(std::move(serviceContextHolder));
+        setGlobalServiceContext(ServiceContext::make());
+
         // TODO This should use a TransportLayerManager or TransportLayerFactory
         auto serviceContext = getGlobalServiceContext();
 

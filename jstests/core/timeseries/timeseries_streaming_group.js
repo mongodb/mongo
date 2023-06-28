@@ -64,6 +64,33 @@ for (let i = 0; i < numTimes; i++) {
 assert.commandWorked(ts.insert(documents));
 assert.commandWorked(coll.insert(documents));
 
+// Incorrect use of $_internalStreamingGroup should return error
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: "timeseires_streaming_group_regular_collection",
+    pipeline: [{
+        $_internalStreamingGroup: {
+            _id: {symbol: "$symbol", time: "$time"},
+            count: {$sum: 1},
+            $monotonicIdFields: ["price"]
+        }
+    }],
+    cursor: {},
+}),
+                             7026705);
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: "timeseires_streaming_group_regular_collection",
+    pipeline: [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}}}],
+    cursor: {},
+}),
+                             7026702);
+assert.commandFailedWithCode(db.runCommand({
+    aggregate: "timeseires_streaming_group_regular_collection",
+    pipeline:
+        [{$_internalStreamingGroup: {_id: null, count: {$sum: 1}, $monotonicIdFields: ["_id"]}}],
+    cursor: {},
+}),
+                             7026708);
+
 const runTest = function(pipeline, expectedMonotonicIdFields) {
     const explain = assert.commandWorked(ts.explain().aggregate(pipeline));
     const streamingGroupStage = getAggPlanStage(explain, "$_internalStreamingGroup");

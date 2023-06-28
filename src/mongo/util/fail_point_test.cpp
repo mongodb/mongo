@@ -27,16 +27,12 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include <functional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/platform/atomic_word.h"
@@ -51,7 +47,6 @@
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
-
 
 using mongo::BSONObj;
 using mongo::FailPoint;
@@ -460,7 +455,6 @@ namespace mongo {
 void assertFunctionInterruptible(std::function<void(Interruptible* interruptible)> f) {
     const auto service = ServiceContext::make();
     const std::shared_ptr<ClockSourceMock> mockClock = std::make_shared<ClockSourceMock>();
-    service->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
     service->setFastClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setPreciseClockSource(std::make_unique<SharedClockSourceAdapter>(mockClock));
     service->setTickSource(std::make_unique<TickSourceMock<>>());

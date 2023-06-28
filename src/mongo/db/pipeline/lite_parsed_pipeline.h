@@ -29,15 +29,25 @@
 
 #pragma once
 
+#include <absl/container/node_hash_set.h>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
 #include <functional>
 #include <memory>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/auth/privilege.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/read_concern_support_result.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 
@@ -148,16 +158,18 @@ public:
     }
 
     /**
-     * Returns false if at least one of the stages does not allow the involved namespace 'nss' to be
-     * sharded.
+     * Returns an error Status if at least one of the stages does not allow the involved namespace
+     * 'nss' to be sharded, otherwise returns Status::OK().
      */
-    bool allowShardedForeignCollection(NamespaceString nss, bool isMultiDocumentTransaction) const {
-        return std::all_of(_stageSpecs.begin(),
-                           _stageSpecs.end(),
-                           [&nss, isMultiDocumentTransaction](auto&& spec) {
-                               return spec->allowShardedForeignCollection(
-                                   nss, isMultiDocumentTransaction);
-                           });
+    Status checkShardedForeignCollAllowed(NamespaceString nss,
+                                          bool isMultiDocumentTransaction) const {
+        for (auto&& spec : _stageSpecs) {
+            if (auto status = spec->checkShardedForeignCollAllowed(nss, isMultiDocumentTransaction);
+                !status.isOK()) {
+                return status;
+            }
+        }
+        return Status::OK();
     }
 
     /**

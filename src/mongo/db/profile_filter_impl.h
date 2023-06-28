@@ -29,10 +29,18 @@
 
 #pragma once
 
-#include "mongo/db/profile_filter.h"
+#include <functional>
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/matcher.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/profile_filter.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

@@ -34,8 +34,14 @@ function testAnalyzeShardKey(conn, {docs, indexSpecs, shardKeys, metrics}) {
     assert.commandWorked(coll.insert(docs, {writeConcern}));
 
     for (let shardKey of shardKeys) {
-        const res = assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: shardKey}));
-        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res, metrics);
+        const res = assert.commandWorked(conn.adminCommand({
+            analyzeShardKey: ns,
+            key: shardKey,
+            // Skip calculating the read and write distribution metrics since they are not needed by
+            // this test.
+            readWriteDistribution: false
+        }));
+        AnalyzeShardKeyUtil.assertKeyCharacteristicsMetrics(res.keyCharacteristics, metrics);
     }
 }
 
@@ -136,12 +142,7 @@ function runTest(conn) {
 }
 
 const setParameterOpts = {
-    analyzeShardKeyNumMostCommonValues: numMostCommonValues,
-    // Skip calculating the read and write distribution metrics since there are no sampled queries
-    // anyway.
-    "failpoint.analyzeShardKeySkipCalcalutingReadWriteDistributionMetrics":
-        tojson({mode: "alwaysOn"})
-
+    analyzeShardKeyNumMostCommonValues: numMostCommonValues
 };
 
 {

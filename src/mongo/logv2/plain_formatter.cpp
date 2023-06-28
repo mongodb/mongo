@@ -34,6 +34,7 @@
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/constants.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str_escape.h"
 
 #include <boost/container/small_vector.hpp>
@@ -50,23 +51,28 @@ namespace {
 
 struct TextValueExtractor {
     void operator()(const char* name, CustomAttributeValue const& val) {
-        if (val.stringSerialize) {
-            fmt::memory_buffer buffer;
-            val.stringSerialize(buffer);
-            _addString(name, fmt::to_string(buffer));
-        } else if (val.toString) {
-            _addString(name, val.toString());
-        } else if (val.BSONAppend) {
-            BSONObjBuilder builder;
-            val.BSONAppend(builder, name);
-            BSONElement element = builder.done().getField(name);
-            _addString(name, element.toString(false));
-        } else if (val.BSONSerialize) {
-            BSONObjBuilder builder;
-            val.BSONSerialize(builder);
-            operator()(name, builder.done());
-        } else if (val.toBSONArray) {
-            operator()(name, val.toBSONArray());
+        try {
+            if (val.stringSerialize) {
+                fmt::memory_buffer buffer;
+                val.stringSerialize(buffer);
+                _addString(name, fmt::to_string(buffer));
+            } else if (val.toString) {
+                _addString(name, val.toString());
+            } else if (val.BSONAppend) {
+                BSONObjBuilder builder;
+                val.BSONAppend(builder, name);
+                BSONElement element = builder.done().getField(name);
+                _addString(name, element.toString(false));
+            } else if (val.BSONSerialize) {
+                BSONObjBuilder builder;
+                val.BSONSerialize(builder);
+                operator()(name, builder.done());
+            } else if (val.toBSONArray) {
+                operator()(name, val.toBSONArray());
+            }
+        } catch (...) {
+            Status s = exceptionToStatus();
+            _addString(name, std::string("Failed to serialize due to exception: ") + s.toString());
         }
     }
 

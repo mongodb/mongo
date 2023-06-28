@@ -24,7 +24,6 @@ const rst = new ReplSetTest({
             replBatchLimitOperations: 1,
             // Make transaction records expire immediately.
             TransactionRecordMinimumLifetimeMinutes: 0,
-            storeFindAndModifyImagesInSideCollection: true,
             internalSessionsReapThreshold: 0
         }
     }

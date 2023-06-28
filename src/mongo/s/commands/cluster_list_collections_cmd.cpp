@@ -110,7 +110,7 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // DB resource grants all non-system collections, so filter out system collections. This is done
     // inside the $or, since some system collections might be granted specific privileges.
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forDatabaseName(DatabaseNameUtil::serializeForAuth(dbName)))) {
+            ResourcePattern::forDatabaseName(dbName))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^(?!system\\.)"))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -119,9 +119,9 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     // system_buckets DB resource grants all system_buckets.* collections so create a filter to
     // include them
     if (authzSession->isAuthorizedForAnyActionOnResource(
-            ResourcePattern::forAnySystemBucketsInDatabase(
-                DatabaseNameUtil::serializeForAuth(dbName))) ||
-        authzSession->isAuthorizedForAnyActionOnResource(ResourcePattern::forAnySystemBuckets())) {
+            ResourcePattern::forAnySystemBucketsInDatabase(dbName)) ||
+        authzSession->isAuthorizedForAnyActionOnResource(
+            ResourcePattern::forAnySystemBuckets(dbName.tenantId()))) {
         mutablebson::Element systemCollectionsFilter = rewrittenCmdObj.makeElementObject(
             "", BSON("name" << BSON("$regex" << BSONRegEx("^system\\.buckets\\."))));
         uassertStatusOK(newFilterOr.pushBack(systemCollectionsFilter));
@@ -132,14 +132,12 @@ BSONObj rewriteCommandForListingOwnCollections(OperationContext* opCtx,
     if (auto authUser = authzSession->getAuthenticatedUser()) {
         for (const auto& [resource, privilege] : authUser.value()->getPrivileges()) {
             if (resource.isCollectionPattern() ||
-                (resource.isExactNamespacePattern() &&
-                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
+                (resource.isExactNamespacePattern() && resource.dbNameToMatch() == dbName)) {
                 collectionNames.emplace(resource.collectionToMatch().toString());
             }
 
             if (resource.isAnySystemBucketsCollectionInAnyDB() ||
-                (resource.isExactSystemBucketsCollection() &&
-                 resource.databaseToMatch() == DatabaseNameUtil::serializeForAuth(dbName))) {
+                (resource.isExactSystemBucketsCollection() && resource.dbNameToMatch() == dbName)) {
                 collectionNames.emplace(systemBucketsDot + resource.collectionToMatch().toString());
             }
         }
@@ -214,7 +212,10 @@ public:
                                  const DatabaseName& dbName,
                                  const BSONObj& cmdObj) const final {
         auto* authzSession = AuthorizationSession::get(opCtx->getClient());
-        return authzSession->checkAuthorizedToListCollections(dbName.db(), cmdObj).getStatus();
+        const bool apiStrict = APIParameters::get(opCtx).getAPIStrict().value_or(false);
+        IDLParserContext ctxt("ListCollection", apiStrict, dbName.tenantId());
+        auto request = ListCollections::parse(ctxt, cmdObj);
+        return authzSession->checkAuthorizedToListCollections(request).getStatus();
     }
 
     bool runWithRequestParser(OperationContext* opCtx,
@@ -252,8 +253,7 @@ public:
             // Use the original command object rather than the rewritten one to preserve whether
             // 'authorizedCollections' field is set.
             uassertStatusOK(AuthorizationSession::get(opCtx->getClient())
-                                ->checkAuthorizedToListCollections(
-                                    DatabaseNameUtil::serializeForAuth(dbName), cmdObj)));
+                                ->checkAuthorizedToListCollections(requestParser.request())));
     }
 
     void validateResult(const BSONObj& result) final {

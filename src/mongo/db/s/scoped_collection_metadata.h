@@ -35,7 +35,7 @@ namespace mongo {
 
 /**
  * Contains the parts of the sharding state for a particular collection, which do not change due to
- * chunk move, split and merge. The implementation is allowed to be tighly coupled with the
+ * chunk move, split and merge. The implementation is allowed to be tightly coupled with the
  * CollectionShardingState from which it was derived and because of this it must not be accessed
  * outside of a collection lock.
  */

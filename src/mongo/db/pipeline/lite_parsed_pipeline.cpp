@@ -27,13 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
+#include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/query/allowed_contexts.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 
@@ -134,10 +146,11 @@ void LiteParsedPipeline::verifyIsSupported(
     }
     // Verify that no involved namespace is sharded unless allowed by the pipeline.
     for (const auto& nss : getInvolvedNamespaces()) {
-        uassert(28769,
-                str::stream() << nss.toStringForErrorMsg() << " cannot be sharded",
-                allowShardedForeignCollection(nss, inMultiDocumentTransaction) ||
-                    !isSharded(opCtx, nss));
+        const auto status = checkShardedForeignCollAllowed(nss, inMultiDocumentTransaction);
+        uassert(status.code(),
+                str::stream() << nss.toStringForErrorMsg()
+                              << " cannot be sharded: " << status.reason(),
+                status.isOK() || !isSharded(opCtx, nss));
     }
 }
 

@@ -29,6 +29,14 @@
 
 #include "mongo/db/commands/update_metrics.h"
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+
 namespace mongo {
 UpdateMetrics::UpdateMetrics(StringData commandName)
     : _commandsWithAggregationPipeline("commands." + commandName + ".pipeline"),

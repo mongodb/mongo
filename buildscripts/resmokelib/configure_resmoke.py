@@ -343,6 +343,7 @@ or explicitly pass --installDir to the run subcommand of buildscripts/resmoke.py
     _config.NUM_SHARDS = config.pop("num_shards")
     _config.CONFIG_SHARD = utils.pick_catalog_shard_node(
         config.pop("config_shard"), _config.NUM_SHARDS)
+    _config.ORIGIN_SUITE = config.pop("origin_suite")
     _config.PERF_REPORT_FILE = config.pop("perf_report_file")
     _config.CEDAR_REPORT_FILE = config.pop("cedar_report_file")
     _config.RANDOM_SEED = config.pop("seed")

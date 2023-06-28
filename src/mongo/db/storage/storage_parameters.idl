@@ -196,19 +196,13 @@ feature_flags:
         default: true
         version: 6.0
         shouldBeFCVGated: true
-    featureFlagBatchMultiDeletes:
-        description: "When enabled, support batching multi-document deletions"
-        cpp_varname: feature_flags::gBatchMultiDeletes
-        default: true
-        version: 6.1
-        shouldBeFCVGated: true
     featureFlagLargeBatchedOperations:
         description:  >-
             Enable support for replicating batched operations over multiple applyOps oplog
             entries. Otherwise, batched operations that do not fit within a single applyOps
             oplog entry will fail with a TransactionTooLarge error.
-            See featureFlagBatchMultiDeletes, maxNumberOfBatchedOperationsInSingleOplogEntry,
-            and maxSizeOfBatchedOperationsInSingleOplogEntryBytes.
+            See maxNumberOfBatchedOperationsInSingleOplogEntry and
+            maxSizeOfBatchedOperationsInSingleOplogEntryBytes.
         cpp_varname: gFeatureFlagLargeBatchedOperations
         default: false
         shouldBeFCVGated: true
@@ -256,5 +250,12 @@ feature_flags:
             Enable support to always use the compressed time-series bucket format when inserting,
             updating, or removing data into new, existing, or re-opened buckets.
         cpp_varname: feature_flags::gTimeseriesAlwaysUseCompressedBuckets
+        default: false
+        shouldBeFCVGated: true
+    featureFlagGloballyUniqueReplicatedRecordIds:
+        description: >-
+            When enabled, all RecordIds for newly created collections are globally unique across
+            shards and consistent within a replica set.
+        cpp_varname: feature_flags::gGloballyUniqueReplicatedRecordIds
         default: false
         shouldBeFCVGated: true

@@ -29,9 +29,33 @@
 #pragma once
 
 #include "mongo/db/s/range_deleter_service.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <map>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/range_deletion_task_gen.h"
 #include "mongo/db/s/shard_server_test_fixture.h"
 #include "mongo/idl/server_parameter_test_util.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/unittest/log_test.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 
@@ -61,9 +85,11 @@ public:
 
     // Instantiate some collection UUIDs and tasks to be used for testing
     UUID uuidCollA = UUID::gen();
-    inline static const NamespaceString nsCollA{"test", "collA"};
+    inline static const NamespaceString nsCollA =
+        NamespaceString::createNamespaceString_forTest("test", "collA");
     UUID uuidCollB = UUID::gen();
-    inline static const NamespaceString nsCollB{"test", "collB"};
+    inline static const NamespaceString nsCollB =
+        NamespaceString::createNamespaceString_forTest("test", "collB");
 
     inline static std::map<UUID, NamespaceString> nssWithUuid{};
 

@@ -105,7 +105,7 @@ assert.commandWorked(session.abortTransaction_forTesting());
 jsTestLog("Waiting for index build to complete");
 IndexBuildTest.waitForIndexBuildToStop(primaryDB, primaryColl.getName(), indexName);
 
-IndexBuildTest.assertIndexes(primaryColl, 2, ["_id_", indexName]);
+IndexBuildTest.assertIndexesSoon(primaryColl, 2, ["_id_", indexName]);
 
 rst.stopSet();
 })();

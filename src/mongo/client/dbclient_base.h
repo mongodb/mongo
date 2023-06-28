@@ -29,10 +29,26 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <functional>
+#include <list>
+#include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/client_api_version_parameters_gen.h"
 #include "mongo/client/connection_string.h"
@@ -40,9 +56,12 @@
 #include "mongo/client/index_spec.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/read_preference.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/write_concern_options.h"
 #include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
@@ -53,6 +72,8 @@
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/ssl_types.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

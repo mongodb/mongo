@@ -27,22 +27,33 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <cstddef>
+#include <memory>
+#include <mutex>
 
-#include "mongo/client/sasl_aws_client_protocol.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <kms_message/kms_caller_identity_request.h>
+#include <kms_message/kms_message_defines.h>
+#include <kms_message/kms_request.h>
 
-#include <iostream>
-
-#include "mongo/base/data_range_cursor.h"
-#include "mongo/base/data_type_validated.h"
-#include "mongo/base/init.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
+#include "mongo/client/sasl_aws_client_protocol.h"
 #include "mongo/client/sasl_aws_client_protocol_gen.h"
+#include "mongo/client/sasl_aws_protocol_common_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/kms_message_support.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace awsIam {

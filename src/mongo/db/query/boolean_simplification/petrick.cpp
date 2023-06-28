@@ -29,9 +29,12 @@
 
 #include "mongo/db/query/boolean_simplification/petrick.h"
 
-#include <boost/dynamic_bitset.hpp>
-
-#include "mongo/util/assert_util.h"
+#include <boost/dynamic_bitset/dynamic_bitset.hpp>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <memory>
+#include <utility>
 
 namespace mongo::boolean_simplification {
 namespace {

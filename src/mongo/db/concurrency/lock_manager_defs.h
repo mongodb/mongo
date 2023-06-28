@@ -29,19 +29,23 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <map>
 #include <string>
 
-#include <MurmurHash3.h>
-
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/murmur3.h"
 
 namespace mongo {
 
@@ -327,9 +331,7 @@ private:
     }
 
     static uint64_t hashStringData(StringData str) {
-        char hash[16];
-        MurmurHash3_x64_128(str.rawData(), str.size(), 0, hash);
-        return static_cast<size_t>(ConstDataView(hash).read<LittleEndian<std::uint64_t>>());
+        return murmur3<sizeof(uint64_t)>(str, 0 /*seed*/);
     }
 };
 

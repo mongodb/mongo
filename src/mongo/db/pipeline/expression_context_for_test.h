@@ -57,7 +57,8 @@ public:
      * Defaults to using a namespace of "test.namespace".
      */
     ExpressionContextForTest()
-        : ExpressionContextForTest(NamespaceString{"test"_sd, "namespace"_sd}) {}
+        : ExpressionContextForTest(
+              NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd)) {}
     /**
      * If there is a global ServiceContext available, this constructor will adopt it. Otherwise, it
      * will internally create an owned QueryTestServiceContext. Similarly, if an OperationContext
@@ -109,7 +110,8 @@ public:
      * Defaults to using a namespace of "test.namespace".
      */
     ExpressionContextForTest(OperationContext* opCtx)
-        : ExpressionContextForTest(opCtx, NamespaceString{"test"_sd, "namespace"_sd}) {}
+        : ExpressionContextForTest(
+              opCtx, NamespaceString::createNamespaceString_forTest("test"_sd, "namespace"_sd)) {}
 
     /**
      * Constructor which sets the given OperationContext on the ExpressionContextForTest. This will

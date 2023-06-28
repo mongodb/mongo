@@ -28,11 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <compare>
+#include <cstddef>
+#include <functional>
+#include <iostream>
+#include <iterator>
+#include <limits>
+#include <map>
 #include <memory>
+#include <string>
+#include <tuple>
+#include <utility>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/native_sasl_client_session.h"
+#include "mongo/client/sasl_client_session.h"
 #include "mongo/client/scram_client_cache.h"
 #include "mongo/crypto/mechanism_scram.h"
 #include "mongo/crypto/sha1_block.h"
@@ -47,9 +67,13 @@
 #include "mongo/db/auth/sasl_scram_server_conversation.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/password_digest.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

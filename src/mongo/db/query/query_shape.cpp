@@ -29,11 +29,35 @@
 
 #include "mongo/db/query/query_shape.h"
 
-#include "mongo/base/status.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/pipeline/expression.h"
 #include "mongo/db/query/find_command.h"
+#include "mongo/db/query/find_command_gen.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_ast_util.h"
 #include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/query_shape_gen.h"
 #include "mongo/db/query/sort_pattern.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::query_shape {
 
@@ -88,8 +112,8 @@ BSONObj extractSortShape(const BSONObj& sortSpec,
         if (elem.isABSONObj()) {
             // We expect this won't work or parse on the main command path, but for shapification we
             // don't really care, just treat it as a literal and don't bother parsing.
-            bob << opts.serializeFieldPathFromString(elem.fieldNameStringData())
-                << kLiteralArgString;
+            opts.appendLiteral(
+                &bob, opts.serializeFieldPathFromString(elem.fieldNameStringData()), elem);
         } else if (elem.fieldNameStringData() == natural.fieldNameStringData()) {
             bob.append(elem);
         } else {
@@ -135,13 +159,11 @@ void addRemainingFindCommandFields(BSONObjBuilder* bob,
                                    const SerializationOptions& opts) {
     for (auto [fieldName, getterFunction] : boolArgMap) {
         auto optBool = getterFunction(findCommand);
-        if (optBool.has_value()) {
-            opts.appendLiteral(bob, fieldName, optBool.value_or(false));
-        }
+        optBool.serializeToBSON(fieldName, bob);
     }
     auto collation = findCommand.getCollation();
     if (!collation.isEmpty()) {
-        opts.appendLiteral(bob, FindCommandRequest::kCollationFieldName, collation);
+        bob->append(FindCommandRequest::kCollationFieldName, collation);
     }
 }
 
@@ -180,27 +202,34 @@ BSONObj extractHintShape(BSONObj obj, const SerializationOptions& opts, bool pre
  */
 BSONObj extractLetSpecShape(BSONObj letSpec,
                             const SerializationOptions& opts,
-                            boost::intrusive_ptr<ExpressionContext> expCtx) {
+                            const boost::intrusive_ptr<ExpressionContext>& expCtx) {
 
     BSONObjBuilder bob;
     for (BSONElement elem : letSpec) {
-        auto redactedValue =
-            Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState)
-                ->serialize(opts);
+        auto expr = Expression::parseOperand(expCtx.get(), elem, expCtx->variablesParseState);
+        auto redactedValue = expr->serialize(opts);
         // Note that this will throw on deeply nested let variables.
         redactedValue.addToBsonObj(&bob, opts.serializeFieldPathFromString(elem.fieldName()));
     }
     return bob.obj();
 }
 
-BSONObj extractNamespaceShape(NamespaceString nss, const SerializationOptions& opts) {
-    BSONObjBuilder bob;
+void appendCmdNs(BSONObjBuilder& bob,
+                 const NamespaceString& nss,
+                 const SerializationOptions& opts) {
+    BSONObjBuilder nsObj = bob.subobjStart("cmdNs");
+    appendNamespaceShape(nsObj, nss, opts);
+    nsObj.doneFast();
+}
+
+void appendNamespaceShape(BSONObjBuilder& bob,
+                          const NamespaceString& nss,
+                          const SerializationOptions& opts) {
     if (nss.tenantId()) {
         bob.append("tenantId", opts.serializeIdentifier(nss.tenantId().value().toString()));
     }
     bob.append("db", opts.serializeIdentifier(nss.db()));
     bob.append("coll", opts.serializeIdentifier(nss.coll()));
-    return bob.obj();
 }
 
 BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
@@ -211,12 +240,13 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
     // Serialize the namespace as part of the query shape.
     {
         auto ns = findCmd.getNamespaceOrUUID();
-        if (ns.nss()) {
-            bob.append("cmdNs", extractNamespaceShape(ns.nss().value(), opts));
+        if (ns.isNamespaceString()) {
+            appendCmdNs(bob, ns.nss(), opts);
         } else {
             BSONObjBuilder cmdNs = bob.subobjStart("cmdNs");
-            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid()->toString()));
-            cmdNs.done();
+            cmdNs.append("uuid", opts.serializeIdentifier(ns.uuid().toString()));
+            cmdNs.append("db", opts.serializeIdentifier(ns.dbname()));
+            cmdNs.doneFast();
         }
     }
 
@@ -275,11 +305,12 @@ BSONObj extractQueryShape(const ParsedFindCommand& findRequest,
 BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
                           const Pipeline& pipeline,
                           const SerializationOptions& opts,
-                          const boost::intrusive_ptr<ExpressionContext>& expCtx) {
+                          const boost::intrusive_ptr<ExpressionContext>& expCtx,
+                          const NamespaceString& nss) {
     BSONObjBuilder bob;
 
     // namespace
-    bob.append("cmdNs", extractNamespaceShape(aggregateCommand.getNamespace(), opts));
+    appendCmdNs(bob, nss, opts);
     bob.append("command", "aggregate");
 
     // pipeline
@@ -321,5 +352,30 @@ BSONObj extractQueryShape(const AggregateCommandRequest& aggregateCommand,
         bob.append(FindCommandRequest::kLetFieldName, std::move(ownedObj));
     }
     return bob.obj();
+}
+
+NamespaceStringOrUUID parseNamespaceShape(BSONElement cmdNsElt) {
+    tassert(7632900, "cmdNs must be an object.", cmdNsElt.type() == BSONType::Object);
+    auto cmdNs = CommandNamespace::parse(IDLParserContext("cmdNs"), cmdNsElt.embeddedObject());
+
+    boost::optional<TenantId> tenantId = cmdNs.getTenantId().map(TenantId::parseFromString);
+
+    if (cmdNs.getColl().has_value()) {
+        tassert(7632903,
+                "Exactly one of 'uuid' and 'coll' can be defined.",
+                !cmdNs.getUuid().has_value());
+        return NamespaceString(cmdNs.getDb(), cmdNs.getColl().value());
+    } else {
+        tassert(7632904,
+                "Exactly one of 'uuid' and 'coll' can be defined.",
+                !cmdNs.getColl().has_value());
+        UUID uuid = uassertStatusOK(UUID::parse(cmdNs.getUuid().value().toString()));
+        return NamespaceStringOrUUID(cmdNs.getDb().toString(), uuid, tenantId);
+    }
+}
+
+QueryShapeHash hash(const BSONObj& queryShape) {
+    return QueryShapeHash::computeHash(reinterpret_cast<const uint8_t*>(queryShape.objdata()),
+                                       queryShape.objsize());
 }
 }  // namespace mongo::query_shape

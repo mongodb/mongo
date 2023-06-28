@@ -29,9 +29,21 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
+#include <vector>
 
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/oplog_writer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

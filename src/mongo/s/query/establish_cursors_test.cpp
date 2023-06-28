@@ -69,7 +69,8 @@ std::vector<UUID> extractOperationKeys(BSONObj obj) {
 
 class EstablishCursorsTest : public ShardingTestFixture {
 public:
-    EstablishCursorsTest() : _nss("testdb.testcoll") {}
+    EstablishCursorsTest()
+        : _nss(NamespaceString::createNamespaceString_forTest("testdb.testcoll")) {}
 
     void setUp() override {
         ShardingTestFixture::setUp();

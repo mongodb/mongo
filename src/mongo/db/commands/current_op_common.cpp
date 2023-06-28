@@ -27,15 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cstddef>
+#include <utility>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/auth/validated_tenancy_scope.h"
 #include "mongo/db/commands/current_op_common.h"
-
-#include <string>
-
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/serialization_context.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 namespace {
@@ -110,9 +120,12 @@ bool CurrentOpCommandBase::run(OperationContext* opCtx,
     pipeline.push_back(groupBuilder.obj());
 
     // Pipeline is complete; create an AggregateCommandRequest for $currentOp.
+    SerializationContext sc = SerializationContext::stateCommandRequest();
+    sc.setTenantIdSource(auth::ValidatedTenancyScope::get(opCtx) != boost::none);
     AggregateCommandRequest request(NamespaceString::makeCollectionlessAggregateNSS(
                                         DatabaseNameUtil::deserialize(dbName.tenantId(), "admin")),
-                                    std::move(pipeline));
+                                    std::move(pipeline),
+                                    sc);
 
     // Run the pipeline and obtain a CursorResponse.
     auto aggResults = uassertStatusOK(runAggregation(opCtx, request));

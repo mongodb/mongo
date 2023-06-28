@@ -29,12 +29,31 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/optimizer/explain_interface.h"
 #include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_explainer.h"
+#include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/query_solution.h"
 #include "mongo/db/query/sbe_plan_ranker.h"
+#include "mongo/db/query/sbe_stage_builder.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
 
 namespace mongo {
@@ -72,7 +91,7 @@ public:
     const ExplainVersion& getVersion() const final;
     std::string getPlanSummary() const final;
     void getSummaryStats(PlanSummaryStats* statsOut) const final;
-    void getSecondarySummaryStats(std::string secondaryColl,
+    void getSecondarySummaryStats(const NamespaceString& secondaryColl,
                                   PlanSummaryStats* statsOut) const override;
     PlanStatsDetails getWinningPlanStats(ExplainOptions::Verbosity verbosity) const final;
     PlanStatsDetails getWinningPlanTrialStats() const final;

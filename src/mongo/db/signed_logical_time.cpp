@@ -29,7 +29,11 @@
 
 #include "mongo/db/signed_logical_time.h"
 
-#include "mongo/util/str.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/crypto/hash_block.h"
 
 namespace mongo {
 

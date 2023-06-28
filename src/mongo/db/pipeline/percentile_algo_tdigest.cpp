@@ -28,11 +28,17 @@
  */
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <iostream>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/pipeline/percentile_algo_tdigest.h"
-
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

@@ -125,15 +125,10 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestDB.adminCommand(commitCmdObj));
     }
 
-    function testNonRetryableBasic(cmdObj, {
-        txnOptions,
-        testMode,
-        expectFindAndModifyImageInOplog,
-        expectFindAndModifyImageInSideCollection
-    }) {
+    function testNonRetryableBasic(
+        cmdObj, {txnOptions, testMode, expectFindAndModifyImageInSideCollection}) {
         // A findAndModify write statement in a non-retryable transaction will not generate a
         // pre/post image.
-        assert(!expectFindAndModifyImageInOplog);
         assert(!expectFindAndModifyImageInSideCollection);
         jsTest.log("Testing retrying a non-retryable internal transaction");
         cmdObj.startTransaction = true;
@@ -150,7 +145,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         const initialTxnStateBefore = getTransactionState(initialLsid, initialTxnNumber);
         assert.eq(initialTxnStateBefore.oplogEntries.length,
-                  (txnOptions.isPreparedTxn ? 2 : 1) + (expectFindAndModifyImageInOplog ? 1 : 0),
+                  (txnOptions.isPreparedTxn ? 2 : 1),
                   initialTxnStateBefore.oplogEntries);
         assert.eq(initialTxnStateBefore.imageEntries.length,
                   expectFindAndModifyImageInSideCollection ? 1 : 0,
@@ -171,14 +166,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestColl.remove({}));
     }
 
-    function testRetryableBasic(cmdObj, {
-        txnOptions,
-        testMode,
-        expectFindAndModifyImageInOplog,
-        expectFindAndModifyImageInSideCollection,
-        checkRetryResponseFunc
-    }) {
-        assert(!expectFindAndModifyImageInOplog || !expectFindAndModifyImageInSideCollection);
+    function testRetryableBasic(
+        cmdObj,
+        {txnOptions, testMode, expectFindAndModifyImageInSideCollection, checkRetryResponseFunc}) {
         jsTest.log(
             "Testing retrying a retryable internal transaction with one applyOps oplog entry");
         cmdObj.startTransaction = true;
@@ -196,7 +186,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
 
         const initialTxnStateBefore = getTransactionState(initialLsid, initialTxnNumber);
         assert.eq(initialTxnStateBefore.oplogEntries.length,
-                  (txnOptions.isPreparedTxn ? 2 : 1) + (expectFindAndModifyImageInOplog ? 1 : 0),
+                  (txnOptions.isPreparedTxn ? 2 : 1),
                   initialTxnStateBefore.oplogEntries);
         assert.eq(initialTxnStateBefore.imageEntries.length,
                   expectFindAndModifyImageInSideCollection ? 1 : 0,
@@ -236,15 +226,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         assert.commandWorked(mongosTestColl.remove({}));
     }
 
-    function testRetryableLargeTxn(cmdObj, {
-        txnOptions,
-        testMode,
-        expectFindAndModifyImageInOplog,
-        expectFindAndModifyImageInSideCollection,
-        checkRetryResponseFunc
-    }) {
-        assert(!expectFindAndModifyImageInOplog || !expectFindAndModifyImageInSideCollection);
-
+    function testRetryableLargeTxn(
+        cmdObj,
+        {txnOptions, testMode, expectFindAndModifyImageInSideCollection, checkRetryResponseFunc}) {
         jsTest.log(
             "Testing retrying a retryable internal transaction with more than one applyOps oplog entry");
 
@@ -315,8 +299,7 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         const expectedOplogLength =
             Math.floor(stmtId / maxNumberOfTransactionOperationsInSingleOplogEntry);
         assert.eq(initialTxnStateBefore.oplogEntries.length,
-                  (txnOptions.isPreparedTxn ? expectedOplogLength + 1 : expectedOplogLength) +
-                      (expectFindAndModifyImageInOplog ? 1 : 0));
+                  (txnOptions.isPreparedTxn ? expectedOplogLength + 1 : expectedOplogLength));
         assert.eq(initialTxnStateBefore.imageEntries.length,
                   expectFindAndModifyImageInSideCollection ? 1 : 0,
                   initialTxnStateBefore.imageEntries);
@@ -365,7 +348,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         txnOptions,
         testMode,
         expectRetryToSucceed,
-        expectFindAndModifyImageInOplog,
         expectFindAndModifyImageInSideCollection,
         checkRetryResponseFunc
     }) {
@@ -383,7 +365,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
             txnOptions,
             testMode,
             expectRetryToSucceed,
-            expectFindAndModifyImageInOplog,
             expectFindAndModifyImageInSideCollection,
             checkRetryResponseFunc
         });
@@ -452,15 +433,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     function testRetryFindAndModify(findAndModifyCmdObj, {
         txnOptions,
         testMode,
-        enableFindAndModifyImageCollection,
         expectRetryToSucceed,
         expectFindAndModifyImage,
     }) {
-        const shard0Primary = st.rs0.getPrimary();
-        assert.commandWorked(shard0Primary.adminCommand({
-            setParameter: 1,
-            storeFindAndModifyImagesInSideCollection: enableFindAndModifyImageCollection
-        }));
         const checkRetryResponseFunc = (initialRes, retryRes) => {
             assert.eq(initialRes.lastErrorObject, retryRes.lastErrorObject);
             assert.eq(initialRes.value, retryRes.value);
@@ -470,10 +445,8 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
             txnOptions,
             testMode,
             expectRetryToSucceed,
-            expectFindAndModifyImageInOplog: expectRetryToSucceed && expectFindAndModifyImage &&
-                !enableFindAndModifyImageCollection,
-            expectFindAndModifyImageInSideCollection: expectRetryToSucceed &&
-                expectFindAndModifyImage && enableFindAndModifyImageCollection,
+            expectFindAndModifyImageInSideCollection:
+                expectRetryToSucceed && expectFindAndModifyImage,
             checkRetryResponseFunc
         });
     }
@@ -481,12 +454,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     function testRetryFindAndModifyUpsert({
         txnOptions,
         testMode,
-        enableFindAndModifyImageCollection,
         expectRetryToSucceed,
     }) {
-        jsTest.log(
-            "Testing findAndModify upsert (i.e. no preImage or postImage) with enableFindAndModifyImageCollection: " +
-            enableFindAndModifyImageCollection);
+        jsTest.log("Testing findAndModify upsert (i.e. no preImage or postImage)");
 
         const findAndModifyCmdObj = {
             findAndModify: kCollName,
@@ -498,7 +468,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,
-            enableFindAndModifyImageCollection,
             expectFindAndModifyImage,
             expectRetryToSucceed,
         });
@@ -507,12 +476,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     function testRetryFindAndModifyUpdateWithPreImage({
         txnOptions,
         testMode,
-        enableFindAndModifyImageCollection,
         expectRetryToSucceed,
     }) {
-        jsTest.log(
-            "Testing findAndModify update with preImage with enableFindAndModifyImageCollection: " +
-            enableFindAndModifyImageCollection);
+        jsTest.log("Testing findAndModify update with preImage");
 
         assert.commandWorked(mongosTestColl.insert([{_id: -1, x: -1}]));
         const findAndModifyCmdObj = {
@@ -524,7 +490,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,
-            enableFindAndModifyImageCollection,
             expectFindAndModifyImage,
             expectRetryToSucceed,
         });
@@ -533,12 +498,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     function testRetryFindAndModifyUpdateWithPostImage({
         txnOptions,
         testMode,
-        enableFindAndModifyImageCollection,
         expectRetryToSucceed,
     }) {
-        jsTest.log(
-            "Testing findAndModify update with postImage with enableFindAndModifyImageCollection: " +
-            enableFindAndModifyImageCollection);
+        jsTest.log("Testing findAndModify update with postImage");
 
         assert.commandWorked(mongosTestColl.insert([{_id: -1, x: -1}]));
         const findAndModifyCmdObj = {
@@ -551,7 +513,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,
-            enableFindAndModifyImageCollection,
             expectFindAndModifyImage,
             expectRetryToSucceed,
         });
@@ -560,12 +521,9 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     function testRetryFindAndModifyRemove({
         txnOptions,
         testMode,
-        enableFindAndModifyImageCollection,
         expectRetryToSucceed,
     }) {
-        jsTest.log(
-            "Testing findAndModify remove (i.e. with preImage) with enableFindAndModifyImageCollection: " +
-            enableFindAndModifyImageCollection);
+        jsTest.log("Testing findAndModify remove (i.e. with preImage)");
 
         assert.commandWorked(mongosTestColl.insert([{_id: -1, x: -1}]));
         const findAndModifyCmdObj = {
@@ -577,7 +535,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
         testRetryFindAndModify(findAndModifyCmdObj, {
             txnOptions,
             testMode,
-            enableFindAndModifyImageCollection,
             expectFindAndModifyImage,
             expectRetryToSucceed,
         });
@@ -609,7 +566,6 @@ function RetryableInternalTransactionTest(collectionOptions = {}) {
     }
 
     this.runFindAndModifyTestsEnableImageCollection = function(testOptions) {
-        testOptions.enableFindAndModifyImageCollection = true;
         runFindAndModifyTests(testOptions);
     };
 

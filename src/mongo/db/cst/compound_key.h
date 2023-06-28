@@ -29,9 +29,10 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
+#include <utility>
+
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 

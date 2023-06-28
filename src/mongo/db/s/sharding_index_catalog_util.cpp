@@ -31,17 +31,38 @@
 
 #include "mongo/db/s/sharding_index_catalog_util.h"
 
-#include "mongo/db/dbdirectclient.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <set>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/s/participant_block_gen.h"
 #include "mongo/db/s/sharded_index_catalog_commands_gen.h"
 #include "mongo/db/s/sharding_ddl_util.h"
 #include "mongo/db/s/sharding_util.h"
-#include "mongo/db/transaction/transaction_api.h"
-#include "mongo/db/transaction/transaction_participant_resource_yielder.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
-#include "mongo/s/catalog/type_index_catalog.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace sharding_index_catalog_util {

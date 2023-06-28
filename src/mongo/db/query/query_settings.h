@@ -29,16 +29,22 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <set>
 #include <string>
+#include <vector>
 
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobj_comparator_interface.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/index_entry.h"
 #include "mongo/db/query/plan_cache.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

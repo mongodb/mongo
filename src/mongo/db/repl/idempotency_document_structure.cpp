@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/repl/idempotency_document_structure.h"
-
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/value.h"
-#include "mongo/db/jsobj.h"
+#include "mongo/db/repl/idempotency_document_structure.h"
 
 namespace mongo {
 

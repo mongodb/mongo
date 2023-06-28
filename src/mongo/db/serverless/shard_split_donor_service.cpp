@@ -30,30 +30,80 @@
 
 #include "mongo/db/serverless/shard_split_donor_service.h"
 
-#include "mongo/client/streamable_replica_set_monitor.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/replica_set_monitor_stats.h"
+#include "mongo/client/sdam/sdam_configuration.h"
+#include "mongo/client/sdam/topology_listener.h"
+#include "mongo/client/server_discovery_monitor.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_write_path.h"
-#include "mongo/db/catalog_raii.h"
+#include "mongo/db/catalog/local_oplog_info.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/ops/update_result.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
+#include "mongo/db/repl/repl_server_parameters_gen.h"
+#include "mongo/db/repl/repl_set_config.h"
+#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/tenant_migration_access_blocker_registry.h"
+#include "mongo/db/repl/tenant_migration_donor_access_blocker.h"
 #include "mongo/db/repl/wait_for_majority_service.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/serverless/serverless_types_gen.h"
 #include "mongo/db/serverless/shard_split_statistics.h"
 #include "mongo/db/serverless/shard_split_utils.h"
 #include "mongo/db/shard_role.h"
-#include "mongo/executor/cancelable_executor.h"
-#include "mongo/executor/connection_pool.h"
-#include "mongo/executor/network_interface_factory.h"
-#include "mongo/executor/network_interface_thread_pool.h"
-#include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/egress_metadata_hook_list.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_util.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -65,6 +115,7 @@ namespace {
 MONGO_FAIL_POINT_DEFINE(abortShardSplitBeforeLeavingBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitBeforeBlockingState);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterBlocking);
+MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterRecipientCaughtUp);
 MONGO_FAIL_POINT_DEFINE(pauseShardSplitAfterDecision);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitGarbageCollectionTimeout);
 MONGO_FAIL_POINT_DEFINE(skipShardSplitWaitForSplitAcceptance);
@@ -345,6 +396,8 @@ SemiFuture<void> ShardSplitDonorService::DonorStateMachine::run(
                 return _waitForRecipientToReachBlockOpTime(executor, abortToken);
             })
             .then([this, executor, abortToken, criticalSectionWithoutCatchupTimer] {
+                auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                pauseShardSplitAfterRecipientCaughtUp.pauseWhileSet(opCtx.get());
                 criticalSectionWithoutCatchupTimer->reset();
                 return _applySplitConfigToDonor(executor, abortToken);
             })
@@ -533,7 +586,7 @@ ConnectionString ShardSplitDonorService::DonorStateMachine::_setupAcceptanceMoni
 
     // Always start the replica set monitor if we haven't reached a decision yet
     _splitAcceptancePromise.setWith([&]() {
-        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking ||
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kRecipientCaughtUp ||
             MONGO_unlikely(skipShardSplitWaitForSplitAcceptance.shouldFail())) {
             return Future<HostAndPort>::makeReady(StatusWith<HostAndPort>(HostAndPort{}));
         }
@@ -661,7 +714,7 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
     checkForTokenInterrupt(abortToken);
 
     stdx::lock_guard<Latch> lg(_mutex);
-    if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking ||
+    if (_stateDoc.getState() >= ShardSplitDonorStateEnum::kRecipientCaughtUp ||
         _hasInstalledSplitConfig(lg)) {
         return ExecutorFuture(**executor);
     }
@@ -686,11 +739,27 @@ ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_waitForRecipien
     LOGV2(
         6177201, "Waiting for recipient nodes to reach block timestamp.", "id"_attr = _migrationId);
 
-    return ExecutorFuture(**executor).then([this, blockOpTime, writeConcern]() {
-        auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
-        auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
-        uassertStatusOK(replCoord->awaitReplication(opCtx.get(), blockOpTime, writeConcern).status);
-    });
+    return ExecutorFuture(**executor)
+        .then([this, blockOpTime, writeConcern]() {
+            auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+            auto replCoord = repl::ReplicationCoordinator::get(cc().getServiceContext());
+            uassertStatusOK(
+                replCoord->awaitReplication(opCtx.get(), blockOpTime, writeConcern).status);
+        })
+        .then([this, executor, abortToken]() {
+            {
+                stdx::lock_guard<Latch> lg(_mutex);
+                LOGV2(8423389,
+                      "Entering 'recipient caught up' state.",
+                      "id"_attr = _stateDoc.getId());
+            }
+
+            return _updateStateDocument(
+                       executor, abortToken, ShardSplitDonorStateEnum::kRecipientCaughtUp)
+                .then([this, self = shared_from_this(), executor, abortToken](repl::OpTime opTime) {
+                    return _waitForMajorityWriteConcern(executor, std::move(opTime), abortToken);
+                });
+        });
 }
 
 ExecutorFuture<void> ShardSplitDonorService::DonorStateMachine::_applySplitConfigToDonor(
@@ -791,7 +860,7 @@ ShardSplitDonorService::DonorStateMachine::_waitForSplitAcceptanceAndEnterCommit
     checkForTokenInterrupt(abortToken);
     {
         stdx::lock_guard<Latch> lg(_mutex);
-        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kBlocking) {
+        if (_stateDoc.getState() > ShardSplitDonorStateEnum::kRecipientCaughtUp) {
             return ExecutorFuture(**executor);
         }
     }
@@ -927,6 +996,7 @@ ExecutorFuture<repl::OpTime> ShardSplitDonorService::DonorStateMachine::_updateS
                        switch (nextState) {
                            case ShardSplitDonorStateEnum::kUninitialized:
                            case ShardSplitDonorStateEnum::kAbortingIndexBuilds:
+                           case ShardSplitDonorStateEnum::kRecipientCaughtUp:
                                break;
                            case ShardSplitDonorStateEnum::kBlocking:
                                _stateDoc.setBlockOpTime(oplogSlot);

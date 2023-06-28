@@ -29,12 +29,40 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/metadata_manager.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_migration_critical_section.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

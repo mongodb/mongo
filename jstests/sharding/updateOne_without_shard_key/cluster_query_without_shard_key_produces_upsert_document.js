@@ -3,10 +3,10 @@
  * filter and {upsert: true}.
  *
  * @tags: [
+ *    requires_fcv_71,
  *    requires_sharding,
  *    uses_transactions,
  *    uses_multi_shard_transaction,
- *    featureFlagUpdateOneWithoutShardKey,
  * ]
  */
 

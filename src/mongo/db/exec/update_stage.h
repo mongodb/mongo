@@ -29,12 +29,35 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <functional>
+#include <memory>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/mutable/damage_vector.h"
+#include "mongo/bson/mutable/document.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_collection_stage.h"
+#include "mongo/db/exec/working_set.h"
 #include "mongo/db/exec/write_stage_common.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/stage_types.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/s/sharding_write_router.h"
+#include "mongo/db/shard_role.h"
+#include "mongo/db/storage/snapshot.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
 

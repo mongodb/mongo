@@ -27,6 +27,10 @@
  *    it in the license file.
  */
 
+#include <iosfwd>
+#include <string>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/rpc/op_msg.h"
 
 #pragma once

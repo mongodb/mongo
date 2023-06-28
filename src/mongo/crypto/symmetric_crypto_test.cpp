@@ -28,12 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <initializer_list>
+#include <iterator>
+#include <memory>
+#include <numeric>
 #include <queue>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/crypto/block_packer.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/crypto/symmetric_key.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 
 namespace mongo {
@@ -805,9 +826,6 @@ TEST_F(AESTestVectors, CTRTestCase1234) {
                       "dfc9c58db67aada613c2dd08457941a6"));
 }
 
-// The tests vectors below are generated using random data. Since they do not contain logic,
-// we will have them in a separate file so that they do not overtake the code space
-#include "symmetric_crypto_tests.gen"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -32,6 +32,7 @@
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/ftdc/collector.h"
 #include "mongo/db/ftdc/controller.h"
 
 namespace mongo {

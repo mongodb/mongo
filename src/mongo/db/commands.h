@@ -29,34 +29,60 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <fmt/format.h>
 #include <functional>
+#include <memory>
+#include <set>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/mutable/element.h"
 #include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/privilege.h"
 #include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/request_execution_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/write_concern.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/reply_builder_interface.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future.h"
+#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {
@@ -69,6 +95,7 @@ extern const std::set<std::string> kApiVersions1;
 
 class AuthorizationContract;
 class Command;
+
 class CommandInvocation;
 class OperationContext;
 

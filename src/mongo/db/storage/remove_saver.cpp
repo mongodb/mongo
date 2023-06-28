@@ -28,19 +28,29 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/storage/remove_saver.h"
-
 #include <boost/filesystem/operations.hpp>
-#include <fstream>
-#include <ios>
+#include <cstddef>
+#include <cstdint>
+#include <fstream>  // IWYU pragma: keep
+#include <utility>
 
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/encryption_hooks.h"
+#include "mongo/db/storage/remove_saver.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

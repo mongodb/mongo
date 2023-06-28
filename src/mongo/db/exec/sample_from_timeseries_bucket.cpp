@@ -29,10 +29,30 @@
 
 
 #include "mongo/db/exec/sample_from_timeseries_bucket.h"
-#include "mongo/db/exec/shard_filterer.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/exec/shard_filterer.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/snapshot.h"
+#include "mongo/db/timeseries/timeseries_constants.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -32,6 +32,7 @@
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/fle2_get_count_info_command_gen.h"
+#include "mongo/db/curop.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
 
@@ -86,8 +87,9 @@ public:
             auto* as = AuthorizationSession::get(opCtx->getClient());
             uassert(ErrorCodes::Unauthorized,
                     "Not authorized to read tags",
-                    as->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::internal));
+                    as->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(request().getDbName().tenantId()),
+                        ActionType::internal));
         }
 
         NamespaceString ns() const final {

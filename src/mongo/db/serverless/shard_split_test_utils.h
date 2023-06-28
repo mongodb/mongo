@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <string>
+#include <vector>
+
 #include "mongo/db/tenant_id.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/uuid.h"

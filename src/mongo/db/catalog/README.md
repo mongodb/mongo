@@ -365,27 +365,30 @@ cache of the [durable catalog](#durable-catalog) state. It provides the followin
  * Ensures `Collection` objects are in-sync with opened storage snapshots.
 
 ### Synchronization
-Catalog access is synchronized using [read-copy-update][] where reads operate on an immutable
-instance and writes on a new instance with its contents copied from the previous immutable instance
-used for reads. Readers holding on to a catalog instance will thus not observe any writes that
-happen after requesting an instance. If it is desired to observe writes while holding a catalog
+Catalog access is synchronized using [Multiversion concurrency control] where readers operate on 
+immutable catalog, collection and index instances. Writes use [copy-on-write][] to create newer 
+versions of the catalog, collection and index instances to be changed, contents are copied from the 
+previous latest version. Readers holding on to a catalog instance will thus not observe any writes 
+that happen after requesting an instance. If it is desired to observe writes while holding a catalog 
 instance then the reader must refresh it.
 
 Catalog writes are handled with the `CollectionCatalog::write(callback)` interface. It provides the
-necessary [read-copy-update][] abstractions. A writable catalog instance is created by making a
+necessary [copy-on-write][] abstractions. A writable catalog instance is created by making a
 shallow copy of the existing catalog. The actual write is implemented in the supplied callback which
 is allowed to throw. Execution of the write callbacks are serialized and may run on a different
-thread than the thread calling `CollectionCatalog::write`.
+thread than the thread calling `CollectionCatalog::write`. Users should take care of not performing 
+any blocking operations in these callbacks as it would block all other DDL writes in the system.
 
 To avoid a bottleneck in the case the catalog contains a large number of collections (being slow to
-copy), concurrent writes are batched together. Any thread that enters `CollectionCatalog::write`
-while a catalog instance is being copied is enqueued. When the copy finishes, all enqueued write
-jobs are run on that catalog instance by the copying thread.
+copy), immutable data structures are used, concurrent writes are also batched together. Any thread 
+that enters `CollectionCatalog::write` while a catalog instance is being copied or while executing 
+write callbacks is enqueued. When the copy finishes, all enqueued write jobs are run on that catalog 
+instance by the copying thread.
 
 ### Collection objects
 Objects of the `Collection` class provide access to a collection's properties between
 [DDL](#glossary) operations that modify these properties. Modifications are synchronized using
-[read-copy-update][]. Reads access immutable `Collection` instances. Writes, such as rename
+[copy-on-write][]. Reads access immutable `Collection` instances. Writes, such as rename
 collection, apply changes to a clone of the latest `Collection` instance and then atomically install
 the new `Collection` instance in the catalog. It is possible for operations that read at different
 points in time to use different `Collection` objects.
@@ -407,16 +410,17 @@ In addition `Collection` objects have shared ownership of:
    by the storage engine.
 
 A writable `Collection` may only be requested in an active [WriteUnitOfWork](#WriteUnitOfWork). The
-new `Collection` instance is installed in the catalog when the storage transaction commits, but only
-after all other `onCommit` [Changes](#Changes) have run. This ensures `onCommit` operations can
-write to the writable `Collection` before it becomes visible to readers in the catalog. If the
-storage transaction rolls back then the writable `Collection` object is simply discarded and no
-change is ever made to the catalog.
+new `Collection` instance is installed in the catalog when the storage transaction commits as the 
+first `onCommit` [Changes](#Changes) that run. This means that it is not allowed to perform any 
+modification to catalog, collection or index instances in `onCommit` handlers. Such modifications 
+would break the immutability property of these instances for readers. If the storage transaction 
+rolls back then the writable `Collection` object is simply discarded and no change is ever made to 
+the catalog.
 
 A writable `Collection` is a clone of the existing `Collection`, members are either deep or
 shallowed copied. Notably, a shallow copy is made for the [`IndexCatalog`](#index-catalog).
 
-The oplog `Collection` follows special rules, it does not use [read-copy-update][] or any other form
+The oplog `Collection` follows special rules, it does not use [copy-on-write][] or any other form
 of synchronization. Modifications operate directly on the instance installed in the catalog. It is
 not allowed to read concurrently with writes on the oplog `Collection`.
 
@@ -438,6 +442,8 @@ The `Collection` object is brought to existence in two ways:
       is not present in the `CollectionCatalog`, or the `Collection` is there, but incompatible with
       the snapshot. See [here](#catalog-changes-versioning-and-the-minimum-valid-snapshot) how a
       `Collection` is determined to be incompatible.
+   3. When we read at latest concurrently with a DDL operation that is also performing multikey 
+      changes.
 
 For (1) and (2.1) the `Collection` objects are stored as shared pointers in the `CollectionCatalog`
 and available to all operations running in the database. These `Collection` objects are released
@@ -451,6 +457,9 @@ that instantiated them. When the snapshot is abandoned, such as during query yie
 `Collection` objects are released. Multiple lookups from the `CollectionCatalog` will re-use the
 previously instantiated `Collection` instead of performing the instantiation at every lookup for the
 same operation.
+
+(2.3) is an edge case where neither latest or pending `Collection` match the opened snapshot due to
+concurrent multikey changes.
 
 Users of `Collection` instances have a few responsibilities to keep the object valid.
 1. Hold a collection-level lock.
@@ -950,7 +959,7 @@ ResourceType, as locking at this level is done in the storage engine itself for 
 ### Document Level Concurrency Control
 
 Each storage engine is responsible for locking at the document level.  The WiredTiger storage engine
-uses MVCC (multiversion concurrency control) along with optimistic locking in order to provide
+uses MVCC [multiversion concurrency control][] along with optimistic locking in order to provide
 concurrency guarantees.
 
 ## Two-Phase Locking
@@ -1663,18 +1672,34 @@ Flow Control is only concerned whether an operation is 'immediate' priority and 
 * `kNormal` - An operation that should be throttled when the server is under load. If an operation is throttled, it will not affect availability or observability. Most operations, both user and internal, should use this priority unless they qualify as 'kLow' or 'kImmediate' priority.
 * `kLow` - It's of low importance that the operation acquires a ticket in Execution Admission Control. Reserved for background tasks that have no other operations dependent on them. The operation will be throttled under load and make significantly less progress compared to operations of higher priorities in the Execution Admission Control.
 
-Developers should consciously decide admission priority when adding new features. Admission priority can be set through the [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L747) RAII.
+[See AdmissionContext::Priority for more details](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/util/concurrency/admission_context.h#L45-L67).
+
+### How to Set Admission Priority
+The preferred method for setting an operation's priority is through the RAII type [ScopedAdmissionPriorityForLock](https://github.com/mongodb/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L747).
+
+```
+ScopedAdmissionPriorityForLock priority(opCtx->lockState(), AdmissionContext::Priority::kLow);
+```
+
+Since the GlobalLock may be acquired and released multiple times throughout an operation's lifetime, it's important to limit the scope of reprioritization to prevent unintentional side-effects. However, if there is a special circumstance where the RAII cannot possibly be used, the priority can be set directly through [Locker::setAdmissionPriority()](https://github.com/10gen/mongo/blob/r7.0.0-rc0/src/mongo/db/concurrency/locker.h#L525).
 
 ### Developer Guidelines for Declaring Low Admission Priority
-Developers must evaluate the consequences of each low priority operation from falling too far behind, and implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
+Developers must evaluate the consequences of each low priority operation from falling too far behind, and should try to implement safeguards to avoid any undesirable behaviors for excessive delays in low priority operations.
 
-An operation should dynamically choose when to be deprioritized or re-prioritized. More
-specifically, all low-priority candidates must assess the state of the system before taking the
+Whenever possible, an operation should dynamically choose when to be deprioritized or re-prioritized. More
+specifically, all low-priority candidates should assess the impact of deprioritizing their operation with respect to the state of the system before taking the
 GlobalLock with low priority.
 
 For example, since TTL deletes can be an expensive background task, they should default to low
 priority. However, it's important they don't fall too far behind TTL inserts - otherwise, there is a risk of
 unbounded collection growth. To remedy this issue, TTL deletes on a collection [are reprioritized](https://github.com/mongodb/mongo/blob/d1a0e34e1e67d4a2b23104af2512d14290b25e5f/src/mongo/db/ttl.idl#L96) to normal priority if they can't catch up after n-subpasses.
+
+Examples of Deprioritized Operations:
+* [TTL deletes](https://github.com/mongodb/mongo/blob/0ceb784512f81f77f0bc55001f83ca77d1aa1d84/src/mongo/db/ttl.cpp#L488)
+* [Persisting sampled queries for analyze shard key](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/commands/write_commands.cpp#L295)
+* [Unbounded Index Scans](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_access.cpp#L1913)
+* [Unbounded Collection Scans](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/query/planner_analysis.cpp#L1254)
+* Index Builds [(1)](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3064), [(2)](https://github.com/10gen/mongo/blob/0ef2c68f58ea20c2dde99e5ce3ea10b79e18453d/src/mongo/db/index_builds_coordinator.cpp#L3105)
 
 ## Execution Admission Control
 A ticketing mechanism that limits the number of concurrent storage engine transactions in a single mongod to reduce contention on storage engine resources.
@@ -2382,4 +2407,5 @@ oplog.
   for removal).
 - `ops.key-hex` and `ops.value-bson` are specific to the pretty printing tool used.
 
-[read-copy-update]: https://en.wikipedia.org/wiki/Read-copy-update
+[copy-on-write]: https://en.wikipedia.org/wiki/Copy-on-write
+[Multiversion concurrency control]: https://en.wikipedia.org/wiki/Multiversion_concurrency_control

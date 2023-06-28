@@ -1117,6 +1117,36 @@ TEST_F(NetworkInterfaceTest, StartExhaustCommandShouldStopOnFailure) {
     }
 }
 
+TEST_F(NetworkInterfaceTest, ExhaustCommandCancelRunsOutOfLine) {
+    thread_local bool inCancellationContext = false;
+    auto pf = makePromiseFuture<bool>();
+    auto cbh = makeCallbackHandle();
+    auto callback = [&](auto&&) mutable {
+        pf.promise.emplaceValue(inCancellationContext);
+    };
+
+    auto deferred = [&] {
+        FailPointEnableBlock fpb("networkInterfaceHangCommandsAfterAcquireConn");
+
+        auto deferred = startExhaustCommand(
+            cbh, makeTestCommand(kMaxWait, makeEchoCmdObj()), std::move(callback));
+
+        waitForHello();
+
+        fpb->waitForTimesEntered(fpb.initialTimesEntered() + 1);
+
+        inCancellationContext = true;
+        net().cancelCommand(cbh);
+        inCancellationContext = false;
+        return deferred;
+    }();
+
+    auto result = deferred.getNoThrow();
+    ASSERT_EQ(ErrorCodes::CallbackCanceled, result);
+    bool cancellationRanInline = pf.future.get();
+    ASSERT_FALSE(cancellationRanInline);
+}
+
 TEST_F(NetworkInterfaceTest, TearDownWaitsForInProgress) {
     boost::optional<stdx::thread> tearDownThread;
     auto tearDownPF = makePromiseFuture<void>();

@@ -39,6 +39,7 @@
 #include <grpcpp/impl/rpc_service_method.h>
 #include <grpcpp/support/byte_buffer.h>
 #include <grpcpp/support/method_handler.h>
+#include <grpcpp/support/status_code_enum.h>
 #include <grpcpp/support/sync_stream.h>
 
 #include "mongo/logv2/log.h"
@@ -51,7 +52,6 @@
 #include "mongo/util/shared_buffer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
-
 
 namespace mongo::transport::grpc {
 
@@ -203,7 +203,7 @@ auto makeRpcServiceMethod(CommandService* service, const char* name, HandlerType
 const std::string CommandService::kClusterMaxWireVersionKey = "mongodb-maxwireversion";
 
 CommandService::CommandService(GRPCTransportLayer* tl,
-                               RpcHandler callback,
+                               RPCHandler callback,
                                std::shared_ptr<WireVersionProvider> wvProvider)
     : _tl{tl},
       _callback{std::move(callback)},
@@ -213,14 +213,14 @@ CommandService::CommandService(GRPCTransportLayer* tl,
     AddMethod(makeRpcServiceMethod(
         this,
         kUnauthenticatedCommandStreamMethodName,
-        [](CommandService* service, GRPCServerContext ctx, GRPCServerStream stream) {
+        [](CommandService* service, GRPCServerContext& ctx, GRPCServerStream& stream) {
             return service->_handleStream(ctx, stream);
         }));
 
     AddMethod(makeRpcServiceMethod(
         this,
         kAuthenticatedCommandStreamMethodName,
-        [](CommandService* service, GRPCServerContext ctx, GRPCServerStream stream) {
+        [](CommandService* service, GRPCServerContext& ctx, GRPCServerStream& stream) {
             return service->_handleAuthenticatedStream(ctx, stream);
         }));
 }
@@ -250,8 +250,7 @@ CommandService::CommandService(GRPCTransportLayer* tl,
 
         if (_shutdown) {
             session->terminate(kShutdownTerminationStatus);
-            return ::grpc::Status{::grpc::StatusCode::UNAVAILABLE,
-                                  kShutdownTerminationStatus.reason()};
+            return util::convertStatus(*session->terminationStatus());
         }
         it = _sessions.insert(_sessions.begin(), session);
     }
@@ -267,9 +266,10 @@ CommandService::CommandService(GRPCTransportLayer* tl,
         logClientMetadataDocument(clientMetadata, *session);
     }
 
-    auto status = _callback(session);
-    invariant(!session->isConnected());
-    return status;
+    _callback(session);
+    auto status = session->terminationStatus();
+    invariant(status.has_value());
+    return util::convertStatus(std::move(*status));
 }
 
 ::grpc::Status CommandService::_handleAuthenticatedStream(ServerContext& serverCtx,
@@ -293,7 +293,7 @@ void CommandService::shutdown() {
 
     auto nSessionsTerminated = _sessions.size();
     for (auto& session : _sessions) {
-        session->terminate(kShutdownTerminationStatus);
+        session->cancel(kShutdownTerminationStatus.reason());
     }
 
     _shutdownCV.wait(lk, [&]() { return _sessions.empty(); });

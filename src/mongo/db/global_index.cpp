@@ -29,23 +29,54 @@
 
 #include "mongo/db/global_index.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
-#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/collection_options.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/dbhelpers.h"
+#include "mongo/db/exec/collection_scan_common.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/record_id_bound.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/shard_role.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/retryable_writes_stats.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -212,14 +243,13 @@ void dropContainer(OperationContext* opCtx, const UUID& indexUUID) {
 }
 
 void insertKey(OperationContext* opCtx,
-               const CollectionPtr& container,
+               const ScopedCollectionAcquisition& container,
                const BSONObj& key,
                const BSONObj& docKey) {
     const auto indexEntry = buildIndexEntry(key, docKey);
     invariant(!opCtx->writesAreReplicated());
 
-    uassertStatusOK(collection_internal::insertDocument(
-        opCtx, container, InsertStatement(indexEntry), nullptr));
+    uassertStatusOK(Helpers::insert(opCtx, container, indexEntry));
 }
 
 void insertKey(OperationContext* opCtx,
@@ -232,17 +262,19 @@ void insertKey(OperationContext* opCtx,
     // Insert the index entry.
     writeConflictRetry(opCtx, "insertGlobalIndexKey", ns, [&] {
         WriteUnitOfWork wuow(opCtx);
-        AutoGetCollection autoColl(opCtx, ns, MODE_IX);
-        auto& container = autoColl.getCollection();
+        const auto coll = acquireCollection(
+            opCtx,
+            CollectionAcquisitionRequest::fromOpCtx(opCtx, ns, AcquisitionPrerequisites::kWrite),
+            MODE_IX);
 
         uassert(6789402,
                 str::stream() << "Global index container with UUID " << indexUUID
                               << " does not exist.",
-                container);
+                coll.exists());
 
         {
             repl::UnreplicatedWritesBlock unreplicatedWrites(opCtx);
-            insertKey(opCtx, container, key, docKey);
+            insertKey(opCtx, coll, key, docKey);
         }
 
         opCtx->getServiceContext()->getOpObserver()->onInsertGlobalIndexKey(

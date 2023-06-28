@@ -29,29 +29,57 @@
 
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <iterator>
+#include <type_traits>
+#include <typeinfo>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/index/index_descriptor.h"
-#include "mongo/db/pipeline/document_source.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
 #include "mongo/db/pipeline/document_source_merge.h"
+#include "mongo/db/pipeline/legacy_runtime_constants_gen.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/cursor_response.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/kill_sessions.h"
+#include "mongo/db/session/session_catalog.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/redaction.h"
 #include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
 #include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/query/router_exec_stage.h"
 #include "mongo/s/query_analysis_sample_tracker.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/s/transaction_router.h"
-#include "mongo/util/fail_point.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

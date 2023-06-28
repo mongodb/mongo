@@ -53,11 +53,8 @@ rst.stepUp(secondary);
 createIdx();
 
 // The new primary should eventually abort the build.
-IndexBuildTest.waitForIndexBuildToStop(primaryDB, primaryColl.getName(), kIndexName);
-IndexBuildTest.waitForIndexBuildToStop(secondaryDB, secondaryColl.getName(), kIndexName);
-
-IndexBuildTest.assertIndexes(primaryColl, 1, ['_id_']);
-IndexBuildTest.assertIndexes(secondaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(primaryColl, 1, ['_id_']);
+IndexBuildTest.assertIndexesSoon(secondaryColl, 1, ['_id_']);
 
 // Verify failure reason is due to step-up check.
 checkLog.checkContainsOnceJsonStringMatch(

@@ -29,23 +29,41 @@
 
 #pragma once
 
-#include <limits>
-
 #include <absl/hash/hash.h>
+#include <boost/container/flat_set.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <functional>
+#include <iosfwd>
+#include <limits>
+#include <string>
+#include <type_traits>
+#include <utility>
 
+#include "mongo/base/data_type_endian.h"
 #include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
 #include "mongo/bson/ordering.h"
 #include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
-
-#include <boost/container/flat_set.hpp>
+#include "mongo/util/bufreader.h"
+#include "mongo/util/shared_buffer_fragment.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

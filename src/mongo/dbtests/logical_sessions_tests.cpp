@@ -43,7 +43,8 @@
 namespace mongo {
 namespace {
 
-const NamespaceString kTestNS("config.system.sessions");
+const NamespaceString kTestNS =
+    NamespaceString::createNamespaceString_forTest("config.system.sessions");
 
 LogicalSessionRecord makeRecord(Date_t time = Date_t::now()) {
     auto record = makeLogicalSessionRecordForTest();

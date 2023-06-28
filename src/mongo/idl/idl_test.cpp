@@ -2470,6 +2470,12 @@ TEST(IDLEnum, ExtraDataEnum) {
     ASSERT_BSONOBJ_EQ(s2Data, s2Expected);
 }
 
+TEST(IDLEnum, NonContiguousIntEnum) {
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::one), 1);
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::five), 5);
+    ASSERT_EQ(static_cast<int>(NonContiguousIntEnum::ten), 10);
+}
+
 OpMsgRequest makeOMR(BSONObj obj) {
     OpMsgRequest request;
     request.body = obj;
@@ -2656,7 +2662,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest("db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2717,7 +2723,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestNSS_WithTenant) {
     auto testStruct =
         BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMRWithTenant(testDoc, tenantId));
     ASSERT_EQUALS(testStruct.getDbName(), DatabaseName::createDatabaseName_forTest(tenantId, "db"));
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss().value(),
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().nss(),
                   NamespaceString::createNamespaceString_forTest(tenantId, "db.coll1"));
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
@@ -2741,7 +2747,7 @@ TEST(IDLCommand, TestConcatentateWithDbOrUUID_TestUUID) {
     auto testStruct = BasicConcatenateWithDbOrUUIDCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
     ASSERT_EQUALS(testStruct.getField2(), "five");
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
     assert_same_types<decltype(testStruct.getNamespaceOrUUID()), const NamespaceStringOrUUID&>();
 
@@ -4074,7 +4080,7 @@ TEST(IDLCommand, BasicNamespaceConstGetterCommand_TestNonConstGetterGeneration) 
 
     auto testStruct = BasicNamespaceConstGetterCommand::parse(ctxt, makeOMR(testDoc));
     ASSERT_EQUALS(testStruct.getField1(), 3);
-    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid().value(), uuid);
+    ASSERT_EQUALS(testStruct.getNamespaceOrUUID().uuid(), uuid);
 
     // Verify that both const and non-const getters are generated.
     assert_same_types<
@@ -4914,13 +4920,16 @@ TEST(IDLAccessCheck, TestSimplePrivilegeAccessCheck) {
 }
 
 TEST(IDLAccessCheck, TestComplexAccessCheck) {
+    const auto kTestDB = DatabaseName::createDatabaseName_forTest(boost::none, "test"_sd);
     AuthorizationContract ac;
     ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::addShard));
     ac.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::serverStatus));
 
-    ac.addPrivilege(Privilege(ResourcePattern::forDatabaseName("test"), ActionType::trafficRecord));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forDatabaseName(kTestDB), ActionType::trafficRecord));
 
-    ac.addPrivilege(Privilege(ResourcePattern::forAnyResource(), ActionType::splitVector));
+    ac.addPrivilege(
+        Privilege(ResourcePattern::forAnyResource(boost::none), ActionType::splitVector));
 
     ac.addAccessCheck(AccessCheckEnum::kIsAuthenticated);
     ac.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);

@@ -29,13 +29,22 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
 #include <stack>
+#include <utility>
+#include <variant>
 
 #include "mongo/db/exec/sbe/abt/abt_lower_defs.h"
 #include "mongo/db/exec/sbe/expressions/expression.h"
 #include "mongo/db/exec/sbe/stages/co_scan.h"
 #include "mongo/db/exec/sbe/stages/limit_skip.h"
+#include "mongo/db/exec/sbe/stages/stages.h"
+#include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/query/sbe_stage_builder_abt_holder_def.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/stdx/variant.h"
 
 namespace mongo::sbe {

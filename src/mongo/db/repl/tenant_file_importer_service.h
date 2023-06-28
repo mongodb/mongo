@@ -29,14 +29,27 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <functional>
+#include <memory>
+#include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/client/dbclient_connection.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replica_set_aware_service.h"
 #include "mongo/db/repl/tenant_migration_shared_data.h"
+#include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/mutex.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/producer_consumer_queue.h"
 #include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
@@ -49,7 +62,7 @@ public:
     static constexpr StringData kTenantFileImporterServiceName = "TenantFileImporterService"_sd;
     static TenantFileImporterService* get(ServiceContext* serviceContext);
     static TenantFileImporterService* get(OperationContext* opCtx);
-    TenantFileImporterService() = default;
+    TenantFileImporterService();
 
     /**
      * Begins the process of copying and importing files for a given migration.
@@ -75,6 +88,28 @@ public:
      * Causes any in-progress migration be interrupted.
      */
     void interruptAll();
+
+    /**
+     * Set the function used to create a donor client connection. Used for testing.
+     */
+    void setCreateConnectionForTest(std::function<std::shared_ptr<DBClientConnection>()> fn) {
+        _createConnection = fn;
+    };
+
+    /**
+     * Set the function used for importing file data. Used for testing.
+     */
+    void setImportFilesForTest(
+        std::function<void(OperationContext* opCtx, const UUID& migrationId)> fn) {
+        _importFiles = fn;
+    };
+
+    BSONObj getState() {
+        stdx::lock_guard lk(_mutex);
+        auto migrationId = _migrationId ? _migrationId->toString() : "(empty)";
+        auto state = stateToString(_state);
+        return BSON("migrationId" << migrationId << "state" << state);
+    }
 
 private:
     void onInitialDataAvailable(OperationContext*, bool) final {}
@@ -203,5 +238,11 @@ private:
 
     // The Queue used for processing ImporterEvents.
     std::shared_ptr<Queue> _eventQueue;  // (I) pointer set under mutex, copied by callers.
+
+    // Called after all filenames have been learned to import file data.
+    std::function<void(OperationContext* opCtx, const UUID& migrationId)> _importFiles = {};  // (W)
+
+    // Used to create a new DBClientConnection to the donor.
+    std::function<std::shared_ptr<DBClientConnection>()> _createConnection = {};  // (W)
 };
 }  // namespace mongo::repl

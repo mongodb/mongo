@@ -267,7 +267,7 @@ public:
             }
 
             BSONObj aggResult = CommandHelpers::runCommandDirectly(
-                opCtx, OpMsgRequest::fromDBAndBody(dbName.db(), std::move(resolvedAggCmd)));
+                opCtx, OpMsgRequestBuilder::create(dbName, std::move(resolvedAggCmd)));
 
             ViewResponseFormatter formatter(aggResult);
             auto formatStatus = formatter.appendAsDistinctResponse(&result, boost::none);

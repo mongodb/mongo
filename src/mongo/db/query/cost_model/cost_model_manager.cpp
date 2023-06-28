@@ -29,7 +29,9 @@
 
 #include "mongo/db/query/cost_model/cost_model_manager.h"
 
-#include "mongo/db/query/cost_model/cost_model_on_update.h"
+#include <utility>
+
+#include "mongo/idl/idl_parser.h"
 
 namespace mongo::cost_model {
 namespace {

@@ -29,8 +29,22 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <exception>
+#include <string>
+#include <variant>
+#include <vector>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/plan_stats.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/ops/update_result.h"
 #include "mongo/db/query/canonical_query.h"
@@ -38,6 +52,14 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/query/restore_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/s/scoped_collection_metadata.h"
+#include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 
@@ -55,11 +77,26 @@ public:
     VariantCollectionPtrOrAcquisition(const ScopedCollectionAcquisition* collection)
         : _collectionPtrOrAcquisition(collection) {}
 
-    const stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>& get() {
+    const stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>& get() const {
         return _collectionPtrOrAcquisition;
     };
 
     const CollectionPtr& getCollectionPtr() const;
+
+    bool isCollectionPtr() const {
+        return stdx::holds_alternative<const CollectionPtr*>(_collectionPtrOrAcquisition);
+    }
+
+    bool isAcquisition() const {
+        return stdx::holds_alternative<const ScopedCollectionAcquisition*>(
+            _collectionPtrOrAcquisition);
+    }
+
+    const ScopedCollectionAcquisition* getAcquisition() const {
+        return stdx::get<const ScopedCollectionAcquisition*>(_collectionPtrOrAcquisition);
+    }
+
+    boost::optional<ScopedCollectionFilter> getShardingFilter(OperationContext* opCtx) const;
 
 private:
     stdx::variant<const CollectionPtr*, const ScopedCollectionAcquisition*>
@@ -305,7 +342,7 @@ public:
      * If this plan executor has already executed an update operation, returns the an 'UpdateResult'
      * describing the outcome of the update. Illegal to call if either 1) the PlanExecutor is not
      * an update PlanExecutor, or 2) the PlanExecutor has not yet been executed either with
-     * 'executeUpdate()' or by calling 'getNext()' until end-of-stream.
+     * 'executeUpdate()' or by calling 'getNext()' until ADVANCED or end-of-stream.
      */
     virtual UpdateResult getUpdateResult() const = 0;
 
@@ -315,6 +352,14 @@ public:
      * that were deleted. Illegal to call on other plan executors.
      */
     virtual long long executeDelete() = 0;
+
+    /**
+     * If this plan executor has already executed a delete operation, returns the the number of
+     * documents that were deleted. Illegal to call if either 1) the PlanExecutor is not a delete
+     * PlanExecutor, or 2) the PlanExecutor has not yet been executed either with 'executeDelete()'
+     * or by calling 'getNext()' until ADVANCED or end-of-stream.
+     */
+    virtual long long getDeleteResult() const = 0;
 
     /**
      * If this plan executor has already executed a batched delete operation, returns the

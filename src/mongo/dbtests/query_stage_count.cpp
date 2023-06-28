@@ -48,7 +48,7 @@ namespace QueryStageCount {
 
 const int kDocuments = 100;
 const int kInterjections = kDocuments;
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 class CountStageTest {
 public:
@@ -93,7 +93,7 @@ public:
         params.tailable = false;
 
         std::unique_ptr<CollectionScan> scan(
-            new CollectionScan(_expCtx.get(), _coll, params, &ws, nullptr));
+            new CollectionScan(_expCtx.get(), &_coll, params, &ws, nullptr));
         while (!scan->isEOF()) {
             WorkingSetID id = WorkingSet::INVALID_ID;
             PlanStage::StageState state = scan->work(&id);
@@ -217,14 +217,14 @@ public:
         params.direction = 1;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new IndexScan(_expCtx.get(), _coll, params, ws, expr);
+        return new IndexScan(_expCtx.get(), &_coll, params, ws, expr);
     }
 
     CollectionScan* createCollScan(MatchExpression* expr, WorkingSet* ws) {
         CollectionScanParams params;
 
         // This child stage gets owned and freed by its parent CountStage
-        return new CollectionScan(_expCtx.get(), _coll, params, ws, expr);
+        return new CollectionScan(_expCtx.get(), &_coll, params, ws, expr);
     }
 
     static const char* ns() {
@@ -232,7 +232,7 @@ public:
     }
 
     static NamespaceString nss() {
-        return NamespaceString(ns());
+        return NamespaceString::createNamespaceString_forTest(ns());
     }
 
 protected:
@@ -248,7 +248,7 @@ protected:
 class QueryStageCountNoChangeDuringYield : public CountStageTest {
 public:
     void run() {
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << LT << kDocuments / 2));
 
         testCount(request, kDocuments / 2);
@@ -259,7 +259,7 @@ public:
 class QueryStageCountYieldWithSkip : public CountStageTest {
 public:
     void run() {
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << GTE << 0));
         request.setSkip(2);
 
@@ -271,7 +271,7 @@ public:
 class QueryStageCountYieldWithLimit : public CountStageTest {
 public:
     void run() {
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << GTE << 0));
         request.setSkip(0);
         request.setLimit(2);
@@ -285,7 +285,7 @@ public:
 class QueryStageCountInsertDuringYield : public CountStageTest {
 public:
     void run() {
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << 1));
 
         testCount(request, kInterjections + 1);
@@ -303,7 +303,7 @@ public:
     void run() {
         // expected count would be 99 but we delete the second record
         // after doing the first unit of work
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << GTE << 1));
 
         testCount(request, kDocuments - 2);
@@ -327,7 +327,7 @@ public:
 class QueryStageCountUpdateDuringYield : public CountStageTest {
 public:
     void run() {
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << GTE << 2));
 
         // We call 'interject' after first unit of work that skips the first document, so it is
@@ -354,7 +354,7 @@ public:
 class QueryStageCountMultiKeyDuringYield : public CountStageTest {
 public:
     void run() {
-        CountCommandRequest request((NamespaceString(ns())));
+        CountCommandRequest request((NamespaceString::createNamespaceString_forTest(ns())));
         request.setQuery(BSON("x" << 1));
         testCount(request, kDocuments + 1, true);  // only applies to indexed case
     }

@@ -28,13 +28,21 @@
  */
 #pragma once
 
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <mutex>
 #include <string>
+#include <type_traits>
+#include <utility>
 
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/intrusive_counter.h"
 #include "mongo/util/out_of_line_executor.h"
 

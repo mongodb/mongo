@@ -29,11 +29,24 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <functional>
 
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/exec/sbe/values/slot.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sbe {
 /**

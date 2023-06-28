@@ -252,27 +252,29 @@ function testMonotonicity(conn, dbName, collName, currentShardKey, testCases, nu
             currIndex = endIndex;
         }
 
-        const res =
-            assert.commandWorked(conn.adminCommand({analyzeShardKey: ns, key: testCase.shardKey}));
+        const res = assert.commandWorked(conn.adminCommand({
+            analyzeShardKey: ns,
+            key: testCase.shardKey,
+            // Skip calculating the read and write distribution metrics since there are not needed
+            // by this test.
+            readWriteDistribution: false
+        }));
+        const metrics = res.keyCharacteristics;
 
-        const listCollectionRes =
-            assert.commandWorked(db.runCommand({listCollections: 1, filter: {name: collName}}));
-        const isClusteredColl =
-            listCollectionRes.cursor.firstBatch[0].options.hasOwnProperty("clusteredIndex");
-
+        const isClusteredColl = AnalyzeShardKeyUtil.isClusterCollection(conn, dbName, collName);
         const expectedType = isClusteredColl ? "unknown" : testCase.expected;
-        assert.eq(res.monotonicity.type, expectedType, res);
+        assert.eq(metrics.monotonicity.type, expectedType, res);
 
         if (expectedType == "unknown") {
-            assert(!res.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
+            assert(!metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
         } else {
-            assert(res.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
+            assert(metrics.monotonicity.hasOwnProperty("recordIdCorrelationCoefficient"));
 
             if (expectedType == "monotonic") {
-                assert.gte(Math.abs(res.monotonicity.recordIdCorrelationCoefficient),
+                assert.gte(Math.abs(metrics.monotonicity.recordIdCorrelationCoefficient),
                            correlationCoefficientThreshold);
             } else if (expectedType == "not monotonic") {
-                assert.lt(Math.abs(res.monotonicity.recordIdCorrelationCoefficient),
+                assert.lt(Math.abs(metrics.monotonicity.recordIdCorrelationCoefficient),
                           correlationCoefficientThreshold);
             } else {
                 throw new Error("Unknown expected monotonicity '" + expectedType + "'");

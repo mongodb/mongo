@@ -29,7 +29,21 @@
 
 #include "mongo/db/query/classic_plan_cache.h"
 
+#include <boost/optional/optional.hpp>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/basic_types.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/matcher/expression.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 CounterMetric planCacheTotalSizeEstimateBytes("query.planCacheTotalSizeEstimateBytes");

@@ -28,15 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/crypto/symmetric_key.h"
 
-#include <cstring>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/secure_zero_memory.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage

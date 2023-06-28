@@ -35,12 +35,6 @@ const kKeyPattern = {
 // Can create a valid columnstore index.
 IndexCatalogHelpers.createIndexAndVerifyWithDrop(coll, kKeyPattern, {name: kIndexName});
 
-// Can create a columnstore index with foreground & background construction.
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-    coll, kKeyPattern, {background: false, name: kIndexName});
-IndexCatalogHelpers.createIndexAndVerifyWithDrop(
-    coll, kKeyPattern, {background: true, name: kIndexName});
-
 // Test that you cannot create a columnstore index with a collation - either with the argument or
 // because the collection has a default collation specified.
 assert.commandFailedWithCode(

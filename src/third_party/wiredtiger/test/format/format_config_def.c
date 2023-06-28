@@ -65,7 +65,7 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
   {"btree.repeat_data_pct", "duplicate values (percentage)", C_TABLE | C_TYPE_VAR, 0, 90, 90,
     V_TABLE_BTREE_REPEAT_DATA_PCT},
 
-  {"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 10, 0, 0,
+  {"btree.reverse", "reverse order collation", C_BOOL | C_TABLE | C_TYPE_ROW, 20, 0, 0,
     V_TABLE_BTREE_REVERSE},
 
   {"btree.split_pct", "page split size as a percentage of the maximum page size", C_TABLE, 50, 100,
@@ -331,8 +331,8 @@ CONFIG configuration_list[] = {{"assert.read_timestamp", "assert read_timestamp"
 
   {"stress.hs_sweep", "stress history store sweep", C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_HS_SWEEP},
 
-  {"stress.prepare_resolution", "stress prepare resolution", C_BOOL, 2, 0, 0,
-    V_GLOBAL_STRESS_PREPARE_RESOLUTION},
+  {"stress.prepare_resolution_1", "stress prepare resolution (#1)", C_BOOL, 2, 0, 0,
+    V_GLOBAL_STRESS_PREPARE_RESOLUTION_1},
 
   {"stress.sleep_before_read_overflow_onpage", "stress onpage overflow read race with checkpoint",
     C_BOOL, 2, 0, 0, V_GLOBAL_STRESS_SLEEP_BEFORE_READ_OVERFLOW_ONPAGE},

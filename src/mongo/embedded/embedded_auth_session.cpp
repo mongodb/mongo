@@ -120,8 +120,7 @@ public:
         UASSERT_NOT_IMPLEMENTED;
     }
 
-    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(StringData,
-                                                                 const BSONObj&) override {
+    StatusWith<PrivilegeVector> checkAuthorizedToListCollections(const ListCollections&) override {
         return PrivilegeVector();
     }
 
@@ -206,7 +205,7 @@ public:
         return Status::OK();
     }
 
-    bool isAuthorizedForAnyActionOnAnyResourceInDB(StringData) override {
+    bool isAuthorizedForAnyActionOnAnyResourceInDB(const DatabaseName&) override {
         return true;
     }
 

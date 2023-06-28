@@ -28,24 +28,68 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/optional.hpp>
+#include <cstdint>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <string>
 
-#include "mongo/db/repl/transaction_oplog_application.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/catalog_raii.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
+#include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/index_builds_coordinator.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/repl/apply_ops.h"
-#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/repl/apply_ops_command_info.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/timestamp_block.h"
+#include "mongo/db/repl/transaction_oplog_application.h"
+#include "mongo/db/repl_index_build_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/internal_session_pool.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/session/session_txn_record_gen.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/transaction/transaction_history_iterator.h"
 #include "mongo/db/transaction/transaction_participant.h"
+#include "mongo/db/transaction_resources.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kReplication
 
@@ -720,14 +764,8 @@ Status applyPrepareTransaction(OperationContext* opCtx,
         case repl::OplogApplication::Mode::kSecondary: {
             switch (op.instruction) {
                 case repl::ApplicationInstruction::applyOplogEntry: {
-                    // Checkout the session and apply non-split prepare op.
-                    // TODO (SERVER-70578): This can no longer happen once the feature flag
-                    // is removed.
-                    invariant(!op.subSession);
-                    invariant(!op.preparedTxnOps);
-                    auto ops = readTransactionOperationsFromOplogChain(opCtx, *op, {});
-                    return _applyPrepareTransaction(
-                        opCtx, *op, *op->getSessionId(), *op->getTxnNumber(), ops, mode);
+                    // Not possible for secondary when applying prepare oplog entries.
+                    MONGO_UNREACHABLE;
                 }
                 case repl::ApplicationInstruction::applySplitPreparedTxnOp: {
                     // Checkout the session and apply split prepare op.
@@ -812,7 +850,10 @@ void reconstructPreparedTransactions(OperationContext* opCtx, repl::OplogApplica
             AlternativeClientRegion acr(newClient);
             const auto newOpCtx = cc().makeOperationContext();
 
-            _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode);
+            // Ignore interruptions while reconstructing prepared transactions, so that we do not
+            // fassert and crash due to interruptions inside this call.
+            newOpCtx->runWithoutInterruptionExceptAtGlobalShutdown(
+                [&] { _reconstructPreparedTransaction(newOpCtx.get(), prepareOplogEntry, mode); });
         }
     }
 }

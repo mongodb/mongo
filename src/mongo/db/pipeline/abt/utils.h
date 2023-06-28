@@ -29,9 +29,19 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <functional>
+#include <utility>
+
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/values/value.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/pipeline/field_path.h"
-#include "mongo/db/query/optimizer/node.h"
+#include "mongo/db/query/optimizer/defs.h"
+#include "mongo/db/query/optimizer/index_bounds.h"
+#include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
+#include "mongo/db/query/optimizer/syntax/syntax.h"
 
 
 namespace mongo::optimizer {

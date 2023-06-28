@@ -37,6 +37,8 @@
 #include "MongoHeaderBracketCheck.h"
 #include "MongoMacroDefinitionLeaksCheck.h"
 #include "MongoMutexCheck.h"
+#include "MongoPolyFillCheck.h"
+#include "MongoRandCheck.h"
 #include "MongoStdAtomicCheck.h"
 #include "MongoStdOptionalCheck.h"
 #include "MongoTraceCheck.h"
@@ -75,6 +77,8 @@ public:
             "mongo-collection-sharding-runtime-check");
         CheckFactories.registerCheck<MongoMacroDefinitionLeaksCheck>(
             "mongo-macro-definition-leaks-check");
+        CheckFactories.registerCheck<MongoRandCheck>("mongo-rand-check");
+        CheckFactories.registerCheck<MongoPolyFillCheck>("mongo-polyfill-check");
     }
 };
 

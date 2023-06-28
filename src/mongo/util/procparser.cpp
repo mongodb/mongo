@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/procparser.h"
 
 #include <algorithm>
@@ -39,21 +37,28 @@
 #include <boost/filesystem.hpp>
 #include <fcntl.h>
 #include <string>
+
+#ifndef _WIN32
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <type_traits>
-#include <unistd.h>
+#endif
 
 #include "mongo/base/parse_number.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/text.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kFTDC
 

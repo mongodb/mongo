@@ -29,10 +29,24 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
+
 #include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/storage/input_stream.h"
 #include "mongo/db/storage/named_pipe.h"
 #include "mongo/db/storage/record_store.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 class MultiBsonStreamCursor : public SeekableRecordCursor {

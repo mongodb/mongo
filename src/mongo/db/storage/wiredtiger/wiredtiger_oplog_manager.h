@@ -29,7 +29,13 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/storage/wiredtiger/wiredtiger_record_store.h"
+#include "mongo/db/storage/wiredtiger/wiredtiger_session_cache.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
@@ -70,8 +76,7 @@ public:
     void haltVisibilityThread();
 
     bool isRunning() {
-        stdx::lock_guard<Latch> lk(_oplogVisibilityStateMutex);
-        return _isRunning && !_shuttingDown;
+        return _isRunning.load();
     }
 
     /**
@@ -122,7 +127,8 @@ private:
     mutable Mutex _oplogVisibilityStateMutex =
         MONGO_MAKE_LATCH("WiredTigerOplogManager::_oplogVisibilityStateMutex");
 
-    bool _isRunning = false;
+    AtomicWord<bool> _isRunning{false};
+
     bool _shuttingDown = false;
 
     // Triggers an oplog visibility update -- can be delayed if no callers are waiting for an

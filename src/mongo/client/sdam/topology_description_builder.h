@@ -27,7 +27,14 @@
  *    it in the license file.
  */
 #pragma once
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "mongo/bson/oid.h"
+#include "mongo/client/sdam/sdam_datatypes.h"
 #include "mongo/client/sdam/topology_description.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo::sdam {
 

@@ -29,20 +29,46 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/resource_yielder.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/inline_executor.h"
 #include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/write_concern_error_detail.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::txn_api {
 namespace details {

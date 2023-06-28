@@ -27,24 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <absl/container/flat_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/db/query/plan_cache_indexability.h"
-
-#include <memory>
-
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/index_path_projection.h"
 #include "mongo/db/exec/projection_executor_utils.h"
-#include "mongo/db/index/wildcard_key_generator.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_algo.h"
-#include "mongo/db/matcher/expression_internal_expr_comparison.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/index_entry.h"
+#include "mongo/db/query/plan_cache_indexability.h"
 #include "mongo/db/query/planner_ixselect.h"
-#include <memory>
+#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

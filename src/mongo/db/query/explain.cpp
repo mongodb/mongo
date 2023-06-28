@@ -27,46 +27,50 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/db/query/explain.h"
+#include <boost/optional/optional.hpp>
 
-#include "mongo/bson/util/builder.h"
-#include "mongo/db/exec/cached_plan.h"
-#include "mongo/db/exec/collection_scan.h"
-#include "mongo/db/exec/count_scan.h"
-#include "mongo/db/exec/distinct_scan.h"
-#include "mongo/db/exec/idhack.h"
-#include "mongo/db/exec/index_scan.h"
-#include "mongo/db/exec/multi_plan.h"
-#include "mongo/db/exec/near.h"
-#include "mongo/db/exec/sort.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/keypattern.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/db/basic_types_gen.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/exec/sbe/util/debug_print.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/pipeline/plan_executor_pipeline.h"
-#include "mongo/db/query/canonical_query_encoder.h"
-#include "mongo/db/query/collection_query_info.h"
+#include "mongo/db/query/canonical_query.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/query/explain.h"
 #include "mongo/db/query/explain_common.h"
-#include "mongo/db/query/get_executor.h"
 #include "mongo/db/query/multiple_collection_accessor.h"
 #include "mongo/db/query/plan_cache.h"
+#include "mongo/db/query/plan_cache_debug_info.h"
 #include "mongo/db/query/plan_cache_key_factory.h"
+#include "mongo/db/query/plan_enumerator_explain_info.h"
 #include "mongo/db/query/plan_executor.h"
-#include "mongo/db/query/plan_executor_impl.h"
-#include "mongo/db/query/plan_executor_sbe.h"
 #include "mongo/db/query/plan_explainer_impl.h"
+#include "mongo/db/query/plan_ranking_decision.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_settings.h"
 #include "mongo/db/query/query_settings_decoration.h"
-#include "mongo/db/query/stage_builder.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/query/sbe_stage_builder.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/overloaded_visitor.h"
-#include "mongo/util/str.h"
-#include "mongo/util/version.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/overloaded_visitor.h"  // IWYU pragma: keep
 
 namespace mongo {
 namespace {

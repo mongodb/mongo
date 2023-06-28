@@ -28,44 +28,25 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/find.h"
-
 #include <memory>
+#include <string>
+#include <utility>
 
-#include "mongo/base/error_codes.h"
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/client.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/basic_types.h"
 #include "mongo/db/clientcursor.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
-#include "mongo/db/curop_failpoint_helpers.h"
-#include "mongo/db/cursor_manager.h"
-#include "mongo/db/db_raii.h"
-#include "mongo/db/exec/filter.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/db/keypattern.h"
-#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collection_query_info.h"
-#include "mongo/db/query/explain.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/get_executor.h"
-#include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/plan_explainer.h"
 #include "mongo/db/query/plan_summary_stats.h"
-#include "mongo/db/query/query_planner_params.h"
-#include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/s/collection_sharding_state.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/service_context.h"
-#include "mongo/db/stats/resource_consumption_metrics.h"
-#include "mongo/db/stats/top.h"
-#include "mongo/db/storage/storage_options.h"
-#include "mongo/logv2/log.h"
-#include "mongo/s/stale_exception.h"
+#include "mongo/db/query/query_stats_key_generator.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -127,7 +108,7 @@ void endQueryOp(OperationContext* opCtx,
     if (cursor) {
         collectQueryStatsMongod(opCtx, *cursor);
     } else {
-        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsRequestShapifier));
+        collectQueryStatsMongod(opCtx, std::move(curOp->debug().queryStatsKeyGenerator));
     }
 
     if (collection) {

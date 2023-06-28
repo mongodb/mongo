@@ -163,7 +163,9 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
 {
     WT_BLOCK_HEADER *blk, swap;
     size_t bufsize, check_size;
+    bool chunkcache_hit;
 
+    chunkcache_hit = false;
     __wt_verbose_debug2(session, WT_VERB_READ,
       "off %" PRIuMAX ", size %" PRIu32 ", checksum %#" PRIx32, (uintmax_t)offset, size, checksum);
 
@@ -197,12 +199,17 @@ __wt_block_read_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, uin
     buf->size = size;
 
     /*
-     * Check if the chunk cache has the needed data. If it does not, the chunk cache may read it
-     * from the file.
+     * Check if the chunk cache has the needed data. If there is a miss in the chunk cache, it will
+     * read and cache the data. If the chunk cache has exceeded its configured capacity and is
+     * unable to evict chunks quickly enough, it will return the error code indicating that it is
+     * out of space We do not propagate this error up to our caller; we read the needed data
+     * ourselves instead.
      */
     if (S2C(session)->chunkcache.configured)
-        WT_RET(__wt_chunkcache_get(session, block, objectid, offset, size, buf->mem));
-    else
+        WT_RET_ERROR_OK(
+          __wt_chunkcache_get(session, block, objectid, offset, size, buf->mem, &chunkcache_hit),
+          ENOSPC);
+    if (!chunkcache_hit)
         WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 
     /*

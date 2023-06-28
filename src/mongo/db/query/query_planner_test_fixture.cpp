@@ -28,21 +28,40 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/query/query_planner_test_fixture.h"
-
 #include <algorithm>
+#include <boost/container/vector.hpp>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <cstdint>
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/index_names.h"
 #include "mongo/db/matcher/expression_parser.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/projection_policies.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
+#include "mongo/db/query/query_planner_test_fixture.h"
 #include "mongo/db/query/query_planner_test_lib.h"
+#include "mongo/db/query/query_request_helper.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/transitional_tools_do_not_use/vector_spooling.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/unittest/assert.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 
@@ -51,7 +70,8 @@ namespace mongo {
 
 using unittest::assertGet;
 
-const NamespaceString QueryPlannerTest::nss("test.collection");
+const NamespaceString QueryPlannerTest::nss =
+    NamespaceString::createNamespaceString_forTest("test.collection");
 
 void QueryPlannerTest::setUp() {
     opCtx = serviceContext.makeOperationContext();

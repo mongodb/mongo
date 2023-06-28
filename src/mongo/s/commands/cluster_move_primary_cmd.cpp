@@ -93,11 +93,12 @@ public:
         }
 
         void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forDatabaseName(ns().db()), ActionType::moveChunk));
+            uassert(
+                ErrorCodes::Unauthorized,
+                "Unauthorized",
+                AuthorizationSession::get(opCtx->getClient())
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forDatabaseName(ns().dbName()), ActionType::moveChunk));
         }
     };
 

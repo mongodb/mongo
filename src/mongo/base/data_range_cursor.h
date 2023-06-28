@@ -32,10 +32,14 @@
 #include <cstddef>
 #include <cstring>
 #include <limits>
+#include <utility>
 
 #include "mongo/base/data_range.h"
 #include "mongo/base/data_type.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/platform/endian.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

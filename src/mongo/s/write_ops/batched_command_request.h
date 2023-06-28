@@ -304,7 +304,7 @@ public:
         if (_batchUpdateRequest) {
             return _batchUpdateRequest->getUpsert();
         } else {
-            tassert(7328102, "invalid bulkWrite updat op reference", _bulkWriteUpdateRequest);
+            tassert(7328102, "invalid bulkWrite update op reference", _bulkWriteUpdateRequest);
             return _bulkWriteUpdateRequest->getUpsert();
         }
     }
@@ -499,9 +499,19 @@ public:
 
     /**
      * Gets an estimate of how much space, in bytes, the referred-to write operation would add to a
-     * write command.
+     * batched write command, i.e. insert, update, or delete. This method *must* only be called if
+     *  the underlying write op is from an insert/update/delete command. Do not call this method if
+     * the underlying write op is from a bulkWrite - use getSizeForBulkWriteBytes() instead.
      */
-    int getWriteSizeBytes() const;
+    int getSizeForBatchWriteBytes() const;
+
+    /**
+     * Gets an estimate of how much space, in bytes, the referred-to write operation would add to a
+     * bulkWrite command. This method *must* only be called if the underlying write op is from a
+     * bulkWrite command. Do not call this method if the underlying write op is from an insert,
+     * update, or delete command - use getSizeForBatchWriteBytes() instead.
+     */
+    int getSizeForBulkWriteBytes() const;
 
 private:
     boost::optional<const BatchedCommandRequest&> _batchedRequest;

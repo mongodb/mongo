@@ -185,21 +185,7 @@ struct CertInformationToLog {
     // it means the certificate is the default one for the local cluster.
     boost::optional<std::string> targetClusterURI;
 
-    logv2::DynamicAttributes getDynamicAttributes() const {
-        logv2::DynamicAttributes attrs;
-        attrs.add("subject", subject);
-        attrs.add("issuer", issuer);
-        attrs.add("thumbprint", StringData(hexEncodedThumbprint));
-        attrs.add("notValidBefore", validityNotBefore);
-        attrs.add("notValidAfter", validityNotAfter);
-        if (keyFile) {
-            attrs.add("keyFile", StringData(*keyFile));
-        }
-        if (targetClusterURI) {
-            attrs.add("targetClusterURI", StringData(*targetClusterURI));
-        }
-        return attrs;
-    }
+    logv2::DynamicAttributes getDynamicAttributes() const;
 };
 
 struct CRLInformationToLog {

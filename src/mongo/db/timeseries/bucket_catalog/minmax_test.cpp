@@ -27,13 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <iterator>
+#include <numeric>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/timeseries/bucket_catalog/flat_bson.h"
-#include "mongo/unittest/unittest.h"
-
-#include <numeric>
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::timeseries::bucket_catalog {
 namespace {

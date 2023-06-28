@@ -29,8 +29,21 @@
 
 #include "mongo/db/repl/replication_metrics.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <mutex>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/commands/server_status.h"
 #include "mongo/db/repl/election_reason_counter.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace repl {

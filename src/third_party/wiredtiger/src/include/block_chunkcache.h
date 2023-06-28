@@ -34,12 +34,12 @@ struct __wt_chunkcache_chunk {
     TAILQ_ENTRY(__wt_chunkcache_chunk) next_lru_item;
 
     WT_CHUNKCACHE_HASHID hash_id;
-    volatile bool being_evicted;
-    char *chunk_memory;
-    size_t chunk_size;
+    uint64_t access_count;
     uint64_t bucket_id; /* save hash bucket ID for quick removal */
-    volatile uint32_t valid;
+    char *chunk_memory;
     wt_off_t chunk_offset;
+    size_t chunk_size;
+    volatile uint32_t valid;
 };
 
 struct __wt_chunkcache_bucket {
@@ -57,8 +57,6 @@ struct __wt_chunkcache_bucket {
  */
 struct __wt_chunkcache {
     WT_CHUNKCACHE_BUCKET *hashtable;
-    WT_SPINLOCK chunkcache_lru_lock; /* Locks the LRU queue. */
-    TAILQ_HEAD(__wt_chunkcache_lru, __wt_chunkcache_chunk) chunkcache_lru_list;
 #ifdef ENABLE_MEMKIND
     struct memkind *memkind; /* Lets us use jemalloc over a file. */
 #endif

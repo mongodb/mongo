@@ -421,6 +421,12 @@ add_option(
 )
 
 add_option(
+    'wait-for-debugger',
+    help='Wait for debugger attach on process startup',
+    nargs=0,
+)
+
+add_option(
     'gcov',
     help='compile with flags for gcov',
     nargs=0,
@@ -2168,19 +2174,33 @@ use_libunwind = get_option("use-libunwind")
 use_system_libunwind = use_system_version_of_library("libunwind")
 
 # Assume system libunwind works if it's installed and selected.
-can_use_libunwind = (use_system_libunwind or env.TargetOSIs('linux') and
-                     (env['TARGET_ARCH'] in ('x86_64', 'aarch64', 'ppc64le', 's390x')))
+# TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
+can_use_libunwind_arch = env.TargetOSIs(
+    'linux') and env['TARGET_ARCH'] == 'aarch64' and not debugBuild
+can_use_libunwind = (use_system_libunwind
+                     or (env.TargetOSIs('linux')
+                         and env['TARGET_ARCH'] in ('x86_64', 'ppc64le', 's390x'))
+                     or can_use_libunwind_arch)
 
 if use_libunwind == "off":
     use_libunwind = False
     use_system_libunwind = False
 elif use_libunwind == "on":
     use_libunwind = True
+    # TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
     if not can_use_libunwind:
-        env.ConfError("libunwind not supported on target platform")
+        if not can_use_libunwind_arch:
+            env.ConfError(
+                "libunwind not supported on amd64 with debug build see SERVER-75120. Recompile with '--use-libunwind=off'"
+            )
+        env.ConfError("libunwind not supported on target platform.")
         Exit(1)
 elif use_libunwind == "auto":
     use_libunwind = can_use_libunwind
+
+# TODO SERVER-75120: Revert the special handling for arch when this ticket is complete
+if not can_use_libunwind_arch and env.TargetOSIs('linux'):
+    env.Append(LINKFLAGS=['-rdynamic'])
 
 use_vendored_libunwind = use_libunwind and not use_system_libunwind
 if use_system_libunwind and not use_libunwind:
@@ -3253,12 +3273,6 @@ if not env.TargetOSIs('windows', 'macOS') and (env.ToolchainIs('GCC', 'clang')):
                     flag_value.startswith(targeting_flag) for search_variable in search_variables
                     for flag_value in env[search_variable]):
                 env.Append(CCFLAGS=[f'{targeting_flag}{targeting_flag_value}'])
-
-# Needed for auth tests since key files are stored in git with mode 644.
-if not env.TargetOSIs('windows'):
-    for keysuffix in ["1", "2", "ForRollover"]:
-        keyfile = "jstests/libs/key%s" % keysuffix
-        os.chmod(keyfile, stat.S_IWUSR | stat.S_IRUSR)
 
 # boostSuffixList is used when using system boost to select a search sequence
 # for boost libraries.
@@ -4368,6 +4382,11 @@ def doConfigure(myenv):
                 env.FatalError(
                     "Cannot use libunwind with TSAN, please add --use-libunwind=off to your compile flags"
                 )
+
+            # We add supressions based on the library file in etc/tsan.suppressions
+            # so the link-model needs to be dynamic.
+            if not link_model.startswith('dynamic'):
+                env.FatalError("TSAN is only supported with dynamic link models")
 
             # If anything is changed, added, or removed in
             # tsan_options, be sure to make the corresponding changes
@@ -6033,8 +6052,10 @@ env['RPATH_ESCAPED_DOLLAR_ORIGIN'] = '\\$$$$ORIGIN'
 
 def isSupportedStreamsPlatform(thisEnv):
     # TODO https://jira.mongodb.org/browse/SERVER-74961: Support other platforms.
-    return thisEnv.TargetOSIs(
-        'linux') and thisEnv['TARGET_ARCH'] == 'x86_64' and ssl_provider == 'openssl'
+    # linux x86 and ARM64 are supported.
+    return thisEnv.TargetOSIs('linux') and \
+        thisEnv['TARGET_ARCH'] in ('x86_64', 'aarch64') \
+        and ssl_provider == 'openssl'
 
 
 def shouldBuildStreams(thisEnv):
@@ -6202,7 +6223,7 @@ sconslinters = env.Command(
 
 lint_py = env.Command(
     target="#lint-lint.py",
-    source=["buildscripts/quickcpplint.py"],
+    source=["buildscripts/quickmongolint.py"],
     action="$PYTHON ${SOURCES[0]} lint",
 )
 

@@ -32,14 +32,21 @@
  */
 
 #include <algorithm>
+#include <cstddef>
+#include <fmt/ranges.h>  // IWYU pragma: keep
 #include <string>
 #include <vector>
 
-#include <fmt/ranges.h>
+#include <fmt/format.h>
+// IWYU pragma: no_include "format.h"
 
 #include "mongo/base/dependency_graph.h"
-#include "mongo/base/init.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

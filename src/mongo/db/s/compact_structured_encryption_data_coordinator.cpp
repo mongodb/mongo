@@ -28,20 +28,48 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <variant>
 
-#include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/fle_options_gen.h"
+#include "mongo/crypto/fle_stats.h"
+#include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/commands/rename_collection_gen.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/drop_gen.h"
-#include "mongo/db/persistent_task_store.h"
+#include "mongo/db/fle_crud.h"
+#include "mongo/db/s/compact_structured_encryption_data_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator.h"
+#include "mongo/db/s/sharding_ddl_coordinator_gen.h"
+#include "mongo/db/server_parameter.h"
+#include "mongo/db/server_parameter_with_storage.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_interface.h"
+#include "mongo/rpc/unique_message.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -29,13 +29,23 @@
 
 #pragma once
 
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <vector>
 
+#include "mongo/base/status_with.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/abstract_async_component.h"
 #include "mongo/db/repl/oplog_buffer.h"
 #include "mongo/db/repl/oplog_entry.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/future.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace repl {

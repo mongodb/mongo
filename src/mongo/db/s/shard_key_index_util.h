@@ -29,15 +29,19 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <string>
+
 #include "mongo/bson/bsonobj.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 
 class Collection;
 class CollectionPtr;
-
 class IndexDescriptor;
 
 class ShardKeyIndex {

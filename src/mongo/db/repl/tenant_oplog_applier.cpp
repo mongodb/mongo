@@ -29,19 +29,39 @@
 
 #include "mongo/db/repl/tenant_oplog_applier.h"
 
+#include <absl/container/node_hash_map.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
+#include <cstddef>
+#include <mutex>
+#include <set>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/document_validation.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbhelpers.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/op_observer/op_observer.h"
-#include "mongo/db/repl/apply_ops.h"
+#include "mongo/db/record_id.h"
 #include "mongo/db/repl/cloner_utils.h"
-#include "mongo/db/repl/insert_group.h"
+#include "mongo/db/repl/oplog_applier.h"
 #include "mongo/db/repl/oplog_applier_utils.h"
+#include "mongo/db/repl/oplog_entry_gen.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/repl_server_parameters_gen.h"
 #include "mongo/db/repl/session_update_tracker.h"
@@ -49,11 +69,24 @@
 #include "mongo/db/repl/tenant_migration_decoration.h"
 #include "mongo/db/repl/tenant_migration_recipient_service.h"
 #include "mongo/db/repl/tenant_oplog_batcher.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/session_catalog_mongod.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/thread_pool.h"
-#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTenantMigration
 
@@ -158,6 +191,10 @@ Timestamp TenantOplogApplier::getResumeBatchingTs() const {
 }
 
 void TenantOplogApplier::setCloneFinishedRecipientOpTime(OpTime cloneFinishedRecipientOpTime) {
+    LOGV2(7817600,
+          "setting cloneFinishedRecipientOpTime.",
+          "opTime"_attr = _cloneFinishedRecipientOpTime);
+
     stdx::lock_guard lk(_mutex);
     invariant(!_isActive_inlock());
     invariant(!cloneFinishedRecipientOpTime.isNull());
@@ -519,45 +556,49 @@ void TenantOplogApplier::_writeRetryableWriteEntryNoOp(
                              "for transaction "
                           << txnNumber << " on session " << sessionId,
             txnParticipant);
-    // beginOrContinue throws on failure, which will abort the migration. Failure should
-    // only result from out-of-order processing, which should not happen.
-    TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
-    txnParticipant.beginOrContinue(opCtx,
-                                   txnNumberAndRetryCounter,
-                                   boost::none /* autocommit */,
-                                   boost::none /* startTransaction */);
 
-    // We could have an existing lastWriteOpTime for the same retryable write chain from a
-    // previously aborted migration. This could also happen if the tenant being migrated has
-    // previously resided in this replica set. So we want to start a new history chain
-    // instead of linking the newly generated no-op to the existing chain before the current
-    // migration starts. Otherwise, we could have duplicate entries for the same stmtId.
+    TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
     invariant(!_cloneFinishedRecipientOpTime.isNull());
     if (txnParticipant.getLastWriteOpTime() > _cloneFinishedRecipientOpTime) {
-        noopEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
-    } else {
-        noopEntry.setPrevWriteOpTimeInTransaction(OpTime());
-
-        // Before we start a new history chain, reset the in-memory retryable write
-        // state in the txnParticipant so it can be built up from scratch again with
-        // the new chain.
-        LOGV2_DEBUG(5709800,
-                    2,
-                    "Tenant oplog applier resetting existing retryable write state",
-                    "lastWriteOpTime"_attr = txnParticipant.getLastWriteOpTime(),
-                    "_cloneFinishedRecipientOpTime"_attr = _cloneFinishedRecipientOpTime,
-                    "sessionId"_attr = sessionId,
-                    "txnNumber"_attr = txnNumber,
-                    "statementIds"_attr = stmtIds,
-                    "protocol"_attr = _protocol,
-                    "migrationId"_attr = _migrationUuid);
-        txnParticipant.invalidate(opCtx);
-        txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
-        TxnNumberAndRetryCounter txnNumberAndRetryCounter{txnNumber};
+        // Out-of-order processing within a migration lifetime is not possible,
+        // except in recipient failovers. However, merge and tenant migration
+        // are not resilient to recipient failovers. If attempted, beginOrContinue()
+        // will throw ErrorCodes::TransactionTooOld.
         txnParticipant.beginOrContinue(opCtx,
                                        txnNumberAndRetryCounter,
                                        boost::none /* autocommit */,
                                        boost::none /* startTransaction */);
+        noopEntry.setPrevWriteOpTimeInTransaction(txnParticipant.getLastWriteOpTime());
+    } else {
+        // We can end up here under the following circumstances:
+        // 1) LastWriteOpTime is not null.
+        //    - During a back-to-back migration (rs0->rs1->rs0) or a migration retry,
+        //      when 'txnNum'== txnParticipant.o().activeTxnNumber and rs0 already has
+        //      the oplog chain.
+        //
+        // 2) LastWriteOpTime is null.
+        //    - During a back-to-back migration (rs0->rs1->rs0) when
+        //      'txnNum' < txnParticipant.o().activeTxnNumber and last activeTxnNumber corresponds
+        //      to a no-op session write, like, no-op retryable update, read transaction, etc.
+        //    - New session with no transaction started yet on this node (this will be a no-op).
+        LOGV2_DEBUG(5709800,
+                    2,
+                    "Tenant oplog applier resetting existing retryable write state",
+                    "lastWriteOpTime"_attr = txnParticipant.getLastWriteOpTime(),
+                    "lastActiveTxnNumber"_attr =
+                        txnParticipant.getActiveTxnNumberAndRetryCounter().toBSON());
+
+        // Reset the statements executed list in the txnParticipant.
+        txnParticipant.invalidate(opCtx);
+        txnParticipant.refreshFromStorageIfNeededNoOplogEntryFetch(opCtx);
+
+        txnParticipant.beginOrContinue(opCtx,
+                                       txnNumberAndRetryCounter,
+                                       boost::none /* autocommit */,
+                                       boost::none /* startTransaction */);
+
+        // Reset the retryable write history chain.
+        noopEntry.setPrevWriteOpTimeInTransaction(OpTime());
     }
 
     // We should never process the same donor statement twice, except in failover
@@ -695,12 +736,12 @@ TenantOplogApplier::OpTimePair TenantOplogApplier::_writeNoOpEntries(
         }
         // Group oplog entries from the same session for noop writes.
         if (auto sessionId = op.entry.getOperationSessionInfo().getSessionId()) {
-            uassert(ErrorCodes::RetryableInternalTransactionNotSupported,
-                    str::stream() << "Tenant migration doesn't support retryable retryable "
-                                     "internal transaction. SessionId:: "
-                                  << sessionId->toBSON(),
-                    _protocol == MigrationProtocolEnum::kShardMerge ||
-                        !isInternalSessionForRetryableWrite(*sessionId));
+            uassert(
+                ErrorCodes::RetryableInternalTransactionNotSupported,
+                str::stream() << "Retryable internal transactions are not supported. Protocol:: "
+                              << MigrationProtocol_serializer(_protocol)
+                              << ", SessionId:: " << sessionId->toBSON(),
+                !isInternalSessionForRetryableWrite(*sessionId));
             sessionOps[*sessionId].emplace_back(&op.entry, slotIter);
         } else {
             nonSessionOps.emplace_back(&op.entry, slotIter);

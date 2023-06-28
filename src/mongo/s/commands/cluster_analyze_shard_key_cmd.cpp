@@ -75,7 +75,7 @@ public:
 
             const auto& catalogCache = Grid::get(opCtx)->catalogCache();
             const auto cri = uassertStatusOK(catalogCache->getCollectionRoutingInfo(opCtx, nss));
-            const auto primaryShardId = cri.cm.dbPrimary();
+            auto primaryShardId = cri.cm.dbPrimary();
 
             std::set<ShardId> candidateShardIds;
             if (cri.cm.isSharded()) {

@@ -29,20 +29,31 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/exec/plan_stage.h"
+#include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/requires_all_indices_stage.h"
+#include "mongo/db/exec/working_set.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/classic_plan_cache.h"
+#include "mongo/db/query/plan_executor.h"
 #include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_planner.h"
 #include "mongo/db/query/query_planner_params.h"
 #include "mongo/db/query/query_solution.h"
+#include "mongo/db/query/stage_types.h"
 #include "mongo/db/record_id.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 
@@ -70,7 +81,7 @@ class OperationContext;
 class SubplanStage final : public RequiresAllIndicesStage {
 public:
     SubplanStage(ExpressionContext* expCtx,
-                 const CollectionPtr& collection,
+                 VariantCollectionPtrOrAcquisition collection,
                  WorkingSet* ws,
                  const QueryPlannerParams& params,
                  CanonicalQuery* cq);

@@ -27,11 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/fts/fts_query_impl.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace fts {

@@ -67,7 +67,7 @@ TEST(BulkWriteCommandModifier, AddInsert) {
 }
 
 TEST(BulkWriteCommandModifier, AddOpInsert) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     auto req = write_ops::InsertCommandRequest(nss);
     auto docs = std::vector<BSONObj>();
     docs.emplace_back(BSON("a" << 1));
@@ -88,7 +88,7 @@ TEST(BulkWriteCommandModifier, AddOpInsert) {
 }
 
 TEST(BulkWriteCommandModifier, AddInsertOps) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     auto docs = std::vector<BSONObj>();
     docs.emplace_back(BSON("a" << 1));
     docs.emplace_back(BSON("b" << 1));
@@ -141,7 +141,7 @@ TEST(BulkWriteCommandModifier, InsertWithShardVersion) {
 }
 
 TEST(BulkWriteCommandModifier, AddUpdate) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     const BSONObj collation = BSON("locale"
@@ -183,7 +183,7 @@ TEST(BulkWriteCommandModifier, AddUpdate) {
 }
 
 TEST(BulkWriteCommandModifier, AddOpUpdate) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     const BSONObj collation = BSON("locale"
@@ -229,7 +229,7 @@ TEST(BulkWriteCommandModifier, AddOpUpdate) {
 }
 
 TEST(BulkWriteCommandModifier, AddUpdateOps) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj update = BSON("$inc" << BSON("x" << 1));
     const BSONObj collation = BSON("locale"
@@ -277,7 +277,7 @@ TEST(BulkWriteCommandModifier, AddUpdateOps) {
 }
 
 TEST(CommandWriteOpsParsers, BulkWriteUpdateWithPipeline) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("q" << BSON("x" << 1));
     std::vector<BSONObj> pipeline{BSON("$addFields" << BSON("x" << 1))};
     const BSONObj update = BSON("u" << pipeline);
@@ -306,7 +306,7 @@ TEST(CommandWriteOpsParsers, BulkWriteUpdateWithPipeline) {
 }
 
 TEST(BulkWriteCommandModifier, AddDelete) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj collation = BSON("locale"
                                    << "en_US");
@@ -339,7 +339,7 @@ TEST(BulkWriteCommandModifier, AddDelete) {
 }
 
 TEST(BulkWriteCommandModifier, AddOpDelete) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj collation = BSON("locale"
                                    << "en_US");
@@ -373,7 +373,7 @@ TEST(BulkWriteCommandModifier, AddOpDelete) {
 
 // Add delete ops
 TEST(BulkWriteCommandModifier, AddDeleteOps) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     const BSONObj query = BSON("x" << 1);
     const BSONObj collation = BSON("locale"
                                    << "en_US");
@@ -402,7 +402,7 @@ TEST(BulkWriteCommandModifier, AddDeleteOps) {
 }
 
 TEST(BulkWriteCommandModifier, TestMultiOpsSameNs) {
-    auto nss = NamespaceString("TestDB", "test");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
     auto docs = std::vector<BSONObj>();
     docs.emplace_back(BSON("a" << 1));
     docs.emplace_back(BSON("b" << 1));
@@ -444,8 +444,8 @@ TEST(BulkWriteCommandModifier, TestMultiOpsSameNs) {
 
 // Multiple ops (different types) different namespaces
 TEST(BulkWriteCommandModifier, TestMultiOpsDifferentNs) {
-    auto nss = NamespaceString("TestDB", "test");
-    auto nss2 = NamespaceString("TestDB", "test1");
+    auto nss = NamespaceString::createNamespaceString_forTest("TestDB", "test");
+    auto nss2 = NamespaceString::createNamespaceString_forTest("TestDB", "test1");
     auto docs = std::vector<BSONObj>();
     docs.emplace_back(BSON("a" << 1));
     docs.emplace_back(BSON("b" << 1));

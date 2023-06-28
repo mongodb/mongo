@@ -29,12 +29,15 @@
 
 #include "mongo/db/exec/and_sorted.h"
 
+#include <limits>
 #include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/db/exec/and_common.h"
-#include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/working_set_common.h"
-#include "mongo/util/str.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

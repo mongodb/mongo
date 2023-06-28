@@ -12,7 +12,8 @@ load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Col
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
 // Define two databases. We will conduct our tests by creating one collection in each.
-const testDB1 = db.getSiblingDB(jsTestName()), testDB2 = db.getSiblingDB(jsTestName() + "_other");
+const testDB1 = db.getSiblingDB("whole_cluster_metadata"),
+      testDB2 = db.getSiblingDB("whole_cluster_metadata_other");
 const adminDB = db.getSiblingDB("admin");
 
 assert.commandWorked(testDB1.dropDatabase());
@@ -153,7 +154,7 @@ for (let collToInvalidate of [db1Coll, db2Coll]) {
         // passthrough suites since we cannot guarantee the primary shard of the target database
         // and renameCollection requires the source and destination to be on the same shard.
         if (!FixtureHelpers.isMongos(testDB)) {
-            const otherDB = testDB.getSiblingDB(testDB.getName() + "_rename_target");
+            const otherDB = testDB.getSiblingDB(testDB.getName() + "_target");
             // Ensure the target database exists.
             const collOtherDB = assertDropAndRecreateCollection(otherDB, "test");
             assertDropCollection(otherDB, collOtherDB.getName());

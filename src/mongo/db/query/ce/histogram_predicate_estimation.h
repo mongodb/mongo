@@ -29,9 +29,14 @@
 
 #pragma once
 
+#include <string>
+
+#include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/query/optimizer/defs.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/stats/array_histogram.h"
+#include "mongo/db/query/stats/scalar_histogram.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo::optimizer::ce {
 

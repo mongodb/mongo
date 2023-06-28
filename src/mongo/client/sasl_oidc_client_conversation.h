@@ -29,6 +29,11 @@
 
 #pragma once
 
+#include <functional>
+#include <string>
+#include <utility>
+
+#include "mongo/base/string_data.h"
 #include "mongo/client/sasl_client_conversation.h"
 #include "mongo/client/sasl_oidc_client_params.h"
 
@@ -46,9 +51,8 @@ public:
           _principalName(principalName.rawData()),
           _accessToken(accessToken.rawData()) {}
 
-    static void setOIDCIdPAuthCallback(
-        const std::function<void(StringData, StringData)>& callback) {
-        oidcClientGlobalParams.oidcIdPAuthCallback = callback;
+    static void setOIDCIdPAuthCallback(std::function<oidcIdPAuthCallbackT> callback) {
+        oidcClientGlobalParams.oidcIdPAuthCallback = std::move(callback);
     }
 
     StatusWith<bool> step(StringData inputData, std::string* outputData) override;

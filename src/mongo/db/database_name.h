@@ -30,13 +30,28 @@
 #pragma once
 #include <algorithm>
 #include <boost/algorithm/string/predicate.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <cstring>
+#include <fmt/format.h>
+#include <iosfwd>
+#include <mutex>
 #include <string>
+#include <utility>
 
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/logv2/log_attr.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 
@@ -97,9 +112,11 @@ public:
 
 #define DBNAME_CONSTANT(id, db) static const ConstantProxy id;
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 
     static constexpr size_t kMaxDatabaseNameLength = 63;
+    static constexpr size_t kMaxTenantDatabaseNameLength = 38;
 
     /**
      * Constructs an empty DatabaseName.
@@ -135,7 +152,9 @@ public:
 
         return TenantId{OID::from(&_data[kDataOffset])};
     }
-
+    /**
+     * This function is deprecated. TODO SERVER-77537 Make db() private.
+     */
     StringData db() const {
         auto offset = _hasTenantId() ? kDataOffset + OID::kOIDSize : kDataOffset;
         return StringData{_data.data() + offset, _data.size() - offset};
@@ -143,6 +162,26 @@ public:
 
     bool isEmpty() const {
         return _data.size() == kDataOffset;
+    }
+    bool isAdminDB() const {
+        return db() == DatabaseName::kAdmin.db();
+    }
+    bool isLocalDB() const {
+        return db() == DatabaseName::kLocal.db();
+    }
+    bool isConfigDB() const {
+        return db() == DatabaseName::kConfig.db();
+    }
+    bool isExternalDB() const {
+        return db() == DatabaseName::kExternal.db();
+    }
+
+    /**
+     * Serialize the db name to stirng, always ignoring the tenantId.
+     * This function should only be used when no available serialize context.
+     */
+    std::string serializeWithoutTenantPrefix() const {
+        return db().toString();
     }
 
     /**
@@ -252,7 +291,7 @@ private:
 
     /**
      * Constructs a DatabaseName from the given tenantId and database name.
-     * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
+     * "dbString" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
      */
     DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
@@ -262,11 +301,12 @@ private:
         uassert(ErrorCodes::InvalidNamespace,
                 "database names cannot have embedded null characters",
                 dbString.find('\0') == std::string::npos);
+
+        size_t maxLen = tenantId ? kMaxTenantDatabaseNameLength : kMaxDatabaseNameLength;
         uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("db name must be at most {} characters, found: {}",
-                            kMaxDatabaseNameLength,
-                            dbString.size()),
-                dbString.size() <= kMaxDatabaseNameLength);
+                fmt::format(
+                    "db name must be at most {} characters, found: {}", maxLen, dbString.size()),
+                dbString.size() <= maxLen);
 
         uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
         size_t dbStartIndex = kDataOffset;
@@ -320,6 +360,7 @@ private:
 namespace dbname_detail::const_proxy_shared_states {
 #define DBNAME_CONSTANT(id, db) constexpr inline DatabaseName::ConstantProxy::SharedState id{db};
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 }  // namespace dbname_detail::const_proxy_shared_states
 
@@ -327,6 +368,7 @@ namespace dbname_detail::const_proxy_shared_states {
     constexpr inline DatabaseName::ConstantProxy DatabaseName::id{ \
         &dbname_detail::const_proxy_shared_states::id};
 #include "database_name_reserved.def.h"  // IWYU pragma: keep
+
 #undef DBNAME_CONSTANT
 
 }  // namespace mongo

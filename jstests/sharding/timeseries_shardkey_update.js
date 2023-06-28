@@ -11,7 +11,7 @@
  *   # TODO SERVER-76583: Remove following two tags.
  *   does_not_support_retryable_writes,
  *   requires_non_retryable_writes,
- *   featureFlagUpdateOneWithoutShardKey,
+ *   featureFlagTimeseriesUpdatesSupport,
  * ]
  */
 
@@ -57,38 +57,36 @@ setUpShardedCluster();
     assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
 })();
 
-// TODO SERVER-77607 This test case should succeed without the error and be enabled.
-/*
 (function testUpdateOneModifyingShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
     // MaxKey).
     const coll = prepareShardedCollection(
         {collName: getCallerName(1), initialDocList: docs, includeMeta: true});
 
-    // This update command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The owning
-    // shard would be the shard that owns (MinKey, meta: "A"].
-    const updateOneCmd = {
-        update: coll.getName(),
-        updates: [{
-            q: {[metaFieldName]: "B", f: {$gt: 103}},
-            u: {$set: {[metaFieldName]: "A"}},
-            multi: false
-        }]
-    };
-    jsTestLog(`Running update one: ${tojson(updateOneCmd)}`);
-
-    // Retryable update one command can modify the shard key.
-    const session = testDB.getMongo().startSession({retryWrites: true});
+    // TODO SERVER-78364 Run this as a retryable write instead of inside a transaction.
+    // Update one command in a transaction can modify the shard key.
+    const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());
 
-    // For now, we don't allow update one to modify the shard key at all.
-    const res = assert.commandFailedWithCode(
-        sessionDB.runCommand(updateOneCmd), 7717801, `cmd = ${tojson(updateOneCmd)}`);
+    session.startTransaction();
 
-    assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
+    // This update command tries to update doc5_b_f104 into {_id: 5, meta: "A", f: 104}. The owning
+    // shard would be the shard that owns (MinKey, meta: "A"].
+    const query = {[metaFieldName]: "B", f: {$gt: 103}};
+    const update = {$set: {[metaFieldName]: "A"}};
+
+    jsTestLog(`Running updateOne: {q: ${tojson(query)}, u: ${tojson(update)}}`);
+
+    const result = assert.commandWorked(sessionDB[coll.getName()].updateOne(query, update));
+    assert.eq(1, result.modifiedCount, tojson(result));
+
+    session.commitTransaction();
+
+    assert.docEq({_id: 5, [metaFieldName]: "A", f: 104, [timeFieldName]: generateTimeValue(5)},
+                 coll.findOne({_id: 5}),
+                 "Document was not updated correctly " + tojson(coll.find().toArray()));
 })();
 
-// TODO SERVER-76871 This test case should succeed without the error and be enabled.
 (function testFindOneAndUpdateModifyingMetaShardKey() {
     // This will create a sharded collection with 2 chunks: (MinKey, meta: "A"] and [meta: "B",
     // MaxKey).
@@ -101,24 +99,33 @@ setUpShardedCluster();
         findAndModify: coll.getName(),
         query: {[metaFieldName]: "B", f: {$gt: 103}},
         update: {$set: {[metaFieldName]: "A"}},
+        new: true,
     };
     jsTestLog(`Running findAndModify update: ${tojson(findOneAndUpdateCmd)}`);
 
-    // FindAndModify command in a transaction can modify the shard key.
+    // As of now, shard key update is only allowed in retryable writes or transactions when
+    // 'featureFlagUpdateDocumentShardKeyUsingTransactionApi' is turned off and findAndModify on
+    // timeseries collections does not support retryable writes. So we should use transaction here.
+    //
+    // TODO SERVER-67429 or SERVER-76583 Relax this restriction.
     const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());
     session.startTransaction();
 
-    // For now, we don't allow findAndModify update to modify the shard key at all.
-    const res = assert.commandFailedWithCode(
-        sessionDB.runCommand(findOneAndUpdateCmd), 7717801, `cmd = ${tojson(findOneAndUpdateCmd)}`);
+    const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
+    assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
+    assert.eq(
+        true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
+    const updatedDoc = Object.assign(doc5_b_f104, {[metaFieldName]: "A"});
+    assert.docEq(updatedDoc, res.value, "Wrong new document");
 
-    session.abortTransaction();
+    session.commitTransaction();
 
-    assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
+    let expectedDocs = docs.filter(doc => doc._id !== 5);
+    expectedDocs.push(updatedDoc);
+    assert.sameMembers(expectedDocs, coll.find().toArray(), "Collection contents did not match");
 })();
 
-// TODO SERVER-76871 This test case should succeed without the error and be enabled.
 (function testFindOneAndUpdateModifyingTimeShardKey() {
     // This will create a sharded collection with 2 chunks: [MinKey,
     // 'splitTimePointBetweenTwoShards') and ['splitTimePointBetweenTwoShards', MaxKey).
@@ -135,20 +142,28 @@ setUpShardedCluster();
     };
     jsTestLog(`Running findAndModify update: ${tojson(findOneAndUpdateCmd)}`);
 
-    // FindAndModify command in a transaction can modify the shard key.
+    // As of now, shard key update is allowed in retryable writes or transactions when 'featureFlag-
+    // UpdateDocumentShardKeyUsingTransactionApi' is turned off and findAndModify on timeseries
+    // collections does not support retryable writes. So we should use transaction here.
+    //
+    // TODO SERVER-67429 or SERVER-76583 Relax this restriction.
     const session = testDB.getMongo().startSession();
     const sessionDB = session.getDatabase(testDB.getName());
     session.startTransaction();
 
-    // For now, we don't allow findAndModify update to modify the shard key at all.
-    const res = assert.commandFailedWithCode(
-        sessionDB.runCommand(findOneAndUpdateCmd), 7717801, `cmd = ${tojson(findOneAndUpdateCmd)}`);
+    const res = assert.commandWorked(sessionDB.runCommand(findOneAndUpdateCmd));
+    assert.eq(1, res.lastErrorObject.n, "Expected 1 document to be updated");
+    assert.eq(
+        true, res.lastErrorObject.updatedExisting, "Expected existing document to be updated");
+    assert.docEq(doc1_a_nofields, res.value, "Wrong old document");
 
-    session.abortTransaction();
+    session.commitTransaction();
 
-    assert.sameMembers(docs, coll.find().toArray(), "Collection contents did not match");
-});
-*/
+    const updatedDoc = Object.assign(doc1_a_nofields, {[timeFieldName]: generateTimeValue(8)});
+    let expectedDocs = docs.filter(doc => doc._id !== 1);
+    expectedDocs.push(updatedDoc);
+    assert.sameMembers(expectedDocs, coll.find().toArray(), "Collection contents did not match");
+})();
 
 tearDownShardedCluster();
 })();

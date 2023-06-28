@@ -2,7 +2,6 @@
  * Tests for the approximate percentile accumulator semantics.
  * @tags: [
  *   requires_fcv_70,
- *   featureFlagApproxPercentiles
  * ]
  */
 (function() {
@@ -16,10 +15,11 @@ const coll = db[jsTestName()];
  * Tests for correctness without grouping. Each group gets its own accumulator so we can validate
  * the basic $percentile functionality using a single group.
  */
-function testWithSingleGroup({docs, percentileSpec, expectedResult, msg}) {
+function testWithSingleGroup({docs, percentileSpec, letSpec, expectedResult, msg}) {
     coll.drop();
     coll.insertMany(docs);
-    const res = coll.aggregate([{$group: {_id: null, p: percentileSpec}}]).toArray();
+    const res =
+        coll.aggregate([{$group: {_id: null, p: percentileSpec}}], {let : letSpec}).toArray();
 
     // For $percentile the result should be ordered to match the spec, so assert exact equality.
     assert.eq(expectedResult, res[0].p, msg + `; Result: ${tojson(res)}`);
@@ -65,6 +65,41 @@ testWithSingleGroup({
     percentileSpec: {$percentile: {p: [0.5, 0.9, 0.1], input: "$x", method: "approximate"}},
     expectedResult: [1, 2, 0],
     msg: "Multiple percentiles"
+});
+
+testWithSingleGroup({
+    docs: [{x: 0}, {x: 1}, {x: 2}],
+    percentileSpec: {$percentile: {p: "$$ps", input: "$x", method: "approximate"}},
+    letSpec: {ps: [0.5, 0.9, 0.1]},
+    expectedResult: [1, 2, 0],
+    msg: "Multiple percentiles using variable in the percentile spec for the whole array"
+});
+
+testWithSingleGroup({
+    docs: [{x: 0}, {x: 1}, {x: 2}],
+    percentileSpec: {$percentile: {p: ["$$p90"], input: "$x", method: "approximate"}},
+    letSpec: {p90: 0.9},
+    expectedResult: [2],
+    msg: "Single percentile using variable in the percentile spec for the array elements"
+});
+
+testWithSingleGroup({
+    docs: [{x: 0}, {x: 1}, {x: 2}],
+    percentileSpec: {
+        $percentile:
+            {p: {$concatArrays: [[0.1, 0.5], ["$$p90"]]}, input: "$x", method: "approximate"}
+    },
+    letSpec: {p90: 0.9},
+    expectedResult: [0, 1, 2],
+    msg: "Multiple percentiles using const expression in the percentile spec"
+});
+
+testWithSingleGroup({
+    docs: [{x: 0}, {x: 1}, {x: 2}],
+    percentileSpec: {$percentile: {p: "$$ps", input: {$add: [42, "$x"]}, method: "approximate"}},
+    letSpec: {ps: [0.5, 0.9, 0.1]},
+    expectedResult: [42 + 1, 42 + 2, 42 + 0],
+    msg: "Multiple percentiles using expression as input"
 });
 
 function testWithMultipleGroups({docs, percentileSpec, expectedResult, msg}) {

@@ -54,7 +54,7 @@ public:
     virtual ~CollectionBase() {}
 };
 
-const NamespaceString kTestNss = NamespaceString("db.dummy");
+const NamespaceString kTestNss = NamespaceString::createNamespaceString_forTest("db.dummy");
 
 template <typename M>
 class Basic {
@@ -226,7 +226,8 @@ public:
     void run() {
         const ServiceContext::UniqueOperationContext opCtxPtr = cc().makeOperationContext();
         OperationContext& opCtx = *opCtxPtr;
-        const NamespaceString nss("unittests.matchertests");
+        const NamespaceString nss =
+            NamespaceString::createNamespaceString_forTest("unittests.matchertests");
         AutoGetCollectionForReadCommand ctx(&opCtx, nss);
 
         const boost::intrusive_ptr<ExpressionContext> expCtx(new ExpressionContext(

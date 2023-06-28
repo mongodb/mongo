@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/watchdog/watchdog.h"
 
 #include <boost/align.hpp>  // IWYU pragma: keep
@@ -39,10 +37,10 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <unistd.h>
 #endif
 
 #include "mongo/base/static_assert.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
@@ -53,6 +51,10 @@
 #include "mongo/util/exit_code.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/timer.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

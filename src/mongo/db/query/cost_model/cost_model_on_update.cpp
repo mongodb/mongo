@@ -29,11 +29,18 @@
 
 #include "mongo/db/query/cost_model/cost_model_on_update.h"
 
+#include <string>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
-#include "mongo/db/query/cost_model/cost_model_manager.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -28,14 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/free_mon/free_mon_mongod.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstdint>
+#include <functional>
+#include <memory>
 #include <mutex>
-#include <snappy.h>
+#include <set>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/data_builder.h"
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_type_validated.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,28 +50,36 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/bsontypes.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/db/client.h"
 #include "mongo/db/free_mon/free_mon_controller.h"
 #include "mongo/db/free_mon/free_mon_message.h"
+#include "mongo/db/free_mon/free_mon_mongod.h"
 #include "mongo/db/free_mon/free_mon_mongod_gen.h"
 #include "mongo/db/free_mon/free_mon_network.h"
 #include "mongo/db/free_mon/free_mon_op_observer.h"
 #include "mongo/db/free_mon/free_mon_options.h"
+#include "mongo/db/free_mon/free_mon_processor.h"
 #include "mongo/db/free_mon/free_mon_protocol_gen.h"
 #include "mongo/db/free_mon/free_mon_storage.h"
 #include "mongo/db/ftdc/ftdc_server.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/service_context.h"
 #include "mongo/executor/network_interface_factory.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/executor/thread_pool_task_executor.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/http_client.h"
 #include "mongo/util/testing_proctor.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -241,7 +256,8 @@ public:
         for (auto& nss : _namespaces) {
             auto optUUID = catalog->lookupUUIDByNSS(opCtx, nss);
             if (optUUID) {
-                builder << nss.toString() << optUUID.get();
+                // Always include tenant id in nss for FTDC collector.
+                builder << toStringForLogging(nss) << optUUID.get();
             }
         }
     }

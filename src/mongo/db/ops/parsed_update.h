@@ -29,13 +29,31 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <map>
+#include <memory>
+#include <type_traits>
+#include <utility>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/matcher/expression.h"
 #include "mongo/db/matcher/expression_with_placeholder.h"
+#include "mongo/db/matcher/extensions_callback.h"
 #include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/matcher/extensions_callback_real.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/ops/parsed_writes_common.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/plan_yield_policy.h"
 #include "mongo/db/update/update_driver.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

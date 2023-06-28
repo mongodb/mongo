@@ -42,7 +42,9 @@ struct ClusterPipelineCommandS {
         return kApiVersions1;
     }
 
-    static void doCheckAuthorization(OperationContext* opCtx, const PrivilegeVector& privileges) {
+    static void doCheckAuthorization(OperationContext* opCtx,
+                                     const OpMsgRequest&,
+                                     const PrivilegeVector& privileges) {
         uassert(
             ErrorCodes::Unauthorized,
             "unauthorized",

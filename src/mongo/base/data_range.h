@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <cstring>
 #include <tuple>
 #include <type_traits>
@@ -36,8 +38,11 @@
 
 #include "mongo/base/data_type.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/platform/endian.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -46,29 +51,32 @@ protected:
     // These are helper types to make ConstDataRange's and friends constructable either from
     // a range of byte-like pointers or from a container of byte-like values.
     template <typename T>
-    constexpr static auto isByteV =
-        (((std::is_integral_v<T> && sizeof(T) == 1) ||
-          std::is_same_v<T, std::byte>)&&(!std::is_same_v<std::decay_t<T>, bool>));
-
-    template <typename T, typename = void>
-    struct HasDataSize : std::false_type {};
-
-    template <typename T>
-    struct HasDataSize<
-        T,
-        std::enable_if_t<std::is_void_v<
-            std::void_t<decltype(std::declval<T>().data()), decltype(std::declval<T>().size())>>>>
-        : std::true_type {};
-
-    template <typename T, typename = void>
-    struct ContiguousContainerOfByteLike : std::false_type {};
+    static constexpr bool isByte = [] {
+        if constexpr (std::is_same_v<T, std::byte>) {
+            return true;
+        } else if constexpr (std::is_same_v<T, bool>) {
+            return false;
+        } else if constexpr (!std::is_integral_v<T>) {
+            return false;
+        } else if constexpr (sizeof(T) != 1) {
+            return false;
+        } else {
+            return true;
+        }
+    }();
 
     template <typename T>
-    struct ContiguousContainerOfByteLike<
-        T,
-        std::void_t<decltype(std::declval<T>().data()),
-                    std::enable_if_t<isByteV<typename T::value_type> && HasDataSize<T>::value>>>
-        : std::true_type {};
+    using DataOp = decltype(std::declval<T>().data());
+    template <typename T>
+    using SizeOp = decltype(std::declval<T>().size());
+    template <typename T>
+    using ValueTypeOp = typename T::value_type;
+
+    template <typename T>
+    static constexpr bool isContiguousContainerOfByteLike =  //
+        stdx::is_detected_v<SizeOp, T>&&                     //
+            stdx::is_detected_v<DataOp, T>&&                 //
+                isByte<stdx::detected_t<ValueTypeOp, T>>;
 
 public:
     using byte_type = char;
@@ -84,7 +92,7 @@ public:
     // to a non-zero value, you'll change the Status messages that are
     // returned on failure to be offset by the amount passed to this
     // constructor.
-    template <typename ByteLike, typename std::enable_if_t<isByteV<ByteLike>, int> = 0>
+    template <typename ByteLike, std::enable_if_t<isByte<ByteLike>, int> = 0>
     ConstDataRange(const ByteLike* begin, const ByteLike* end, std::ptrdiff_t debug_offset = 0)
         : _begin(reinterpret_cast<const byte_type*>(begin)),
           _end(reinterpret_cast<const byte_type*>(end)),
@@ -97,7 +105,7 @@ public:
         : _begin(nullptr), _end(nullptr), _debug_offset(debug_offset) {}
 
     // You can also construct from a pointer to a byte-like type and a size.
-    template <typename ByteLike, typename std::enable_if_t<isByteV<ByteLike>, int> = 0>
+    template <typename ByteLike, std::enable_if_t<isByte<ByteLike>, int> = 0>
     ConstDataRange(const ByteLike* begin, std::size_t length, std::ptrdiff_t debug_offset = 0)
         : _begin(reinterpret_cast<const byte_type*>(begin)),
           _end(reinterpret_cast<const byte_type*>(_begin + length)),
@@ -109,12 +117,12 @@ public:
     // must have a data() function that returns a pointer to the front and a size() function
     // that returns the number of elements.
     template <typename Container,
-              typename std::enable_if_t<ContiguousContainerOfByteLike<Container>::value, int> = 0>
+              std::enable_if_t<isContiguousContainerOfByteLike<Container>, int> = 0>
     ConstDataRange(const Container& container, std::ptrdiff_t debug_offset = 0)
         : ConstDataRange(container.data(), container.size(), debug_offset) {}
 
     // You can also construct from a C-style array, including string literals.
-    template <typename ByteLike, size_t N, typename std::enable_if_t<isByteV<ByteLike>, int> = 0>
+    template <typename ByteLike, size_t N, std::enable_if_t<isByte<ByteLike>, int> = 0>
     ConstDataRange(const ByteLike (&arr)[N], std::ptrdiff_t debug_offset = 0)
         : ConstDataRange(arr, N, debug_offset) {}
 
@@ -195,9 +203,7 @@ public:
 
 protected:
     // Shared implementation of split() logic between DataRange and ConstDataRange.
-    template <typename RangeT,
-              typename ByteLike,
-              typename std::enable_if_t<isByteV<ByteLike>, int> = 0>
+    template <typename RangeT, typename ByteLike, std::enable_if_t<isByte<ByteLike>, int> = 0>
     std::pair<RangeT, RangeT> doSplit(const ByteLike* splitPoint) const {
         const auto* typedPoint = reinterpret_cast<const byte_type*>(splitPoint);
         uassert(ErrorCodes::BadValue,
@@ -258,16 +264,16 @@ public:
         : ConstDataRange(nullptr, nullptr, debug_offset) {}
 
     template <typename Container,
-              typename std::enable_if_t<ContiguousContainerOfByteLike<Container>::value, int> = 0>
+              std::enable_if_t<isContiguousContainerOfByteLike<Container>, int> = 0>
     DataRange(Container& container, std::ptrdiff_t debug_offset = 0)
         : ConstDataRange(std::forward<Container>(container), debug_offset) {}
 
     template <typename Container,
-              typename std::enable_if_t<ContiguousContainerOfByteLike<Container>::value, int> = 0>
+              std::enable_if_t<isContiguousContainerOfByteLike<Container>, int> = 0>
     DataRange(const Container&, std::ptrdiff_t) = delete;
 
     template <typename Container,
-              typename std::enable_if_t<ContiguousContainerOfByteLike<Container>::value, int> = 0>
+              std::enable_if_t<isContiguousContainerOfByteLike<Container>, int> = 0>
     DataRange(const Container&) = delete;
 
     template <typename ByteLike, size_t N>
@@ -323,8 +329,7 @@ struct DataRangeTypeHelper {
 
 // Enable for classes derived from ConstDataRange
 template <typename T>
-struct DataType::Handler<T,
-                         typename std::enable_if<std::is_base_of<ConstDataRange, T>::value>::type> {
+struct DataType::Handler<T, std::enable_if_t<std::is_base_of_v<ConstDataRange, T>>> {
     static Status load(
         T* t, const char* ptr, size_t length, size_t* advanced, std::ptrdiff_t debug_offset) {
         if (t) {

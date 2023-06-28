@@ -30,8 +30,15 @@
 
 #pragma once
 
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <functional>
 #include <numeric>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
@@ -42,7 +49,7 @@ namespace mongo::optimizer {
 
 template <class T>
 struct TassertNegator {
-    T operator()(const T v) const {
+    T operator()(T v) const {
         tassert(7453909, "No negator specified", false);
         return v;
     }

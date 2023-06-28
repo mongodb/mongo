@@ -29,23 +29,44 @@
 
 #pragma once
 
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <functional>
+#include <immer/detail/util.hpp>
 #include <map>
+#include <memory>
 #include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/historical_catalogid_tracker.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/views_for_database.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/profile_filter.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/durable_catalog_entry.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/db/views/view.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/immutable/map.h"
 #include "mongo/util/immutable/unordered_map.h"
 #include "mongo/util/immutable/unordered_set.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 #include "mongo/util/uuid.h"
 
 namespace mongo {
@@ -72,12 +93,9 @@ public:
         bool operator!=(const iterator& other) const;
 
     private:
-        void _skipUncommitted();
-
         const OrderedCollectionMap& _map;
         immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::iterator
             _mapIter;
-        immutable::map<std::pair<DatabaseName, UUID>, std::shared_ptr<Collection>>::iterator _end;
     };
 
     class Range {
@@ -310,16 +328,6 @@ public:
                             boost::optional<Timestamp> commitTime);
 
     /**
-     * Like 'registerCollection' above but allows the Collection to be registered using just a
-     * MODE_IX lock on the namespace. The collection will be added to the catalog using a two-phase
-     * commit where it is marked as 'pending commit' internally. The user must call
-     * 'onCreateCollection' which sets up the necessary state for finishing the two-phase commit.
-     */
-    void registerCollectionTwoPhase(OperationContext* opCtx,
-                                    std::shared_ptr<Collection> collection,
-                                    boost::optional<Timestamp> commitTime);
-
-    /**
      * Deregister the collection.
      *
      * Adds the collection to the drop pending state in the catalog when isDropPending=true.
@@ -418,12 +426,6 @@ public:
                                                             const NamespaceString& nss) const;
 
     /**
-     * Returns true if the collection has been registered in the CollectionCatalog but not yet made
-     * visible.
-     */
-    bool isCollectionAwaitingVisibility(UUID uuid) const;
-
-    /**
      * This function gets the NamespaceString from the collection catalog entry that
      * corresponds to UUID uuid. If no collection exists with the uuid, return
      * boost::none. See onCloseCatalog/onOpenCatalog for more info.
@@ -438,9 +440,11 @@ public:
                                           const NamespaceString& nss) const;
 
     /**
-     * Returns true if this CollectionCatalog contains the provided collection instance
+     * Checks if the provided instance is the latest version for this catalog version. This check
+     * should be used to determine if the collection instance is safe to perform CRUD writes on. For
+     * the check to be meaningful it should be performed against CollectionCatalog::latest.
      */
-    bool containsCollection(OperationContext* opCtx, const Collection* collection) const;
+    bool isLatestCollection(OperationContext* opCtx, const Collection* collection) const;
 
     /**
      * Iterates through the views in the catalog associated with database `dbName`, applying
@@ -665,13 +669,9 @@ private:
 
     /**
      * Register the collection.
-     *
-     * If 'twoPhase' is true, this call must be followed by 'onCreateCollection' which continues the
-     * two-phase commit process.
      */
     void _registerCollection(OperationContext* opCtx,
                              std::shared_ptr<Collection> collection,
-                             bool twoPhase,
                              boost::optional<Timestamp> commitTime);
 
     std::shared_ptr<Collection> _lookupCollectionByUUID(UUID uuid) const;

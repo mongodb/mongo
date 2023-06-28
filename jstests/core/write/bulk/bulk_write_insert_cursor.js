@@ -10,6 +10,8 @@
  *   featureFlagBulkWriteCommand,
  * ]
  */
+load("jstests/libs/bulk_write_utils.js");  // For cursorEntryValidator.
+
 (function() {
 "use strict";
 
@@ -17,13 +19,6 @@ var coll = db.getCollection("coll");
 var coll1 = db.getCollection("coll1");
 coll.drop();
 coll1.drop();
-
-const cursorEntryValidator = function(entry, expectedEntry) {
-    assert(entry.ok == expectedEntry.ok);
-    assert(entry.idx == expectedEntry.idx);
-    assert(entry.n == expectedEntry.n);
-    assert(entry.code == expectedEntry.code);
-};
 
 // Make sure a properly formed request has successful result.
 var res = db.adminCommand(

@@ -29,14 +29,29 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/client.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_id.h"
 #include "mongo/db/query/datetime/date_time_support.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/storage_options.h"
@@ -50,6 +65,7 @@
 #include "mongo/util/cancellation.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/lockable_adapter.h"
@@ -89,7 +105,7 @@ extern FailPoint maxTimeNeverTimeOut;
  * (RecoveryUnitState) to reduce complexity and duplication in the storage-engine specific
  * RecoveryUnit and to allow better invariant checking.
  */
-class OperationContext : public Interruptible, public Decorable<OperationContext> {
+class OperationContext final : public Interruptible, public Decorable<OperationContext> {
     OperationContext(const OperationContext&) = delete;
     OperationContext& operator=(const OperationContext&) = delete;
 
@@ -561,6 +577,10 @@ public:
     boost::optional<BSONElement> getComment() {
         // The '_comment' object, if present, will only ever have one field.
         return _comment ? boost::optional<BSONElement>(_comment->firstElement()) : boost::none;
+    }
+
+    boost::optional<BSONObj> getCommentOwnedCopy() const {
+        return _comment.has_value() ? boost::optional<BSONObj>{_comment->copy()} : boost::none;
     }
 
     /**
