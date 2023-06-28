@@ -82,7 +82,7 @@ structs:
       numDocsTotal:
         type: long
         description: "The number of documents in the collection."
-        validator: { gte: 0 }
+        validator: { gt: 0 }
       numOrphanDocs:
         type: long
         description: "The number of orphan documents in the collection."
@@ -91,14 +91,19 @@ structs:
       avgDocSizeBytes:
         type: long
         description: "The average document size in bytes."
-        validator: { gte: 0 }
+        validator: { gt: 0 }
+      numDocsSampled:
+        type: long
+        description: "The number of sampled documents when calculating the metrics about the
+                     characteristics of the shard key."
+        validator: { gt: 0 }
       isUnique:
         type: bool
         description: "Whether the shard key index enforces a uniqueness constraint."
       numDistinctValues:
         type: long
         description: "The number of distinct shard key values in the collection."
-        validator: { gte: 0 }
+        validator: { gt: 0 }
       mostCommonValues:
         type: array<ValueFrequencyMetrics>
         description: "The value and frequency of the most common shard key values."
@@ -324,6 +329,22 @@ commands:
         description: "The boolean specifying whether the command should calculate the metrics about
                      the read and write distribution."
         default: true
+      sampleRate:
+        description: "The proportion of the documents in the collection, in the range (0,1] to
+                     sample when calculating the metrics about the characteristics of the shard
+                     key."
+        type: safeDouble
+        validator:
+          gt: 0
+          lte: 1
+        optional: true
+      sampleSize:
+        description: "The number of documents to sample when calculating the metrics about the
+                      characteristics of the shard key."
+        type: safeInt64
+        validator:
+          gt: 0
+        optional: true
       $readPreference:
         type: readPreference
         cpp_name: readPreference
