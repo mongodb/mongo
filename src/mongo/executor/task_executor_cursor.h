@@ -52,8 +52,8 @@ namespace executor {
  *
  * The main differentiator for this type over DBClientCursor is the use of a task executor (which
  * provides access to a different connection pool, as well as interruptibility) and the ability to
- * overlap getMores.  This starts fetching the next batch as soon as one is exhausted (rather than
- * on a call to getNext()).
+ * overlap getMores.  This starts fetching the next batch as soon as the previous one is received
+ * (rather than on a call to 'getNext()').
  */
 class TaskExecutorCursor {
 public:
@@ -67,6 +67,11 @@ public:
 
     struct Options {
         boost::optional<int64_t> batchSize;
+        // If true, we will fetch the next batch as soon as the current one is recieved.
+        // If false, we will fetch the next batch when the current batch is exhausted and
+        // 'getNext()' is invoked.
+        bool preFetchNextBatch{true};
+        Options() {}
     };
 
     /**
@@ -126,6 +131,14 @@ private:
      * Create a new request, annotating with lsid and current opCtx
      */
     const RemoteCommandRequest& _createRequest(OperationContext* opCtx, const BSONObj& cmd);
+
+    /**
+     * Schedules a 'GetMore' request to run asyncronously.
+     * This function can only be invoked when:
+     * - There is no in-flight request ('_cmdState' is null).
+     * - We have an open '_cursorId'.
+     */
+    void _scheduleGetMore(OperationContext* opCtx);
 
     executor::TaskExecutor* _executor;
 

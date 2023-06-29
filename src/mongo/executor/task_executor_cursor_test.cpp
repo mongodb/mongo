@@ -84,7 +84,42 @@ public:
         }
         bob.append("ok", int(1));
 
+        // We perform this assertion since we are in the prefetching-disabled case. Otherwise, we
+        // would not have a ready request here.
         ASSERT(getNet()->hasReadyRequests());
+
+        auto rcr = getNet()->scheduleSuccessfulResponse(bob.obj());
+        getNet()->runReadyNetworkOperations();
+
+        return rcr.cmdObj.getOwned();
+    }
+
+    /**
+     * The same as scheduleSuccessfulCursorResponse, just without the assertion that would be
+     * inappropriate for the prefetching-enabled getMore case.
+     */
+    BSONObj scheduleSuccessfulCursorResponseNoPrefetchGetMore(StringData fieldName,
+                                                              size_t start,
+                                                              size_t end,
+                                                              size_t cursorId) {
+        NetworkInterfaceMock::InNetworkGuard ing(getNet());
+
+        BSONObjBuilder bob;
+        {
+            BSONObjBuilder cursor(bob.subobjStart("cursor"));
+            {
+                BSONArrayBuilder batch(cursor.subarrayStart(fieldName));
+
+                for (size_t i = start; i <= end; ++i) {
+                    BSONObjBuilder doc(batch.subobjStart());
+                    doc.append("x", int(i));
+                }
+            }
+            cursor.append("id", (long long)(cursorId));
+            cursor.append("ns", "test.test");
+        }
+        bob.append("ok", int(1));
+
         auto rcr = getNet()->scheduleSuccessfulResponse(bob.obj());
         getNet()->runReadyNetworkOperations();
 
@@ -378,6 +413,62 @@ TEST_F(TaskExecutorCursorFixture, LsidIsPassed) {
                            << "cursors" << BSON_ARRAY(1) << "lsid" << lsid.toBSON()),
                       scheduleSuccessfulKillCursorResponse(1));
 
+    ASSERT_FALSE(hasReadyRequests());
+}
+
+/**
+ * Test that if 'preFetchNextBatch' is false, the TaskExecutorCursor does not request GetMores
+ * until the current batch is exhausted and 'getNext()' is invoked.
+ */
+TEST_F(TaskExecutorCursorFixture, NoPrefetchGetMore) {
+    CursorId cursorId = 1;
+    RemoteCommandRequest rcr(HostAndPort("localhost"),
+                             "test",
+                             BSON("search"
+                                  << "foo"),
+                             opCtx.get());
+
+    // Construction of the TaskExecutorCursor enqueues a request in the NetworkInterfaceMock.
+    TaskExecutorCursor tec(&getExecutor(), rcr, [] {
+        TaskExecutorCursor::Options opts;
+        opts.batchSize = 2;
+        opts.preFetchNextBatch = false;
+        return opts;
+    }());
+
+    // Mock the response for the first batch.
+    scheduleSuccessfulCursorResponse("firstBatch", 1, 2, cursorId);
+
+    // Exhaust the first batch.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 1);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 2);
+
+    // Assert that the TaskExecutorCursor has not requested a GetMore. This enforces that
+    // 'preFetchNextBatch' works as expected.
+    ASSERT_FALSE(hasReadyRequests());
+
+    // As soon as 'getNext()' is invoked, the TaskExecutorCursor will try to send a GetMore and
+    // that will block this thread in the NetworkInterfaceMock until there is a scheduled
+    // response. However, we cannot schedule the cursor response on the main thread before we
+    // call 'getNext()' as that will cause the NetworkInterfaceMock to block until there is
+    // request enqueued ('getNext()' is the function which will enqueue such as request).
+    // To avoid this deadlock, we start a new thread which will schedule a response on the
+    // NetworkInterfaceMock.
+    stdx::thread t([this, cursorId] {
+        scheduleSuccessfulCursorResponseNoPrefetchGetMore("nextBatch", 3, 4, 0);
+    });
+
+    // Schedules the GetMore request and exhausts the cursor.
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 3);
+    ASSERT_EQUALS(tec.getNext(opCtx.get()).value()["x"].Int(), 4);
+
+    // Joining the thread which schedules the cursor response for the GetMore here forces the
+    // destructor of NetworkInterfaceMock::InNetworkGuard to run, which ensures that the
+    // 'NetworkInterfaceMock' stops executing as the network thread. This is required before we
+    // invoke 'hasReadyRequests()' which enters the network again.
+    t.join();
+
+    // Assert no GetMore is requested.
     ASSERT_FALSE(hasReadyRequests());
 }
 

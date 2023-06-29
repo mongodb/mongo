@@ -130,8 +130,26 @@ void TaskExecutorCursor::_runRemoteCommand(const RemoteCommandRequest& rcr) {
         }));
 }
 
+void TaskExecutorCursor::_scheduleGetMore(OperationContext* opCtx) {
+    // The previous response must have returned an open cursor ID.
+    invariant(_cursorId >= kMinLegalCursorId);
+    // There cannot be an existing in-flight request.
+    invariant(!_cbHandle);
+    GetMoreRequest getMoreRequest(_ns, _cursorId, _options.batchSize, {}, {}, {});
+    _runRemoteCommand(_createRequest(opCtx, getMoreRequest.toBSON()));
+}
+
 void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
-    invariant(_cbHandle, "_getNextBatch() requires an async request to have already been sent.");
+    // If we don't have an in-flight request, schedule one. This will occur when the
+    // 'preFetchNextBatch' option is false.
+    if (!_cbHandle) {
+        invariant(!_options.preFetchNextBatch);
+        _scheduleGetMore(opCtx);
+    }
+
+    // There should be an in-flight request at this point, either sent asyncronously when we
+    // processed the previous response or just scheduled.
+    invariant(_cbHandle);
     invariant(_cursorId != kClosedCursorId);
 
     auto clock = opCtx->getServiceContext()->getPreciseClockSource();
@@ -167,10 +185,10 @@ void TaskExecutorCursor::_getNextBatch(OperationContext* opCtx) {
     _batch = cr.releaseBatch();
     _batchIter = _batch.begin();
 
-    // If we got a cursor id back, pre-fetch the next batch
-    if (_cursorId) {
-        _runRemoteCommand(_createRequest(
-            opCtx, GetMoreRequest(_ns, _cursorId, _options.batchSize, {}, {}, {}).toBSON()));
+    // If the previous response contained a cursorId and pre-fetching is enabled, schedule the
+    // getMore.
+    if ((_cursorId != kClosedCursorId) && _options.preFetchNextBatch) {
+        _scheduleGetMore(opCtx);
     }
 }
 
