@@ -117,13 +117,8 @@ StringData getBaseName(StringData path) {
 
 class IterationIface {
 public:
-    enum Flags {
-        kRaw = 0,
-        kSymbolic = 1,  // Also gather symbolic metadata.
-    };
-
     virtual ~IterationIface() = default;
-    virtual void start(Flags f) = 0;
+    virtual void start() = 0;
     virtual bool done() const = 0;
     virtual const StackTraceAddressMetadata& deref() const = 0;
     virtual void advance() = 0;
@@ -135,7 +130,7 @@ public:
  */
 std::vector<uintptr_t> uniqueBases(IterationIface& iter, size_t capacity) {
     std::vector<uintptr_t> bases;
-    for (iter.start(iter.kSymbolic); bases.size() < capacity && !iter.done(); iter.advance()) {
+    for (iter.start(); bases.size() < capacity && !iter.done(); iter.advance()) {
         const auto& f = iter.deref();
         if (!f.file())
             continue;
@@ -151,7 +146,7 @@ std::vector<uintptr_t> uniqueBases(IterationIface& iter, size_t capacity) {
 
 void appendBacktrace(BSONObjBuilder* obj, IterationIface& iter, const Options& options) {
     BSONArrayBuilder frames(obj->subarrayStart("backtrace"));
-    for (iter.start(iter.kSymbolic); !iter.done(); iter.advance()) {
+    for (iter.start(); !iter.done(); iter.advance()) {
         const auto& meta = iter.deref();
         const uintptr_t addr = reinterpret_cast<uintptr_t>(meta.address());
         BSONObjBuilder frame(frames.subobjStart());
@@ -265,91 +260,89 @@ void mergeDlInfo(StackTraceAddressMetadata& f) {
 class LibunwindStepIteration : public IterationIface {
 public:
     explicit LibunwindStepIteration(StackTraceSink& sink) : _sink(sink) {
-        if (int r = unw_getcontext(&_context); r < 0) {
+        // libunwind assumes that register/state capture (unw_getcontext) and stack unwinding
+        // (unw_step) happen in the same or child frames.
+        unw_context_t context;
+
+        if (int r = unw_getcontext(&context); r < 0) {
             _sink << "unw_getcontext: " << unw_strerror(r) << "\n";
-            _failed = true;
+            return;
         }
+
+        captureStackFrames(&context);
     }
 
 private:
-    void start(Flags flags) override {
-        _flags = flags;
-        _end = false;
-        _i = 0;
+    void captureStackFrames(unw_context_t* context) {
+        unw_cursor_t cursor;
 
-        if (_failed) {
-            _end = true;
-            return;
-        }
-        int r = unw_init_local(&_cursor, &_context);
-        if (r < 0) {
+        _metas.reserve(kStackTraceFrameMax);
+
+        if (int r = unw_init_local(&cursor, context); r < 0) {
             _sink << "unw_init_local: " << unw_strerror(r) << "\n";
-            _end = true;
             return;
         }
-        _load();
-    }
 
-    bool done() const override {
-        return (_i == kStackTraceFrameMax) || _end;
-    }
+        while (_metas.size() < kStackTraceFrameMax) {
+            if (int r = unw_step(&cursor); r <= 0) {
+                if (r < 0) {
+                    _sink << "error: unw_step: " << unw_strerror(r) << "\n";
+                }
 
-    const StackTraceAddressMetadata& deref() const override {
-        return _meta;
-    }
-
-    void advance() override {
-        ++_i;
-        int r = unw_step(&_cursor);
-        if (r <= 0) {
-            if (r < 0) {
-                _sink << "error: unw_step: " << unw_strerror(r) << "\n";
+                return;
             }
-            _end = true;
-        }
-        if (!_end) {
-            _load();
-        }
-    }
 
-    void _load() {
-        unw_word_t pc;
-        if (int r = unw_get_reg(&_cursor, UNW_REG_IP, &pc); r < 0) {
-            _sink << "unw_get_reg: " << unw_strerror(r) << "\n";
-            _end = true;
-            return;
-        }
-        if (pc == 0) {
-            _end = true;
-            return;
-        }
-        _meta.reset(static_cast<uintptr_t>(pc));
-        if (_flags & kSymbolic) {
+            unw_word_t pc;
+            if (int r = unw_get_reg(&cursor, UNW_REG_IP, &pc); r < 0) {
+                _sink << "unw_get_reg: " << unw_strerror(r) << "\n";
+                return;
+            }
+
+            if (pc == 0) {
+                return;
+            }
+
+            _metas.emplace_back();
+            StackTraceAddressMetadata& meta = _metas.back();
+
+            meta.reset(static_cast<uintptr_t>(pc));
+
             // `unw_get_proc_name`, with its access to a cursor, and to libunwind's
             // dwarf reader, can generate better metadata than mergeDlInfo, so prefer it.
             unw_word_t offset;
-            if (int r = unw_get_proc_name(&_cursor, _symbolBuf, sizeof(_symbolBuf), &offset);
+            if (int r = unw_get_proc_name(&cursor, _symbolBuf, sizeof(_symbolBuf), &offset);
                 r < 0) {
-                _sink << "unw_get_proc_name(" << Hex(_meta.address()) << "): " << unw_strerror(r)
+                _sink << "unw_get_proc_name(" << Hex(meta.address()) << "): " << unw_strerror(r)
                       << "\n";
             } else {
-                _meta.symbol().assign(_meta.address() - offset, _symbolBuf);
+                meta.symbol().assign(meta.address() - offset, _symbolBuf);
             }
-            mergeDlInfo(_meta);
+
+            mergeDlInfo(meta);
+        }
+    }
+
+    void start() override {
+        _i = _metas.begin();
+    }
+
+    bool done() const override {
+        return _i == _metas.end();
+    }
+
+    const StackTraceAddressMetadata& deref() const override {
+        return *_i;
+    }
+
+    void advance() override {
+        if (_i != _metas.end()) {
+            ++_i;
         }
     }
 
     StackTraceSink& _sink;
-
-    Flags _flags;
-    StackTraceAddressMetadata _meta;
-
-    bool _failed = false;
-    bool _end = false;
-    size_t _i = 0;
-
-    unw_context_t _context;
-    unw_cursor_t _cursor;
+    std::vector<StackTraceAddressMetadata> _metas;
+    decltype(_metas)::iterator _i;
 
     char _symbolBuf[kSymbolMax];
 };
@@ -368,8 +361,7 @@ public:
     }
 
 private:
-    void start(Flags flags) override {
-        _flags = flags;
+    void start() override {
         _i = 0;
         if (!done())
             _load();
@@ -391,12 +383,9 @@ private:
 
     void _load() {
         _meta.reset(reinterpret_cast<uintptr_t>(_addresses[_i]));
-        if (_flags & kSymbolic) {
-            mergeDlInfo(_meta);
-        }
+        mergeDlInfo(_meta);
     }
 
-    Flags _flags;
     StackTraceAddressMetadata _meta;
 
     std::array<void*, kStackTraceFrameMax> _addresses;
