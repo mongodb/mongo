@@ -868,4 +868,12 @@ void StreamableReplicaSetMonitor::_processOutstanding(
 void StreamableReplicaSetMonitor::runScanForMockReplicaSet() {
     MONGO_UNREACHABLE;
 }
+
+boost::optional<Microseconds> StreamableReplicaSetMonitor::pingTime(const HostAndPort& host) const {
+    if (const auto& serverDescription = _currentTopology()->findServerByAddress(host)) {
+        return (*serverDescription)->getRtt();
+    }
+    return boost::none;
+}
+
 }  // namespace mongo

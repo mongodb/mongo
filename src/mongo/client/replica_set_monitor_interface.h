@@ -173,6 +173,11 @@ public:
      * continuing.
      */
     virtual void runScanForMockReplicaSet() = 0;
+
+    /**
+     * Returns the ping time of `server` if available.
+     */
+    virtual boost::optional<Microseconds> pingTime(const HostAndPort& server) const = 0;
 };
 
 }  // namespace mongo

@@ -163,6 +163,9 @@ public:
 
     bool isKnownToHaveGoodPrimary() const override;
     void runScanForMockReplicaSet() override;
+
+    boost::optional<Microseconds> pingTime(const HostAndPort& server) const override;
+
     class StreamableReplicaSetMonitorDiscoveryTimeProcessor;
 
 private:

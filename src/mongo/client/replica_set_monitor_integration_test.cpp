@@ -257,6 +257,25 @@ TEST_F(ReplicaSetMonitorFixture, LockOrderingAndGC) {
     ASSERT_EQ(0, ReplicaSetMonitorManager::get()->getAllSetNames().size());
 }
 
+// Tests 1) that boost::none gets returned if you try to get pingTime for some random host and port
+// that isn't part of the RSM and 2) that the pingTime can be collected for an RSM.
+TEST_F(ReplicaSetMonitorFixture, PingTime) {
+    auto rsm = ReplicaSetMonitorManager::get()->getOrCreateMonitor(replSetUri, nullptr);
+
+    rsm->getHostOrRefresh(ReadPreferenceSetting(ReadPreference::PrimaryOnly),
+                          CancellationToken::uncancelable())
+        .get();
+
+    bool foundPing = false;
+    for (const auto& server : replSetUri.getServers()) {
+        if (rsm->pingTime(server) != boost::none) {
+            foundPing = true;
+        }
+    }
+    ASSERT_TRUE(foundPing);
+    ASSERT_EQ(rsm->pingTime(HostAndPort{"not-member-host", 1234}), boost::none);
+}
+
 }  // namespace
 }  // namespace executor
 }  // namespace mongo
