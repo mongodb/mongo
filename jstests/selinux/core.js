@@ -43,7 +43,10 @@ class TestDefinition extends SelinuxBaseTest {
 
                 jsTest.log("Running test: " + t);
                 try {
-                    await import(t);
+                    let evalString = "import(" + tojson(t) + ")";
+                    let handle = startParallelShell(evalString, db.getMongo().port);
+                    let rc = handle();
+                    assert.eq(rc, 0);
                 } catch (e) {
                     print(tojson(e));
                     throw ("failed to load test " + t);
