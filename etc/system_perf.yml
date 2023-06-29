@@ -1830,6 +1830,40 @@ buildvariants:
       - name: linkbench
       - name: linkbench2
 
+  - name: atlas-M30-real
+    display_name: M30-Atlas ReplSet AWS
+    cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
+    modules: *modules
+    expansions:
+      mongodb_setup: atlas
+      canaries: none
+      atlas_setup: M30-repl
+      use_custom_build: true
+      infrastructure_provisioning: workload_client_arm.2023-04
+      infrastructure_provisioning_release: 2022-11
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-atlas-large"
+    depends_on:
+      - name: compile
+        variant: compile-amazon2
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+      - name: compile
+        variant: compile-amazon-linux2-arm64
+      - name: schedule_global_auto_tasks
+        variant: task_generation
+    tasks: # Cannot use *3nodetasks because secondary_performance uses a special mongodb setup
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+      - name: industry_benchmarks
+      - name: tpcc
+      - name: linkbench2
+
   - name: atlas-M60-real
     display_name: M60-Atlas ReplSet AWS
     cron: "0 0 * * 0,4"  # 00:00 on Sunday, Thursday
