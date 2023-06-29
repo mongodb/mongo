@@ -104,6 +104,9 @@ TEST(QueryPredicateShape, Equals) {
     ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
         R"({"$and":[{"REDACT_a":{"$eq":"?number"}},{"REDACT_b":{"$eq":"?number"}}]})",
         "{a: 5, b: 6}");
+    ASSERT_REDACTED_SHAPE_EQ_AUTO(  // NOLINT
+        R"({"REDACT_foo.REDACT_$bar":{"$eq":"?number"}})",
+        R"({"foo.$bar":0})");
 }
 
 TEST(QueryPredicateShape, ArraySubTypes) {
