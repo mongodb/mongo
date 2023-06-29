@@ -646,14 +646,11 @@ been replicated to a majority of nodes in the replica set. Any data seen in majo
 roll back in the future. Thus majority reads prevent **dirty reads**, though they often are
 **stale reads**.
 
-Read concern majority reads usually return as fast as local reads, but sometimes will block. Read
-concern majority reads do not wait for anything to be committed; they just use different snapshots
-from local reads. They do block though when the node metadata (in the catalog cache) differs from
-the committed snapshot. For example, index builds or drops, collection creates or drops, database
-drops, or collmod’s could cause majority reads to block. If the primary receives a `createIndex`
-command, subsequent majority reads will block until that index build is finished on a majority of
-nodes. Majority reads also block right after startup or rollback when we do not yet have a committed
-snapshot.
+Read concern majority reads do not wait for anything to be committed; they just use different 
+snapshots from local reads. Read concern majority reads usually return as fast as local reads, but 
+sometimes will block. For example, right after startup or rollback when we do not have a committed 
+snapshot, majority reads will be blocked. Also, when some of the secondaries are unavailable or 
+lagging, majority reads could slow down or block.
 
 For information on how majority read concern works within a multi-document transaction, see the
 [Read Concern Behavior Within Transactions](#read-concern-behavior-within-transactions) section.
