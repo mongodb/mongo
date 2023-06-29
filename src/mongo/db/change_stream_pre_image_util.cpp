@@ -64,6 +64,7 @@
 namespace mongo {
 // Fail point to set current time for time-based expiration of pre-images.
 MONGO_FAIL_POINT_DEFINE(changeStreamPreImageRemoverCurrentTime);
+MONGO_FAIL_POINT_DEFINE(changeStreamPreImageRemoverExpireTimeIsAlwaysLarger);
 
 namespace change_stream_pre_image_util {
 
@@ -83,6 +84,9 @@ boost::optional<std::int64_t> getExpireAfterSecondsFromChangeStreamOptions(
 }  // namespace
 
 boost::optional<Date_t> getPreImageExpirationTime(OperationContext* opCtx, Date_t currentTime) {
+    if (MONGO_unlikely(changeStreamPreImageRemoverExpireTimeIsAlwaysLarger.shouldFail())) {
+        return Date_t::max();
+    }
     // Non-serverless and serverless environments expire pre-images according to different logic and
     // parameters. This method retrieves the 'expireAfterSeconds' for a single-tenant environment.
     boost::optional<std::int64_t> expireAfterSeconds = boost::none;

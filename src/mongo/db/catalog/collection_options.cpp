@@ -48,6 +48,7 @@
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_options_validation.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
@@ -603,5 +604,40 @@ bool CollectionOptions::matchesStorageOptions(const CollectionOptions& other,
     }
 
     return true;
+}
+
+namespace {
+Status validateIsNotInDbs(const NamespaceString& ns,
+                          const std::vector<DatabaseName>& disallowedDbs,
+                          StringData optionName) {
+    if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.dbName()) != disallowedDbs.end()) {
+        return {ErrorCodes::InvalidOptions,
+                str::stream() << optionName << " collection option is not supported on the "
+                              << ns.dbName().toStringForErrorMsg() << " database"};
+    }
+
+    return Status::OK();
+}
+}  // namespace
+
+// Validates that the option is not used on admin, local or config db as well as not being used on
+// config servers.
+Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns) {
+    auto validationStatus =
+        validateIsNotInDbs(ns,
+                           {DatabaseName::kAdmin, DatabaseName::kLocal, DatabaseName::kConfig},
+                           "changeStreamPreAndPostImages");
+    if (validationStatus != Status::OK()) {
+        return validationStatus;
+    }
+
+    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
+        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility)) {
+        return {
+            ErrorCodes::InvalidOptions,
+            "changeStreamPreAndPostImages collection option is not supported on config servers"};
+    }
+
+    return Status::OK();
 }
 }  // namespace mongo

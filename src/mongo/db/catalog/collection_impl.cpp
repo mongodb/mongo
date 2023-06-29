@@ -171,39 +171,6 @@ Status checkValidationOptionsCanBeUsed(const CollectionOptions& opts,
     return Status::OK();
 }
 
-Status validateIsNotInDbs(const NamespaceString& ns,
-                          const std::vector<DatabaseName>& disallowedDbs,
-                          StringData optionName) {
-    if (std::find(disallowedDbs.begin(), disallowedDbs.end(), ns.dbName()) != disallowedDbs.end()) {
-        return {ErrorCodes::InvalidOptions,
-                str::stream() << optionName << " collection option is not supported on the "
-                              << ns.dbName().toStringForErrorMsg() << " database"};
-    }
-
-    return Status::OK();
-}
-
-// Validates that the option is not used on admin, local or config db as well as not being used on
-// config servers.
-Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns) {
-    auto validationStatus =
-        validateIsNotInDbs(ns,
-                           {DatabaseName::kAdmin, DatabaseName::kLocal, DatabaseName::kConfig},
-                           "changeStreamPreAndPostImages");
-    if (validationStatus != Status::OK()) {
-        return validationStatus;
-    }
-
-    if (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) &&
-        !gFeatureFlagCatalogShard.isEnabled(serverGlobalParams.featureCompatibility)) {
-        return {
-            ErrorCodes::InvalidOptions,
-            "changeStreamPreAndPostImages collection option is not supported on config servers"};
-    }
-
-    return Status::OK();
-}
-
 /**
  * Returns true if we are running retryable write or retryable internal multi-document transaction.
  */

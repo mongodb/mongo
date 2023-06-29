@@ -284,6 +284,7 @@ function RollbackTest(name = "RollbackTest", replSet, nodeOptions) {
 
         const name = rst.name;
         rst.checkOplogs(name);
+        rst.checkPreImageCollection(name);
         rst.checkReplicatedDataHashes(name);
         collectionValidator.validateNodes(rst.nodeList());
     };

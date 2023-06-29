@@ -5460,6 +5460,18 @@ tasks:
   - func: "generate resmoke tasks"
 
 - <<: *gen_task_template
+  name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
+  name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
+  tags: []
+  commands:
+  - func: "generate resmoke tasks"
+
+- <<: *gen_task_template
   name: replica_sets_api_version_jscore_passthrough_gen
   tags: []
   commands:

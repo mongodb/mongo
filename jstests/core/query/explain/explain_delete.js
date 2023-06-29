@@ -6,6 +6,8 @@
  *  requires_fastcount,
  *  requires_fcv_61,
  *  requires_non_retryable_writes,
+ *  # Pre-images requires doc-by-doc deletion and this test relies on BATCHED_DELETE
+ *  incompatible_with_preimages_by_default,
  *  ]
  */
 
