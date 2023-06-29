@@ -1063,6 +1063,7 @@ bool isEligibleCommon(const RequestType& request,
         }
     };
     if (hasParam(request.getCollation()) || hasParam(request.getLet()) ||
+        hasParam(request.getResumeAfter()) || request.getRequestResumeToken() ||
         request.getLegacyRuntimeConstants()) {
         return false;
     }
@@ -1206,8 +1207,7 @@ bool isEligibleForBonsai(const AggregateCommandRequest& request,
     }
 
     bool commandOptionsEligible = isEligibleCommon(request, opCtx, collection, frameworkControl) &&
-        !request.getRequestReshardingResumeToken().has_value() && !request.getExchange() &&
-        !request.getRequestResumeToken();
+        !request.getRequestReshardingResumeToken().has_value() && !request.getExchange();
 
     // Early return to avoid unnecessary work of walking the input pipeline.
     if (!commandOptionsEligible) {
@@ -1244,9 +1244,9 @@ bool isEligibleForBonsai(const CanonicalQuery& cq,
         request.getSort().isEmpty() && request.getMin().isEmpty() && request.getMax().isEmpty() &&
         !request.getReturnKey() && !request.getSingleBatch() && !request.getTailable() &&
         !request.getSkip() && !request.getLimit() && !request.getNoCursorTimeout() &&
-        !request.getRequestResumeToken() && !request.getAllowPartialResults() &&
-        !request.getAllowSpeculativeMajorityRead() && !request.getAwaitData() &&
-        !request.getReadOnce() && !request.getShowRecordId() && !request.getTerm();
+        !request.getAllowPartialResults() && !request.getAllowSpeculativeMajorityRead() &&
+        !request.getAwaitData() && !request.getReadOnce() && !request.getShowRecordId() &&
+        !request.getTerm();
 
     // Early return to avoid unnecessary work of walking the input expression.
     if (!commandOptionsEligible) {

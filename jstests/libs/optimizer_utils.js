@@ -4,11 +4,8 @@ load("jstests/libs/analyze_plan.js");
  * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
  */
 function checkCascadesOptimizerEnabled(theDB) {
-    const frameworkControl =
-        theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1});
-    const val = frameworkControl.hasOwnProperty("internalQueryFrameworkControl")
-        ? frameworkControl.internalQueryFrameworkControl.value
-        : "";
+    const val = theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1})
+                    .internalQueryFrameworkControl;
     return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
 }
 

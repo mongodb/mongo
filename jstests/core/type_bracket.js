@@ -2,7 +2,6 @@
 "use strict";
 
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq
-load('jstests/libs/optimizer_utils.js');      // For checkCascadesOptimizerEnabled
 
 const t = db.type_bracket;
 t.drop();
@@ -115,27 +114,45 @@ let tests = [
     {filter: {a: {$gte: new Code("")}}, expected: [docs[28]]},
     {filter: {a: {$lte: new Code("")}}, expected: []},
 
+    // MinKey/MaxKey
+    {filter: {a: {$lte: MinKey()}}, expected: [docs[0]]},
+    {filter: {a: {$lt: MinKey()}}, expected: []},
+    {filter: {a: {$gte: MaxKey()}}, expected: [docs[31]]},
+    {filter: {a: {$gt: MaxKey()}}, expected: []}
 ];
 
-// Include Min/MaxKey type bracketing tests conditional on using CQF.
-// TODO SERVER-68274: Always include these testcases once SBE correctly handles the semantics of
+// Currently, depending on which query engine is used, documents which are missing 'a' may or may
+// not be returned when comparing 'a' against MinKey/MaxKey. For example, for query
+// {a: {$gte: MinKey()}}, classic and CQF correctly return documents missing 'a', but SBE does not.
+// TODO SERVER-68274: Restrict these testcases once SBE correctly handles the semantics of
 // missing fields and type bracketing (missing field is implicitly null which is greater than
 // MinKey).
-if (checkCascadesOptimizerEnabled(db)) {
-    tests.push(
-        // MinKey
-        {filter: {a: {$gte: MinKey()}}, expected: docs},
-        {filter: {a: {$gt: MinKey()}}, expected: docs.slice(1)},
-        {filter: {a: {$lte: MinKey()}}, expected: [docs[0]]},
-        {filter: {a: {$lt: MinKey()}}, expected: []},
-        // MaxKey
-        {filter: {a: {$lte: MaxKey()}}, expected: docs},
-        {filter: {a: {$lt: MaxKey()}}, expected: docs.slice(0, 31)},
-        {filter: {a: {$gte: MaxKey()}}, expected: [docs[31]]},
-        {filter: {a: {$gt: MaxKey()}}, expected: []});
-}
+let docsWithA = docs.slice();
+docsWithA.splice(29, 1);
+
+tests.push(
+    // MinKey
+    {filter: {a: {$gte: MinKey()}}, expectedList: [docs, docsWithA]},
+    {filter: {a: {$gt: MinKey()}}, expectedList: [docs.slice(1), docsWithA.slice(1)]},
+
+    // MaxKey
+    {filter: {a: {$lte: MaxKey()}}, expectedList: [docs, docsWithA]},
+    {filter: {a: {$lt: MaxKey()}}, expectedList: [docs.slice(0, 31), docsWithA.slice(0, 30)]});
 
 for (const testData of tests) {
-    runTest(testData.filter, testData.expected);
+    if (testData.hasOwnProperty("expected")) {
+        runTest(testData.filter, testData.expected);
+    } else {
+        const result = t.aggregate({$match: testData.filter}).toArray();
+        let foundMatch = false;
+        for (let i = 0; i < testData.expectedList.length; i++) {
+            const expected = testData.expectedList[i];
+            foundMatch |= arrayEq(result, expected);
+        }
+        assert(foundMatch,
+               `Actual query result did not match any of the expected options. filter=${
+                   tojson(testData.filter)}, actual=${tojson(result)}, expectedList=${
+                   tojson(testData.expectedList)}`);
+    }
 }
 }());

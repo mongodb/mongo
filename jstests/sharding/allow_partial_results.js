@@ -1,6 +1,8 @@
 /**
  * Tests that the 'allowPartialResults' option to find is respected, and that aggregation does not
  * accept the 'allowPartialResults' option.
+ * TODO SERVER-71169: Re-enable this test after shard filtering in CQF is implemented.
+ * @tags: [cqf_incompatible]
  */
 
 // This test shuts down a shard.

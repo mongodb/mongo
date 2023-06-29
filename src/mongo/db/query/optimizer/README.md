@@ -33,7 +33,6 @@ exercising this codebase:
 - **cqf_disabled_pipeline_opt**:
     [buildscripts/resmokeconfig/suites/cqf_disabled_pipeline_opt.yml](/buildscripts/resmokeconfig/suites/cqf_disabled_pipeline_opt.yml)
 - **cqf_parallel**: [buildscripts/resmokeconfig/suites/cqf_parallel.yml](/buildscripts/resmokeconfig/suites/cqf_parallel.yml)
-- **cqf_passthrough**: [buildscripts/resmokeconfig/suites/cqf_passthrough.yml](/buildscripts/resmokeconfig/suites/cqf_passthrough.yml)
 - **query_golden_cqf**: [buildscripts/resmokeconfig/suites/query_golden_cqf.yml](/buildscripts/resmokeconfig/suites/query_golden_cqf.yml)
 
 Desriptions of these suites can be found in
@@ -43,13 +42,7 @@ You may run these like so, adjusting the `-j` flag for the appropriate level of
 parallel execution for your machine.
 ```
 ./buildscripts/resmoke.py run -j4 \
- --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel,cqf_passthrough,query_golden_cqf
-```
-
-cqf_passthrough takes the longest to run by far, so this command may be more
-useful for a quicker signal:
-```
-./buildscripts/resmoke.py run --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel,query_golden_cqf -j4
+ --suites=cqf,cqf_disabled_pipeline_opt,cqf_parallel,query_golden_cqf
 ```
 
 ## Local Testing Recommendation
@@ -67,12 +60,7 @@ build/install/bin/sbe_abt_test \
 **Note:** You may need to adjust the path to the unit test binary targets if your
 SCons install directory is something more like `build/opt/install/bin`.
 
-**Note:** The 'cqf_passthrough' suite may also be useful for additional coverage,
-but due to the number of tests it takes quite a while to run locally
-(~15 minutes depending on parallelization and compile flags)
-
 ## Evergreen Testing Recommendation
 In addition to the above suites, there is a patch-only variant which enables the CQF feature flag
-on a selection of existing suites. The variant, "Query Patch Only (all feature flags and CQF
-enabled)", runs the suites listed above and some others including: aggregation, jsCore,
-noPassthrough, and a handful of passthroughs (e.g. sharding_jscore_passthrough).
+on a selection of existing suites. The variant, "Query (all feature flags and CQF enabled)", runs
+all the tasks from the recommended all-feature-flags variants.
