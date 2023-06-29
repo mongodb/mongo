@@ -7,7 +7,6 @@
 //  requires_replication,
 //  requires_getmore,
 //  no_selinux,
-//  incompatible_with_preimages_by_default,
 // ]
 (function() {
 "use strict";

@@ -133,7 +133,6 @@
 #include "mongo/db/operation_context.h"
 #include "mongo/db/periodic_runner_job_abort_expired_transactions.h"
 #include "mongo/db/pipeline/change_stream_expired_pre_image_remover.h"
-#include "mongo/db/pipeline/change_stream_preimage_gen.h"
 #include "mongo/db/pipeline/process_interface/replica_set_node_process_interface.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/query/query_settings_manager.h"
@@ -931,7 +930,7 @@ ExitCode _initAndListen(ServiceContext* serviceContext, int listenPort) {
     const auto isStandalone =
         repl::ReplicationCoordinator::get(serviceContext)->getReplicationMode() ==
         repl::ReplicationCoordinator::modeNone;
-    if (!isStandalone && !gPreImageRemoverDisabled) {
+    if (!isStandalone) {
         startChangeStreamExpiredPreImagesRemover(serviceContext);
         startChangeCollectionExpiredDocumentsRemover(serviceContext);
     }

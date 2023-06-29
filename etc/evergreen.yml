@@ -1041,12 +1041,6 @@ buildvariants:
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
@@ -1157,12 +1151,6 @@ buildvariants:
   - name: replica_sets_api_version_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
@@ -1308,12 +1296,6 @@ buildvariants:
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
     distros:
     - rhel80-medium
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
-    distros:
-    - rhel80-medium
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
     distros:
@@ -1435,12 +1417,6 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen
@@ -2048,8 +2024,6 @@ buildvariants:
   - name: replica_sets_reconfig_jscore_passthrough_gen
   - name: replica_sets_reconfig_jscore_stepdown_passthrough_gen
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
   - name: retryable_writes_jscore_passthrough_gen
   - name: retryable_writes_jscore_stepdown_passthrough_gen
   - name: .read_only
@@ -2492,12 +2466,6 @@ buildvariants:
     distros:
     - rhel80-xlarge
   - name: replica_sets_reconfig_kill_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_stepdown_primary_jscore_passthrough_gen
-    distros:
-    - rhel80-xlarge
-  - name: change_streams_pre_images_replica_sets_kill_secondary_jscore_passthrough_gen
     distros:
     - rhel80-xlarge
   - name: retryable_writes_jscore_passthrough_gen

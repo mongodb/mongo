@@ -180,7 +180,4 @@ struct CollectionOptions {
     // The options for collections with encrypted fields
     boost::optional<EncryptedFieldConfig> encryptedFieldConfig;
 };
-
-Status validateChangeStreamPreAndPostImagesOptionIsPermitted(const NamespaceString& ns);
-
 }  // namespace mongo

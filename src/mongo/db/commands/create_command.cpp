@@ -84,8 +84,6 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(preImagesEnabledOnAllCollectionsByDefault);
-
 constexpr auto kCreateCommandHelp =
     "explicitly creates a collection or view\n"
     "{\n"
@@ -437,14 +435,6 @@ public:
 
             OperationShardingState::ScopedAllowImplicitCollectionCreate_UNSAFE
                 unsafeCreateCollection(opCtx);
-
-            preImagesEnabledOnAllCollectionsByDefault.execute([&](const auto&) {
-                if (!cmd.getViewOn() &&
-                    validateChangeStreamPreAndPostImagesOptionIsPermitted(cmd.getNamespace())
-                        .isOK()) {
-                    cmd.setChangeStreamPreAndPostImages(ChangeStreamPreAndPostImagesOptions{true});
-                }
-            });
 
             const auto createStatus = createCollection(opCtx, cmd);
             // NamespaceExists will cause multi-document transactions to implicitly abort, so
