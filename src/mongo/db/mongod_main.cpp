@@ -194,7 +194,6 @@
 #include "mongo/db/s/sharding_state.h"
 #include "mongo/db/s/transaction_coordinator_service.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/db/serverless/shard_split_donor_op_observer.h"
 #include "mongo/db/serverless/shard_split_donor_service.h"
 #include "mongo/db/service_context.h"
@@ -1808,7 +1807,6 @@ int mongod_main(int argc, char* argv[]) {
     setUpCatalog(service);
     setUpReplication(service);
     setUpObservers(service);
-    setUpMultitenancyCheck(service, gMultitenancySupport);
     service->setServiceEntryPoint(std::make_unique<ServiceEntryPointMongod>(service));
 
     ErrorExtraInfo::invariantHaveAllParsers();

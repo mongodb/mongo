@@ -58,7 +58,6 @@
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_settings_manager.h"
 #include "mongo/db/server_options.h"
-#include "mongo/db/serverless/multitenancy_check.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison_mongos.h"
 #include "mongo/db/session/kill_sessions.h"
@@ -1038,8 +1037,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     cmdline_utils::censorArgvArray(argc, argv);
 
     logCommonStartupWarnings(serverGlobalParams);
-
-    setUpMultitenancyCheck(service, gMultitenancySupport);
 
     try {
         if (!initialize_server_global_state::checkSocketPath())
