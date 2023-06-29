@@ -62,6 +62,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/audit.h"
+#include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/auth/authz_manager_external_state.h"
 #include "mongo/db/auth/authz_manager_external_state_s.h"
@@ -1056,6 +1057,12 @@ ExitCode mongos_main(int argc, char* argv[]) {
         return ExitCode::abrupt;
     }
 
+    const auto service = getGlobalServiceContext();
+
+    if (audit::setAuditInterface) {
+        audit::setAuditInterface(service);
+    }
+
     // Attempt to rotate the audit log pre-emptively on startup to avoid any potential conflicts
     // with existing log state. If this rotation fails, then exit nicely with failure
     try {
@@ -1069,8 +1076,6 @@ ExitCode mongos_main(int argc, char* argv[]) {
     }
 
     registerShutdownTask(cleanupTask);
-
-    const auto service = getGlobalServiceContext();
 
     ErrorExtraInfo::invariantHaveAllParsers();
 

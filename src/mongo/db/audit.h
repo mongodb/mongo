@@ -91,6 +91,7 @@ extern std::function<void()> shutdownSynchronizeJob;
 extern std::function<void(OperationContext*, boost::optional<Timestamp>)> migrateOldToNew;
 extern std::function<void(OperationContext*)> removeOldConfig;
 extern std::function<void(OperationContext*)> updateAuditConfigOnDowngrade;
+extern std::function<void(ServiceContext*)> setAuditInterface;
 
 /**
  * Struct that temporarily stores client information when an audit hook

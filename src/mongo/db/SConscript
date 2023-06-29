@@ -715,6 +715,7 @@ env.Clone().InjectModule("enterprise").Library(
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/base",
+        "service_context",
     ],
 )
 

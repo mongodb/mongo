@@ -67,6 +67,7 @@
 #include "mongo/client/replica_set_monitor.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/audit.h"
+#include "mongo/db/audit_interface.h"
 #include "mongo/db/auth/auth_op_observer.h"
 #include "mongo/db/auth/authorization_manager.h"
 #include "mongo/db/catalog/collection.h"
@@ -1801,6 +1802,10 @@ int mongod_main(int argc, char* argv[]) {
             quickExit(ExitCode::fail);
         }
     }();
+
+    if (audit::setAuditInterface) {
+        audit::setAuditInterface(service);
+    }
 
     {
         // Create the durable history registry prior to calling the `setUp*` methods. They may
