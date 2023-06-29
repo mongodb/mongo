@@ -609,6 +609,11 @@ bool TTLMonitor::_doTTLIndexDelete(OperationContext* opCtx,
         if (!coll.exists() || coll.uuid() != uuid)
             return false;
 
+        // Allow TTL deletion on non-capped collections, and on capped clustered collections.
+        const auto& collectionPtr = coll.getCollectionPtr();
+        invariant(!collectionPtr->isCapped() ||
+                  (collectionPtr->isCapped() && collectionPtr->isClustered()));
+
         if (MONGO_unlikely(hangTTLMonitorWithLock.shouldFail())) {
             LOGV2(22534,
                   "Hanging due to hangTTLMonitorWithLock fail point",
