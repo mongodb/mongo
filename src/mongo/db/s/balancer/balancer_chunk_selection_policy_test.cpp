@@ -356,6 +356,8 @@ protected:
 
     std::unique_ptr<ClusterStatistics> _clusterStats;
     stdx::unordered_set<NamespaceString> _imbalancedCollectionsCache;
+    RAIIServerParameterControllerForTest _balancerChunksSelectionTimeout{
+        "balancerChunksSelectionTimeoutMs", 60000};
 
     // Object under test
     std::unique_ptr<BalancerChunkSelectionPolicy> _chunkSelectionPolicy;
