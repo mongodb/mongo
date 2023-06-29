@@ -36,7 +36,7 @@ import sys
 import textwrap
 from abc import ABCMeta, abstractmethod
 from enum import Enum
-from typing import Dict, List, Mapping, Tuple, Union, cast
+from typing import Callable, Dict, List, Mapping, Optional, Tuple, Union, cast
 
 from . import (ast, bson, common, cpp_types, enum_types, generic_field_list_types, struct_types,
                writer)
@@ -173,6 +173,12 @@ def _gen_field_usage_constant(field):
     # type: (ast.Field) -> str
     """Get the name for a bitset constant in field usage checking."""
     return "k%sBit" % (common.title_case(field.cpp_name))
+
+
+def _gen_field_element_name(field):
+    # type: (ast.Field) -> str
+    """Get the name for a BSONElement pointer in field iteration."""
+    return "BSONElement_%s" % (common.title_case(field.cpp_name))
 
 
 def _get_constant(name):
@@ -1494,8 +1500,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('%s = true;' % (_get_has_field_member_name(field)))
 
     def gen_field_deserializer(self, field, field_type, bson_object, bson_element,
-                               field_usage_check, tenant, is_command_field=False, check_type=True):
-        # type: (ast.Field, ast.Type, str, str, _FieldUsageCheckerBase, str, bool, bool) -> None
+                               field_usage_check, tenant, is_command_field=False, check_type=True,
+                               deserialize_fn=None):
+        # type: (ast.Field, ast.Type, str, str, _FieldUsageCheckerBase, str, bool, bool, Optional[Callable[[], None]]) -> None
         """Generate the C++ deserializer piece for a field.
 
         If field_type is scalar and check_type is True (the default), generate type-checking code.
@@ -1510,12 +1517,18 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             predicate = "MONGO_likely(ctxt.checkAndAssertType(%s, Array))" % (bson_element)
             with self._predicate(predicate):
                 self._gen_usage_check(field, bson_element, field_usage_check)
-            self._gen_array_deserializer(field, bson_element, field_type, tenant)
+                if deserialize_fn:
+                    deserialize_fn()
+                else:
+                    self._gen_array_deserializer(field, bson_element, field_type, tenant)
             return
 
         elif field_type.is_variant:
             self._gen_usage_check(field, bson_element, field_usage_check)
-            self._gen_variant_deserializer(field, bson_element, tenant)
+            if deserialize_fn:
+                deserialize_fn()
+            else:
+                self._gen_variant_deserializer(field, bson_element, tenant)
             return
 
         def validate_and_assign_or_uassert(field, expression):
@@ -1532,6 +1545,7 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                 self._writer.write_line('%s = std::move(value);' % (field_name))
 
         if field.chained:
+            assert not deserialize_fn
             # Do not generate a predicate check since we always call these deserializers.
 
             if field_type.is_struct:
@@ -1556,6 +1570,9 @@ class _CppSourceFileWriter(_CppFileWriterBase):
             with self._predicate(predicate):
 
                 self._gen_usage_check(field, bson_element, field_usage_check)
+                if deserialize_fn:
+                    deserialize_fn()
+                    return
 
                 object_value = self._gen_field_deserializer_expression(
                     bson_element, field, field_type, tenant)
@@ -1795,9 +1812,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
         # type: (ast.Struct, str, str) -> _FieldUsageCheckerBase
         """Generate the C++ code to deserialize list of fields."""
 
-        struct_fields = struct.fields.copy()
-        preparse_fields = []  # type: List[ast.Field]
-
         field_usage_check = _get_field_usage_checker(self._writer, struct)
         if isinstance(struct, ast.Command):
             self._writer.write_line('BSONElement commandElement;')
@@ -1825,12 +1839,6 @@ class _CppSourceFileWriter(_CppFileWriterBase):
                     self._writer.write_line(
                         'setSerializationContext(SerializationContext::stateCommandRequest());')
 
-            # some fields are consumed in the BSON iteration loop and need to be parsed before
-            # entering the main loop
-            for field in struct.fields:  # iterate over the original list
-                if field.preparse:
-                    struct_fields.remove(field)
-                    preparse_fields.append(field)
         else:
             # set the local serializer flags according to the constexpr set by is_command_reply
             self._writer.write_empty_line()
@@ -1840,86 +1848,103 @@ class _CppSourceFileWriter(_CppFileWriterBase):
 
         self._writer.write_empty_line()
 
-        # we need to build two loops: one for the preparsed fields, and one for fields that don't
-        # depend on other fields
-        fields = []  # type: List[List[ast.Field]]
-        if preparse_fields:
-            fields.append(preparse_fields)
-        fields.append(struct_fields)
-        for_blocks = len(fields)
-        last_block = for_blocks - 1
-
-        for block_num in range(for_blocks):
-            with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
-
-                self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
+        deferred_fields = []  # type: List[ast.Field]
+        deferred_field_names = []  # type: List[str]
+        if 'expectPrefix' in [field.name for field in struct.fields]:
+            # Deserialization of 'expectPrefix' modifies the deserializationContext and how
+            # certain other fields are then deserialized.
+            # Such dependent fields include those which "deserialize_with_tenant" and
+            # any complex struct type.
+            # In practice, this typically only occurs on Command structs.
+            deferred_fields = [
+                field for field in struct.fields
+                if field.type and (field.type.is_struct or field.type.deserialize_with_tenant)
+            ]
+            deferred_field_names = [field.name for field in deferred_fields]
+            if deferred_fields:
+                self._writer.write_line(
+                    '// Anchors for values of fields which may depend on others.')
+                for field in deferred_fields:
+                    self._writer.write_line('BSONElement %s;' % (_gen_field_element_name(field)))
                 self._writer.write_empty_line()
 
-                if isinstance(struct, ast.Command) and block_num == last_block:
-                    with self._predicate("firstFieldFound == false"):
-                        # Get the Command element if we need it for later in the deserializer to get the
-                        # namespace
-                        if struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
-                            self._writer.write_line('commandElement = element;')
+        with self._block('for (const auto& element :%s) {' % (bson_object), '}'):
 
-                        self._writer.write_line('firstFieldFound = true;')
-                        self._writer.write_line('continue;')
+            self._writer.write_line('const auto fieldName = element.fieldNameStringData();')
+            self._writer.write_empty_line()
 
-                    self._writer.write_empty_line()
+            if isinstance(struct, ast.Command):
+                with self._predicate("firstFieldFound == false"):
+                    # Get the Command element if we need it for later in the deserializer to get the
+                    # namespace
+                    if struct.namespace != common.COMMAND_NAMESPACE_IGNORED:
+                        self._writer.write_line('commandElement = element;')
 
-                first_field = True
-                for field in fields[block_num]:
-                    # Do not parse chained fields as fields since they are actually chained types.
-                    if field.chained and not field.chained_struct_field:
-                        continue
-                    # Internal only fields are not parsed from BSON objects
-                    if field.type and field.type.internal_only:
-                        continue
+                    self._writer.write_line('firstFieldFound = true;')
+                    self._writer.write_line('continue;')
 
-                    field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
-
-                    with self._predicate(field_predicate, not first_field):
-
-                        if field.ignore:
-                            field_usage_check.add(field, "element")
-
-                            self._writer.write_line('// ignore field')
-                        else:
-                            self.gen_field_deserializer(field, field.type, bson_object, "element",
-                                                        field_usage_check, tenant)
-
-                    if first_field:
-                        first_field = False
-
-                # only check for extraneous fields in the final block
-                if block_num == last_block:
-                    # End of for fields
-                    # Generate strict check for extranous fields
-                    if struct.strict:
-                        # For commands, check if this is a well known command field that the IDL parser
-                        # should ignore regardless of strict mode.
-                        command_predicate = None
-                        if isinstance(struct, ast.Command):
-                            command_predicate = "!mongo::isGenericArgument(fieldName)"
-
-                        # Ditto for command replies
-                        if struct.is_command_reply:
-                            command_predicate = "!mongo::isGenericReply(fieldName)"
-
-                        with self._block('else {', '}'):
-                            with self._predicate(command_predicate):
-                                self._writer.write_line('ctxt.throwUnknownField(fieldName);')
-                    elif not struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
-                        with self._else(not first_field):
-                            self._writer.write_line(
-                                'auto push_result = usedFieldSet.insert(fieldName);')
-                            with writer.IndentedScopedBlock(
-                                    self._writer,
-                                    'if (MONGO_unlikely(push_result.second == false)) {', '}'):
-                                self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
-
-            if block_num < last_block:
                 self._writer.write_empty_line()
+
+            first_field = True
+            for field in struct.fields:
+                # Do not parse chained fields as fields since they are actually chained types.
+                if field.chained and not field.chained_struct_field:
+                    continue
+                # Internal only fields are not parsed from BSON objects
+                if field.type and field.type.internal_only:
+                    continue
+
+                field_predicate = 'fieldName == %s' % (_get_field_constant_name(field))
+
+                with self._predicate(field_predicate, not first_field):
+
+                    def defer_field():
+                        # type: () -> None
+                        """Field depends on other field(s), store its location and defer processing till later."""
+                        assert field.name in deferred_field_names
+                        self._writer.write_line('%s = element;' % (_gen_field_element_name(field)))
+
+                    if field.ignore:
+                        field_usage_check.add(field, "element")
+                        self._writer.write_line('// ignore field')
+                    else:
+                        fn = defer_field if field.name in deferred_field_names else None
+                        self.gen_field_deserializer(field, field.type, bson_object, "element",
+                                                    field_usage_check, tenant, deserialize_fn=fn)
+
+                if first_field:
+                    first_field = False
+
+            # End of for fields
+            # Generate strict check for extranous fields
+            if struct.strict:
+                # For commands, check if this is a well known command field that the IDL parser
+                # should ignore regardless of strict mode.
+                command_predicate = None
+                if isinstance(struct, ast.Command):
+                    command_predicate = "!mongo::isGenericArgument(fieldName)"
+
+                # Ditto for command replies
+                if struct.is_command_reply:
+                    command_predicate = "!mongo::isGenericReply(fieldName)"
+
+                with self._block('else {', '}'):
+                    with self._predicate(command_predicate):
+                        self._writer.write_line('ctxt.throwUnknownField(fieldName);')
+            elif not struct.unsafe_dangerous_disable_extra_field_duplicate_checks:
+                with self._else(not first_field):
+                    self._writer.write_line('auto push_result = usedFieldSet.insert(fieldName);')
+                    with writer.IndentedScopedBlock(
+                            self._writer, 'if (MONGO_unlikely(push_result.second == false)) {',
+                            '}'):
+                        self._writer.write_line('ctxt.throwDuplicateField(fieldName);')
+
+        # Handle the deferred fields after their possible dependencies have been processed.
+        for field in deferred_fields:
+            element_name = _gen_field_element_name(field)
+            with self._predicate(element_name):
+                self.gen_field_deserializer(field, field.type, bson_object, element_name, None,
+                                            tenant)
 
         # Parse chained structs if not inlined
         # Parse chained types always here

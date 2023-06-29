@@ -444,8 +444,6 @@ def _inject_hidden_command_fields(command):
     expect_prefix_field.type.type_name = "bool"
     expect_prefix_field.cpp_name = "expectPrefix"
     expect_prefix_field.optional = True
-    # we must extract expectPrefix before any other fields that may consume it
-    expect_prefix_field.preparse = True
 
     command.fields.append(expect_prefix_field)
 
@@ -1054,7 +1052,6 @@ def _bind_field(ctxt, parsed_spec, field):
     # to provide compatibility support.
     ast_field.stability = field.stability
     ast_field.always_serialize = field.always_serialize
-    ast_field.preparse = field.preparse
 
     if field.query_shape is not None:
         ast_field.query_shape = ast.QueryShapeFieldType.bind(field.query_shape)
