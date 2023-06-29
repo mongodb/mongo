@@ -64,3 +64,8 @@ feature_flags:
       cpp_varname: gFeatureFlagBucketUnpackWithSort50
       default: true
       version: 5.0
+
+    featureFlagSearchBatchSizeLimit:
+      description: "Feature flag to enable the search batchsize and limit optimization."
+      cpp_varname: gFeatureFlagSearchBatchSizeLimit
+      default: false
