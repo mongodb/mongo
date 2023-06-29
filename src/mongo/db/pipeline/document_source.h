@@ -47,7 +47,6 @@
 #include "mongo/db/exec/document_value/value.h"
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/scoped_timer_factory.h"
 #include "mongo/db/generic_cursor.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/db/matcher/expression_algo.h"
@@ -363,10 +362,9 @@ public:
         }
 
         auto serviceCtx = pExpCtx->opCtx->getServiceContext();
-        invariant(serviceCtx);
+        dassert(serviceCtx);
 
-        auto timer = scoped_timer_factory::make(
-            serviceCtx, QueryExecTimerPrecision::kMillis, _commonStats.executionTime.get_ptr());
+        ScopedTimer timer(_commonStats.executionTime.get_ptr(), serviceCtx->getFastClockSource());
 
         ++_commonStats.works;
 

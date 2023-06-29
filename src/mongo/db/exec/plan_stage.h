@@ -34,7 +34,6 @@
 
 #include "mongo/db/exec/plan_stats.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/scoped_timer_factory.h"
 #include "mongo/db/exec/working_set.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/query/plan_summary_stats.h"
@@ -404,9 +403,9 @@ protected:
      */
     boost::optional<ScopedTimer> getOptTimer() {
         if (_opCtx && _commonStats.executionTime) {
-            return scoped_timer_factory::make(_opCtx->getServiceContext(),
-                                              QueryExecTimerPrecision::kMillis,
-                                              _commonStats.executionTime.get_ptr());
+            return boost::optional<ScopedTimer>(boost::in_place_init,
+                                                _commonStats.executionTime.get_ptr(),
+                                                _opCtx->getServiceContext()->getFastClockSource());
         }
 
         return boost::none;

@@ -55,10 +55,10 @@ public:
 private:
     // Reference to the counter that we are incrementing with the elapsed time.
     Nanoseconds* const _counter;
-    TickSource* _tickSource = nullptr;
-    ClockSource* _clockSource = nullptr;
+    TickSource* _tickSource;
+    ClockSource* _clockSource;
 
     Date_t _startCS;
-    TickSource::Tick _startTS = 0;
+    TickSource::Tick _startTS;
 };
 }  // namespace mongo
