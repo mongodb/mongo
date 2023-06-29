@@ -1527,22 +1527,4 @@ void ShardingCatalogManager::cleanUpPlacementHistory(OperationContext* opCtx,
     LOGV2_DEBUG(7068808, 2, "Cleaning up placement history - done deleting entries");
 }
 
-void ShardingCatalogManager::_performLocalNoopWriteWithWAllWriteConcern(OperationContext* opCtx,
-                                                                        StringData msg) {
-    tenant_migration_access_blocker::performNoopWrite(opCtx, msg);
-
-    auto allMembersWriteConcern =
-        WriteConcernOptions(repl::ReplSetConfig::kConfigAllWriteConcernName,
-                            WriteConcernOptions::SyncMode::NONE,
-                            // Defaults to no timeout if none was set.
-                            opCtx->getWriteConcern().wTimeout);
-
-    const auto& replClient = repl::ReplClientInfo::forClient(opCtx->getClient());
-    auto awaitReplicationResult = repl::ReplicationCoordinator::get(opCtx)->awaitReplication(
-        opCtx, replClient.getLastOp(), allMembersWriteConcern);
-    uassertStatusOKWithContext(awaitReplicationResult.status,
-                               str::stream() << "Waiting for replication of noop with message: \""
-                                             << msg << "\" failed");
-}
-
 }  // namespace mongo

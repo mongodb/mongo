@@ -95,9 +95,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << kStageName << " is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
                                                                     specElem.embeddedObject());

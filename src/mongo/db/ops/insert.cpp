@@ -223,13 +223,6 @@ Status userAllowedCreateNS(OperationContext* opCtx, const NamespaceString& ns) {
                       str::stream() << "Invalid collection name: " << ns.coll());
     }
 
-    if (serverGlobalParams.clusterRole.exclusivelyHasConfigRole() && !ns.isOnInternalDb()) {
-        return Status(ErrorCodes::InvalidNamespace,
-                      str::stream()
-                          << "Can't create user databases on a dedicated --configsvr instance "
-                          << ns.toStringForErrorMsg());
-    }
-
     if (ns.isSystemDotProfile()) {
         return Status::OK();
     }

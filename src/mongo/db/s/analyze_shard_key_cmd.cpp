@@ -83,9 +83,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    "analyzeShardKey command is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             uassert(ErrorCodes::InvalidOptions,
                     "Cannot skip analyzing all metrics",

@@ -85,9 +85,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << kStageName << " is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
             uassert(6875700,
                     str::stream() << kStageName
                                   << " must take a nested object but found: " << specElem,

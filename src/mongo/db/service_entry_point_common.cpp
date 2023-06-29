@@ -1922,8 +1922,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
         .onError<ErrorCodes::StaleDbVersion>([this](Status s) -> Future<void> {
             auto opCtx = _execContext->getOpCtx();
 
-            if (!opCtx->getClient()->isInDirectClient() &&
-                !serverGlobalParams.clusterRole.exclusivelyHasConfigRole() && !_refreshedDatabase) {
+            if (!opCtx->getClient()->isInDirectClient() && !_refreshedDatabase) {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
 
@@ -1953,9 +1952,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
             auto opCtx = _execContext->getOpCtx();
             ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
-            if (!opCtx->getClient()->isInDirectClient() &&
-                !serverGlobalParams.clusterRole.exclusivelyHasConfigRole() &&
-                !_refreshedCollection) {
+            if (!opCtx->getClient()->isInDirectClient() && !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
                     bool inCriticalSection = sce->getCriticalSectionSignal().has_value();
                     bool stableLocalVersion = !inCriticalSection && sce->getVersionWanted();
@@ -2000,10 +1997,6 @@ Future<void> ExecCommandDatabase::_commandExec() {
             return s;
         })
         .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status s) -> Future<void> {
-            // This exception can never happen on the config server. Config servers can't receive
-            // SSV either, because they never have commands with shardVersion sent.
-            invariant(!serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
-
             auto opCtx = _execContext->getOpCtx();
             if (!opCtx->getClient()->isInDirectClient() && !_refreshedCatalogCache) {
                 invariant(!opCtx->lockState()->isLocked());

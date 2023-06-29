@@ -950,8 +950,6 @@ TEST(ClusterRole, Equality) {
 
     ASSERT_TRUE(ClusterRole(ClusterRole::ShardServer).exclusivelyHasShardRole());
     ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasShardRole());
-
-    ASSERT_FALSE(ClusterRole(ClusterRole::ConfigServer).exclusivelyHasConfigRole());
 }
 
 #if !defined(_WIN32) && !(defined(__APPLE__) && TARGET_OS_TV)

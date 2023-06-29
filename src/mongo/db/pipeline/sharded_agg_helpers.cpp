@@ -1680,21 +1680,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             const auto& cm = cri.cm;
             auto pipelineToTarget = pipeline->clone();
 
-            if (!cm.isSharded() &&
-                // TODO SERVER-75391: Remove this condition.
-                (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-                 expCtx->ns != NamespaceString::kConfigsvrCollectionsNamespace)) {
+            if (!cm.isSharded()) {
                 // If the collection is unsharded and we are on the primary, we should be able to
                 // do a local read. The primary may be moved right after the primary shard check,
                 // but the local read path will do a db version check before it establishes a cursor
                 // to catch this case and ensure we fail to read locally.
-                //
-                // There is the case where we are in config.collections (collection unsharded) and
-                // we want to broadcast to all shards for the $shardedDataDistribution pipeline. In
-                // this case we don't want to do a local read and we must target the config servers.
-                // In 7.0, only the config server will be targeted for this collection, but in a
-                // mixed version cluster, an older binary mongos may still target a shard, so if the
-                // current node is not the config server, we force remote targeting.
                 try {
                     auto expectUnshardedCollection(
                         expCtx->mongoProcessInterface->expectUnshardedCollectionInScope(
