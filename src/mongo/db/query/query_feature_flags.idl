@@ -108,3 +108,9 @@ feature_flags:
       default: false
       # TODO SERVER-78294 Toggle this once we've backported the feature.
       shouldBeFCVGated: true
+
+    featureFlagSearchInSbe:
+      description: "Feature flag to enable $search execution in SBE"
+      cpp_varname: gFeatureFlagSearchInSbe
+      default: false
+      shouldBeFCVGated: true
