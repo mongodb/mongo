@@ -78,7 +78,7 @@ public:
     /**
      * Computes a KeyString that can be used as the sort key for this object.
      */
-    KeyString::Value computeSortKeyString(const BSONObj& bson);
+    key_string::Value computeSortKeyString(const BSONObj& bson);
 
     /**
      * Determines all of the portions of the sort key for the given document and populates the

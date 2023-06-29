@@ -94,13 +94,13 @@ struct IndexEntryInfo {
     IndexEntryInfo(const IndexInfo& indexInfo,
                    RecordId entryRecordId,
                    BSONObj entryIdKey,
-                   KeyString::Value entryKeyString);
+                   key_string::Value entryKeyString);
     const std::string indexName;
     const BSONObj keyPattern;
     const Ordering ord;
     RecordId recordId;
     BSONObj idKey;
-    KeyString::Value keyString;
+    key_string::Value keyString;
 };
 
 
@@ -266,7 +266,7 @@ private:
      * inconsistent hash buckets during the first phase of validation.
      */
     void addDocKey(OperationContext* opCtx,
-                   const KeyString::Value& ks,
+                   const key_string::Value& ks,
                    IndexInfo* indexInfo,
                    const RecordId& recordId,
                    ValidateResults* results);
@@ -279,7 +279,7 @@ private:
      */
     void addIndexKey(OperationContext* opCtx,
                      const IndexCatalogEntry* entry,
-                     const KeyString::Value& ks,
+                     const key_string::Value& ks,
                      IndexInfo* indexInfo,
                      const RecordId& recordId,
                      ValidateResults* results);
@@ -295,8 +295,8 @@ private:
      * entries and remove any path encountered. As we expect the index to contain a super-set of
      * the collection paths, a non-empty set represents an invalid index.
      */
-    void addMultikeyMetadataPath(const KeyString::Value& ks, IndexInfo* indexInfo);
-    void removeMultikeyMetadataPath(const KeyString::Value& ks, IndexInfo* indexInfo);
+    void addMultikeyMetadataPath(const key_string::Value& ks, IndexInfo* indexInfo);
+    void removeMultikeyMetadataPath(const key_string::Value& ks, IndexInfo* indexInfo);
     size_t getMultikeyMetadataPathCount(IndexInfo* indexInfo);
 
     /**
@@ -320,7 +320,7 @@ private:
     /**
      * Returns a hashed value from the given KeyString and index namespace.
      */
-    uint32_t _hashKeyString(const KeyString::Value& ks, uint32_t indexNameHash) const;
+    uint32_t _hashKeyString(const key_string::Value& ks, uint32_t indexNameHash) const;
 
     /**
      * Prints the collection document's and index entry's metadata.

@@ -184,7 +184,7 @@ private:
 
     void makeTemporaryRecordStore();
 
-    std::pair<RecordId, KeyString::TypeBits> serializeKeyForRecordStore(
+    std::pair<RecordId, key_string::TypeBits> serializeKeyForRecordStore(
         const value::MaterializedRow& key) const;
 
     /**

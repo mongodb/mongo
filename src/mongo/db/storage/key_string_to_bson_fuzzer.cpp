@@ -32,31 +32,31 @@
 
 const mongo::Ordering kAllAscending = mongo::Ordering::make(mongo::BSONObj());
 const mongo::Ordering kOneDescending = mongo::Ordering::make(BSON("a" << -1));
-const auto kV1 = mongo::KeyString::Version::V1;
-const auto kV0 = mongo::KeyString::Version::V0;
+const auto kV1 = mongo::key_string::Version::V1;
+const auto kV0 = mongo::key_string::Version::V0;
 
 uint8_t getZeroType(char val) {
     switch (val % 10) {
         case 0:
-            return mongo::KeyString::TypeBits::kInt;
+            return mongo::key_string::TypeBits::kInt;
         case 1:
-            return mongo::KeyString::TypeBits::kDouble;
+            return mongo::key_string::TypeBits::kDouble;
         case 2:
-            return mongo::KeyString::TypeBits::kLong;
+            return mongo::key_string::TypeBits::kLong;
         case 3:
-            return mongo::KeyString::TypeBits::kNegativeDoubleZero;
+            return mongo::key_string::TypeBits::kNegativeDoubleZero;
         case 4:
-            return mongo::KeyString::TypeBits::kDecimalZero0xxx;
+            return mongo::key_string::TypeBits::kDecimalZero0xxx;
         case 5:
-            return mongo::KeyString::TypeBits::kDecimalZero1xxx;
+            return mongo::key_string::TypeBits::kDecimalZero1xxx;
         case 6:
-            return mongo::KeyString::TypeBits::kDecimalZero2xxx;
+            return mongo::key_string::TypeBits::kDecimalZero2xxx;
         case 7:
-            return mongo::KeyString::TypeBits::kDecimalZero3xxx;
+            return mongo::key_string::TypeBits::kDecimalZero3xxx;
         case 8:
-            return mongo::KeyString::TypeBits::kDecimalZero4xxx;
+            return mongo::key_string::TypeBits::kDecimalZero4xxx;
         case 9:
-            return mongo::KeyString::TypeBits::kDecimalZero5xxx;
+            return mongo::key_string::TypeBits::kDecimalZero5xxx;
         default:
             return 0x00;
     }
@@ -69,7 +69,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
     const auto version = Data[0] % 2 == 0 ? kV0 : kV1;
     const auto ord = Data[1] % 2 == 0 ? kAllAscending : kOneDescending;
 
-    mongo::KeyString::TypeBits tb(version);
+    mongo::key_string::TypeBits tb(version);
 
     const size_t len = Data[2];
     if (len > static_cast<size_t>(Size - 3))
@@ -114,7 +114,7 @@ extern "C" int LLVMFuzzerTestOneInput(const char* Data, size_t Size) {
 
     try {
         mongo::BSONObj obj =
-            mongo::KeyString::toBsonSafe(&Data[2 + len], Size - (2 + len), ord, tb);
+            mongo::key_string::toBsonSafe(&Data[2 + len], Size - (2 + len), ord, tb);
         // We want to make sure the generated BSON is valid
         invariant(mongo::validateBSON(obj.objdata(), obj.objsize()));
     } catch (const mongo::AssertionException&) {

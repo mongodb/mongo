@@ -791,19 +791,19 @@ TEST_F(CollectionValidationDiskTest, BackgroundValidateRunsConcurrentlyWithWrite
 /**
  * Generates a KeyString suitable for positioning a cursor at the beginning of an index.
  */
-KeyString::Value makeFirstKeyString(const SortedDataInterface& sortedDataInterface) {
-    KeyString::Builder firstKeyStringBuilder(sortedDataInterface.getKeyStringVersion(),
-                                             BSONObj(),
-                                             sortedDataInterface.getOrdering(),
-                                             KeyString::Discriminator::kExclusiveBefore);
+key_string::Value makeFirstKeyString(const SortedDataInterface& sortedDataInterface) {
+    key_string::Builder firstKeyStringBuilder(sortedDataInterface.getKeyStringVersion(),
+                                              BSONObj(),
+                                              sortedDataInterface.getOrdering(),
+                                              key_string::Discriminator::kExclusiveBefore);
     return firstKeyStringBuilder.getValueCopy();
 }
 
 /**
  * Extracts KeyString without RecordId.
  */
-KeyString::Value makeKeyStringWithoutRecordId(const KeyString::Value& keyStringWithRecordId,
-                                              KeyString::Version version) {
+key_string::Value makeKeyStringWithoutRecordId(const key_string::Value& keyStringWithRecordId,
+                                               key_string::Version version) {
     BufBuilder bufBuilder;
     keyStringWithRecordId.serializeWithoutRecordIdLong(bufBuilder);
     auto builderSize = bufBuilder.len();
@@ -811,7 +811,7 @@ KeyString::Value makeKeyStringWithoutRecordId(const KeyString::Value& keyStringW
     auto buffer = bufBuilder.release();
 
     BufReader bufReader(buffer.get(), builderSize);
-    return KeyString::Value::deserialize(bufReader, version);
+    return key_string::Value::deserialize(bufReader, version);
 }
 
 // Verify calling validate() on a collection with old (pre-4.2) keys in a WT unique index.
@@ -855,7 +855,7 @@ TEST_F(CollectionValidationTest, ValidateOldUniqueIndexKeyWarning) {
 
         // Check key in index for only document.
         auto firstKeyString = makeFirstKeyString(*sortedDataInterface);
-        KeyString::Value keyStringWithRecordId;
+        key_string::Value keyStringWithRecordId;
         RecordId recordId;
         {
             auto cursor = sortedDataInterface->newCursor(opCtx);

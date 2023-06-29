@@ -222,7 +222,7 @@ std::string ShardKeyPattern::toString() const {
 }
 
 std::string ShardKeyPattern::toKeyString(const BSONObj& shardKey) {
-    KeyString::Builder ks(KeyString::Version::V1, Ordering::allAscending());
+    key_string::Builder ks(key_string::Version::V1, Ordering::allAscending());
 
     BSONObjIterator it(shardKey);
     while (auto elem = it.next()) {

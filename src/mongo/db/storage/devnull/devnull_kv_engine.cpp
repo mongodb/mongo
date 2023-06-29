@@ -218,7 +218,7 @@ class DevNullSortedDataBuilderInterface : public SortedDataBuilderInterface {
 public:
     DevNullSortedDataBuilderInterface() {}
 
-    virtual Status addKey(const KeyString::Value& keyString) {
+    virtual Status addKey(const key_string::Value& keyString) {
         return Status::OK();
     }
 };
@@ -227,7 +227,7 @@ class DevNullSortedDataInterface : public SortedDataInterface {
 public:
     DevNullSortedDataInterface(StringData identName)
         : SortedDataInterface(identName,
-                              KeyString::Version::kLatestVersion,
+                              key_string::Version::kLatestVersion,
                               Ordering::make(BSONObj()),
                               KeyFormat::Long) {}
 
@@ -239,22 +239,22 @@ public:
     }
 
     virtual Status insert(OperationContext* opCtx,
-                          const KeyString::Value& keyString,
+                          const key_string::Value& keyString,
                           bool dupsAllowed,
                           IncludeDuplicateRecordId includeDuplicateRecordId) {
         return Status::OK();
     }
 
     virtual void unindex(OperationContext* opCtx,
-                         const KeyString::Value& keyString,
+                         const key_string::Value& keyString,
                          bool dupsAllowed) {}
 
-    virtual Status dupKeyCheck(OperationContext* opCtx, const KeyString::Value& keyString) {
+    virtual Status dupKeyCheck(OperationContext* opCtx, const key_string::Value& keyString) {
         return Status::OK();
     }
 
     virtual boost::optional<RecordId> findLoc(OperationContext* opCtx,
-                                              const KeyString::Value& keyString) const override {
+                                              const key_string::Value& keyString) const override {
         return boost::none;
     }
 
@@ -285,7 +285,7 @@ public:
     }
 
     virtual void printIndexEntryMetadata(OperationContext* opCtx,
-                                         const KeyString::Value& keyString) const {}
+                                         const key_string::Value& keyString) const {}
 
     virtual std::unique_ptr<SortedDataInterface::Cursor> newCursor(OperationContext* opCtx,
                                                                    bool isForward) const {
@@ -297,7 +297,7 @@ public:
     }
 
     void insertWithRecordIdInValue_forTest(OperationContext* opCtx,
-                                           const KeyString::Value& keyString,
+                                           const key_string::Value& keyString,
                                            RecordId rid) override {
         MONGO_UNREACHABLE;
     }

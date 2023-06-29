@@ -123,7 +123,7 @@ boost::optional<IndexKeyEntry> IndexScan::initIndexScan() {
         _endKey = _bounds.endKey;
         _indexCursor->setEndPosition(_endKey, _endKeyInclusive);
 
-        KeyString::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+        key_string::Value keyStringForSeek = IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             _startKey,
             indexAccessMethod()->getSortedDataInterface()->getKeyStringVersion(),
             indexAccessMethod()->getSortedDataInterface()->getOrdering(),

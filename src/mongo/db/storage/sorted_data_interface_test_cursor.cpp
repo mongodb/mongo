@@ -156,7 +156,7 @@ TEST(SortedDataInterface, ExhaustKeyStringCursor) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
-    std::vector<KeyString::Value> keyStrings;
+    std::vector<key_string::Value> keyStrings;
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -165,7 +165,7 @@ TEST(SortedDataInterface, ExhaustKeyStringCursor) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            KeyString::Value ks = makeKeyString(sorted.get(), key, loc);
+            key_string::Value ks = makeKeyString(sorted.get(), key, loc);
             keyStrings.push_back(ks);
             ASSERT_OK(sorted->insert(opCtx.get(), ks, true));
             uow.commit();
@@ -255,7 +255,7 @@ TEST(SortedDataInterface, ExhaustKeyStringCursorReversed) {
         ASSERT(sorted->isEmpty(opCtx.get()));
     }
 
-    std::vector<KeyString::Value> keyStrings;
+    std::vector<key_string::Value> keyStrings;
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -264,7 +264,7 @@ TEST(SortedDataInterface, ExhaustKeyStringCursorReversed) {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
             RecordId loc(42, i * 2);
-            KeyString::Value ks = makeKeyString(sorted.get(), key, loc);
+            key_string::Value ks = makeKeyString(sorted.get(), key, loc);
             keyStrings.push_back(ks);
             ASSERT_OK(sorted->insert(opCtx.get(), ks, true));
             uow.commit();

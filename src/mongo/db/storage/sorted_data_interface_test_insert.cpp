@@ -313,9 +313,9 @@ TEST(SortedDataInterface, InsertSameKeyString) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
-    KeyString::Builder keyStringLoc1(
+    key_string::Builder keyStringLoc1(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyStringLoc2(
+    key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
     {

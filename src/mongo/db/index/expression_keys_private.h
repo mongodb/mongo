@@ -83,7 +83,7 @@ public:
                           const BSONObj& obj,
                           const TwoDIndexingParams& params,
                           KeyStringSet* keys,
-                          KeyString::Version keyStringVersion,
+                          key_string::Version keyStringVersion,
                           Ordering ordering,
                           const boost::optional<RecordId>& id = boost::none);
 
@@ -95,7 +95,7 @@ public:
                            const BSONObj& obj,
                            const fts::FTSSpec& ftsSpec,
                            KeyStringSet* keys,
-                           KeyString::Version keyStringVersion,
+                           key_string::Version keyStringVersion,
                            Ordering ordering,
                            const boost::optional<RecordId>& id = boost::none);
 
@@ -114,7 +114,7 @@ public:
                             bool isSparse,
                             const CollatorInterface* collator,
                             KeyStringSet* keys,
-                            KeyString::Version keyStringVersion,
+                            key_string::Version keyStringVersion,
                             Ordering ordering,
                             bool ignoreArraysAlongPath,
                             const boost::optional<RecordId>& id = boost::none);
@@ -139,7 +139,7 @@ public:
                           const S2IndexingParams& params,
                           KeyStringSet* keys,
                           MultikeyPaths* multikeyPaths,
-                          KeyString::Version keyStringVersion,
+                          key_string::Version keyStringVersion,
                           SortedDataIndexAccessMethod::GetKeysContext context,
                           Ordering ordering,
                           const boost::optional<RecordId>& id = boost::none);

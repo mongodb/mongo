@@ -86,26 +86,27 @@ void removeFromIndex(OperationContext* opCtx,
     wuow.commit();
 }
 
-KeyString::Value makeKeyString(SortedDataInterface* sorted,
-                               BSONObj bsonKey,
-                               const boost::optional<RecordId>& rid) {
-    KeyString::Builder builder(sorted->getKeyStringVersion(), bsonKey, sorted->getOrdering());
+key_string::Value makeKeyString(SortedDataInterface* sorted,
+                                BSONObj bsonKey,
+                                const boost::optional<RecordId>& rid) {
+    key_string::Builder builder(sorted->getKeyStringVersion(), bsonKey, sorted->getOrdering());
     if (rid) {
         builder.appendRecordId(*rid);
     }
     return builder.getValueCopy();
 }
 
-KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
-                                      BSONObj bsonKey,
-                                      bool isForward,
-                                      bool inclusive) {
+key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
+                                       BSONObj bsonKey,
+                                       bool isForward,
+                                       bool inclusive) {
     BSONObj finalKey = BSONObj::stripFieldNames(bsonKey);
-    KeyString::Builder builder(sorted->getKeyStringVersion(),
-                               finalKey,
-                               sorted->getOrdering(),
-                               isForward == inclusive ? KeyString::Discriminator::kExclusiveBefore
-                                                      : KeyString::Discriminator::kExclusiveAfter);
+    key_string::Builder builder(sorted->getKeyStringVersion(),
+                                finalKey,
+                                sorted->getOrdering(),
+                                isForward == inclusive
+                                    ? key_string::Discriminator::kExclusiveBefore
+                                    : key_string::Discriminator::kExclusiveAfter);
     return builder.getValueCopy();
 }
 

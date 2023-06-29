@@ -121,14 +121,14 @@ void registerSortedDataInterfaceHarnessHelperFactory(
 
 std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper();
 
-KeyString::Value makeKeyString(SortedDataInterface* sorted,
-                               BSONObj bsonKey,
-                               const boost::optional<RecordId>& rid = boost::none);
+key_string::Value makeKeyString(SortedDataInterface* sorted,
+                                BSONObj bsonKey,
+                                const boost::optional<RecordId>& rid = boost::none);
 
-KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
-                                      BSONObj bsonKey,
-                                      bool isForward,
-                                      bool inclusive);
+key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
+                                       BSONObj bsonKey,
+                                       bool isForward,
+                                       bool inclusive);
 
 /**
  * Inserts all entries in toInsert into index.

@@ -333,8 +333,8 @@ TEST_F(KVEngineTestHarness, SimpleSorted1) {
         Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         WriteUnitOfWork uow(opCtx.get());
         const RecordId recordId(6, 4);
-        const KeyString::Value keyString =
-            KeyString::HeapBuilder(
+        const key_string::Value keyString =
+            key_string::HeapBuilder(
                 sorted->getKeyStringVersion(), BSON("" << 5), sorted->getOrdering(), recordId)
                 .release();
         ASSERT_OK(sorted->insert(opCtx.get(), keyString, true));

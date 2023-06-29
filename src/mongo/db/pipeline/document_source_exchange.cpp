@@ -179,7 +179,7 @@ std::vector<std::string> Exchange::extractBoundaries(
             kb << "" << elem;
         }
 
-        KeyString::Builder key{KeyString::Version::V1, kb.obj(), ordering};
+        key_string::Builder key{key_string::Version::V1, kb.obj(), ordering};
         std::string keyStr{key.getBuffer(), key.getSize()};
 
         ret.emplace_back(std::move(keyStr));
@@ -200,8 +200,8 @@ std::vector<std::string> Exchange::extractBoundaries(
         kbMax << "" << MAXKEY;
     }
 
-    KeyString::Builder minKey{KeyString::Version::V1, kbMin.obj(), ordering};
-    KeyString::Builder maxKey{KeyString::Version::V1, kbMax.obj(), ordering};
+    key_string::Builder minKey{key_string::Version::V1, kbMin.obj(), ordering};
+    key_string::Builder maxKey{key_string::Version::V1, kbMax.obj(), ordering};
     StringData minKeyStr{minKey.getBuffer(), minKey.getSize()};
     StringData maxKeyStr{maxKey.getBuffer(), maxKey.getSize()};
 
@@ -439,7 +439,7 @@ size_t Exchange::getTargetConsumer(const Document& input) {
         ++counter;
     }
 
-    KeyString::Builder key{KeyString::Version::V1, kb.obj(), _ordering};
+    key_string::Builder key{key_string::Version::V1, kb.obj(), _ordering};
     std::string keyStr{key.getBuffer(), key.getSize()};
 
     // Binary search for the consumer id.

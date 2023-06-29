@@ -96,7 +96,7 @@ public:
                                                    Status status,
                                                    const BSONObj& obj,
                                                    const boost::optional<RecordId>& loc)>;
-    using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
+    using KeyHandlerFn = std::function<Status(const key_string::Value&)>;
     using RecordIdHandlerFn = std::function<Status(const RecordId&)>;
 
     IndexAccessMethod() = default;
@@ -653,7 +653,7 @@ private:
      */
     void removeOneKey(OperationContext* opCtx,
                       const IndexCatalogEntry* entry,
-                      const KeyString::Value& keyString,
+                      const key_string::Value& keyString,
                       bool dupsAllowed) const;
 
     /**
@@ -663,7 +663,7 @@ private:
      */
     Status _handleDuplicateKey(OperationContext* opCtx,
                                const IndexCatalogEntry* entry,
-                               const KeyString::Value& dataKey,
+                               const key_string::Value& dataKey,
                                const RecordIdHandlerFn& onDuplicateRecord);
 
     Status _indexKeysOrWriteToSideTable(OperationContext* opCtx,

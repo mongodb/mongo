@@ -235,9 +235,9 @@ void HashLookupStage::reset() {
     _bufferIt = 0;
 }
 
-std::pair<RecordId, KeyString::TypeBits> HashLookupStage::serializeKeyForRecordStore(
+std::pair<RecordId, key_string::TypeBits> HashLookupStage::serializeKeyForRecordStore(
     const value::MaterializedRow& key) const {
-    KeyString::Builder kb{KeyString::Version::kLatestVersion};
+    key_string::Builder kb{key_string::Version::kLatestVersion};
     return encodeKeyString(kb, key);
 }
 

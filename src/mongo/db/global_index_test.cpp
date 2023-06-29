@@ -106,7 +106,7 @@ void verifyStoredKeyMatchesIndexKey(const BSONObj& key,
         indexEntry.hasElement(global_index::kContainerIndexKeyTypeBitsFieldName);
     ASSERT_EQ(expectTypeBits, hasTypeBits);
 
-    auto tb = KeyString::TypeBits(KeyString::Version::V1);
+    auto tb = key_string::TypeBits(key_string::Version::V1);
     if (hasTypeBits) {
         auto entryTypeBitsSize =
             indexEntry[global_index::kContainerIndexKeyTypeBitsFieldName].size();
@@ -114,12 +114,12 @@ void verifyStoredKeyMatchesIndexKey(const BSONObj& key,
             indexEntry[global_index::kContainerIndexKeyTypeBitsFieldName].binData(
                 entryTypeBitsSize);
         auto entryTypeBitsReader = BufReader(entryTypeBitsBinData, entryTypeBitsSize);
-        tb = KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &entryTypeBitsReader);
+        tb = key_string::TypeBits::fromBuffer(key_string::Version::V1, &entryTypeBitsReader);
         ASSERT(!tb.isAllZeros());
     }
 
     const auto rehydratedKey =
-        KeyString::toBson(entryIndexKeyBinData, entryIndexKeySize, KeyString::ALL_ASCENDING, tb);
+        key_string::toBson(entryIndexKeyBinData, entryIndexKeySize, key_string::ALL_ASCENDING, tb);
 
     ASSERT_BSONOBJ_EQ(rehydratedKey, key);
     LOGV2(6789401,

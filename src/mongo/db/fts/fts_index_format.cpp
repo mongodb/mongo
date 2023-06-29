@@ -122,7 +122,7 @@ void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
                              const FTSSpec& spec,
                              const BSONObj& obj,
                              KeyStringSet* keys,
-                             KeyString::Version keyStringVersion,
+                             key_string::Version keyStringVersion,
                              Ordering ordering,
                              const boost::optional<RecordId>& id) {
     vector<BSONElement> extrasBefore;
@@ -148,7 +148,7 @@ void FTSIndexFormat::getKeys(SharedBufferFragmentBuilder& pooledBufferBuilder,
         const string& term = i->first;
         double weight = i->second;
 
-        KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
+        key_string::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
         for (const auto& elem : extrasBefore) {
             keyString.appendBSONElement(elem);
         }
@@ -177,9 +177,9 @@ BSONObj FTSIndexFormat::getIndexKey(double weight,
         b.appendAs(i.next(), "");
     }
 
-    KeyString::Builder keyString(KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING);
+    key_string::Builder keyString(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
     _appendIndexKey(keyString, weight, term, textIndexVersion);
-    auto key = KeyString::toBson(keyString, KeyString::ALL_ASCENDING);
+    auto key = key_string::toBson(keyString, key_string::ALL_ASCENDING);
 
     return b.appendElements(key).obj();
 }

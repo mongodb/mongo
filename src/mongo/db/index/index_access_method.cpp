@@ -254,7 +254,7 @@ MultikeyPaths createMultikeyPaths(const std::vector<MultikeyPath>& multikeyPaths
 }  // namespace
 
 struct BtreeExternalSortComparison {
-    int operator()(const KeyString::Value& l, const KeyString::Value& r) const {
+    int operator()(const key_string::Value& l, const key_string::Value& r) const {
         return l.compare(r);
     }
 };
@@ -481,7 +481,7 @@ Status SortedDataIndexAccessMethod::insertKeys(OperationContext* opCtx,
 
 void SortedDataIndexAccessMethod::removeOneKey(OperationContext* opCtx,
                                                const IndexCatalogEntry* entry,
-                                               const KeyString::Value& keyString,
+                                               const key_string::Value& keyString,
                                                bool dupsAllowed) const {
 
     try {
@@ -535,11 +535,11 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
                                                  const IndexCatalogEntry* entry,
                                                  const BSONObj& requestedKey) const {
     // Generate the key for this index.
-    KeyString::Value actualKey = [&]() {
+    key_string::Value actualKey = [&]() {
         if (entry->getCollator()) {
             // For performance, call get keys only if there is a non-simple collation.
             SharedBufferFragmentBuilder pooledBuilder(
-                KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+                key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
             auto& executionCtx = StorageExecutionContext::get(opCtx);
             auto keys = executionCtx.keys();
             KeyStringSet* multikeyMetadataKeys = nullptr;
@@ -559,7 +559,7 @@ RecordId SortedDataIndexAccessMethod::findSingle(OperationContext* opCtx,
             invariant(keys->size() == 1);
             return *keys->begin();
         } else {
-            KeyString::HeapBuilder requestedKeyString(
+            key_string::HeapBuilder requestedKeyString(
                 getSortedDataInterface()->getKeyStringVersion(),
                 BSONObj::stripFieldNames(requestedKey),
                 getSortedDataInterface()->getOrdering());
@@ -645,7 +645,7 @@ void SortedDataIndexAccessMethod::prepareUpdate(OperationContext* opCtx,
                                                 const RecordId& record,
                                                 const InsertDeleteOptions& options,
                                                 UpdateTicket* ticket) const {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     const MatchExpression* indexFilter = entry->getFilterExpression();
     if (!indexFilter || indexFilter->matchesBSON(from)) {
         // Override key constraints when generating keys for removal. This only applies to keys
@@ -770,12 +770,12 @@ Status SortedDataIndexAccessMethod::applyIndexBuildSideWrite(OperationContext* o
         }
     }();
 
-    // Deserialize the encoded KeyString::Value.
+    // Deserialize the encoded key_string::Value.
     int keyLen;
     const char* binKey = operation["key"].binData(keyLen);
     BufReader reader(binKey, keyLen);
-    const KeyString::Value keyString =
-        KeyString::Value::deserialize(reader, getSortedDataInterface()->getKeyStringVersion());
+    const key_string::Value keyString =
+        key_string::Value::deserialize(reader, getSortedDataInterface()->getKeyStringVersion());
 
     const KeyStringSet keySet{keyString};
     if (opType == IndexBuildInterceptor::Op::kInsert) {
@@ -876,7 +876,7 @@ const IndexCatalogEntry* IndexAccessMethod::BulkBuilder::yield(OperationContext*
 class SortedDataIndexAccessMethod::BulkBuilderImpl final
     : public BulkBuilderCommon<SortedDataIndexAccessMethod::BulkBuilderImpl> {
 public:
-    using Sorter = mongo::Sorter<KeyString::Value, mongo::NullValue>;
+    using Sorter = mongo::Sorter<key_string::Value, mongo::NullValue>;
 
     BulkBuilderImpl(const IndexCatalogEntry* entry,
                     SortedDataIndexAccessMethod* iam,
@@ -938,7 +938,7 @@ private:
     SortedDataIndexAccessMethod* _iam;
     std::unique_ptr<Sorter> _sorter;
 
-    KeyString::Value _previousKey;
+    key_string::Value _previousKey;
 
     // Set to true if any document added to the BulkBuilder causes the index to become multikey.
     bool _isMultiKey = false;
@@ -1080,7 +1080,7 @@ void SortedDataIndexAccessMethod::BulkBuilderImpl::_insertMultikeyMetadataKeysIn
 
 SortedDataIndexAccessMethod::BulkBuilderImpl::Sorter::Settings
 SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorterSettings() const {
-    return std::pair<KeyString::Value::SorterDeserializeSettings,
+    return std::pair<key_string::Value::SorterDeserializeSettings,
                      mongo::NullValue::SorterDeserializeSettings>(
         {_iam->getSortedDataInterface()->getKeyStringVersion()}, {});
 }
@@ -1103,7 +1103,7 @@ SortedDataIndexAccessMethod::BulkBuilderImpl::_makeSorter(
                        _makeSorterSettings());
 }
 
-std::unique_ptr<mongo::Sorter<KeyString::Value, mongo::NullValue>::Iterator>
+std::unique_ptr<mongo::Sorter<key_string::Value, mongo::NullValue>::Iterator>
 SortedDataIndexAccessMethod::BulkBuilderImpl::finalizeSort() {
     _insertMultikeyMetadataKeysIntoSorter();
     return std::unique_ptr<Sorter::Iterator>(_sorter->done());
@@ -1276,16 +1276,16 @@ std::string nextFileName() {
 Status SortedDataIndexAccessMethod::_handleDuplicateKey(
     OperationContext* opCtx,
     const IndexCatalogEntry* entry,
-    const KeyString::Value& dataKey,
+    const key_string::Value& dataKey,
     const RecordIdHandlerFn& onDuplicateRecord) {
     RecordId recordId = (KeyFormat::Long == _newInterface->rsKeyFormat())
-        ? KeyString::decodeRecordIdLongAtEnd(dataKey.getBuffer(), dataKey.getSize())
-        : KeyString::decodeRecordIdStrAtEnd(dataKey.getBuffer(), dataKey.getSize());
+        ? key_string::decodeRecordIdLongAtEnd(dataKey.getBuffer(), dataKey.getSize())
+        : key_string::decodeRecordIdStrAtEnd(dataKey.getBuffer(), dataKey.getSize());
     if (onDuplicateRecord) {
         return onDuplicateRecord(recordId);
     }
 
-    BSONObj dupKey = KeyString::toBson(dataKey, getSortedDataInterface()->getOrdering());
+    BSONObj dupKey = key_string::toBson(dataKey, getSortedDataInterface()->getOrdering());
     return buildDupKeyErrorStatus(dupKey.getOwned(),
                                   entry->getNSSFromCatalog(opCtx),
                                   entry->descriptor()->indexName(),
@@ -1406,4 +1406,4 @@ void SortedDataIndexAccessMethod::_unindexKeysOrWriteToSideTable(
 #include "mongo/db/sorter/sorter.cpp"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
-MONGO_CREATE_SORTER(mongo::KeyString::Value, mongo::NullValue, mongo::BtreeExternalSortComparison);
+MONGO_CREATE_SORTER(mongo::key_string::Value, mongo::NullValue, mongo::BtreeExternalSortComparison);

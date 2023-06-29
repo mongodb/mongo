@@ -74,10 +74,10 @@ private:
     void tearDown() override;
 
 protected:
-    const KeyString::Value kMinKeyString = KeyString::Builder{KeyString::Version::kLatestVersion,
-                                                              kMinBSONKey,
-                                                              KeyString::ALL_ASCENDING}
-                                               .getValueCopy();
+    const key_string::Value kMinKeyString = key_string::Builder{key_string::Version::kLatestVersion,
+                                                                kMinBSONKey,
+                                                                key_string::ALL_ASCENDING}
+                                                .getValueCopy();
 
     explicit ThrottleCursorTest(Milliseconds clockIncrement = Milliseconds{kTickDelay})
         : CatalogTestFixture(Options{}.useMockClock(true, clockIncrement)) {}

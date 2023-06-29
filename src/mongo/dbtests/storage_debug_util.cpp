@@ -80,10 +80,10 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         auto indexCursor = iam->newCursor(opCtx, /*forward*/ true);
 
         const BSONObj& keyPattern = indexDescriptor->keyPattern();
-        const KeyString::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
+        const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
         const auto ordering = Ordering::make(keyPattern);
-        KeyString::Builder firstKeyString(
-            version, BSONObj(), ordering, KeyString::Discriminator::kExclusiveBefore);
+        key_string::Builder firstKeyString(
+            version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
 
         LOGV2(51810,
               "[Debugging] {keyPattern_str} index table entries:",
@@ -92,15 +92,15 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         for (auto keyStringEntry = indexCursor->seekForKeyString(firstKeyString.getValueCopy());
              keyStringEntry;
              keyStringEntry = indexCursor->nextKeyString()) {
-            auto keyString = KeyString::toBsonSafe(keyStringEntry->keyString.getBuffer(),
-                                                   keyStringEntry->keyString.getSize(),
-                                                   ordering,
-                                                   keyStringEntry->keyString.getTypeBits());
-            KeyString::logKeyString(keyStringEntry->loc,
-                                    keyStringEntry->keyString,
-                                    keyPattern,
-                                    keyString,
-                                    "[Debugging](index)");
+            auto keyString = key_string::toBsonSafe(keyStringEntry->keyString.getBuffer(),
+                                                    keyStringEntry->keyString.getSize(),
+                                                    ordering,
+                                                    keyStringEntry->keyString.getTypeBits());
+            key_string::logKeyString(keyStringEntry->loc,
+                                     keyStringEntry->keyString,
+                                     keyPattern,
+                                     keyString,
+                                     "[Debugging](index)");
         }
     }
 }

@@ -135,7 +135,7 @@ void IndexBuildInterceptor::keepTemporaryTables() {
 
 Status IndexBuildInterceptor::recordDuplicateKey(OperationContext* opCtx,
                                                  const IndexCatalogEntry* indexCatalogEntry,
-                                                 const KeyString::Value& key) const {
+                                                 const key_string::Value& key) const {
     invariant(indexCatalogEntry->descriptor()->unique());
     return _duplicateKeyTracker->recordKey(opCtx, indexCatalogEntry, key);
 }
@@ -353,7 +353,7 @@ Status IndexBuildInterceptor::_applyWrite(OperationContext* opCtx,
     // indexes are not sorted and therefore cannot enforce uniqueness constraints. Only sorted
     // indexes will use this lambda passed through the IndexAccessMethod interface.
     IndexAccessMethod::KeyHandlerFn onDuplicateKeyFn =
-        [=, this](const KeyString::Value& duplicateKey) {
+        [=, this](const key_string::Value& duplicateKey) {
             return trackDups == TrackDuplicates::kTrack
                 ? recordDuplicateKey(opCtx, indexCatalogEntry, duplicateKey)
                 : Status::OK();
@@ -529,8 +529,8 @@ Status IndexBuildInterceptor::sideWrite(OperationContext* opCtx,
         // replication rollbacks, side table writes associated with a CUD operation should
         // remain/rollback along with the corresponding oplog entry.
 
-        // Serialize the KeyString::Value into a binary format for storage. Since the
-        // KeyString::Value also contains TypeBits information, it is not sufficient to just read
+        // Serialize the key_string::Value into a binary format for storage. Since the
+        // key_string::Value also contains TypeBits information, it is not sufficient to just read
         // from getBuffer().
         builder.reset();
         keyString.serialize(builder);

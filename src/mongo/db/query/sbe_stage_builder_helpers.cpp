@@ -742,7 +742,7 @@ void indexKeyCorruptionCheckCallback(OperationContext* opCtx,
             tassert(5113708, "KeyString does not exist", keyString);
 
             BSONObj bsonKeyPattern(sbe::value::bitcastTo<const char*>(kpVal));
-            auto bsonKeyString = KeyString::toBson(*keyString, Ordering::make(bsonKeyPattern));
+            auto bsonKeyString = key_string::toBson(*keyString, Ordering::make(bsonKeyPattern));
             auto hydratedKey = IndexKeyEntry::rehydrateKey(bsonKeyPattern, bsonKeyString);
 
             HealthLogEntry entry;
@@ -846,7 +846,7 @@ bool indexKeyConsistencyCheckCallback(OperationContext* opCtx,
             auto& executionCtx = StorageExecutionContext::get(opCtx);
             auto keys = executionCtx.keys();
             SharedBufferFragmentBuilder pooledBuilder(
-                KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+                key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when ensuring the keyData is still valid.

@@ -92,7 +92,7 @@ struct Fixture {
     ServiceContext::UniqueOperationContext opCtx;
     Lock::GlobalLock globalLock;
     std::unique_ptr<SortedDataInterface::Cursor> cursor;
-    KeyString::Value firstKey;
+    key_string::Value firstKey;
     size_t itemsProcessed = 0;
 };
 

@@ -854,7 +854,7 @@ public:
         }
 
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection, insert three records and check it's valid.
         lockDb(MODE_X);
@@ -944,7 +944,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create an index with bad index specs.
         lockDb(MODE_X);
@@ -1048,12 +1048,12 @@ public:
         auto sortedDataInterface = accessMethod->getSortedDataInterface();
         {
             WriteUnitOfWork wunit(&_opCtx);
-            const KeyString::Value indexKey =
-                KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
-                                       BSON("" << 1 << ""
-                                               << "non_existent_path"),
-                                       sortedDataInterface->getOrdering(),
-                                       recordId)
+            const key_string::Value indexKey =
+                key_string::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
+                                        BSON("" << 1 << ""
+                                                << "non_existent_path"),
+                                        sortedDataInterface->getOrdering(),
+                                        recordId)
                     .release();
             auto insertStatus =
                 sortedDataInterface->insert(&_opCtx, indexKey, true /* dupsAllowed */);
@@ -1071,12 +1071,12 @@ public:
         lockDb(MODE_X);
         {
             WriteUnitOfWork wunit(&_opCtx);
-            const KeyString::Value indexKey =
-                KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
-                                       BSON("" << 1 << ""
-                                               << "mk_1"),
-                                       sortedDataInterface->getOrdering(),
-                                       recordId)
+            const key_string::Value indexKey =
+                key_string::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
+                                        BSON("" << 1 << ""
+                                                << "mk_1"),
+                                        sortedDataInterface->getOrdering(),
+                                        recordId)
                     .release();
             sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
             wunit.commit();
@@ -1176,12 +1176,12 @@ public:
             WriteUnitOfWork wunit(&_opCtx);
             RecordId recordId(record_id_helpers::reservedIdFor(
                 record_id_helpers::ReservationId::kWildcardMultikeyMetadataId, KeyFormat::Long));
-            const KeyString::Value indexKey =
-                KeyString::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
-                                       BSON("" << 1 << ""
-                                               << "a"),
-                                       sortedDataInterface->getOrdering(),
-                                       recordId)
+            const key_string::Value indexKey =
+                key_string::HeapBuilder(sortedDataInterface->getKeyStringVersion(),
+                                        BSON("" << 1 << ""
+                                                << "a"),
+                                        sortedDataInterface->getOrdering(),
+                                        recordId)
                     .release();
             sortedDataInterface->unindex(&_opCtx, indexKey, true /* dupsAllowed */);
             wunit.commit();
@@ -1297,7 +1297,7 @@ public:
         }
 
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -1686,7 +1686,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -2021,7 +2021,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
@@ -2115,7 +2115,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2260,7 +2260,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
@@ -2371,7 +2371,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2522,7 +2522,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert a document.
         lockDb(MODE_X);
@@ -2678,7 +2678,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2725,7 +2725,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -2873,7 +2873,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert non-multikey document.
         lockDb(MODE_X);
@@ -3057,7 +3057,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -3207,7 +3207,7 @@ public:
         }
 
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection.
         lockDb(MODE_X);
@@ -3306,7 +3306,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3353,7 +3353,7 @@ public:
                         {},
                         MultikeyPaths{},
                         options,
-                        [this, &entry, &interceptor](const KeyString::Value& duplicateKey) {
+                        [this, &entry, &interceptor](const key_string::Value& duplicateKey) {
                             return interceptor->recordDuplicateKey(&_opCtx, entry, duplicateKey);
                         },
                         &numInserted);
@@ -3640,7 +3640,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert non-multikey document.
         lockDb(MODE_X);
@@ -3870,7 +3870,7 @@ public:
 
     void run() {
         SharedBufferFragmentBuilder pooledBuilder(
-            KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
         // Create a new collection and insert multikey document.
         lockDb(MODE_X);

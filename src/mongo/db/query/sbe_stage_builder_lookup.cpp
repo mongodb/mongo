@@ -875,7 +875,7 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
     auto [_, indexKeyPatternValue] =
         copyValue(TypeTags::bsonObject, bitcastFrom<const char*>(index.keyPattern.objdata()));
 
-    auto makeNewKeyStringCall = [&](KeyString::Discriminator discriminator) {
+    auto makeNewKeyStringCall = [&](key_string::Discriminator discriminator) {
         StringData functionName = "ks";
         EExpression::Vector args;
         args.emplace_back(
@@ -894,9 +894,9 @@ std::pair<SlotId, std::unique_ptr<sbe::PlanStage>> buildIndexJoinLookupStage(
         makeProjectStage(std::move(valueGeneratorStage),
                          nodeId,
                          lowKeySlot,
-                         makeNewKeyStringCall(KeyString::Discriminator::kExclusiveBefore),
+                         makeNewKeyStringCall(key_string::Discriminator::kExclusiveBefore),
                          highKeySlot,
-                         makeNewKeyStringCall(KeyString::Discriminator::kExclusiveAfter),
+                         makeNewKeyStringCall(key_string::Discriminator::kExclusiveAfter),
                          indexKeyPatternSlot,
                          makeConstant(value::TypeTags::bsonObject, indexKeyPatternValue));
 

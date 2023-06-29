@@ -45,8 +45,8 @@ namespace {
 KeyStringSet makeKeyStringSet(std::initializer_list<BSONObj> objs) {
     KeyStringSet keyStrings;
     for (auto& obj : objs) {
-        KeyString::HeapBuilder keyString(
-            KeyString::Version::kLatestVersion, obj, Ordering::make(BSONObj()));
+        key_string::HeapBuilder keyString(
+            key_string::Version::kLatestVersion, obj, Ordering::make(BSONObj()));
         keyStrings.insert(keyString.release());
     }
     return keyStrings;
@@ -212,14 +212,14 @@ TEST(IndexAccessMethodSetDifference, ShouldNotReportOverlapsFromNonDisjointSets)
     for (auto&& keyString : diff.first) {
         ASSERT(left.find(keyString) != left.end());
         // Make sure it's not in the intersection.
-        auto obj = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto obj = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ASSERT_BSONOBJ_NE(obj, BSON("" << 1));
         ASSERT_BSONOBJ_NE(obj, BSON("" << 4));
     }
     for (auto&& keyString : diff.second) {
         ASSERT(right.find(keyString) != right.end());
         // Make sure it's not in the intersection.
-        auto obj = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto obj = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ASSERT_BSONOBJ_NE(obj, BSON("" << 1));
         ASSERT_BSONOBJ_NE(obj, BSON("" << 4));
     }
@@ -241,10 +241,10 @@ TEST(IndexAccessMethodInsertKeys, DuplicatesCheckingOnSecondaryUniqueIndexes) {
     auto indexAccessMethod =
         coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
 
-    KeyString::HeapBuilder keyString1(
-        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
-    KeyString::HeapBuilder keyString2(
-        KeyString::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(2));
+    key_string::HeapBuilder keyString1(
+        key_string::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(1));
+    key_string::HeapBuilder keyString2(
+        key_string::Version::kLatestVersion, BSON("" << 1), Ordering::make(BSONObj()), RecordId(2));
     KeyStringSet keys{keyString1.release(), keyString2.release()};
     struct InsertDeleteOptions options; /* options.dupsAllowed = false */
     int64_t numInserted;
@@ -280,14 +280,14 @@ TEST(IndexAccessMethodInsertKeys, InsertWhenPrepareUnique) {
         auto indexAccessMethod =
             coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
 
-        KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                          BSON("" << 1),
-                                          Ordering::make(BSONObj()),
-                                          RecordId(1));
-        KeyString::HeapBuilder keyString2(KeyString::Version::kLatestVersion,
-                                          BSON("" << 1),
-                                          Ordering::make(BSONObj()),
-                                          RecordId(2));
+        key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                           BSON("" << 1),
+                                           Ordering::make(BSONObj()),
+                                           RecordId(1));
+        key_string::HeapBuilder keyString2(key_string::Version::kLatestVersion,
+                                           BSON("" << 1),
+                                           Ordering::make(BSONObj()),
+                                           RecordId(2));
         KeyStringSet keys{keyString1.release(), keyString2.release()};
         struct InsertDeleteOptions options;
         int64_t numInserted;
@@ -318,18 +318,18 @@ TEST(IndexAccessMethodUpdateKeys, UpdateWhenPrepareUnique) {
         auto indexAccessMethod =
             coll->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
 
-        KeyString::HeapBuilder keyString1(KeyString::Version::kLatestVersion,
-                                          BSON("" << 1),
-                                          Ordering::make(BSONObj()),
-                                          RecordId(1));
-        KeyString::HeapBuilder keyString2_old(KeyString::Version::kLatestVersion,
-                                              BSON("" << 2),
-                                              Ordering::make(BSONObj()),
-                                              RecordId(2));
-        KeyString::HeapBuilder keyString2_new(KeyString::Version::kLatestVersion,
-                                              BSON("" << 1),
-                                              Ordering::make(BSONObj()),
-                                              RecordId(2));
+        key_string::HeapBuilder keyString1(key_string::Version::kLatestVersion,
+                                           BSON("" << 1),
+                                           Ordering::make(BSONObj()),
+                                           RecordId(1));
+        key_string::HeapBuilder keyString2_old(key_string::Version::kLatestVersion,
+                                               BSON("" << 2),
+                                               Ordering::make(BSONObj()),
+                                               RecordId(2));
+        key_string::HeapBuilder keyString2_new(key_string::Version::kLatestVersion,
+                                               BSON("" << 1),
+                                               Ordering::make(BSONObj()),
+                                               RecordId(2));
         KeyStringSet key1{keyString1.release()};
         KeyStringSet key2_old{keyString2_old.release()};
         KeyStringSet key2_new{keyString2_new.release()};

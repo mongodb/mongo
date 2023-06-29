@@ -74,7 +74,7 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
     for (auto& keyString : keyStrings) {
-        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ss << key.toString() << " ";
     }
     ss << "]";
@@ -128,12 +128,12 @@ void assertMultikeyPathsEqual(const MultikeyPaths& expectedMultikeyPaths,
 
 struct S2BucketKeyGeneratorTest : public unittest::Test {
     using PointSet = std::set<std::pair<long, long>>;
-    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+    SharedBufferFragmentBuilder allocator{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
 
     void verifySetIsCoveredByKeys(const KeyStringSet& keys, const PointSet& points) const {
         std::vector<S2Cell> cells;
         for (const auto& key : keys) {
-            auto obj = KeyString::toBson(key, Ordering::make(BSONObj()));
+            auto obj = key_string::toBson(key, Ordering::make(BSONObj()));
             cells.emplace_back(S2CellId(obj.firstElement().Long()));
         }
 
@@ -172,7 +172,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeys) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
@@ -201,7 +201,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubField) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
@@ -230,7 +230,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysDeepSubField) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 
@@ -264,7 +264,7 @@ TEST_F(S2BucketKeyGeneratorTest, GetS2BucketKeysSubFieldSomeMissing) {
                                      params,
                                      &actualKeys,
                                      &actualMultikeyPaths,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys,
                                      Ordering::make(BSONObj()));
 

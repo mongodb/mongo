@@ -197,7 +197,7 @@ private:
 
     /**
      * Inserts a key and value pair to the '_recordStore'. They key is serialized to a
-     * 'KeyString::Value' which becomes the 'RecordId'. This makes the keys memcmp-able and ensures
+     * 'key_string::Value' which becomes the 'RecordId'. This makes the keys memcmp-able and ensures
      * that the record store ends up sorted by the group-by keys.
      *
      * Note that the 'typeBits' are needed to reconstruct the spilled 'key' to a 'MaterializedRow',

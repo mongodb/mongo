@@ -84,7 +84,8 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    key_string::Builder keyString1(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -208,9 +209,9 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
-    KeyString::Builder keyStringLoc1(
+    key_string::Builder keyStringLoc1(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyStringLoc2(
+    key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
     {
@@ -275,9 +276,9 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    KeyString::Builder keyStringLoc1(
+    key_string::Builder keyStringLoc1(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyStringLoc2(
+    key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
     {
@@ -341,9 +342,12 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyString2(sorted->getKeyStringVersion(), key2, sorted->getOrdering(), loc2);
-    KeyString::Builder keyString3(sorted->getKeyStringVersion(), key3, sorted->getOrdering(), loc3);
+    key_string::Builder keyString1(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    key_string::Builder keyString2(
+        sorted->getKeyStringVersion(), key2, sorted->getOrdering(), loc2);
+    key_string::Builder keyString3(
+        sorted->getKeyStringVersion(), key3, sorted->getOrdering(), loc3);
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());

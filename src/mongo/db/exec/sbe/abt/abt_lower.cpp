@@ -1171,17 +1171,17 @@ std::unique_ptr<sbe::EExpression> SBENodeLowering::convertBoundsToExpr(
         ksFnArgs.emplace_back(exprLower.optimize(expr));
     }
 
-    KeyString::Discriminator discriminator;
+    key_string::Discriminator discriminator;
     // For a reverse scan, we start from the high bound and iterate until the low bound.
     if (isLower != reversed) {
         // For the start point, we want to seek ExclusiveBefore iff the bound is inclusive,
         // so that values equal to the seek value are included.
-        discriminator = bound.isInclusive() ? KeyString::Discriminator::kExclusiveBefore
-                                            : KeyString::Discriminator::kExclusiveAfter;
+        discriminator = bound.isInclusive() ? key_string::Discriminator::kExclusiveBefore
+                                            : key_string::Discriminator::kExclusiveAfter;
     } else {
         // For the end point we want the opposite.
-        discriminator = bound.isInclusive() ? KeyString::Discriminator::kExclusiveAfter
-                                            : KeyString::Discriminator::kExclusiveBefore;
+        discriminator = bound.isInclusive() ? key_string::Discriminator::kExclusiveAfter
+                                            : key_string::Discriminator::kExclusiveBefore;
     }
 
     ksFnArgs.emplace_back(sbe::makeE<sbe::EConstant>(

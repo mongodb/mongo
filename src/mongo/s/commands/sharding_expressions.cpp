@@ -273,7 +273,7 @@ private:
         // This helper accepts the key string 'keyString' and returns a 'BSONObj' that maps a field
         // names to its index key.
         auto buildObjectFromKeyString = [&](const auto& keyString) {
-            auto keyStringObj = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+            auto keyStringObj = key_string::toBson(keyString, Ordering::make(BSONObj()));
             BSONObjBuilder keyObjectBuilder;
 
             switch (_indexDescriptor->getIndexType()) {
@@ -353,7 +353,7 @@ private:
     std::unique_ptr<CollatorInterface> _collatorInterface;
 
     // The key string version to be used for generating the key strings.
-    const KeyString::Version _keyStringVersion = KeyString::Version::kLatestVersion;
+    const key_string::Version _keyStringVersion = key_string::Version::kLatestVersion;
 
     // The ordering to be used for generating the key strings.
     const Ordering _ordering = Ordering::allAscending();

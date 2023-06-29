@@ -309,7 +309,7 @@ void HashAggStage::makeTemporaryRecordStore() {
 
 void HashAggStage::spillRowToDisk(const value::MaterializedRow& key,
                                   const value::MaterializedRow& val) {
-    KeyString::Builder kb{KeyString::Version::kLatestVersion};
+    key_string::Builder kb{key_string::Version::kLatestVersion};
     key.serializeIntoKeyString(kb);
     // Add a unique integer to the end of the key, since record ids must be unique. We want equal
     // keys to be adjacent in the 'RecordStore' so that we can merge the partial aggregates with a
@@ -552,7 +552,8 @@ HashAggStage::SpilledRow HashAggStage::deserializeSpilledRecord(const Record& re
     // Read the values and type bits out of the value part of the record.
     BufReader valReader(record.data.data(), record.data.size());
     auto val = value::MaterializedRow::deserializeForSorter(valReader, {});
-    auto typeBits = KeyString::TypeBits::fromBuffer(KeyString::Version::kLatestVersion, &valReader);
+    auto typeBits =
+        key_string::TypeBits::fromBuffer(key_string::Version::kLatestVersion, &valReader);
 
     keyBuffer.reset();
     auto key = value::MaterializedRow::deserializeFromKeyString(

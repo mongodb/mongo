@@ -60,7 +60,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
  */
 int repairMissingIndexEntry(OperationContext* opCtx,
                             const IndexCatalogEntry* index,
-                            const KeyString::Value& ks,
+                            const key_string::Value& ks,
                             const KeyFormat& keyFormat,
                             const NamespaceString& nss,
                             const CollectionPtr& coll,

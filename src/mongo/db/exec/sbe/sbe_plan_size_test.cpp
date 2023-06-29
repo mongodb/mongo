@@ -196,8 +196,11 @@ TEST_F(PlanSizeTest, SimpleIndexScanStage) {
 
 TEST_F(PlanSizeTest, GenericIndexScanStage) {
     auto collUuid = UUID::parse("00000000-0000-0000-0000-000000000000").getValue();
-    GenericIndexScanStageParams params{
-        makeE<EVariable>(generateSlotId()), {}, 1, KeyString::Version{0}, Ordering::allAscending()};
+    GenericIndexScanStageParams params{makeE<EVariable>(generateSlotId()),
+                                       {},
+                                       1,
+                                       key_string::Version{0},
+                                       Ordering::allAscending()};
     auto stage = makeS<GenericIndexScanStage>(collUuid,
                                               StringData(),
                                               std::move(params),

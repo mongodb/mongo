@@ -71,7 +71,7 @@ namespace sbe::value {
 class ValueBuilder;
 }
 
-namespace KeyString {
+namespace key_string {
 
 enum class Version : uint8_t { V0 = 0, V1 = 1, kLatestVersion = V1 };
 
@@ -193,7 +193,7 @@ public:
     }
 
     //
-    // Everything below is only for use by KeyString::Builder.
+    // Everything below is only for use by key_string::Builder.
     //
 
     // Note: No space is used if all bits are 0 so the most common cases should be 0x0.
@@ -372,7 +372,7 @@ private:
 
 
 /**
- * Value owns a buffer that corresponds to a completely generated KeyString::Builder with the
+ * Value owns a buffer that corresponds to a completely generated key_string::Builder with the
  * TypeBits appended.
  *
  * To optimize copy performance and space requirements of this structure, the buffer will contain
@@ -401,7 +401,7 @@ public:
     }
 
     /**
-     * Compare with another KeyString::Value or Builder.
+     * Compare with another key_string::Value or Builder.
      */
     template <class T>
     int compare(const T& other) const;
@@ -409,7 +409,7 @@ public:
     int compareWithTypeBits(const Value& other) const;
 
     /**
-     * Compare with another KeyString::Value or Builder, ignoring the RecordId part of both.
+     * Compare with another key_string::Value or Builder, ignoring the RecordId part of both.
      */
     template <class T>
     int compareWithoutRecordIdLong(const T& other) const;
@@ -464,7 +464,7 @@ public:
     void serializeWithoutRecordIdStr(BufBuilder& buf) const;
 
     // Deserialize the Value from a serialized format.
-    static Value deserialize(BufReader& buf, KeyString::Version version) {
+    static Value deserialize(BufReader& buf, key_string::Version version) {
         const int32_t sizeOfKeystring = buf.read<LittleEndian<int32_t>>();
         const void* keystringPtr = buf.skip(sizeOfKeystring);
 
@@ -503,7 +503,7 @@ public:
     // aggregate and free unused memory periodically.
     int memUsageForSorter() const {
         invariant(!_buffer.isShared(),
-                  "Cannot obtain memory usage from shared buffer on KeyString::Value");
+                  "Cannot obtain memory usage from shared buffer on key_string::Value");
         return sizeof(Value) + _buffer.underlyingCapacity();
     }
 
@@ -702,13 +702,13 @@ public:
     }
 
     /**
-     * Compare with another KeyString::Value or Builder.
+     * Compare with another key_string::Value or Builder.
      */
     template <class T>
     int compare(const T& other) const;
 
     /**
-     * Compare with another KeyString::Value or Builder, ignoring the RecordId part of both.
+     * Compare with another key_string::Value or Builder, ignoring the RecordId part of both.
      */
     template <class T>
     int compareWithoutRecordIdLong(const T& other) const;
@@ -1105,18 +1105,18 @@ void appendSingleFieldToBSONAs(const char* buf,
                                int len,
                                StringData fieldName,
                                BSONObjBuilder* builder,
-                               Version version = KeyString::Version::kLatestVersion);
+                               Version version = key_string::Version::kLatestVersion);
 
 template <class BufferT>
 template <class T>
 int BuilderBase<BufferT>::compare(const T& other) const {
-    return KeyString::compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
+    return key_string::compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
 }
 
 template <class BufferT>
 template <class T>
 int BuilderBase<BufferT>::compareWithoutRecordIdLong(const T& other) const {
-    return KeyString::compare(
+    return key_string::compare(
         getBuffer(),
         other.getBuffer(),
         !isEmpty() ? sizeWithoutRecordIdLongAtEnd(getBuffer(), getSize()) : 0,
@@ -1126,7 +1126,7 @@ int BuilderBase<BufferT>::compareWithoutRecordIdLong(const T& other) const {
 template <class BufferT>
 template <class T>
 int BuilderBase<BufferT>::compareWithoutRecordIdStr(const T& other) const {
-    return KeyString::compare(
+    return key_string::compare(
         getBuffer(),
         other.getBuffer(),
         !isEmpty() ? sizeWithoutRecordIdStrAtEnd(getBuffer(), getSize()) : 0,
@@ -1135,12 +1135,12 @@ int BuilderBase<BufferT>::compareWithoutRecordIdStr(const T& other) const {
 
 template <class T>
 int Value::compare(const T& other) const {
-    return KeyString::compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
+    return key_string::compare(getBuffer(), other.getBuffer(), getSize(), other.getSize());
 }
 
 template <class T>
 int Value::compareWithoutRecordIdLong(const T& other) const {
-    return KeyString::compare(
+    return key_string::compare(
         getBuffer(),
         other.getBuffer(),
         !isEmpty() ? sizeWithoutRecordIdLongAtEnd(getBuffer(), getSize()) : 0,
@@ -1149,7 +1149,7 @@ int Value::compareWithoutRecordIdLong(const T& other) const {
 
 template <class T>
 int Value::compareWithoutRecordIdStr(const T& other) const {
-    return KeyString::compare(
+    return key_string::compare(
         getBuffer(),
         other.getBuffer(),
         !isEmpty() ? sizeWithoutRecordIdStrAtEnd(getBuffer(), getSize()) : 0,
@@ -1185,8 +1185,8 @@ std::string explain(const char* buffer,
                     const TypeBits& typeBits,
                     boost::optional<KeyFormat> keyFormat);
 
-}  // namespace KeyString
+}  // namespace key_string
 
-using KeyStringSet = boost::container::flat_set<KeyString::Value>;
+using KeyStringSet = boost::container::flat_set<key_string::Value>;
 
 }  // namespace mongo
