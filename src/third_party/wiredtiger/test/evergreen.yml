@@ -307,7 +307,7 @@ functions:
               -e 's|gcp_client_x509_cert_url|${gcp_sdk_ext_client_x509_cert_url}|'  ../test/evergreen/gcp_auth.json > $file
           export GOOGLE_APPLICATION_CREDENTIALS="$file"
 
-          virtualenv -p python3 venv
+          PATH=/opt/mongodbtoolchain/v4/bin:$PATH virtualenv -p python3 venv
           source venv/bin/activate
           pip3 install boto3
           pip3 install azure-storage-blob
@@ -649,20 +649,20 @@ functions:
           rm -rf RUNDIR_1 RUNDIR_2 RUNDIR_3
 
           first_run_args="-c $config runs.timer=$runtime"
-          ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1
-          stable_hex=$(../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
+          ${test_env_vars|} ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1
+          stable_hex=$(${test_env_vars|} ../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
           ops=$(echo $((0x$stable_hex)))
 
           # Do the second run up to the stable timestamp, using the same data seed,
           # but with a different extra seed.  Compare it when done.
           common_args="-c RUNDIR_1/CONFIG runs.timer=0 runs.ops=$ops"
-          ./t -h RUNDIR_2 $common_args random.extra_seed=$x2 || fail RUNDIR_2/CONFIG 2>&1
-          ../../../tools/wt_cmp_dir RUNDIR_1 RUNDIR_2 || fail RUNDIR_1/CONFIG RUNDIR_2/CONFIG 2>&1
+          ${test_env_vars|} ./t -h RUNDIR_2 $common_args random.extra_seed=$x2 || fail RUNDIR_2/CONFIG 2>&1
+          ${test_env_vars|} ../../../tools/wt_cmp_dir RUNDIR_1 RUNDIR_2 || fail RUNDIR_1/CONFIG RUNDIR_2/CONFIG 2>&1
 
           # Do the third run up to the stable timestamp, using the same data seed,
           # but with a different extra seed.  Compare it to the second run when done.
-          ./t -h RUNDIR_3 $common_args random.extra_seed=$x3 || fail RUNDIR_3/CONFIG 2>&1
-          ../../../tools/wt_cmp_dir RUNDIR_2 RUNDIR_3 || fail RUNDIR_2/CONFIG RUNDIR_3/CONFIG 2>&1
+          ${test_env_vars|} ./t -h RUNDIR_3 $common_args random.extra_seed=$x3 || fail RUNDIR_3/CONFIG 2>&1
+          ${test_env_vars|} ../../../tools/wt_cmp_dir RUNDIR_2 RUNDIR_3 || fail RUNDIR_2/CONFIG RUNDIR_3/CONFIG 2>&1
         done
   "format test script":
     command: shell.exec
@@ -775,11 +775,11 @@ functions:
 
         rm -rf RUNDIR_0
         # The first run is for calibration only.  We just want to run for the designated
-        # time and get an approriate stop timestamp that can be used in later runs.
+        # time and get an appropriate stop timestamp that can be used in later runs.
         calibration_run_args="-PSD$r,E$x0 -T $nthreads -t $runtime"
         ./test_schema_abort -p -h RUNDIR_0 $first_run_args || exit 1
         echo "Finished calibration run"
-        stable_hex=$($toolsdir/wt_timestamps RUNDIR_0/WT_HOME | sed -e '/stable=/!d' -e 's/.*=//')
+        stable_hex=$(${test_env_vars|} $toolsdir/wt_timestamps RUNDIR_0/WT_HOME | sed -e '/stable=/!d' -e 's/.*=//')
         op_count=$(echo $((0x$stable_hex)))
 
         for i in $(seq ${times}); do
@@ -804,7 +804,7 @@ functions:
           # We are ignoring the table:wt table. This table does not participate in
           # predictable replay, as it may be concurrently created, opened (regular or bulk cursor),
           # verified, upgraded and dropped by multiple threads in test_schema_abort.
-          $toolsdir/wt_cmp_dir -i '^table:wt$' RUNDIR_1/WT_HOME RUNDIR_2/WT_HOME || exit 1
+          ${test_env_vars|} $toolsdir/wt_cmp_dir -i '^table:wt$' RUNDIR_1/WT_HOME RUNDIR_2/WT_HOME || exit 1
         done
   "upload artifact":
     - command: archive.targz_pack
@@ -930,7 +930,7 @@ functions:
         calibration_run_args="-PSD$r,E$x0"
         ${test_env_vars|} ./test_checkpoint -h RUNDIR_0 $base_args ${checkpoint_args} $calibration_run_args || exit 1
         echo "Finished calibration run"
-        stable_hex=$($toolsdir/wt_timestamps RUNDIR_0 | sed -e '/stable=/!d' -e 's/.*=//')
+        stable_hex=$(${test_env_vars|} $toolsdir/wt_timestamps RUNDIR_0 | sed -e '/stable=/!d' -e 's/.*=//')
         stop_ts=$(echo $((0x$stable_hex)))
         for i in $(seq ${times}); do
           echo Iteration $i/${times}
@@ -946,7 +946,7 @@ functions:
           echo "Second run with args $base_args ${checkpoint_args} $second_run_args"
           ${test_env_vars|} ./test_checkpoint -h RUNDIR_2 $base_args ${checkpoint_args} $second_run_args || exit 1
           # Compare the runs.
-          $toolsdir/wt_cmp_dir RUNDIR_1 RUNDIR_2 || exit 1
+          ${test_env_vars|} $toolsdir/wt_cmp_dir RUNDIR_1 RUNDIR_2 || exit 1
         done
 
   "checkpoint stress test":
@@ -3440,8 +3440,7 @@ tasks:
       - func: "code coverage publish summary"
 
   - name: s3-tiered-storage-extensions-test
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # tags: ["python"]
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3460,8 +3459,7 @@ tasks:
           python_binary: $(pwd)/venv/bin/python3
           tiered_storage_test_name: tiered
   - name: s3-tiered-test-small
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # tags: ["pull_request", "python"]
+    tags: ["pull_request", "python"]
     commands:
       - func: "get project"
       - func: "compile wiredtiger"
@@ -3494,8 +3492,7 @@ tasks:
             # Run S3 extension unit testing.
             ext/storage_sources/s3_store/test/run_s3_unit_tests
   - name: azure-gcp-tiered-storage-extensions-test
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # tags: ["python"]
+    tags: ["python"]
     commands:
       - func: "get project"
       - func: "install gcp dependencies"
@@ -3546,8 +3543,7 @@ tasks:
             ext/storage_sources/azure_store/test/run_azure_unit_tests
 
   - name: azure-gcp-tiered-test-small
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # tags: ["pull_request", "python"]
+    tags: ["pull_request", "python"]
     commands:
       - func: "get project"
       - func: "install gcp dependencies"
@@ -5518,6 +5514,8 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    configure_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
@@ -5559,9 +5557,8 @@ buildvariants:
     - name: format-failure-configs-test
     - name: ".data-validation-stress-test"
     - name: unittest-test
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # - name: s3-tiered-storage-extensions-test
-    # - name: azure-gcp-tiered-storage-extensions-test
+    - name: s3-tiered-storage-extensions-test
+    - name: azure-gcp-tiered-storage-extensions-test
     - name: bench-tiered-push-pull
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
@@ -5701,6 +5698,8 @@ buildvariants:
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    configure_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
@@ -5725,13 +5724,11 @@ buildvariants:
     - name: ".stress-test-4-nonstandalone"
     - name: ".stress-test-no-barrier-nonstandalone"
     - name: format-abort-recovery-stress-test-nonstandalone
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # - name: format-predictable-test
+    - name: format-predictable-test
     # FIXME-WT-10822
     # - name: format-tiered-test
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # - name: schema-abort-predictable-test
-    # - name: checkpoint-filetypes-predictable-test
+    - name: schema-abort-predictable-test
+    - name: checkpoint-filetypes-predictable-test
 
 
 # When running the Python tests on this variant tcmalloc must be preloaded otherwise the wiredtiger library
@@ -6057,8 +6054,7 @@ buildvariants:
     - name: long-test
     - name: configure-combinations
     - name: format-smoke-test
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # - name: s3-tiered-storage-extensions-test
+    - name: s3-tiered-storage-extensions-test
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
@@ -6103,8 +6099,7 @@ buildvariants:
     - name: ftruncate-test
     - name: long-test
     - name: format-smoke-test
-    # FIXME-WT-11226 - re-enable when tests can handle Python 3.9.5 on the platforms
-    # - name: s3-tiered-storage-extensions-test
+    - name: s3-tiered-storage-extensions-test
     - name: compile-nonstandalone
     - name: make-check-nonstandalone
     - name: unit-test-nonstandalone
