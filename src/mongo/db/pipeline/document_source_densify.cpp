@@ -29,17 +29,17 @@
 
 #include "mongo/db/pipeline/document_source_densify.h"
 
-#include <algorithm>
-#include <iterator>
-#include <memory>
-
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/basic_types.h"

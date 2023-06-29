@@ -494,7 +494,7 @@ env.Library(
     target="signal_handlers",
     source=[
         "signal_handlers.cpp",
-        "signal_win32.cpp",
+        "signal_win32.cpp" if env.TargetOSIs('windows') else [],
     ],
     LIBDEPS=[
         "$BUILD_DIR/mongo/db/log_process_details",

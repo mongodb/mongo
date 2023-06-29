@@ -29,9 +29,23 @@
 
 #include "mongo/transport/service_executor_synchronous.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <deque>
+#include <mutex>
+#include <string>
+#include <utility>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/logv2/log.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_executor_utils.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/out_of_line_executor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

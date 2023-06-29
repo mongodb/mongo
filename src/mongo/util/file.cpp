@@ -30,24 +30,29 @@
 
 #include "mongo/util/file.h"
 
-#include <boost/filesystem/operations.hpp>
 #include <cstdint>
-#include <iostream>
 #include <string>
+#include <system_error>
 
 #ifndef _WIN32
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/statvfs.h>
-#include <sys/types.h>
 #endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
-#include "mongo/platform/basic.h"
-#include "mongo/util/allocator.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 

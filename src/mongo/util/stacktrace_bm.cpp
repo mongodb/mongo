@@ -28,28 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <array>
+#include <benchmark/benchmark.h>
+#include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <iostream>
-#include <limits>
-#include <random>
-#include <sstream>
-#include <string>
-#include <vector>
 
-#include <benchmark/benchmark.h>
+// IWYU pragma: no_include "libunwind-x86_64.h"
 
-#include "mongo/base/string_data.h"
-#include "mongo/config.h"
-#include "mongo/util/decimal_counter.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/platform/compiler.h"
 #include "mongo/util/stacktrace.h"
 
 #if defined(MONGO_CONFIG_USE_LIBUNWIND)
 #define UNW_LOCAL_ONLY
-#include <libunwind.h>
+#include <libunwind.h>  // IWYU pragma: keep
 #endif
 
 

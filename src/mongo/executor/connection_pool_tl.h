@@ -29,16 +29,30 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
 #include <memory>
+#include <string>
+#include <utility>
 
 #include "mongo/client/async_client.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/connection_metrics.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/network_interface.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_set.h"
 #include "mongo/transport/ssl_connection_context.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 namespace executor {

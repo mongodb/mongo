@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 
 #include "mongo/base/status_with.h"

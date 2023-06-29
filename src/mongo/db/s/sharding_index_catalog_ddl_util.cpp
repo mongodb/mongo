@@ -29,13 +29,12 @@
 
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 
-#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-#include <boost/optional/optional.hpp>
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

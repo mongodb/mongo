@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <functional>
 #include <memory>
 #include <string>
-
-#include <boost/optional.hpp>
+#include <utility>
 
 #include "mongo/bson/bsonobj.h"
 #include "mongo/util/tick_source.h"

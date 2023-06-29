@@ -29,9 +29,9 @@
 
 #pragma once
 
-#include "mongo/unittest/unittest.h"
-
 #include "mongo/platform/source_location.h"
+
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
 inline bool operator==(const SourceLocationHolder& lhs, const SourceLocationHolder& rhs) {

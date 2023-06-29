@@ -28,9 +28,15 @@
  */
 
 
+#include <cstdint>
+#include <string>
 #include <type_traits>
+#include <utility>
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 

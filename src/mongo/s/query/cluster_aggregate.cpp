@@ -28,64 +28,77 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/query/cluster_aggregate.h"
+#include <boost/optional/optional.hpp>
 
-#include <boost/intrusive_ptr.hpp>
-
-#include "mongo/db/api_parameters.h"
-#include "mongo/db/auth/authorization_session.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/pipeline/document_source_change_stream.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/pipeline/document_source_internal_unpack_bucket.h"
-#include "mongo/db/pipeline/document_source_out.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
 #include "mongo/db/pipeline/pipeline.h"
 #include "mongo/db/pipeline/process_interface/mongos_process_interface.h"
 #include "mongo/db/pipeline/sharded_agg_helpers.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/explain_common.h"
-#include "mongo/db/query/find_common.h"
-#include "mongo/db/query/fle/server_rewrite.h"
+#include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/query_stats.h"
 #include "mongo/db/query/query_stats_aggregate_key_generator.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_options.h"
 #include "mongo/db/views/resolved_view.h"
-#include "mongo/db/views/view.h"
-#include "mongo/db/write_concern_options.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/logv2/log.h"
-#include "mongo/rpc/get_status_from_command_result.h"
-#include "mongo/rpc/op_msg_rpc_impls.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
-#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/multi_statement_transaction_requests_sender.h"
+#include "mongo/s/query/cluster_aggregate.h"
 #include "mongo/s/query/cluster_aggregation_planner.h"
-#include "mongo/s/query/cluster_client_cursor_impl.h"
-#include "mongo/s/query/cluster_client_cursor_params.h"
-#include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/s/query/cluster_query_knobs_gen.h"
-#include "mongo/s/query/document_source_merge_cursors.h"
-#include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/query/owned_remote_cursor.h"
-#include "mongo/s/query/router_stage_pipeline.h"
-#include "mongo/s/query/store_possible_cursor.h"
-#include "mongo/s/stale_exception.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
 #include "mongo/util/net/socket_utils.h"
+#include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

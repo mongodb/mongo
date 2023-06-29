@@ -27,11 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/logv2/log_component_settings.h"
-
 #include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
 
 namespace mongo::logv2 {
 

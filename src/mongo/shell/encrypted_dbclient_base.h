@@ -27,22 +27,56 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <js/CallArgs.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
+#include <vector>
 
 #include "mongo/base/data_cursor.h"
+#include "mongo/base/data_range.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/secure_allocator.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/config.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/encryption_fields_gen.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
+#include "mongo/crypto/fle_data_frames.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
+#include "mongo/crypto/symmetric_key.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/platform/basic.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/rpc/unique_message.h"
 #include "mongo/scripting/mozjs/bindata.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/maxkey.h"
@@ -55,6 +89,9 @@
 #include "mongo/shell/kms_gen.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/util/lru_cache.h"
+#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

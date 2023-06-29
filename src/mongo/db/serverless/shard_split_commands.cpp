@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <vector>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -46,6 +45,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/namespace_string.h"

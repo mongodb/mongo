@@ -29,14 +29,13 @@
 
 #include "mongo/db/storage/kv/kv_engine_test_harness.h"
 
-#include <string>
-#include <utility>
-#include <vector>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -53,7 +52,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"

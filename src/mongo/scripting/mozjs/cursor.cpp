@@ -27,18 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <js/CallArgs.h>
 #include <js/Object.h>
+#include <js/RootingAPI.h>
 
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/scripting/mozjs/cursor.h"
-
-#include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
 
 namespace mongo {
 namespace mozjs {

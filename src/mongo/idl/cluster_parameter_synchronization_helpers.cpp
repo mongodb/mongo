@@ -29,11 +29,23 @@
 
 #include "mongo/idl/cluster_parameter_synchronization_helpers.h"
 
+#include <map>
+#include <set>
+#include <string>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/db/audit.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

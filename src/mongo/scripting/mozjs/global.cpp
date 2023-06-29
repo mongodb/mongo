@@ -28,20 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/global.h"
-
+#include <cstddef>
+#include <cstdint>
+#include <js/CallArgs.h>
 #include <js/Conversions.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <ostream>
 
-#include "mongo/base/init.h"
+#include <js/PropertySpec.h>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_options.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/scripting/engine.h"
+#include "mongo/scripting/mozjs/global.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

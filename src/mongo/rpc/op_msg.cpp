@@ -28,24 +28,38 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/rpc/op_msg.h"
-
 #include <bitset>
+#include <boost/cstdint.hpp>
+#include <fmt/format.h>
+#include <memory>
 #include <set>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/data_type_endian.h"
-#include "mongo/config.h"
-#include "mongo/db/auth/security_token_gen.h"
+#include "mongo/base/data_type_validated.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/bson/dotted_path_support.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
+#include "mongo/rpc/op_msg.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/debug_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/str.h"
 
 #ifdef MONGO_CONFIG_WIREDTIGER_ENABLED
 #include <wiredtiger.h>

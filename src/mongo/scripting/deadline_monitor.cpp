@@ -27,9 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/scripting/deadline_monitor.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/scripting/deadline_monitor_gen.h"
 
 

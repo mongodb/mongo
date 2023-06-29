@@ -27,41 +27,81 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/shell/encrypted_dbclient_base.h"
-
+#include <absl/container/node_hash_map.h>
+#include <algorithm>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
+#include <js/Class.h>
 #include <js/Object.h>
 #include <js/ValueArray.h>
+#include <jsapi.h>
+#include <limits>
+#include <list>
+#include <new>
+#include <stack>
 
-#include "mongo/base/data_cursor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <js/CallArgs.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
+
+#include "mongo/base/data_range_cursor.h"
 #include "mongo/base/data_type_validated.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bson_depth.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/client/dbclient_base.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/crypto/aead_encryption.h"
 #include "mongo/crypto/fle_crypto.h"
 #include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/crypto/symmetric_crypto.h"
-#include "mongo/db/client.h"
-#include "mongo/db/commands.h"
 #include "mongo/db/matcher/schema/encrypt_schema_gen.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/rpc/object_check.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/object_check.h"  // IWYU pragma: keep
 #include "mongo/rpc/op_msg_rpc_impls.h"
+#include "mongo/rpc/reply_interface.h"
 #include "mongo/scripting/mozjs/bindata.h"
+#include "mongo/scripting/mozjs/code.h"
+#include "mongo/scripting/mozjs/db.h"
+#include "mongo/scripting/mozjs/dbcollection.h"
+#include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/maxkey.h"
 #include "mongo/scripting/mozjs/minkey.h"
 #include "mongo/scripting/mozjs/mongo.h"
+#include "mongo/scripting/mozjs/numberdecimal.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/shell/encrypted_dbclient_base.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/shell/shell_options.h"
+#include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/base64.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

@@ -27,7 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstring>
+#include <string>
 
 #include "mongo/base/string_data.h"
 #include "mongo/client/mongo_uri.h"

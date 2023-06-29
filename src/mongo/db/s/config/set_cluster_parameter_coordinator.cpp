@@ -31,13 +31,12 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <tuple>
 #include <utility>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -57,7 +56,6 @@
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"

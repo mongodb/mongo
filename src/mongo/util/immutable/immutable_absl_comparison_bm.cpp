@@ -28,6 +28,11 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstdint>
+#include <type_traits>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/immutable/unordered_map.h"

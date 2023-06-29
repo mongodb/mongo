@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/preprocessor/facilities/overload.hpp>
 #include <cstdlib>
+#include <exception>
+#include <fmt/format.h>
+#include <iterator>
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <typeinfo>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/source_location.h"
 #include "mongo/util/assert_util_core.h"  // IWYU pragma: export

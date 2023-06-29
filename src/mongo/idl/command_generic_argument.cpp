@@ -27,8 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/string_data.h"
 #include "mongo/idl/generic_argument_gen.h"
 
 namespace mongo {

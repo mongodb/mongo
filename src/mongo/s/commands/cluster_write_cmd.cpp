@@ -30,33 +30,65 @@
 
 #include "mongo/s/commands/cluster_write_cmd.h"
 
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/error_codes.h"
-#include "mongo/client/remote_command_targeter.h"
-#include "mongo/db/catalog/document_validation.h"
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/fle_crud.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
 #include "mongo/db/pipeline/lite_parsed_pipeline.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/storage/duplicate_key_error_info.h"
+#include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/write_concern_error_detail.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
-#include "mongo/s/client/shard_registry.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/commands/cluster_explain.h"
 #include "mongo/s/commands/document_shard_key_update_util.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

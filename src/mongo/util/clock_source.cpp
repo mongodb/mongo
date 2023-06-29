@@ -28,9 +28,13 @@
  */
 
 #include "mongo/util/clock_source.h"
-#include "mongo/platform/basic.h"
-#include "mongo/platform/mutex.h"
-#include "mongo/stdx/thread.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <memory>
+#include <mutex>
+#include <utility>
+
 #include "mongo/util/system_clock_source.h"
 #include "mongo/util/waitable.h"
 

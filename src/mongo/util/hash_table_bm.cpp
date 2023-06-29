@@ -27,18 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/string_map.h"
-
 #include <absl/container/flat_hash_map.h>
 #include <absl/container/node_hash_map.h>
 #include <absl/strings/string_view.h>
 #include <algorithm>
 #include <benchmark/benchmark.h>
+#include <cstdint>
+#include <cstdio>
+#include <map>
 #include <memory>
 #include <random>
+#include <string>
+#include <type_traits>
 #include <unordered_map>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
 
 
 namespace mongo {

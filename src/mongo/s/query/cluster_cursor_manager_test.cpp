@@ -27,16 +27,38 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_set.h>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <fmt/format.h>
+#include <iterator>
+#include <list>
+#include <type_traits>
 #include <vector>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
 #include "mongo/s/query/cluster_client_cursor_mock.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/s/query/cluster_query_result.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {

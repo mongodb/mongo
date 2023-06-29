@@ -30,14 +30,17 @@
 #include "mongo/platform/decimal128.h"
 
 #include <array>
+#include <cfloat>
 #include <cmath>
 #include <fmt/format.h>
+#include <limits>
 #include <memory>
 #include <string>
-#include <utility>
 
-#include "mongo/config.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

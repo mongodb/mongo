@@ -30,26 +30,34 @@
 
 #include "mongo/rpc/rewrite_state_change_errors.h"
 
-#include "mongo/platform/basic.h"
-
 #include <array>
-#include <string>
-
-#include <boost/optional.hpp>
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <fmt/format.h>
+#include <iterator>
+#include <string>
+#include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/mutable/document.h"
 #include "mongo/bson/mutable/element.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
-#include "mongo/rpc/message.h"
-#include "mongo/rpc/op_msg.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/rewrite_state_change_errors_server_parameter_gen.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/static_immortal.h"
 

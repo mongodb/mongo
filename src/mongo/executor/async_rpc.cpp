@@ -28,10 +28,22 @@
  */
 
 #include "mongo/executor/async_rpc.h"
+
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/error_codes.h"
 #include "mongo/executor/remote_command_request.h"
+#include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
 
 namespace mongo::async_rpc {

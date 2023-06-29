@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <cstddef>
 #include <vector>
 
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
 #include "mongo/db/cursor_id.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/explain_options.h"
 #include "mongo/db/query/getmore_command_gen.h"

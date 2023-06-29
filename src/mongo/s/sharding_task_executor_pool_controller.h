@@ -30,13 +30,27 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/replica_set_change_notifier.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 

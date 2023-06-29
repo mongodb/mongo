@@ -29,12 +29,27 @@
 
 #pragma once
 
+#include <memory>
+#include <variant>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/error_extra_info.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/idl/generic_args_with_types_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/stdx/variant.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 using executor::RemoteCommandOnAnyResponse;

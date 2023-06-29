@@ -27,38 +27,47 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/signal_handlers_synchronous.h"
 
 #include <boost/exception/diagnostic_information.hpp>
 #include <boost/exception/exception.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cerrno>
 #include <csignal>
+#include <cstring>
 #include <exception>
 #include <fmt/format.h>
 #include <iostream>
-#include <memory>
+#include <mutex>
+#include <new>
 #include <streambuf>
+#include <string>
 #include <typeinfo>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+
+#ifdef __linux__
+#include <ucontext.h>
+#endif
+
+#ifdef _WIN32
+#include "mongo/util/exception_filter_win32.h"
+#endif
 
 #include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_detail.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/stdx/exception.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/thread_name.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
-#include "mongo/util/dynamic_catch.h"
-#include "mongo/util/exception_filter_win32.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/signal_handlers.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/static_immortal.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 
@@ -91,9 +100,9 @@ int sehExceptionFilter(unsigned int code, struct _EXCEPTION_POINTERS* excPointer
 // Bit 29:     1 = Client bit, i.e. a user-defined code
 #define STATUS_EXIT_ABRUPT 0xE0000001
 
-// Historically we relied on raising SEH exception and letting the unhandled exception handler then
-// handle it to that we can dump the process. This works in all but one case.
-// The C++ terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
+// Historically we relied on raising SEH exception and letting the unhandled exception handler
+// then handle it to that we can dump the process. This works in all but one case. The C++
+// terminate handler runs the terminate handler in a SEH __try/__catch. Therefore, any SEH
 // exceptions we raise become handled. Now, we setup our own SEH handler to quick catch the SEH
 // exception and take the dump bypassing the unhandled exception handler.
 //
@@ -110,8 +119,9 @@ void endProcessWithSignal(int signalNum) {
 #else
 
 void endProcessWithSignal(int signalNum) {
-    // This works by restoring the system-default handler for the given signal and re-raising it, in
-    // order to get the system default termination behavior (i.e., dumping core, or just exiting).
+    // This works by restoring the system-default handler for the given signal and re-raising
+    // it, in order to get the system default termination behavior (i.e., dumping core, or just
+    // exiting).
     struct sigaction defaultedSignals;
     memset(&defaultedSignals, 0, sizeof(defaultedSignals));
     defaultedSignals.sa_handler = SIG_DFL;

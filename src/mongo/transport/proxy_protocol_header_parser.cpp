@@ -30,10 +30,15 @@
 
 #include "mongo/transport/proxy_protocol_header_parser.h"
 
-#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <cstring>
-#include <exception>
 #include <fmt/format.h>
+#include <stdexcept>
+#include <string>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #ifndef _WIN32
 #include <netinet/in.h>
@@ -41,8 +46,8 @@
 #endif
 
 #include "mongo/base/parse_number.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/logv2/log.h"
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 

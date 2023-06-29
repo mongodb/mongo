@@ -29,19 +29,20 @@
 
 #include "mongo/db/query/optimizer/partial_schema_requirements.h"
 
+#include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <climits>
-
-#include <absl/container/node_hash_map.h>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <climits>
+#include <type_traits>
 
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep
 #include "mongo/db/query/optimizer/utils/abt_compare.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo::optimizer {
 namespace {

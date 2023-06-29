@@ -38,6 +38,7 @@
 #include <cstdint>
 #include <fmt/format.h>
 #include <limits>
+#include <ostream>
 #include <utility>
 
 #include "mongo/base/error_codes.h"

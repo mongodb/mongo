@@ -31,11 +31,21 @@
 #include <cstdlib>
 #include <ctime>
 #include <fmt/format.h>
+#include <memory>
+#include <ostream>
 #include <string>
+#include <system_error>
+#include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

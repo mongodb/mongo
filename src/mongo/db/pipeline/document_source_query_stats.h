@@ -55,7 +55,9 @@
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/db/query/query_stats.h"
 #include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 #include "mongo/db/query/serialization_options.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 #include "mongo/util/producer_consumer_queue.h"
 

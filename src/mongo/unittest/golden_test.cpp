@@ -28,21 +28,20 @@
  */
 
 
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/iostreams/stream_buffer.hpp>
-#include <boost/program_options.hpp>
+#include <cstdlib>
 #include <fmt/format.h>
-#include <fmt/ostream.h>
-#include <yaml-cpp/yaml.h>
+#include <iostream>
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/path_traits.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/golden_test.h"
-#include "mongo/util/ctype.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

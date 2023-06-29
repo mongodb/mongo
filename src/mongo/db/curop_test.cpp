@@ -27,11 +27,11 @@
  *    it in the license file.
  */
 
-#include <mutex>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <initializer_list>
+#include <mutex>
 
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"

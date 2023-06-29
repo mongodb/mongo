@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "cxxabi.h"
+
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/unittest/barrier.h"
-
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

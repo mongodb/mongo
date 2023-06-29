@@ -32,22 +32,23 @@
 #include <absl/container/node_hash_map.h>
 #include <algorithm>
 #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <mutex>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/cancelable_operation_context.h"
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/commit_quorum_options.h"
+#include "mongo/db/catalog/index_catalog.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/exception_util.h"
@@ -57,7 +58,6 @@
 #include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/ops/delete.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"

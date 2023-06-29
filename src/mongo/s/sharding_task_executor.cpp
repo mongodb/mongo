@@ -28,21 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/sharding_task_executor.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
-#include "mongo/bson/timestamp.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_time_tracker.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/thread_pool_task_executor.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/s/transaction_router.h"
+#include "mongo/s/sharding_task_executor.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT mongo::logv2::LogComponent::kSharding

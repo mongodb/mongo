@@ -33,6 +33,8 @@
 #include <algorithm>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
@@ -41,9 +43,6 @@
 #include <mutex>
 #include <tuple>
 #include <vector>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bson_field.h"
@@ -83,9 +82,7 @@
 #include "mongo/db/repl/optime_with.h"
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/repl_client_info.h"
-#include "mongo/db/repl/repl_set_config.h"
 #include "mongo/db/repl/replication_coordinator.h"
-#include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/config/index_on_config.h"
 #include "mongo/db/s/config/placement_history_cleaner.h"
@@ -133,7 +130,6 @@
 #include "mongo/util/namespace_string_util.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
-#include "mongo/util/str.h"
 #include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

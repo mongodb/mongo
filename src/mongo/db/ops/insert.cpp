@@ -29,13 +29,12 @@
 
 #include "mongo/db/ops/insert.h"
 
+#include <boost/move/utility_core.hpp>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -45,7 +44,6 @@
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/db/catalog/document_validation.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"

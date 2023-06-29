@@ -27,9 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <cstdio>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"

@@ -29,13 +29,34 @@
 
 #include "mongo/s/config_server_catalog_cache_loader.h"
 
+#include <boost/smart_ptr.hpp>
+#include <mutex>
+#include <string>
+#include <tuple>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
 #include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/repl/replication_coordinator.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
-#include "mongo/logv2/log.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -28,22 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/cstdint.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <mutex>
+#include <string>
 
-#include "mongo/s/query/async_results_merger.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/client/remote_command_targeter.h"
 #include "mongo/db/pipeline/change_stream_constants.h"
 #include "mongo/db/pipeline/change_stream_invalidation_info.h"
 #include "mongo/db/query/cursor_response.h"
 #include "mongo/db/query/getmore_command_gen.h"
 #include "mongo/db/query/kill_cursors_gen.h"
-#include "mongo/db/query/query_feature_flags_gen.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/remote_command_response.h"
-#include "mongo/s/catalog/type_shard.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/s/query/async_results_merger.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

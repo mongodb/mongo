@@ -31,17 +31,46 @@
  * This file includes integration testing between the MockDBClientBase and MockRemoteDB.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/db/jsobj.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/timer.h"
-
-#include <ctime>
+#include <cstdint>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/mock/mock_dbclient_connection.h"
+#include "mongo/dbtests/mock/mock_remote_db_server.h"
+#include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/socket_exception.h"
+#include "mongo/util/net/ssl_options.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 using std::string;
 using std::vector;

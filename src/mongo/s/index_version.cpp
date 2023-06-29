@@ -28,7 +28,12 @@
  */
 
 #include "mongo/s/index_version.h"
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/index_version_gen.h"
+
 namespace mongo {
 
 CollectionIndexes CollectionIndexes::parse(const BSONElement& element) {

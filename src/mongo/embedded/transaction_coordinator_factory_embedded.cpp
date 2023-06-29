@@ -27,10 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/shim.h"
-#include "mongo/db/s/transaction_coordinator_factory.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/session/logical_session_id.h"
 
 namespace mongo {
 namespace {

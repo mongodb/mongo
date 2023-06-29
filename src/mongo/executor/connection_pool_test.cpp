@@ -27,24 +27,30 @@
  *    it in the license file.
  */
 
-#include "mongo/executor/connection_pool_test_fixture.h"
-
-#include "mongo/util/duration.h"
-#include "mongo/util/net/hostandport.h"
 #include <algorithm>
+#include <array>
+#include <boost/smart_ptr.hpp>
 #include <memory>
 #include <random>
+#include <ratio>
+#include <set>
 #include <stack>
 #include <tuple>
+#include <type_traits>
 
-#include <fmt/format.h>
-#include <fmt/ostream.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/executor/connection_pool.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/stdx/future.h"
+#include "mongo/executor/connection_pool_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/executor_test_util.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

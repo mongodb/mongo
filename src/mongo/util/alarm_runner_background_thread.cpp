@@ -27,9 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <mutex>
 
 #include "mongo/util/alarm_runner_background_thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 
 namespace mongo {
 

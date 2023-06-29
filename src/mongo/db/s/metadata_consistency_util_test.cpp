@@ -34,8 +34,6 @@
 #include <cstddef>
 #include <string>
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

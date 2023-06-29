@@ -28,16 +28,12 @@
  */
 
 #include <algorithm>
-#include <cctype>  // NOLINT
-#include <functional>
-#include <iomanip>
-#include <sstream>
-#include <string>
-#include <vector>
-
 #include <benchmark/benchmark.h>
+#include <cctype>  // NOLINT
+#include <cstddef>
+#include <cstdint>
+#include <string>
 
-#include "mongo/base/simple_string_data_comparator.h"
 #include "mongo/base/string_data.h"
 #include "mongo/util/ctype.h"
 

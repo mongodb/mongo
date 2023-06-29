@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
@@ -39,15 +40,12 @@
 #include <tuple>
 #include <utility>
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bson_field.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsontypes.h"
-#include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/bson_extract.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/client/read_preference.h"
@@ -58,11 +56,8 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/repl/change_stream_oplog_notification.h"
-#include "mongo/db/repl/optime.h"
 #include "mongo/db/repl/read_concern_level.h"
-#include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/forwardable_operation_metadata.h"
 #include "mongo/db/s/sharding_ddl_util.h"
@@ -88,11 +83,9 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/move_primary_gen.h"
 #include "mongo/util/database_name_util.h"
-#include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/future_impl.h"
-#include "mongo/util/future_util.h"
 #include "mongo/util/namespace_string_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

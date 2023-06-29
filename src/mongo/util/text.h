@@ -33,7 +33,7 @@
 #include <vector>
 
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 namespace mongo {
 

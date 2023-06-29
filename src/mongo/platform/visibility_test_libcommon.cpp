@@ -27,11 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
 
 #include "mongo/platform/visibility_test_libcommon.h"
-
-#include <stdexcept>
 
 namespace mongo {
 namespace visibility_test_libcommon {

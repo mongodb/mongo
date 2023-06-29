@@ -28,15 +28,16 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <boost/optional.hpp>
+#include <cstddef>
 #include <fmt/format.h>
+#include <string>
+// IWYU pragma: no_include <ctype.h>
 
-#include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/ctype.h"
-#include "mongo/util/hex.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

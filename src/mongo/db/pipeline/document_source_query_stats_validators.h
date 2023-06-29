@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 #include "mongo/base/status.h"
 #include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 

@@ -29,20 +29,46 @@
 
 #include "mongo/s/query_analysis_sampler.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <future>
+#include <limits>
+#include <memory>
+#include <string>
+#include <system_error>
+#include <utility>
+#include <vector>
+
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/counters.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/refresh_query_analyzer_configuration_cmd_gen.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/stdx/future.h"
+#include "mongo/transport/session.h"
 #include "mongo/transport/transport_layer_mock.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/periodic_runner_factory.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

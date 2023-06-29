@@ -28,14 +28,13 @@
  */
 
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/smart_ptr.hpp>
 #include <memory>
 #include <string>
 #include <tuple>
 #include <utility>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -44,6 +43,7 @@
 #include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/client.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/s/resharding/resharding_util.h"

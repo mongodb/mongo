@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #ifdef _WIN32
 #include <crtdbg.h>
 #include <cstdio>
@@ -37,9 +35,9 @@
 #include <mmsystem.h>
 #endif
 
-#include "mongo/base/init.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/base/init.h"        // IWYU pragma: keep
+#include "mongo/logv2/log.h"        // IWYU pragma: keep
+#include "mongo/util/stacktrace.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

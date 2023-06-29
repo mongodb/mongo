@@ -29,6 +29,19 @@
 
 #include "mongo/db/matcher/expression_geo_serializer.h"
 
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/exec/document_value/value.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+
 namespace mongo {
 namespace {
 void appendLegacyGeoLiteral(BSONObjBuilder* bob, const BSONElement& e, SerializationOptions opts) {

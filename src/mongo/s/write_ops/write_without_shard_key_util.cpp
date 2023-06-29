@@ -29,24 +29,62 @@
 
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <memory>
+#include <string>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/mutable/document.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/field_ref_set.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/canonical_query.h"
 #include "mongo/db/query/collation/collation_index_key.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/timeseries/timeseries_constants.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/storage/storage_parameters_gen.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/db/timeseries/timeseries_update_delete_util.h"
 #include "mongo/db/timeseries/timeseries_write_util.h"
 #include "mongo/db/transaction/transaction_api.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/executor/inline_executor.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/collection_routing_info_targeter.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
 #include "mongo/s/shard_key_pattern_query_util.h"
 #include "mongo/s/transaction_router_resource_yielder.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/out_of_line_executor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

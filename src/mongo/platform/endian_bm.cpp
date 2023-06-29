@@ -28,19 +28,11 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <array>
+#include <benchmark/benchmark.h>
 #include <cstdint>
-#include <limits>
 #include <numeric>
-#include <random>
-#include <string>
 #include <vector>
 
-#include <benchmark/benchmark.h>
-
-#include "mongo/base/string_data.h"
 #include "mongo/platform/endian.h"
 
 namespace mongo {

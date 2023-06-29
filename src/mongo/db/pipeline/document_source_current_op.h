@@ -29,16 +29,15 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {

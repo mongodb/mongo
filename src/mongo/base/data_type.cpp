@@ -31,7 +31,8 @@
 
 #include <fmt/format.h>
 
-#include "mongo/util/str.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 
 namespace mongo {
 

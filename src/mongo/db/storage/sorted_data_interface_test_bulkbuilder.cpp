@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include <boost/move/utility_core.hpp>
+#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"

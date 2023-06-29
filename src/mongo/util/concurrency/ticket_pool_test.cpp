@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include <condition_variable>
-#include <mutex>
+#include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/ticket_pool.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/timer.h"

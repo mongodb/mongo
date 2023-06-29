@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/stdx/exception.h"
-
 #include <cstdlib>
-
+#include <exception>
 #include <iostream>
 
+#include "mongo/stdx/exception.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit_code.h"
 

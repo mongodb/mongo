@@ -28,21 +28,31 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/diagnostic_info.h"
-
-#include <forward_list>
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
-#include <fmt/ostream.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <forward_list>
+#include <mutex>
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/diagnostic_info.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/interruptible.h"

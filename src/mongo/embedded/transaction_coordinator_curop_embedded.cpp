@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
 
 #include "mongo/base/shim.h"
-#include "mongo/db/s/transaction_coordinator_curop.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
 
 namespace mongo {
 namespace {

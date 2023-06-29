@@ -29,21 +29,46 @@
 
 #include "mongo/logv2/file_rotate_sink.h"
 
+#include <absl/container/flat_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
 #include <boost/exception/diagnostic_information.hpp>
+#include <boost/exception/exception.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/make_shared.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <exception>
 #include <fmt/format.h>
-#include <fstream>
+#include <fstream>  // IWYU pragma: keep
+#include <iostream>
+#include <utility>
 
+#include <boost/log/core/record_view.hpp>
+// IWYU pragma: no_include "boost/system/detail/errc.hpp"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/json_formatter.h"
-#include "mongo/logv2/log_detail.h"
-#include "mongo/logv2/shared_access_fstream.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/log_truncation.h"
+#include "mongo/logv2/shared_access_fstream.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/thread_name.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/string_map.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo::logv2 {
 namespace {

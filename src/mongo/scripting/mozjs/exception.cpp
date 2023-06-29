@@ -29,16 +29,23 @@
 
 #include "mongo/scripting/mozjs/exception.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <js/Exception.h>
+#include <js/RootingAPI.h>
 #include <js/friend/ErrorMessages.h>
-#include <jsfriendapi.h>
-#include <limits>
 #include <mongo/scripting/mozjs/mongoErrorReportToString.h>
+#include <utility>
 
-#include "mongo/base/static_assert.h"
+#include <js/ErrorReport.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/scripting/mozjs/error.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/jsstringwrapper.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/status.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

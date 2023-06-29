@@ -28,13 +28,13 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
 
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -42,6 +42,7 @@
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/str.h"
 

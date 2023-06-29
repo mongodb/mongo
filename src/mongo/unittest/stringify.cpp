@@ -27,14 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/matcher_core.h"
-
-#include <cstdlib>
+#include <fmt/format.h>
 #include <string>
 #include <typeinfo>
 
-#include <fmt/format.h>
-
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/stringify.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
 

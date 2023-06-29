@@ -35,7 +35,9 @@
 #include <atomic>
 #endif
 
-#include "mongo/config.h"
+#include <mutex>
+
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 

@@ -28,28 +28,30 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/stacktrace.h"
-
-#include <array>
-#include <boost/optional.hpp>
-#include <climits>
-#include <cstdlib>
-#include <cxxabi.h>
 #include <dlfcn.h>
-#include <iomanip>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <array>
+#include <cerrno>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
 #include <string>
+#include <vector>
+// IWYU pragma: no_include "libunwind-x86_64.h"
 
-#include "mongo/base/init.h"
-#include "mongo/bson/json.h"
-#include "mongo/config.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/util/stacktrace.h"
 #include "mongo/util/stacktrace_somap.h"
-#include "mongo/util/version.h"
 
 #define MONGO_STACKTRACE_BACKEND_NONE 0
 #define MONGO_STACKTRACE_BACKEND_LIBUNWIND 1
@@ -71,7 +73,7 @@
 
 #if MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_LIBUNWIND
 #define UNW_LOCAL_ONLY
-#include <libunwind.h>
+#include <libunwind.h>  // IWYU pragma: keep
 #elif MONGO_STACKTRACE_BACKEND == MONGO_STACKTRACE_BACKEND_EXECINFO
 #include <execinfo.h>
 #endif

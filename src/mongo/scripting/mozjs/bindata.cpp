@@ -27,21 +27,37 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/bindata.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <iomanip>
 #include <js/Object.h>
+#include <js/PropertyDescriptor.h>
+#include <js/RootingAPI.h>
+#include <js/Value.h>
 #include <js/ValueArray.h>
+#include <jsapi.h>
+#include <ostream>
+#include <string>
+#include <utility>
 
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/base/data_range.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/scripting/mozjs/bindata.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"

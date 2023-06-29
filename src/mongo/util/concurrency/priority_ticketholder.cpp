@@ -29,11 +29,17 @@
 
 #include "mongo/util/concurrency/priority_ticketholder.h"
 
-#include <iostream>
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/service_context.h"
-#include "mongo/logv2/log.h"
-#include "mongo/util/str.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

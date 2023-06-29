@@ -29,17 +29,13 @@
 
 #include "mongo/db/pipeline/document_source_query_stats.h"
 
-#include "mongo/bson/bsontypes.h"
-#include "mongo/bson/timestamp.h"
-#include "mongo/idl/idl_parser.h"
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <list>
 
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
-
+#include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
@@ -47,10 +43,12 @@
 #include "mongo/db/catalog/util/partitioned.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/feature_flag.h"
+#include "mongo/db/pipeline/document_source_query_stats_gen.h"
 #include "mongo/db/query/allowed_contexts.h"
 #include "mongo/db/query/lru_key_value.h"
 #include "mongo/db/query/query_feature_flags_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"

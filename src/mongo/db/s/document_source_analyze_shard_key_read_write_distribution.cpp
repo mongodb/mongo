@@ -31,15 +31,14 @@
 
 #include <absl/container/flat_hash_map.h>
 #include <algorithm>
-#include <boost/preprocessor/control/iif.hpp>
-#include <cstddef>
-#include <functional>
-#include <vector>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <functional>
+#include <vector>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -48,6 +47,7 @@
 #include "mongo/client/dbclient_cursor.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/catalog/collection.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/exec/document_value/document.h"
@@ -61,6 +61,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/s/analyze_shard_key_read_write_distribution.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/db/write_concern_options.h"

@@ -28,7 +28,10 @@
  */
 #pragma once
 
+// IWYU pragma: no_include "cxxabi.h"
 #include <cstdint>
+#include <memory>
+#include <mutex>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
@@ -37,6 +40,8 @@
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/concurrency/thread_name.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

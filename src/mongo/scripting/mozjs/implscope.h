@@ -29,12 +29,39 @@
 
 #pragma once
 
+#include <atomic>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <functional>
+#include <js/CompileOptions.h>
+#include <js/Context.h>
+#include <js/GCAPI.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <js/Value.h>
 #include <jsapi.h>
 #include <jsfriendapi.h>
+#include <memory>
 #include <mongo/scripting/mozjs/freeOpToJSContext.h>
+#include <string>
+#include <thread>
+#include <type_traits>
+#include <utility>
+#include <vector>
 #include <vm/PosixNSPR.h>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/platform/decimal128.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/bindata.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/code.h"
@@ -67,7 +94,11 @@
 #include "mongo/scripting/mozjs/status.h"
 #include "mongo/scripting/mozjs/timestamp.h"
 #include "mongo/scripting/mozjs/uri.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/stdx/unordered_set.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

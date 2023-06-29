@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/base/string_data.h"

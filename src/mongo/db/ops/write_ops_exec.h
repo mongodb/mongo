@@ -33,6 +33,7 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <cstddef>
+#include <memory>
 #include <vector>
 
 #include "mongo/base/error_codes.h"
@@ -52,6 +53,8 @@
 #include "mongo/db/repl/oplog.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/stale_exception.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/uuid.h"

@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/stacktrace_somap.h"
-
-#include <climits>
+#include <cstdint>
 #include <cstdlib>
+#include <cstring>
 #include <fmt/format.h>
 #include <string>
+#include <utility>
+
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/stacktrace_somap.h"
 
 #if defined(__linux__)
 #include <elf.h>
@@ -49,12 +54,10 @@
 #include <sys/utsname.h>
 #endif
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/str.h"
 #include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

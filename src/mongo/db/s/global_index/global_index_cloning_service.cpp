@@ -29,15 +29,14 @@
 
 #include "mongo/db/s/global_index/global_index_cloning_service.h"
 
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <mutex>
 #include <string>
 #include <tuple>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
@@ -56,7 +55,6 @@
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/create_indexes_gen.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/optime.h"

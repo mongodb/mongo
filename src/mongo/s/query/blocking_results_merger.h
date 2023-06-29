@@ -29,10 +29,25 @@
 
 #pragma once
 
+#include <cstddef>
+#include <functional>
 #include <memory>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/resource_yielder.h"
+#include "mongo/executor/task_executor.h"
 #include "mongo/s/query/async_results_merger.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/router_exec_stage.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 

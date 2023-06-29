@@ -29,7 +29,11 @@
 
 #include "mongo/db/query/optimizer/cascades/logical_props_derivation.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <absl/meta/type_traits.h>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstddef>
 #include <set>
 #include <string>
@@ -37,12 +41,9 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <absl/meta/type_traits.h>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/containers.h"
 #include "mongo/db/query/optimizer/index_bounds.h"
 #include "mongo/db/query/optimizer/node.h"  // IWYU pragma: keep

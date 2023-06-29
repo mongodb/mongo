@@ -28,10 +28,20 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <functional>
 
-#include "mongo/db/commands.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

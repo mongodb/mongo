@@ -31,9 +31,15 @@
 
 #include "mongo/db/record_id.h"
 
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/record_id_helpers.h"
+#include "mongo/db/storage/key_format.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/debug_util.h"
 
 namespace mongo {

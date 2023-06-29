@@ -28,15 +28,22 @@
  */
 
 #include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <jsapi.h>
+#include <utility>
 
-#include "mongo/platform/basic.h"
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/TypeDecls.h>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/bson.h"
 #include "mongo/scripting/mozjs/dbref.h"
 #include "mongo/scripting/mozjs/implscope.h"
 #include "mongo/scripting/mozjs/internedstring.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
+#include "mongo/scripting/mozjs/wraptype.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {

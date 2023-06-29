@@ -29,6 +29,8 @@
 
 #include "mongo/db/exec/scoped_timer.h"
 
+#include "mongo/platform/compiler.h"
+
 namespace mongo {
 ScopedTimer::ScopedTimer(Nanoseconds* counter, TickSource* ts)
     : _counter(counter), _tickSource(ts), _clockSource(nullptr), _startTS(ts->getTicks()) {}

@@ -31,7 +31,9 @@
 #include <absl/container/node_hash_set.h>
 #include <algorithm>
 #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
 #include <fmt/format.h>
 #include <functional>
@@ -40,9 +42,6 @@
 #include <ostream>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -78,6 +77,7 @@
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/db/storage/recovery_unit.h"

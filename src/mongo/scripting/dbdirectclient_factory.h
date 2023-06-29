@@ -33,6 +33,8 @@
 #include <memory>
 
 #include "mongo/client/dbclient_base.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 
 namespace mongo {
 

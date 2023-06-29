@@ -29,9 +29,18 @@
 
 #pragma once
 
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/thread_pool_mock.h"
+#include "mongo/rpc/metadata.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/unittest.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace executor {

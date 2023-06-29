@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <future>
 #include <memory>
 #include <string>
 #include <system_error>

@@ -29,9 +29,52 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <list>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/json.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/basic_types.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/network_interface_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/query/async_results_merger.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
 #include "mongo/s/sharding_router_test_fixture.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

@@ -30,27 +30,29 @@
 
 #include "mongo/bson/bsonelement.h"
 
-#include <boost/functional/hash.hpp>
-#include <cmath>
+#include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <cmath>
+#include <ostream>
 
 #include "mongo/base/compare_numbers.h"
 #include "mongo/base/data_cursor.h"
 #include "mongo/base/parse_number.h"
-#include "mongo/base/simple_string_data_comparator.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data_comparator_interface.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
 #include "mongo/bson/generator_extended_relaxed_2_0_0.h"
 #include "mongo/bson/generator_legacy_strict.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/strnlen.h"
-#include "mongo/util/base64.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/hex.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/string_map.h"
-#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -27,18 +27,27 @@
  *    it in the license file.
  */
 
-#include <cstdlib>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/secure_allocator.h"
-#include "mongo/base/status_with.h"
-#include "mongo/bson/json.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/aead_encryption.h"
+#include "mongo/crypto/fle_data_frames.h"
 #include "mongo/crypto/symmetric_crypto.h"
 #include "mongo/crypto/symmetric_key.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/util/base64.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

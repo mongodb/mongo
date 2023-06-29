@@ -28,11 +28,10 @@
  */
 
 
-#include <memory>
-#include <string>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -43,7 +42,6 @@
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/feature_flag.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/persistent_task_store.h"
@@ -62,7 +60,6 @@
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/request_types/abort_reshard_collection_gen.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/future.h"

@@ -28,22 +28,59 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/tuple/tuple.hpp>
+#include <functional>
+#include <mutex>
+#include <tuple>
+#include <type_traits>
+#include <vector>
 
-#include "mongo/executor/connection_pool_tl.h"
+#include <boost/move/utility_core.hpp>
 
+#include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/authenticate.h"
-#include "mongo/config.h"
+#include "mongo/client/internal_auth.h"
+#include "mongo/client/sasl_client_session.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/auth/authorization_manager.h"
+#include "mongo/db/auth/user.h"
+#include "mongo/db/auth/user_name.h"
 #include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/executor/connection_pool_tl.h"
 #include "mongo/executor/network_interface_tl_gen.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_types.h"
+#include "mongo/util/read_through_cache.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kASIO
 

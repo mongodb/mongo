@@ -29,11 +29,22 @@
 
 #pragma once
 
-#include "mongo/s/query/router_exec_stage.h"
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <memory>
 
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/exec/document_value/document.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/pipeline.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/document_source_merge_cursors.h"
+#include "mongo/s/query/router_exec_stage.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/intrusive_counter.h"
 
 namespace mongo {
 

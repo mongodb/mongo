@@ -27,29 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/platform/process_id.h"
 
+
+// IWYU pragma: no_include "syscall.h"
+
 #ifndef _WIN32
-#include <pthread.h>
+#include <pthread.h>  // IWYU pragma: keep
 #endif
 
 #if defined(__linux__)
-#include <sys/syscall.h>
-#include <sys/types.h>
+#include <sys/syscall.h>  // IWYU pragma: keep
+#include <sys/types.h>    // IWYU pragma: keep
 #endif
-
 #ifdef __FreeBSD__
 #include <pthread_np.h>
 #endif
 
-#include <iostream>
 #include <limits>
 #include <sstream>  // IWYU pragma: keep
 
 #include "mongo/base/static_assert.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/assert_util.h"  // IWYU pragma: keep
 
 namespace mongo {
 

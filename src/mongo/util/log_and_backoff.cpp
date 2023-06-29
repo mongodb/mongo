@@ -30,7 +30,6 @@
 
 #include "mongo/util/log_and_backoff.h"
 
-#include "mongo/logv2/log.h"
 #include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

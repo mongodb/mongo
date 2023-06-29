@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
-#include "mongo/db/multitenancy_gen.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 

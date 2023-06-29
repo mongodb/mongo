@@ -31,22 +31,21 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
 #include "mongo/db/dbhelpers.h"
 #include "mongo/db/exec/delete_stage.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/explain_options.h"
@@ -73,6 +72,7 @@
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/rpc/reply_interface.h"
 #include "mongo/rpc/unique_message.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"

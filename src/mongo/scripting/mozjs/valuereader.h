@@ -29,10 +29,16 @@
 
 #pragma once
 
+#include <cstdint>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 #include <jsapi.h>
 #include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/platform/decimal128.h"
 
 namespace mongo {
 namespace mozjs {

@@ -29,25 +29,27 @@
 
 
 #include "mongo/platform/decimal128.h"
-#include "mongo/platform/basic.h"
 
 #include <algorithm>
 #include <cmath>
-#include <cstdlib>
 #include <iostream>
-#include <memory>
 #include <string>
-#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
 // The Intel C library typedefs wchar_t, but it is a distinct fundamental type
 // in C++, so we #define _WCHAR_T here to prevent the library from trying to typedef.
 #define _WCHAR_T
 #include <bid_conf.h>
 #include <bid_functions.h>
+
 #undef _WCHAR_T
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/endian.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"

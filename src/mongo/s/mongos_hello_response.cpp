@@ -28,8 +28,8 @@
  */
 
 #include "mongo/s/mongos_hello_response.h"
+
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/util/str.h"
 
 namespace mongo {
 

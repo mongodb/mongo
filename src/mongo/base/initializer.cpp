@@ -27,10 +27,6 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/initializer.h"
-
 #include <fmt/format.h>
 #include <iostream>
 #include <string>
@@ -38,12 +34,16 @@
 #include <vector>
 
 #include "mongo/base/dependency_graph.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

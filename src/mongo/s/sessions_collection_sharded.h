@@ -30,8 +30,10 @@
 #pragma once
 
 #include <memory>
+#include <vector>
 
 #include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/session/sessions_collection.h"
 #include "mongo/util/time_support.h"
 

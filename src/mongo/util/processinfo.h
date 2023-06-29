@@ -29,13 +29,21 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
+#include <new>
 #include <string>
+#include <vector>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/process_id.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/static_immortal.h"
 

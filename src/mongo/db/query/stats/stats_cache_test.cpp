@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 #include <cstddef>
 #include <list>
 #include <string>
-#include <tuple>
 #include <type_traits>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"

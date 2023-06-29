@@ -28,13 +28,11 @@
  */
 
 #include <absl/container/node_hash_map.h>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "boost/container/detail/std_fwd.hpp"
 #include <climits>
 #include <cmath>
-#include <fmt/format.h>
 #include <limits>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"

@@ -29,12 +29,16 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "mongo/base/status.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/server_options.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace mongo {
 

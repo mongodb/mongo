@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/util/sort.h"
-
 #include <array>
-#include <utility>
+#include <cstddef>
+#include <functional>
+#include <iterator>
+
+#include "mongo/util/sort.h"
 
 namespace mongo {
 namespace {

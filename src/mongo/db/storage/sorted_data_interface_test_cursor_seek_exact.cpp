@@ -27,12 +27,12 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include <boost/none.hpp>
+#include <memory>
 
 #include "mongo/base/string_data.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 #include "mongo/unittest/assert.h"

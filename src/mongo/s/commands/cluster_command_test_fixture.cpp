@@ -28,21 +28,44 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <system_error>
+#include <utility>
 
-#include "mongo/s/commands/cluster_command_test_fixture.h"
-
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/db/client.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/keys_collection_client_sharded.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_gen.h"
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/read_write_concern_defaults.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/request_execution_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_cache_noop.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/s/commands/strategy.h"
+#include "mongo/s/grid.h"
+#include "mongo/transport/service_executor.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
 #include "mongo/util/options_parser/startup_option_init.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

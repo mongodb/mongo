@@ -46,6 +46,7 @@
 #include "mongo/db/query/plan_summary_stats.h"
 #include "mongo/db/query/restore_context.h"
 #include "mongo/db/query/stage_types.h"
+#include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"

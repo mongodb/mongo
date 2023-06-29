@@ -37,14 +37,26 @@
 
 #include <algorithm>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstring>
+#include <iterator>
 #include <memory>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
+
+#ifndef _WIN32
+#include <strings.h>
+#endif
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/bits.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {

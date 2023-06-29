@@ -34,8 +34,6 @@
 #include <string>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-
 #include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

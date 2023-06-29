@@ -28,7 +28,11 @@
  */
 
 #include "mongo/unittest/inline_auto_update.h"
-#include "mongo/unittest/unittest.h"
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+
 namespace mongo::unittest {
 namespace {
 TEST(AutoUpdateAssertion, DiffTest) {

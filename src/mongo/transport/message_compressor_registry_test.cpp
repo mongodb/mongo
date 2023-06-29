@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <memory>
+#include <utility>
 
 #include "mongo/transport/message_compressor_noop.h"
 #include "mongo/transport/message_compressor_registry.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 /**
  * Asserts that a value is null

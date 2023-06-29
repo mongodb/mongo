@@ -27,12 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <memory>
 
-#include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/client/read_preference.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
+#include "mongo/db/database_name.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/client/shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/read_write_concern_defaults_cache_lookup_mongos.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

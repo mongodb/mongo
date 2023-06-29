@@ -33,7 +33,7 @@
 #include <io.h>
 
 #include "mongo/platform/windows_basic.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #else
 #include "mongo/config.h"  // IWYU pragma: keep
 

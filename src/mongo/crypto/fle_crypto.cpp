@@ -109,8 +109,6 @@ extern "C" {
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/namespace_string_util.h"
-#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

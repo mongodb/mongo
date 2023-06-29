@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <fmt/format.h>
+#include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/repl/optime.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/rpc/metadata/tracking_metadata.h"
-#include "mongo/stdx/chrono.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 

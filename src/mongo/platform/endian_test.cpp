@@ -31,8 +31,10 @@
 
 #include <cstring>
 
-#include "mongo/config.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo::endian {
 namespace {

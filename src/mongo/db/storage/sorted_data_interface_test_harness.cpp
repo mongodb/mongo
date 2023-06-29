@@ -30,15 +30,15 @@
 #include "mongo/db/storage/sorted_data_interface_test_harness.h"
 
 #include <algorithm>
-#include <memory>
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <utility>
 
 #include "mongo/bson/ordering.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/storage/sorted_data_interface.h"
 #include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/unittest/assert.h"

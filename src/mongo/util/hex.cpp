@@ -30,11 +30,12 @@
 #include "mongo/util/hex.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <fmt/format.h>
-#include <iterator>
 #include <string>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 
 namespace mongo {

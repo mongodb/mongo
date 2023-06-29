@@ -38,7 +38,6 @@
 #include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <cstdint>
-#include <future>
 #include <memory>
 #include <ratio>
 #include <string>

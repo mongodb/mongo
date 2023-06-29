@@ -29,14 +29,13 @@
 
 #include "mongo/db/s/rename_collection_participant_service.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <string>
 #include <tuple>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -49,7 +48,6 @@
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"

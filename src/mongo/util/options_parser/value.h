@@ -30,10 +30,14 @@
 #pragma once
 
 #include <map>
+#include <string>
+#include <typeinfo>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace optionenvironment {

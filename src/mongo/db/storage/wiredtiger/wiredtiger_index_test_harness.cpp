@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 #include <wiredtiger.h>
 
 #include "mongo/base/init.h"  // IWYU pragma: keep
@@ -46,7 +45,6 @@
 #include "mongo/db/catalog/collection_mock.h"
 #include "mongo/db/index/index_descriptor.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context.h"
 #include "mongo/db/storage/key_format.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/sorted_data_interface.h"

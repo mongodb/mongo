@@ -28,8 +28,6 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/bson/simple_bsonobj_comparator.h"
 
 namespace mongo {

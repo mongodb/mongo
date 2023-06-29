@@ -27,13 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-#include <utility>
-
 #include <absl/container/inlined_vector.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"

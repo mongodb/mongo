@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <functional>
 #include <memory>
 
 #include "mongo/db/baton.h"

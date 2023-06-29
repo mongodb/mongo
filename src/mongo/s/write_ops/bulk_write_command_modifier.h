@@ -29,18 +29,30 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <memory>
+#include <tuple>
+#include <variant>
+#include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/commands/bulk_write_crud_op.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

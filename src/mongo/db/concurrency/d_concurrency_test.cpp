@@ -56,7 +56,7 @@
 #include "mongo/db/concurrency/resource_catalog.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/storage/execution_control/concurrency_adjustment_parameters_gen.h"
 #include "mongo/db/storage/recovery_unit.h"
 #include "mongo/db/storage/recovery_unit_noop.h"

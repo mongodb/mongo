@@ -29,8 +29,20 @@
 
 #pragma once
 
+#include <array>
 #include <bitset>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstring>
+#include <fmt/format.h>
+#include <functional>
+#include <iosfwd>
+#include <iterator>
+#include <limits>
 #include <list>
+#include <memory>
 #include <set>
 #include <string>
 #include <type_traits>
@@ -38,6 +50,10 @@
 #include <vector>
 
 #include "mongo/base/data_type.h"
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/data_view.h"
+#include "mongo/base/static_assert.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 #include "mongo/bson/bson_comparator_interface_base.h"
@@ -46,7 +62,10 @@
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/shared_buffer.h"
 #include "mongo/util/string_map.h"
@@ -54,6 +73,7 @@
 namespace mongo {
 
 class BSONObjBuilder;
+
 class BSONObjStlIterator;
 class ExtendedCanonicalV200Generator;
 class ExtendedRelaxedV200Generator;

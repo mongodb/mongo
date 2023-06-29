@@ -30,12 +30,21 @@
 #pragma once
 
 #include <functional>
+#include <memory>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/connection_pool_stats.h"
 #include "mongo/executor/task_executor_pool.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/shard_registry.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {

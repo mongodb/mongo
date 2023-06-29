@@ -28,9 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonobj.h"
 #include "mongo/s/query/router_stage_queued_data.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

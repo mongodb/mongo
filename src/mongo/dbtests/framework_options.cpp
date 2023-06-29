@@ -28,25 +28,42 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-
-#include "mongo/dbtests/framework_options.h"
-
 #include <boost/filesystem/operations.hpp>
 #include <iostream>
+#include <map>
+#include <utility>
 
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/util/builder.h"
-#include "mongo/db/query/find.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/server_parameter.h"
 #include "mongo/db/storage/flow_control_parameters_gen.h"
 #include "mongo/db/storage/storage_options.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/dbtests/framework_options.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/startup_options.h"
-#include "mongo/util/password.h"
+#include "mongo/util/options_parser/value.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -30,11 +30,9 @@
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
-#include <iostream>
 #include <mutex>
 
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/util/debug_util.h"
 #include "mongo/util/debugger.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)

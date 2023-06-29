@@ -27,19 +27,18 @@
  *    it in the license file.
  */
 
-#include <cstddef>
-#include <cstdint>
-#include <functional>
-#include <memory>
-#include <string>
-#include <utility>
-
 #include <absl/hash/hash.h>
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <memory>
+#include <string>
+#include <utility>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
@@ -62,6 +61,7 @@
 #include "mongo/db/query/query_stats_aggregate_key_generator.h"
 #include "mongo/db/query/query_stats_find_key_generator.h"
 #include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/unittest/assert.h"

@@ -31,9 +31,11 @@
 
 #include <type_traits>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/functional.h"
 #include "mongo/util/lockable_adapter.h"
 #include "mongo/util/time_support.h"

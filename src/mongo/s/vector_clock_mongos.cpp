@@ -27,9 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
 
+#include "mongo/db/service_context.h"
 #include "mongo/db/vector_clock.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

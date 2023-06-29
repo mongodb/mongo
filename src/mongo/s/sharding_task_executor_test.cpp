@@ -28,16 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <fmt/format.h>
+#include <list>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/remote_command_targeter_mock.h"
-#include "mongo/executor/task_executor_test_common.h"
+#include "mongo/crypto/sha256_block.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/sharding_task_executor.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

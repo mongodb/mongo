@@ -36,6 +36,7 @@
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/matcher/expression.h"
 #include "mongo/db/namespace_string.h"

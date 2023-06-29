@@ -28,24 +28,47 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/engine.h"
-
 #include <algorithm>
+#include <boost/filesystem/directory.hpp>
 #include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <chrono>
+#include <cstring>
+#include <deque>
+#include <mutex>
 
+#include <boost/optional/optional.hpp>
+#include <boost/type_traits/decay.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/client/dbclient_base.h"
 #include "mongo/client/dbclient_cursor.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/query/find_command.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/storage/recovery_unit.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/file.h"
-#include "mongo/util/text.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -29,6 +29,10 @@
 
 #pragma once
 
+#include <cstddef>
+#include <cstdint>
+#include <mutex>
+
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 

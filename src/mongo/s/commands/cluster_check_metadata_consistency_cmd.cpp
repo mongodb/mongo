@@ -28,19 +28,70 @@
  */
 
 
+#include <cstdint>
+#include <memory>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include <absl/container/node_hash_set.h>
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/json.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/metadata_consistency_types_gen.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregate_command_gen.h"
+#include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/find_common.h"
+#include "mongo/db/query/query_request_helper.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/check_metadata_consistency_gen.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
+#include "mongo/s/database_version.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
+#include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/query/establish_cursors.h"
-#include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/database_name_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/str.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

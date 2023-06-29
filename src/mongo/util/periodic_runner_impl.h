@@ -29,14 +29,18 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <memory>
+#include <utility>
 #include <vector>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/clock_source.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/periodic_runner.h"
 
 namespace mongo {

@@ -28,16 +28,15 @@
  */
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <cstring>
 #include <iterator>
 #include <string>
 #include <utility>
 #include <wiredtiger.h>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -50,6 +49,7 @@
 #include "mongo/bson/json.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/kv/kv_engine.h"
 #include "mongo/db/storage/record_store_test_harness.h"

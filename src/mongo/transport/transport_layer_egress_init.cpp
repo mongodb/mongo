@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
 
-#include "mongo/base/init.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/db/service_context.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
-
-#include <iostream>
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

@@ -55,7 +55,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/clone_catalog_data_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

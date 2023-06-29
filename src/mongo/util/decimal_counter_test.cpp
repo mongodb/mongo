@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <array>
 #include <cstdint>
-#include <limits>
+#include <string>
 
 #include "mongo/base/string_data.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/decimal_counter.h"
 
 namespace {

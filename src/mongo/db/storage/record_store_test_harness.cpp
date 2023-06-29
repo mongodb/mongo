@@ -30,13 +30,12 @@
 #include "mongo/db/storage/record_store_test_harness.h"
 
 #include <algorithm>
-#include <cstring>
-#include <utility>
-#include <vector>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <cstring>
+#include <utility>
+#include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -49,6 +48,7 @@
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"

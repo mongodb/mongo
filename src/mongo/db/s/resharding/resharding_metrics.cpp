@@ -32,18 +32,19 @@
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
-
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/exec/document_value/document.h"
 #include "mongo/db/exec/document_value/value.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/keypattern.h"
 #include "mongo/db/s/metrics/sharding_data_transform_metrics.h"
 #include "mongo/db/s/resharding/resharding_util.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"

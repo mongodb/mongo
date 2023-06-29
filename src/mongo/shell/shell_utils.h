@@ -30,10 +30,15 @@
 #pragma once
 
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/path.hpp>
 #include <map>
 #include <set>
 #include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/mutex.h"

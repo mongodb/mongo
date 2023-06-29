@@ -37,7 +37,6 @@
 #include <algorithm>
 #include <cstddef>
 #include <cstdint>
-#include <future>
 #include <map>
 #include <memory>
 #include <numeric>

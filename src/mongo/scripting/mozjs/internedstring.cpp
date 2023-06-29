@@ -27,11 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <js/String.h>
 
-#include "mongo/scripting/mozjs/internedstring.h"
+#include <js/Id.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
 
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {
@@ -48,6 +52,7 @@ InternedStringTable::InternedStringTable(JSContext* cx) {
         _internedStrings[i++].init(cx, JS::PropertyKey::fromPinnedString(s));         \
     } while (0);
 #include "mongo/scripting/mozjs/internedstring.defs"
+
 #undef MONGO_MOZJS_INTERNED_STRING
 }
 

@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/logv2/log_component.h"
+#include <type_traits>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/logv2/log_component.h"
 
 namespace mongo::logv2 {
 

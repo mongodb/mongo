@@ -30,9 +30,14 @@
 #pragma once
 
 #include <map>
+#include <string>
 #include <vector>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/util/options_parser/value.h"
 

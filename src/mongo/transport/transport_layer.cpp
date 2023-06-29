@@ -27,12 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstdint>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/transport/baton.h"
 #include "mongo/transport/transport_layer.h"
 
 namespace mongo {

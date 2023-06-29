@@ -31,6 +31,7 @@
 
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
 #include <limits>
@@ -38,8 +39,6 @@
 #include <string>
 #include <utility>
 #include <variant>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"

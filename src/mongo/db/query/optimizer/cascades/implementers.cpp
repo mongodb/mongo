@@ -29,7 +29,13 @@
 
 #include "mongo/db/query/optimizer/cascades/implementers.h"
 
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <cstddef>
 #include <map>
 #include <memory>
@@ -38,14 +44,8 @@
 #include <utility>
 #include <vector>
 
-#include <absl/container/node_hash_map.h>
-#include <absl/container/node_hash_set.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
+#include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/cascades/rewrite_queues.h"
 #include "mongo/db/query/optimizer/cascades/rewriter_rules.h"
 #include "mongo/db/query/optimizer/containers.h"

@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include "mongo/db/operation_context.h"
 #include "mongo/db/session/session_catalog.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

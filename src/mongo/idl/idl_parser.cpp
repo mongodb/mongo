@@ -27,14 +27,19 @@
  *    it in the license file.
  */
 
+#include <boost/optional/optional.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <iterator>
 #include <stack>
 #include <string>
 
-#include "mongo/idl/idl_parser.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/command_generic_argument.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

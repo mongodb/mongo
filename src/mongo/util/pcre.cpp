@@ -32,12 +32,17 @@
 #include <fmt/format.h>
 
 #define PCRE2_CODE_UNIT_WIDTH 8  // Select 8-bit PCRE2 library.
+#include <algorithm>
+#include <array>
+#include <new>
 #include <pcre2.h>
 
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/base/error_codes.h"
-#include "mongo/logv2/log.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
+#include "mongo/util/static_immortal.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 
@@ -121,7 +126,6 @@ const std::error_category& pcreCategory() noexcept {
 
 namespace detail {
 
-class MatchDataImpl;
 
 // Global.
 inline constexpr size_t kMaxPatternLength = 16384;

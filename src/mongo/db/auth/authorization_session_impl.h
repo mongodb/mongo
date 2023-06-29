@@ -55,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
 

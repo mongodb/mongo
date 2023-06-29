@@ -27,11 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/bson/util/bson_extract.h"
+#include <cmath>
+#include <numeric>
+#include <string>
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/mirroring_sampler.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 

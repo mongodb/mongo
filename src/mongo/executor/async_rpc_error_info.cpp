@@ -29,7 +29,10 @@
 
 
 #include "mongo/executor/async_rpc_error_info.h"
-#include "mongo/base/init.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo {

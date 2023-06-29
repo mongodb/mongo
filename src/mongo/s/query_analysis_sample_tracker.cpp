@@ -29,9 +29,20 @@
 
 #include "mongo/s/query_analysis_sample_tracker.h"
 
-#include "mongo/logv2/log.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/server_options.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/is_mongos.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

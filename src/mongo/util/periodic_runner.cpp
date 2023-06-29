@@ -27,11 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/periodic_runner.h"
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/util/assert_util.h"
+#include "mongo/util/periodic_runner.h"
 
 namespace mongo {
 

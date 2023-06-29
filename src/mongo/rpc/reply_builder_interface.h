@@ -29,12 +29,21 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
 #include <memory>
+#include <type_traits>
 
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/rpc/protocol.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 class BSONObj;

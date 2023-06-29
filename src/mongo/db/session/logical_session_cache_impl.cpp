@@ -37,7 +37,7 @@
 #include <boost/optional/optional.hpp>
 #include <iterator>
 #include <mutex>
-#include <stack>
+#include <shared_mutex>
 #include <string>
 #include <type_traits>
 #include <utility>

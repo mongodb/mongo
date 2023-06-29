@@ -27,19 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <tuple>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/async_multicaster.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor_pool.h"
-#include "mongo/s/catalog/type_shard.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/commands/cluster_commands_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 namespace {

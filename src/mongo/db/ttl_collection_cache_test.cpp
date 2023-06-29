@@ -28,7 +28,14 @@
  */
 
 #include "mongo/db/ttl_collection_cache.h"
-#include "mongo/unittest/unittest.h"
+
+#include <memory>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

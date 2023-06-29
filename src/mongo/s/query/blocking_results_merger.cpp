@@ -27,12 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <future>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/db/curop.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/session/session_catalog_mongod.h"
-#include "mongo/db/transaction/transaction_participant.h"
 #include "mongo/s/query/blocking_results_merger.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/scopeguard.h"
 
 namespace mongo {

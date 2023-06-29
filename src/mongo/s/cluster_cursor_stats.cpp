@@ -27,7 +27,12 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status_metric.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
 

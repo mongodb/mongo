@@ -27,17 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/parse_number.h"
-
 #include <algorithm>
 #include <cerrno>
 #include <cstdint>
 #include <cstdlib>
+#include <iterator>
 #include <limits>
 #include <string>
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/parse_number.h"
+#include "mongo/base/static_assert.h"
 #include "mongo/base/status_with.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/platform/overflow_arithmetic.h"

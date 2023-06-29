@@ -28,16 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/hash/hash.h>
+#include <array>
+#include <boost/move/utility_core.hpp>
+#include <fmt/format.h>
+#include <functional>
 #include <iostream>
+#include <iterator>
+#include <memory>
 #include <type_traits>
 #include <utility>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/stdx/type_traits.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/lru_cache.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

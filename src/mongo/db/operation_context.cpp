@@ -35,6 +35,7 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <string>
 #include <thread>
+#include <type_traits>
 
 #include "mongo/base/error_extra_info.h"
 #include "mongo/base/string_data.h"

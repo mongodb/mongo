@@ -33,7 +33,6 @@
 #include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <fmt/format.h>
-#include <future>
 #include <list>
 #include <memory>
 #include <string>

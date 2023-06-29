@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <mutex>
+#include <utility>
+
 #include "mongo/platform/mutex.h"
 #include "mongo/util/assert_util.h"
-
-#include <utility>
 
 namespace mongo {
 

@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/base/simple_string_data_comparator.h"
-
 #include "mongo/util/murmur3.h"
 
 namespace mongo {

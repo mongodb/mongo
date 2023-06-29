@@ -28,7 +28,15 @@
  */
 
 #include "mongo/platform/int128.h"
-#include "mongo/unittest/unittest.h"
+
+#include <cstdint>
+
+#include <absl/numeric/int128.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using namespace mongo;
 

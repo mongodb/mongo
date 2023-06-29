@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/db/pipeline/document_source_query_stats_validators.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 #include "mongo/util/str.h"
-#include <set>
 
 namespace mongo {
 

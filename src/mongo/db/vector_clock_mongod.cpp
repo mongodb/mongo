@@ -28,6 +28,11 @@
  */
 
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
 #include <cstdint>
 #include <map>
@@ -38,12 +43,6 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <boost/cstdint.hpp>
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -59,7 +58,6 @@
 #include "mongo/db/logical_time_validator.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
 #include "mongo/db/repl/optime.h"

@@ -33,14 +33,12 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
-#include <cstddef>
+#include <boost/optional/optional.hpp>
 #include <map>
 #include <string>
 #include <type_traits>
 #include <utility>
 #include <vector>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/pipeline/abt/utils.h"
@@ -50,6 +48,7 @@
 #include "mongo/db/query/ce/sel_tree_utils.h"
 #include "mongo/db/query/cqf_command_utils.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
+#include "mongo/db/query/optimizer/algebra/polyvalue.h"
 #include "mongo/db/query/optimizer/bool_expression.h"
 #include "mongo/db/query/optimizer/cascades/memo.h"
 #include "mongo/db/query/optimizer/explain.h"

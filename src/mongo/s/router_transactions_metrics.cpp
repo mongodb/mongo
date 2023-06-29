@@ -27,14 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/s/router_transactions_metrics.h"
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/s/router_transactions_metrics.h"
 #include "mongo/s/router_transactions_stats_gen.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

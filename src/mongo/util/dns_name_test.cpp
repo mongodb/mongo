@@ -30,8 +30,11 @@
 
 #include "mongo/util/dns_name.h"
 
+#include <type_traits>
+
 #include "mongo/stdx/utility.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 using namespace std::literals::string_literals;
 

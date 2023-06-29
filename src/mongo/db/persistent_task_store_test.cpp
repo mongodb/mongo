@@ -27,12 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <limits>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/catalog/catalog_test_fixture.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/persistent_task_store.h"
-#include "mongo/db/s/collection_sharding_runtime.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

@@ -28,25 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/sharding_initialization.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/db/audit.h"
-#include "mongo/db/keys_collection_client_sharded.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/keys_collection_manager.h"
+#include "mongo/db/keys_collection_manager_gen.h"
 #include "mongo/db/logical_time_validator.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/time_proof_service.h"
 #include "mongo/executor/async_multicaster.h"
 #include "mongo/executor/connection_pool.h"
-#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface.h"
 #include "mongo/executor/network_interface_factory.h"
 #include "mongo/executor/network_interface_thread_pool.h"
 #include "mongo/executor/scoped_task_executor.h"
@@ -54,13 +65,17 @@
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/metadata/metadata_hook.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/analyze_shard_key_role.h"
 #include "mongo/s/balancer_configuration.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/sharding_catalog_client_impl.h"
+#include "mongo/s/catalog/type_database_gen.h"
 #include "mongo/s/catalog/type_shard.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/client/num_hosts_targeted_metrics.h"
-#include "mongo/s/client/shard_factory.h"
 #include "mongo/s/client/sharding_network_connection_hook.h"
 #include "mongo/s/cluster_identity_loader.h"
 #include "mongo/s/grid.h"
@@ -69,14 +84,16 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query_analysis_client.h"
 #include "mongo/s/query_analysis_sampler.h"
+#include "mongo/s/sharding_initialization.h"
 #include "mongo/s/sharding_task_executor.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
-#include "mongo/s/sharding_task_executor_pool_gen.h"
-#include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
-#include "mongo/util/net/socket_utils.h"
-#include "mongo/util/str.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

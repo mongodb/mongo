@@ -27,20 +27,45 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <functional>
+#include <limits>
+#include <list>
+#include <memory>
+#include <ostream>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <absl/container/flat_hash_set.h>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+
+#include "mongo/base/data_type.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
-
-#include "mongo/db/jsobj.h"
-
-#include "mongo/base/data_range.h"
 #include "mongo/bson/bsonelement_comparator_interface.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/generator_extended_canonical_2_0_0.h"
 #include "mongo/bson/generator_extended_relaxed_2_0_0.h"
 #include "mongo/bson/generator_legacy_strict.h"
-#include "mongo/db/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/allocator.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/hex.h"
+#include "mongo/util/shared_buffer.h"
 #include "mongo/util/str.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

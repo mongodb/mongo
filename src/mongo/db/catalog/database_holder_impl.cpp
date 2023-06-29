@@ -33,13 +33,12 @@
 #include <absl/meta/type_traits.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -66,7 +65,6 @@
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/database_name_util.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 

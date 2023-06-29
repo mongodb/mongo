@@ -27,15 +27,34 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <cstdint>
+#include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <vector>
 
+#include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/idl/config_option_no_init_test_gen.h"
+#include "mongo/idl/config_option_test.h"
 #include "mongo/idl/config_option_test_gen.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/cmdline_utils/censor_cmdline.h"
 #include "mongo/util/cmdline_utils/censor_cmdline_test.h"
+#include "mongo/util/options_parser/environment.h"
+#include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
 #include "mongo/util/options_parser/startup_option_init.h"
 #include "mongo/util/options_parser/startup_options.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace mongo {
 namespace test {

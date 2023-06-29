@@ -29,9 +29,12 @@
 
 #pragma once
 
+#include <cstddef>
 #include <memory>
 
 #include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/protocol.h"

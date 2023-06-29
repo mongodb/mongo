@@ -27,10 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-#include "mongo/util/base64.h"
 #include <benchmark/benchmark.h>
+#include <cstddef>
 #include <fmt/format.h>
+#include <iosfwd>
+#include <string>
+
+#include "mongo/util/base64.h"
 
 namespace mongo {
 namespace {

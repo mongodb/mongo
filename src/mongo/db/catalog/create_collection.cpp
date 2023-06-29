@@ -30,20 +30,16 @@
 #include "mongo/db/catalog/create_collection.h"
 
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <cstdint>
-#include <fmt/format.h>
-#include <fmt/ostream.h>
 #include <fmt/printf.h>  // IWYU pragma: keep
-#include <iosfwd>
 #include <memory>
 #include <string>
 #include <utility>
 #include <variant>
-
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status_with.h"
@@ -52,7 +48,6 @@
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/json.h"
 #include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/db/catalog/clustered_collection_options_gen.h"
 #include "mongo/db/catalog/clustered_collection_util.h"
@@ -104,6 +99,7 @@
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand

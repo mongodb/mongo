@@ -27,13 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
 
-#include "mongo/executor/network_test_env.h"
+#include <boost/move/utility_core.hpp>
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/executor/network_test_env.h"
 
 namespace mongo {
 

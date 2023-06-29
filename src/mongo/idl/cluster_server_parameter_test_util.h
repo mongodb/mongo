@@ -29,15 +29,30 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/change_stream_options_manager.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/multitenancy_gen.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_mock.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/cluster_server_parameter_gen.h"
 #include "mongo/idl/cluster_server_parameter_test_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

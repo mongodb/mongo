@@ -32,7 +32,6 @@
 // IWYU pragma: no_include "cxxabi.h"
 #include <cstddef>
 #include <cstdint>
-#include <future>
 #include <map>
 #include <memory>
 #include <ostream>

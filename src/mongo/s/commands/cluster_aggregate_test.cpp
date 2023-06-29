@@ -28,11 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <functional>
+#include <memory>
+#include <vector>
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/service_context.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/s/commands/cluster_command_test_fixture.h"
 #include "mongo/s/query/cluster_aggregate.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

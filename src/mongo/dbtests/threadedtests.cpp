@@ -28,23 +28,37 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <boost/version.hpp>
-#include <functional>
+#include <fmt/format.h>
 #include <iostream>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <typeinfo>
+#include <vector>
 
-#include "mongo/config.h"
+#include "mongo/base/status.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/bits.h"
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
+#include "mongo/util/concurrency/mutex.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand

@@ -27,21 +27,32 @@
  *    it in the license file.
  */
 
-#include <array>
-#include <boost/filesystem.hpp>
-#include <fstream>
+#include <cstddef>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
 #include <map>
-#include <ostream>
-#include <sstream>
+#include <memory>
+#include <utility>
 
+#include <boost/filesystem/path.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/constraints.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_description.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
 
 namespace {
 

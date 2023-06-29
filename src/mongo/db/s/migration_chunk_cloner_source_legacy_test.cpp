@@ -37,7 +37,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <future>
 #include <iterator>
 #include <memory>
 #include <string>

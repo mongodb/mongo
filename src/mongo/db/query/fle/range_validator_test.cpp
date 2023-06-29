@@ -26,16 +26,36 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
+#include <cstdint>
+#include <initializer_list>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "encrypted_predicate_test_fixtures.h"
+#include "range_validator.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
 #include "mongo/crypto/fle_crypto.h"
+#include "mongo/crypto/fle_crypto_types.h"
 #include "mongo/crypto/fle_field_schema_gen.h"
 #include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/unittest/assert.h"
-#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/framework.h"
-#include "range_validator.h"
-#include <initializer_list>
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/str.h"
 
 namespace mongo::fle {
 class RangeValidatorTest : public unittest::Test {

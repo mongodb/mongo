@@ -29,6 +29,14 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <iosfwd>
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/platform/mutex.h"

@@ -27,13 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/none.hpp>
+#include <cmath>
+#include <utility>
+#include <vector>
 
-#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/auth/auth_name.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/auth/role_name.h"
+#include "mongo/db/auth/user_name.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/rpc/metadata/impersonated_user_metadata.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/synchronized_value.h"
 
 namespace mongo {
 namespace rpc {

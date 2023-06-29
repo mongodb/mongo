@@ -29,6 +29,14 @@
 
 #include "mongo/s/query_analysis_sampler_util.h"
 
+#include <iterator>
+#include <new>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
 #include "mongo/idl/idl_parser.h"
 #include "mongo/platform/random.h"
 #include "mongo/util/static_immortal.h"

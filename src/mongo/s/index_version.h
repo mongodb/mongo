@@ -29,6 +29,15 @@
 
 #pragma once
 
+#include <iosfwd>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/s/chunk_version.h"
 #include "mongo/util/uuid.h"
 

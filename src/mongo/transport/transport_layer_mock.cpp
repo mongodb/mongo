@@ -27,17 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/transport/transport_layer_mock.h"
-
+#include <absl/container/node_hash_map.h>
 #include <memory>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/transport_layer.h"
-#include "mongo/util/time_support.h"
+#include "mongo/transport/transport_layer_mock.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace transport {

@@ -29,14 +29,21 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
 #include <functional>
 #include <string>
 #include <type_traits>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util.h"

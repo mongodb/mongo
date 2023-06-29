@@ -60,9 +60,10 @@
 
 #pragma once
 
+#include <type_traits>
+
 #include "mongo/util/decoration_container.h"
 #include "mongo/util/decoration_registry.h"
-#include <type_traits>
 
 namespace mongo {
 

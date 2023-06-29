@@ -27,10 +27,19 @@
  *    it in the license file.
  */
 
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/shim.h"
+#include "mongo/base/status.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/read_concern.h"
 #include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/util/duration.h"
 
 namespace mongo {
 namespace {

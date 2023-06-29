@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include "mongo/s/query/results_merger_test_fixture.h"
 
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/client/connection_string.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
 #include "mongo/client/remote_command_targeter_mock.h"
 #include "mongo/db/curop.h"
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/catalog/type_shard.h"
-#include "mongo/s/query/results_merger_test_fixture.h"
 
 namespace mongo {
 const HostAndPort ResultsMergerTestFixture::kTestConfigShardHost =

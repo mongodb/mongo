@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-#include <ostream>
-#include <utility>
-
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
@@ -37,6 +34,8 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <ostream>
+#include <utility>
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include <fmt/format.h>
@@ -47,7 +46,7 @@
 #include "mongo/bson/bsonelement.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/d_concurrency.h"
-#include "mongo/db/concurrency/locker.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/global_settings.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

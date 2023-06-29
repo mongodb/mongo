@@ -30,23 +30,40 @@
 
 #include "mongo/executor/connection_pool.h"
 
-#include "mongo/db/service_context.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/tuple/tuple.hpp>
 #include <fmt/format.h>
-#include <fmt/ostream.h>
+#include <iterator>
+#include <list>
 #include <memory>
+#include <queue>
+#include <system_error>
+#include <type_traits>
 
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/db/server_feature_flags_gen.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/connection_pool_stats.h"
-#include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
 #include "mongo/util/destructor_guard.h"
+#include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/lru_cache.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kConnectionPool
 

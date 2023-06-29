@@ -31,6 +31,8 @@
 
 #include <functional>
 
+#include <boost/move/utility_core.hpp>
+
 #include "mongo/db/service_context.h"
 #include "mongo/executor/egress_tag_closer.h"
 #include "mongo/platform/mutex.h"

@@ -59,6 +59,7 @@
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/session/logical_session_cache.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {

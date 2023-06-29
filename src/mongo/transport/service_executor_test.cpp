@@ -28,30 +28,54 @@
  */
 
 
-#include <algorithm>
-#include <asio.hpp>
-#include <boost/optional.hpp>
+#include <asio.hpp>  // IWYU pragma: keep
+#include <boost/smart_ptr.hpp>
+#include <chrono>
+#include <compare>
+#include <cstddef>
+#include <memory>
+#include <new>
+#include <thread>
+#include <utility>
 
-#include "mongo/bson/bsonobjbuilder.h"
+// IWYU pragma: no_include "asio/impl/dispatch.hpp"
+// IWYU pragma: no_include "asio/impl/io_context.hpp"
+// IWYU pragma: no_include "asio/impl/post.hpp"
+// IWYU pragma: no_include "asio/impl/system_executor.hpp"
+#include <asio/io_context.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/db/service_context.h"
-#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/thread.h"
 #include "mongo/transport/mock_session.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_fixed.h"
-#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/assert_that.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher_core.h"
 #include "mongo/unittest/thread_assertion_monitor.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/out_of_line_executor.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

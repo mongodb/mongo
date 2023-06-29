@@ -30,15 +30,31 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
 #include "mongo/db/auth/validated_tenancy_scope.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/shared_buffer.h"
 
 namespace mongo {
 

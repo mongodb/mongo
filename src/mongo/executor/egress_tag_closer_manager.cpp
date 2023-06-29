@@ -28,11 +28,13 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <mutex>
+#include <utility>
+
+#include <absl/container/node_hash_set.h>
 
 #include "mongo/executor/egress_tag_closer_manager.h"
-
-
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/hostandport.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor

@@ -28,19 +28,38 @@
  */
 
 
-#include "mongo/logv2/component_settings_filter.h"
-#include "mongo/logv2/log.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/logv2/text_formatter.h"
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
 #include <boost/iostreams/device/null.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <boost/log/sinks/sync_frontend.hpp>
 #include <boost/log/sinks/text_ostream_backend.hpp>
-#include <boost/make_shared.hpp>
 #include <iostream>
+#include <string>
+
+#include <boost/core/typeinfo.hpp>
+#include <boost/exception/exception.hpp>
+#include <boost/iostreams/categories.hpp>
+// IWYU pragma: no_include "boost/iostreams/detail/error.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/streambuf/indirect_streambuf.hpp"
+// IWYU pragma: no_include "boost/iostreams/detail/wrap_unwrap.hpp"
+#include <boost/iostreams/imbue.hpp>
+#include <boost/log/core/core.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_domain_global.h"
+#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/text_formatter.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

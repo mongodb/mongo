@@ -29,22 +29,25 @@
 
 #include "mongo/s/query_analysis_sample_tracker.h"
 
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <string>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/server_options.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/s/analyze_shard_key_common_gen.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/s/sharding_router_test_fixture.h"
 #include "mongo/s/sharding_test_fixture_common.h"
-#include "mongo/transport/transport_layer_mock.h"
-#include "mongo/unittest/bson_test_util.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/tick_source_mock.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/uuid.h"
-
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <cstddef>
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

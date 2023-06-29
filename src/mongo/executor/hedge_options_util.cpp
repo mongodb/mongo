@@ -29,10 +29,18 @@
 
 #include "mongo/executor/hedge_options_util.h"
 
-#include "mongo/s/mongos_server_parameters_gen.h"
-#include "mongo/util/sort.h"
+#include <algorithm>
+#include <array>
+#include <string>
 
-#include "mongo/util/optional_util.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/client/hedging_mode_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/mongos_server_parameters.h"
+#include "mongo/s/mongos_server_parameters_gen.h"
+#include "mongo/util/ctype.h"
+#include "mongo/util/sort.h"
 
 namespace mongo {
 MONGO_FAIL_POINT_DEFINE(hedgedReadsSendRequestsToTargetHostsInAlphabeticalOrder);

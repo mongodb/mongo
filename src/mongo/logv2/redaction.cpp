@@ -28,14 +28,15 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <ostream>
 
-#include "mongo/logv2/redaction.h"
-
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/logv2/log_util.h"
-#include "mongo/logv2/logv2_options_gen.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

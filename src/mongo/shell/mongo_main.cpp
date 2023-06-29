@@ -27,71 +27,106 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/shell/mongo_main.h"
-
+#include <algorithm>
+#include <array>
 #include <boost/core/null_deleter.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/log/attributes/value_extraction.hpp>
-#include <boost/log/core.hpp>
-#include <boost/log/sinks.hpp>
 #include <csignal>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
-#include <fstream>
+#include <ctime>
+#include <exception>
+#include <fstream>  // IWYU pragma: keep
 #include <iostream>
+#include <iterator>
+#include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/exception/exception.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/log/core/core.hpp>
+#include <boost/log/core/record_view.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+// IWYU pragma: no_include "boost/log/detail/locking_ptr.hpp"
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/log/sinks/text_ostream_backend.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+#include <boost/thread/exceptions.hpp>
+
+#include "mongo/base/error_extra_info.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/client/authenticate.h"
 #include "mongo/client/mongo_uri.h"
 #include "mongo/client/sasl_aws_client_options.h"
 #include "mongo/client/sasl_oidc_client_params.h"
-#include "mongo/config.h"
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/db/auth/sasl_command_constants.h"
-#include "mongo/db/client.h"
-#include "mongo/db/log_process_details.h"
 #include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/wire_version.h"
 #include "mongo/logv2/attributes.h"
 #include "mongo/logv2/component_settings_filter.h"
 #include "mongo/logv2/console.h"
 #include "mongo/logv2/json_formatter.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
-#include "mongo/logv2/text_formatter.h"
+#include "mongo/logv2/log_tag.h"
+#include "mongo/logv2/plain_formatter.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/platform/process_id.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/linenoise.h"
+#include "mongo/shell/mongo_main.h"
 #include "mongo/shell/program_runner.h"
 #include "mongo/shell/shell_options.h"
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
+#include "mongo/transport/transport_layer.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/errno_util.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/file.h"
 #include "mongo/util/net/ocsp/ocsp_manager.h"
-#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/password.h"
 #include "mongo/util/pcre.h"
 #include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/stacktrace.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+#include "mongo/util/time_support.h"
 #include "mongo/util/version.h"
+#include "mongo/util/version/releases.h"
 
 #ifdef _WIN32
 #include <io.h>
 #include <shlobj.h>
+
 #define isatty _isatty
 #define fileno _fileno
 #else

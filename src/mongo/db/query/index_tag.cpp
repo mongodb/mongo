@@ -31,13 +31,16 @@
 
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <boost/container/small_vector.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 // IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <limits>
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/field_ref.h"
 #include "mongo/db/matcher/expression_path.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/stdx/unordered_map.h"

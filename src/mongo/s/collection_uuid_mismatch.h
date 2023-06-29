@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/db/operation_context.h"
 
 namespace mongo {

@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 

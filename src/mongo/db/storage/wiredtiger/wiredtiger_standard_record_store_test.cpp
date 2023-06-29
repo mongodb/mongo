@@ -27,14 +27,11 @@
  *    it in the license file.
  */
 
-#include <cstring>
-#include <memory>
-#include <sstream>
-#include <string>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/preprocessor/control/iif.hpp>
-
+#include <cstring>
+#include <memory>
+#include <string>
 #include <wiredtiger.h>
 
 #include "mongo/base/checked_cast.h"
@@ -44,6 +41,7 @@
 #include "mongo/bson/mutable/damage_vector.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/record_id.h"

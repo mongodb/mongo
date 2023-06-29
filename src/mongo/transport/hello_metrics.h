@@ -29,9 +29,13 @@
 
 #pragma once
 
+#include <cstddef>
+
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/atomic_word.h"
+#include "mongo/transport/session.h"
 
 namespace mongo {
 

@@ -28,19 +28,30 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/concurrency/thread_pool_test_common.h"
-
+#include <absl/container/node_hash_map.h>
+#include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <cstddef>
 #include <memory>
+#include <mutex>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
+#include "mongo/stdx/unordered_map.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/concurrency/thread_pool_test_common.h"
 #include "mongo/util/concurrency/thread_pool_test_fixture.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -29,13 +29,16 @@
 
 #pragma once
 
+#include <memory>
 #include <vector>
 
 #include "mongo/db/service_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/with_lock.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/periodic_runner.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

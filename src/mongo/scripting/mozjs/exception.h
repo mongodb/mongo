@@ -29,10 +29,15 @@
 
 #pragma once
 
+#include <js/ErrorReport.h>
+#include <js/TypeDecls.h>
 #include <jsapi.h>
+#include <string>
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

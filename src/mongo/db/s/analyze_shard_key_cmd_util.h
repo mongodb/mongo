@@ -30,6 +30,7 @@
 #pragma once
 
 #include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <utility>
 
 #include "mongo/db/keypattern.h"

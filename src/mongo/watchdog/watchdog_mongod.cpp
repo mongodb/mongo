@@ -28,25 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/watchdog/watchdog_mongod.h"
-
-#include <boost/filesystem.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
-#include "mongo/config.h"
-#include "mongo/db/client.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/watchdog/watchdog.h"
+#include "mongo/watchdog/watchdog_mongod.h"
 #include "mongo/watchdog/watchdog_mongod_gen.h"
 #include "mongo/watchdog/watchdog_register.h"
 

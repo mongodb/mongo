@@ -28,13 +28,14 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/db/operation_id.h"
-#include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

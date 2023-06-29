@@ -32,6 +32,7 @@
 #include <memory>
 #include <string>
 
+#include "mongo/base/status.h"
 #include "mongo/db/request_execution_context.h"
 #include "mongo/util/concurrency/thread_pool.h"
 #include "mongo/util/future.h"

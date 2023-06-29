@@ -27,14 +27,26 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr.hpp>
+#include <fmt/format.h>
+#include <memory>
+#include <thread>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/util/future.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
-
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/future_test_utils.h"
 
 namespace mongo {

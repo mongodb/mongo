@@ -28,9 +28,15 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <cstdint>
+#include <map>
+#include <type_traits>
+#include <utility>
+
+#include <immer/detail/iterator_facade.hpp>
+#include <immer/detail/util.hpp>
 
 #include "mongo/util/immutable/map.h"
-#include <map>
 
 namespace mongo {
 

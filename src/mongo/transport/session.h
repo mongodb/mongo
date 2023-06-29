@@ -29,14 +29,20 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <functional>
 #include <memory>
 
-#include "mongo/config.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/baton.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
 #include "mongo/transport/session_id.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/sockaddr.h"

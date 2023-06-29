@@ -34,8 +34,12 @@
 #include <absl/meta/type_traits.h>
 #include <algorithm>
 #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -44,11 +48,6 @@
 #include <ratio>
 #include <set>
 #include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -61,7 +60,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -94,7 +92,6 @@
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"

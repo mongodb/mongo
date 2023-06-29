@@ -29,42 +29,41 @@
 
 #include "mongo/db/catalog/coll_mod.h"
 
-#include <memory>
-
+#include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+#include <variant>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/catalog_raii.h"
-#include "mongo/db/coll_mod_gen.h"
-#include "mongo/idl/idl_parser.h"
-#include "mongo/unittest/assert.h"
-#include "mongo/unittest/framework.h"
-#include <boost/optional.hpp>
-
-#include "mongo/db/catalog/collection_catalog.h"
-#include "mongo/db/catalog/collection_write_path.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/create_collection.h"
-#include "mongo/db/catalog/database_holder.h"
-#include "mongo/db/catalog/virtual_collection_impl.h"
-#include "mongo/db/catalog/virtual_collection_options.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
 #include "mongo/db/coll_mod_gen.h"
 #include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/exception_util.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
-#include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/storage/write_unit_of_work.h"
 #include "mongo/db/timeseries/timeseries_collmod.h"
 #include "mongo/db/timeseries/timeseries_gen.h"
-#include "mongo/stdx/utility.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace {

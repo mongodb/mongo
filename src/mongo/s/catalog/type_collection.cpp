@@ -27,16 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/s/catalog/type_collection.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/bson/bsonobjbuilder.h"
-#include "mongo/bson/simple_bsonobj_comparator.h"
-#include "mongo/bson/util/bson_extract.h"
-#include "mongo/s/balancer_configuration.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

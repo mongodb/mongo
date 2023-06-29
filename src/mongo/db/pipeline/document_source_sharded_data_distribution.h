@@ -29,12 +29,13 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <list>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {

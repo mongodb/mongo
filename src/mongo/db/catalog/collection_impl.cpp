@@ -29,8 +29,8 @@
 
 #include "mongo/db/catalog/collection_impl.h"
 
-// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <absl/container/flat_hash_map.h>
+#include <algorithm>
 #include <boost/container/flat_set.hpp>
 #include <boost/container/small_vector.hpp>
 #include <boost/container/vector.hpp>
@@ -42,10 +42,10 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
-// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
-#include <algorithm>
 #include <map>
 #include <mutex>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+// IWYU pragma: no_include "boost/intrusive/detail/iterator.hpp"
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"
@@ -60,7 +60,7 @@
 #include "mongo/db/catalog/index_catalog_impl.h"
 #include "mongo/db/catalog/index_key_validate.h"
 #include "mongo/db/catalog/uncommitted_multikey.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
+#include "mongo/db/catalog_shard_feature_flag_gen.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/cluster_role.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"

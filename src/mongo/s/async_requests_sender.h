@@ -29,19 +29,29 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <memory>
+#include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/resource_yielder.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/scoped_task_executor.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/s/client/shard.h"
+#include "mongo/util/future.h"
 #include "mongo/util/interruptible.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/producer_consumer_queue.h"
