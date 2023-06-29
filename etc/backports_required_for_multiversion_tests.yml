@@ -20,6 +20,8 @@
 #
 last-continuous:
   all:
+  - test_file: jstests/core/timeseries/timeseries_field_parsed_as_bson.js
+    ticket: SERVER-77654
   - test_file: jstests/sharding/conn_pool_stats.js
     ticket: SERVER-75911
   - test_file: jstests/core/administrative/check_shard_index.js

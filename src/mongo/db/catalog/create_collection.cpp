@@ -244,84 +244,122 @@ Status _createDefaultTimeseriesIndex(OperationContext* opCtx, CollectionWriter& 
 }
 
 BSONObj _generateTimeseriesValidator(int bucketVersion, StringData timeField) {
-    switch (bucketVersion) {
-        case timeseries::kTimeseriesControlCompressedVersion:
-            return fromjson(fmt::sprintf(R"(
-{
-'$jsonSchema' : {
-    bsonType: 'object',
-    required: ['_id', 'control', 'data'],
-    properties: {
-        _id: {bsonType: 'objectId'},
-        control: {
-            bsonType: 'object',
-            required: ['version', 'min', 'max'],
-            properties: {
-                version: {bsonType: 'number'},
-                min: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                max: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                closed: {bsonType: 'bool'},
-                count: {bsonType: 'number', minimum: 1}
-            },
-            additionalProperties: false
-        },
-        data: {bsonType: 'object'},
-        meta: {}
-    },
-    additionalProperties: false
-}
-})",
-                                         timeField,
-                                         timeField,
-                                         timeField,
-                                         timeField));
-        case timeseries::kTimeseriesControlUncompressedVersion:
-            return fromjson(fmt::sprintf(R"(
-{
-'$jsonSchema' : {
-    bsonType: 'object',
-    required: ['_id', 'control', 'data'],
-    properties: {
-        _id: {bsonType: 'objectId'},
-        control: {
-            bsonType: 'object',
-            required: ['version', 'min', 'max'],
-            properties: {
-                version: {bsonType: 'number'},
-                min: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                max: {
-                    bsonType: 'object',
-                    required: ['%s'],
-                    properties: {'%s': {bsonType: 'date'}}
-                },
-                closed: {bsonType: 'bool'}
+    if (bucketVersion != timeseries::kTimeseriesControlCompressedVersion &&
+        bucketVersion != timeseries::kTimeseriesControlUncompressedVersion) {
+        MONGO_UNREACHABLE;
+    }
+    // '$jsonSchema' : {
+    //     bsonType: 'object',
+    //     required: ['_id', 'control', 'data'],
+    //     properties: {
+    //         _id: {bsonType: 'objectId'},
+    //         control: {
+    //             bsonType: 'object',
+    //             required: ['version', 'min', 'max'],
+    //             properties: {
+    //                 version: {bsonType: 'number'},
+    //                 min: {
+    //                     bsonType: 'object',
+    //                     required: ['%s'],
+    //                     properties: {'%s': {bsonType: 'date'}}
+    //                 },
+    //                 max: {
+    //                     bsonType: 'object',
+    //                     required: ['%s'],
+    //                     properties: {'%s': {bsonType: 'date'}}
+    //                 },
+    //                 closed: {bsonType: 'bool'},
+    //                 count: {bsonType: 'number', minimum: 1} // only if bucketVersion ==
+    //                 timeseries::kTimeseriesControlCompressedVersion
+    //             },
+    //             additionalProperties: false // only if bucketVersion ==
+    //             timeseries::kTimeseriesControlCompressedVersion
+    //         },
+    //         data: {bsonType: 'object'},
+    //         meta: {}
+    //     },
+    //     additionalProperties: false
+    //   }
+    BSONObjBuilder validator;
+    BSONObjBuilder schema(validator.subobjStart("$jsonSchema"));
+    schema.append("bsonType", "object");
+    schema.append("required",
+                  BSON_ARRAY("_id"
+                             << "control"
+                             << "data"));
+    {
+        BSONObjBuilder properties(schema.subobjStart("properties"));
+        {
+            BSONObjBuilder _id(properties.subobjStart("_id"));
+            _id.append("bsonType", "objectId");
+            _id.done();
+        }
+        {
+            BSONObjBuilder control(properties.subobjStart("control"));
+            control.append("bsonType", "object");
+            control.append("required",
+                           BSON_ARRAY("version"
+                                      << "min"
+                                      << "max"));
+            {
+                BSONObjBuilder innerProperties(control.subobjStart("properties"));
+                {
+                    BSONObjBuilder version(innerProperties.subobjStart("version"));
+                    version.append("bsonType", "number");
+                    version.done();
+                }
+                {
+                    BSONObjBuilder min(innerProperties.subobjStart("min"));
+                    min.append("bsonType", "object");
+                    min.append("required", BSON_ARRAY(timeField));
+                    BSONObjBuilder minProperties(min.subobjStart("properties"));
+                    BSONObjBuilder timeFieldObj(minProperties.subobjStart(timeField));
+                    timeFieldObj.append("bsonType", "date");
+                    timeFieldObj.done();
+                    minProperties.done();
+                    min.done();
+                }
+
+                {
+                    BSONObjBuilder max(innerProperties.subobjStart("max"));
+                    max.append("bsonType", "object");
+                    max.append("required", BSON_ARRAY(timeField));
+                    BSONObjBuilder maxProperties(max.subobjStart("properties"));
+                    BSONObjBuilder timeFieldObj(maxProperties.subobjStart(timeField));
+                    timeFieldObj.append("bsonType", "date");
+                    timeFieldObj.done();
+                    maxProperties.done();
+                    max.done();
+                }
+                {
+                    BSONObjBuilder closed(innerProperties.subobjStart("closed"));
+                    closed.append("bsonType", "bool");
+                    closed.done();
+                }
+                if (bucketVersion == timeseries::kTimeseriesControlCompressedVersion) {
+                    BSONObjBuilder count(innerProperties.subobjStart("count"));
+                    count.append("bsonType", "number");
+                    count.append("minimum", 1);
+                    count.done();
+                }
+                innerProperties.done();
             }
-        },
-        data: {bsonType: 'object'},
-        meta: {}
-    },
-    additionalProperties: false
-}
-})",
-                                         timeField,
-                                         timeField,
-                                         timeField,
-                                         timeField));
-        default:
-            MONGO_UNREACHABLE;
-    };
+            if (bucketVersion == timeseries::kTimeseriesControlCompressedVersion) {
+                control.append("additionalProperties", false);
+            }
+            control.done();
+        }
+        {
+            BSONObjBuilder data(properties.subobjStart("data"));
+            data.append("bsonType", "object");
+            data.done();
+        }
+        properties.append("meta", BSONObj{});
+        properties.done();
+    }
+    schema.append("additionalProperties", false);
+    schema.done();
+    return validator.obj();
 }
 
 Status _createTimeseries(OperationContext* opCtx,
