@@ -4,10 +4,15 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
+import {
+    innerAggTestCases,
+    outerAggTestCases,
+    queryAnalysisSamplerConfigurationRefreshSecs,
+    queryAnalysisWriterIntervalSecs,
+    testCustomInnerPipeline,
+    testNoCustomInnerPipeline
+} from "jstests/sharding/analyze_shard_key/libs/sample_nested_agg_queries_common.js";
 
-load("jstests/sharding/analyze_shard_key/libs/sample_nested_agg_queries_common.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const st = new ShardingTest({
@@ -145,4 +150,3 @@ for (let {name,
 assert.commandWorked(st.s.adminCommand({configureQueryAnalyzer: foreignNs, mode: "off"}));
 
 st.stop();
-})();

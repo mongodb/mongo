@@ -1,5 +1,4 @@
 var defragmentationUtil = (function() {
-    load("jstests/libs/feature_flag_util.js");
     load("jstests/sharding/libs/find_chunks_util.js");
 
     let createFragmentedCollection = function(mongos,

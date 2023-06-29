@@ -22,17 +22,18 @@
  *     tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/profiler.js");                    // For getLatestProfileEntry.
-load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
-load("jstests/libs/analyze_plan.js");                // For planHasStage.
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest.
+load("jstests/libs/profiler.js");         // For getLatestProfileEntry.
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
+import {
+    getAggPlanStages,
+    getAggPlanStage,
+    getPlanCacheKeyFromExplain
+} from "jstests/libs/analyze_plan.js";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
     jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    return;
+    quit();
 }
 
 const fields = ["a", "b", "i"];
@@ -146,4 +147,3 @@ for (const sortDirection of [-1, 1]) {
         testBoundedSorterPlanCache(sortDirection, indexDirection);
     }
 }
-})();

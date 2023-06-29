@@ -6,10 +6,6 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");
 
 // Valid parameter values are in the range [0, infinity).
@@ -33,4 +29,3 @@ testNumericServerParameter('timeseriesBucketMaxSize',
                            0 /*lowerOutOfBounds*/,
                            false /*hasUpperBound*/,
                            "unused" /*upperOutOfBounds*/);
-})();

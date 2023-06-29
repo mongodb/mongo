@@ -1,10 +1,6 @@
 /**
  * Test that chunks and documents are moved correctly after zone changes.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/zone_changes_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
@@ -247,4 +243,3 @@ assertChunksOnShards(configDB, ns, shardChunkBounds);
 assertDocsOnShards(st, ns, shardChunkBounds, docs, shardKey);
 
 st.stop();
-})();

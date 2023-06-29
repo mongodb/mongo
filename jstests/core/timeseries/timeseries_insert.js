@@ -5,10 +5,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const coll = db.timeseries_insert;
 coll.drop();
@@ -32,4 +29,3 @@ for (let i = 0; i < 100; i++) {
         tags: host.tags,
     }));
 }
-})();

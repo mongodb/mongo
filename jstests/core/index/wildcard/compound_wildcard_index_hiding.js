@@ -11,11 +11,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/wildcard_index_helpers.js");
+import {WildcardIndexHelpers} from "jstests/libs/wildcard_index_helpers.js";
 
 const collectionName = "compound_wildcard_index_hiding";
 const cwiList = [
@@ -159,4 +155,3 @@ testCompoundWildcardIndexesHiding(cwiList, collectionName);
 /////////////////////////////////////////////////////////////////////////
 // 3. Test that queries do not use hidden Compound Wildcard Indexes.
 assertHiddenIndexesIsNotUsed(cwiList, collectionName);
-})();

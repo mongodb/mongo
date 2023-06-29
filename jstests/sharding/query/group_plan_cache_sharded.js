@@ -12,10 +12,7 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 1}});
 const mongosDB = st.s.getDB(jsTestName());
@@ -25,7 +22,7 @@ const mongosDB = st.s.getDB(jsTestName());
 if (!checkSBEEnabled(mongosDB)) {
     jsTestLog("Skipping test because SBE is not enabled");
     st.stop();
-    return;
+    quit();
 }
 
 const collName = jsTestName();
@@ -97,4 +94,3 @@ assert.eq(nonMergingKeyCount, 1, tojson(cacheEntries));
 assert.eq(mergingKeyCount, 2, tojson(cacheEntries));
 
 st.stop();
-}());

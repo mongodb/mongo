@@ -1,15 +1,12 @@
 /**
  * Tests basic functionality of pushing $group into the find layer.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
-    return;
+    quit();
 }
 
 // Ensure group pushdown is enabled and capture the original value of
@@ -747,5 +744,4 @@ assert.commandWorked(db.adminCommand(
     assert.eq(
         coll.aggregate([{$group: {_id: "$$REMOVE", o: {$first: "$non_existent_field"}}}]).toArray(),
         [{_id: null, o: null}]);
-})();
 })();

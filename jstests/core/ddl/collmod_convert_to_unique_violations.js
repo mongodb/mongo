@@ -15,15 +15,13 @@
  * ]
  */
 
-(function() {
-'use strict';
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
 
 if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
-    return;
+    quit();
 }
 
 function sortViolationsArray(arr) {
@@ -98,4 +96,3 @@ assertFailedWithViolations({a: 1, b: 1}, [{ids: [4, 9]}, {ids: [6, 7, 8]}]);
 
 assert.commandWorked(coll.insert({_id: "10", a: 101, b: 4}));
 assertFailedWithViolations({a: 1, b: 1}, [{ids: [4, 9, "10"]}, {ids: [6, 7, 8]}]);
-})();

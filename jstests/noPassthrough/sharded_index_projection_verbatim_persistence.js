@@ -9,10 +9,7 @@
  * ]
 
  */
-(function() {
-"use strict";
-
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const st = new ShardingTest({shards: 3, rs: {nodes: 1}});
 const dbName = "test";
@@ -76,4 +73,3 @@ if (setUpServerForColumnStoreIndexTest(st.s.getDB(dbName))) {
     }
 }
 st.stop();
-})();

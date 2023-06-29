@@ -10,11 +10,8 @@
  *   requires_pipeline_optimization,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function getWinningPlanForPipeline({coll, pipeline}) {
     const explain = assert.commandWorked(coll.explain().aggregate(pipeline));
@@ -161,4 +158,3 @@ function assertScanFilterEq({coll, pipeline, filter}) {
         });
     }
 }
-}());

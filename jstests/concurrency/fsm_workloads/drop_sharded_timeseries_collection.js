@@ -15,8 +15,6 @@ const collCount = 2;
 const timeField = 'time';
 const metaField = 'hostId';
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
-
 function getRandomDb(db) {
     return db.getSiblingDB(dbPrefix + Random.randInt(dbCount));
 }

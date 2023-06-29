@@ -22,11 +22,8 @@
 //   references_foreign_collection,
 // ]
 
-(function() {
-'use strict';
-
-load("jstests/libs/analyze_plan.js");  // getPlanCacheKeyFromShape
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getPlanCacheKeyFromPipeline, getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 load("jstests/libs/fixture_helpers.js");
 
 const coll = db.jstests_plan_cache_clear;
@@ -406,4 +403,3 @@ assert.eq(false, planCacheContainsQuerySet(cachedQueries, coll, 0), dumpPlanCach
 
 // Case 3: The mongod process restarts
 // Not applicable.
-})();

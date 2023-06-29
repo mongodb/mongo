@@ -7,13 +7,10 @@
  *   requires_fcv_63,
  * ]
  */
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
-
-(function() {
-'use strict';
-load("jstests/libs/sbe_util.js");
 
 const criticalSectionTimeoutMS = 24 * 60 * 60 * 1000;  // 1 day
 const st = new ShardingTest({
@@ -36,7 +33,7 @@ const collB = db["collB"];
 if (!checkSBEEnabled(db)) {
     jsTestLog("********** Skip the test because SBE is disabled **********");
     st.stop();
-    return;
+    quit();
 }
 
 function assertPlanCacheSizeForColl(nss, expectedEntriesCount) {
@@ -148,4 +145,3 @@ assert.commandWorked(mongos.adminCommand({enableSharding: dbName}));
 })();
 
 st.stop();
-})();

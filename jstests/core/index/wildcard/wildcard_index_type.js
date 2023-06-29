@@ -5,11 +5,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");       // For getPlanStages.
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_index_type;
 coll.drop();
@@ -175,4 +172,3 @@ assertExpectedDocAnswersWildcardIndexQuery({a: new Date()}, {a: {$type: "date"}}
 
 // A $type of 'timestamp' won't match a date value.
 assertExpectedDocAnswersWildcardIndexQuery({a: new Date()}, {a: {$type: "timestamp"}}, false);
-})();

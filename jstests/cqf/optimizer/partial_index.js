@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_partial_index;
@@ -30,4 +28,3 @@ assert.eq(1, res.length);
 // TODO: verify with explain the plan should not use the index.
 res = t.aggregate([{$match: {'a': 3, 'b': 3}}]).toArray();
 assert.eq(2, res.length);
-}());

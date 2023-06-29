@@ -4,10 +4,10 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -158,4 +158,3 @@ testError({$percentile: {input: "$str", method: "approximate"}},
           40414 /* IDL required field error */);
 testError({$median: {p: [0.1, 0.6], input: "$str", method: "approximate"}},
           40415 /* IDL unknown field error */);
-})();

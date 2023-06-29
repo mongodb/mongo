@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
+import {assertValueOnPlanPath} from "jstests/libs/optimizer_utils.js";
 
 const t = db.cqf_type_bracket;
 t.drop();
@@ -55,4 +52,3 @@ assert.commandWorked(t.createIndex({a: 1}));
     assert.eq(4, res.executionStats.nReturned);
     assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 }
-}());

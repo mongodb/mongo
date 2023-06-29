@@ -20,14 +20,11 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
-    return;
+    quit();
 }
 
 const collName = 'collmod_convert_to_unique_apply_ops';
@@ -98,4 +95,3 @@ assert.eq(countUnique({a: 1}), 1, 'index should be unique now: ' + tojson(coll.g
 
 // Test uniqueness constraint.
 assert.commandFailedWithCode(coll.insert({_id: 100, a: 100}), ErrorCodes.DuplicateKey);
-})();

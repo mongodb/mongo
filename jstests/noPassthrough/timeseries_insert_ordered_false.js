@@ -5,10 +5,7 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/core/timeseries/libs/timeseries.js');
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load('jstests/libs/fail_point_util.js');
 
 const conn = MongoRunner.runMongod();
@@ -116,4 +113,3 @@ runTest(mongos, st.getPrimaryShard(jsTestName()), false);
 // Run test on sharded cluster after sharding the collection.
 runTest(mongos, st.getPrimaryShard(jsTestName()), true);
 st.stop();
-})();

@@ -11,17 +11,14 @@
  *   assumes_read_preference_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-    return;
+    quit();
 }
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -777,4 +774,3 @@ const reopenBucketsWhenSuitableIndexExistsNoMeta = function() {
 }();
 
 coll.drop();
-})();

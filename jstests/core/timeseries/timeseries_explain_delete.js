@@ -11,10 +11,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanStage() and getExecutionStages().
+import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const timeFieldName = "time";
 const metaFieldName = "tag";
@@ -277,4 +275,3 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
         });
     })();
 }
-})();

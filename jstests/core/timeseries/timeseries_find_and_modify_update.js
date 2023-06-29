@@ -11,10 +11,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries_writes_util.js");
+import {
+    makeBucketFilter,
+    metaFieldName,
+    testFindOneAndUpdate,
+    timeFieldName
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
 /**
@@ -534,4 +536,3 @@ load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
         });
     })();
 }
-})();

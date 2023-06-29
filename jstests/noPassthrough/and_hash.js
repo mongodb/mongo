@@ -1,9 +1,6 @@
 // Tests for whether the query solution correctly used an AND_HASH for index intersection.
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/analyze_plan.js");  // For planHasStage helper to analyze explain() output.
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -137,4 +134,3 @@ assertAndHashUsed({
 });
 
 MongoRunner.stopMongod(conn);
-})();

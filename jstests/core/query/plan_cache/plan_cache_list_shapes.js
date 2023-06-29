@@ -16,13 +16,11 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
 // ]
-(function() {
-'use strict';
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (checkSBEEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled.");
-    return;
+    quit();
 }
 
 const coll = db.jstests_plan_cache_list_shapes;
@@ -90,4 +88,3 @@ regexQuery.s.$options = 'mi';
 assert.eq(6, coll.find(regexQuery).itcount());
 shapes = getCachedQueryShapes();
 assert.eq(4, shapes.length, shapes);
-})();

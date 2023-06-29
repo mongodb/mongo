@@ -2,11 +2,8 @@
  * Tests that $group stage reports memory footprint per accumulator when explain is run with
  * verbosities "executionStats" and "allPlansExecution".
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStage().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB('test');
@@ -19,7 +16,7 @@ if (checkSBEEnabled(testDB)) {
     // spilling behavior of the classic DocumentSourceGroup stage.
     jsTest.log("Skipping test since SBE $group pushdown has different memory tracking behavior");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 const bigStr = Array(1025).toString();  // 1KB of ','
@@ -150,4 +147,3 @@ groupStages = getAggPlanStage(
 checkGroupStages(groupStages, {}, false, 0);
 
 MongoRunner.stopMongod(conn);
-}());

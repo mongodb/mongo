@@ -19,10 +19,6 @@
  *   uses_parallel_shell,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/curop_helpers.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
@@ -356,4 +352,3 @@ testUpdateHintFailed({
     nModifiedBuckets: 0,
     failCode: ErrorCodes.BadValue,
 });
-})();

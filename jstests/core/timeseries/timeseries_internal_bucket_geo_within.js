@@ -18,10 +18,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_internal_bucket_geo_within;
 coll.drop();
@@ -314,4 +311,3 @@ assert.sameMembers(results, [
     err = assert.throws(() => coll.explain().aggregate(pipeline));
     assert.eq(err.code, ErrorCodes.BadValue, err);
 }
-}());

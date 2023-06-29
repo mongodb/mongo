@@ -6,12 +6,9 @@
  * ]
  */
 
-(function() {
-"use strict";
 load("jstests/aggregation/extras/utils.js");  // arrayEq, documentEq
 load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
-load("jstests/libs/analyze_plan.js");         // For getAggPlanStage.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 const collA = testDB.A;
@@ -260,4 +257,3 @@ if (!res["failpoint.disablePipelineOptimization"].mode) {
     expectedResult = indexedColl.explain("executionStats").aggregate([{$match: {val: {$gt: 2}}}]);
     assertExplainMatch(result, expectedResult);
 }
-})();

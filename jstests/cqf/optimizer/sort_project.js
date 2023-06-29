@@ -1,10 +1,12 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 var coll = db.cqf_testCovIndxScan;
@@ -78,4 +80,3 @@ const nDocs = 20;
     assert.eq(nDocs, res.executionStats.nReturned);
     assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
 }
-}());

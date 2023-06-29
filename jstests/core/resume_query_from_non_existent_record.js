@@ -15,10 +15,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collName = "resume_query_from_non_existent_record";
 const coll = db[collName];
@@ -136,4 +133,3 @@ const testAggregateCmd = function() {
 
 testFindCmd();
 testAggregateCmd();
-})();

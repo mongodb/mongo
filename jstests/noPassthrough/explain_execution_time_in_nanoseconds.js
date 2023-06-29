@@ -1,10 +1,7 @@
 // When running explain commands with "executionStats" verbosity, checks that the explain output
 // includes "executionTimeMicros"/"executionTimeNanos" only if requested.
 // "executionTimeMillisEstimate" will always be present in the explain output.
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAllPlanStages().
+import {getAllPlanStages} from "jstests/libs/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start up");
@@ -86,4 +83,3 @@ for (let executionStage of executionStages) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

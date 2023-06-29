@@ -11,10 +11,6 @@
  * @tags: [featureFlagBulkWriteCommand] // TODO SERVER-52419: Remove this tag.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");
 
@@ -337,4 +333,3 @@ commands.forEach(function(cmd) {
 });
 
 replTest.stopSet();
-})();

@@ -9,12 +9,8 @@
  *   requires_persistence,
  *  ]
  */
-(function() {
-'use strict';
-
 load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/remove_shard_util.js');
-load("jstests/libs/config_shard_util.js");
 load('jstests/replsets/rslib.js');
 
 const clusterParameter1Value = {
@@ -422,4 +418,3 @@ if (!TestData.configShard) {
         configShard.stopSet();
     }
 }
-})();

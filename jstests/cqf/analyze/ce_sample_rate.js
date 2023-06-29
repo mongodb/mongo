@@ -2,10 +2,14 @@
  * This is an integration test for histogram CE & statistics to ensure that we can estimate a
  * histogram appropriately for different sample sizes.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ce_stats_utils.js');
+import {
+    assertApproxEq,
+    createAndValidateHistogram,
+    createHistogram,
+    getRootCE,
+    runHistogramsTest
+} from "jstests/libs/ce_stats_utils.js";
+import {forceCE, round2} from "jstests/libs/optimizer_utils.js";
 
 const field = "sampled";
 const numDocs = 1000;
@@ -135,4 +139,3 @@ runHistogramsTest(function testSampleRates() {
         testSampleRatesForDocsWithPredicates(docs, expectedEst, expectedHistogram, sampleRates);
     }
 });
-})();

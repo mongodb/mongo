@@ -5,11 +5,7 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/feature_flag_util.js");
 
 const latest = "latest";
 
@@ -189,4 +185,3 @@ runStandaloneTest();
 runReplicaSetTest();
 testConfigServerFCVTimestampIsAlwaysNewer();
 runShardingTest();
-})();

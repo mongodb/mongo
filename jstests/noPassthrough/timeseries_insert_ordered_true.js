@@ -1,10 +1,7 @@
 /**
  * Tests that time-series inserts respect {ordered: true}.
  */
-(function() {
-'use strict';
-
-load('jstests/core/timeseries/libs/timeseries.js');
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load('jstests/libs/fail_point_util.js');
 
 const conn = MongoRunner.runMongod();
@@ -67,4 +64,3 @@ assert.eq(bucketsColl.count(),
               ' buckets but found: ' + tojson(bucketsColl.find().toArray()));
 
 MongoRunner.stopMongod(conn);
-})();

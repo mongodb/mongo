@@ -5,14 +5,11 @@
  * requires_fcv_70
  * ]
  */
-load("jstests/fle2/libs/encrypted_client_util.js");
-
-(function() {
-'use strict';
+import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 
 // Passthrough workaround
 if (!isMongos(db)) {
-    return;
+    quit();
 }
 
 let dbName = 'shard_state';
@@ -38,4 +35,3 @@ assert.commandFailedWithCode(
     db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecc', key: {_id: 1}}), 6464401);
 assert.commandFailedWithCode(
     db.adminCommand({shardCollection: 'shard_state.enxcol_.basic.ecoc', key: {_id: 1}}), 6464401);
-}());

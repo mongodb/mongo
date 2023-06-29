@@ -3,11 +3,8 @@
  * writeConcern greater than w:1.
  * @tags: [requires_replication, requires_majority_read_concern, requires_persistence]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
+import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const kNumNodes = 3;
 const replTest = new ReplSetTest({
@@ -214,4 +211,3 @@ const readColl = secondary.getDB("test").foo;
 })();
 
 replTest.stopSet();
-})();

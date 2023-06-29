@@ -8,9 +8,14 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");  // For planHasStage().
+import {
+    getAggPlanStage,
+    getWinningPlan,
+    isCollscan,
+    isIndexOnly,
+    isIxscan,
+    planHasStage,
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.distinct_with_hashed_index;
 coll.drop();
@@ -151,4 +156,3 @@ assert.eq(26, coll.aggregate(pipeline).itcount());
 explainPlan = coll.explain().aggregate(pipeline);
 assert.eq(null, getAggPlanStage(explainPlan, "DISTINCT_SCAN"), explainPlan);
 assert.neq(null, getAggPlanStage(explainPlan, "COLLSCAN"), explainPlan);
-})();

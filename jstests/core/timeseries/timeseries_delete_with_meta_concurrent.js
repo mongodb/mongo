@@ -20,10 +20,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/libs/curop_helpers.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
@@ -115,4 +111,3 @@ validateDeleteIndex([objA],
                     [{q: {[metaFieldName]: {a: "A"}}, limit: 0}],
                     ErrorCodes.NamespaceNotFound,
                     testCases.REPLACE_COLLECTION);
-})();

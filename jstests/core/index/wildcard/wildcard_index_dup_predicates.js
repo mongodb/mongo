@@ -5,11 +5,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");       // For getPlanStages.
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_index_dup_predicates;
 coll.drop();
@@ -91,4 +88,3 @@ assertExpectedDocAnswersWildcardIndexQuery(
     {a: {b: "foo"}},
     {$and: [{a: {$elemMatch: {$gt: {}}}}, {a: {$elemMatch: {$gt: {}}}}, {"a.b": "foo"}]},
     false);
-})();

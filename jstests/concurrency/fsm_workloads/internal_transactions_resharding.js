@@ -15,7 +15,6 @@ import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/internal_transactions_sharded.js";
 load('jstests/libs/fail_point_util.js');
-load("jstests/libs/feature_flag_util.js");
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     // reshardingMinimumOperationDurationMillis is set to 30 seconds when there are stepdowns.

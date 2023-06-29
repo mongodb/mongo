@@ -9,10 +9,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_index_dedup;
 coll.drop();
@@ -51,4 +48,3 @@ if (allowCompoundWildcardIndexes) {
     assert.eq(1, coll.find({"a.c": {$exists: true}, post: 1}).hint(compoundKeyPattern).itcount());
     assert.eq(1, coll.find({"a.h": {$exists: true}, post: 1}).hint(compoundKeyPattern).itcount());
 }
-})();

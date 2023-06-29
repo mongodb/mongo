@@ -25,9 +25,9 @@ class WaitForReplication(interface.Hook):
         start_time = time.time()
         client_conn = self.fixture.get_driver_connection_url()
         js_cmds = """
-            conn = '{}';
+            const conn = '{}';
             try {{
-                rst = new ReplSetTest(conn);
+                const rst = new ReplSetTest(conn);
                 rst.awaitReplication();
             }} catch (e) {{
                 jsTestLog("WaitForReplication got error: " + tojson(e));

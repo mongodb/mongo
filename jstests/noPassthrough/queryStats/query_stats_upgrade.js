@@ -2,11 +2,7 @@
  * Test that telemetry doesn't work on a lower FCV version but works after an FCV upgrade.
  * @tags: [featureFlagQueryStats]
  */
-load('jstests/libs/analyze_plan.js');
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-"use strict";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbpath = MongoRunner.dataPath + jsTestName();
 let conn = MongoRunner.runMongod({dbpath: dbpath});
@@ -40,4 +36,3 @@ function testLower(restart = false) {
 testLower(true);
 testLower(false);
 MongoRunner.stopMongod(conn);
-})();

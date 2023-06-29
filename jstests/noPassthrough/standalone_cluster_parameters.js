@@ -5,10 +5,11 @@
  *   requires_fcv_71,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    setupNode,
+    testInvalidClusterParameterCommands,
+    testValidClusterParameterCommands,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 const conn = MongoRunner.runMongod({});
 
@@ -22,4 +23,3 @@ testInvalidClusterParameterCommands(conn);
 testValidClusterParameterCommands(conn);
 
 MongoRunner.stopMongod(conn);
-})();

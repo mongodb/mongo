@@ -4,10 +4,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 let coll = db.jstest_distinct_multikey;
 coll.drop();
@@ -111,4 +108,3 @@ explain = coll.explain("queryPlanner").distinct("b.c", {a: 3});
 winningPlan = getWinningPlan(explain.queryPlanner);
 assert(planHasStage(db, winningPlan, "PROJECTION_DEFAULT"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
-}());

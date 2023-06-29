@@ -13,10 +13,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanStages.
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const collName = "index_filter_collation";
 const coll = db[collName];
@@ -118,4 +115,3 @@ assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
 explain = coll.explain().distinct("_id", {x: 3}, {collation: caseInsensitive});
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1});
-})();

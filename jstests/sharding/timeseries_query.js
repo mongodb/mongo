@@ -7,9 +7,8 @@
  * ]
  */
 
-(function() {
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {isClusteredIxscan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 Random.setRandomSeed();
 
@@ -520,4 +519,3 @@ function runQuery(
 })();
 
 st.stop();
-})();

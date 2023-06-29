@@ -1,11 +1,7 @@
 /**
  * Test that calls to read from telemetry store fail when feature flag is turned off.
  */
-load('jstests/libs/analyze_plan.js');
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-"use strict";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // This test specifically tests error handling when the feature flag is not on.
 // TODO SERVER-65800 this test can be removed when the feature flag is removed.
@@ -14,7 +10,7 @@ const testDB = conn.getDB('test');
 if (FeatureFlagUtil.isEnabled(testDB, "QueryStats")) {
     jsTestLog("Skipping test since query stats are enabled.");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 // Pipeline to read telemetry store should fail without feature flag turned on.
@@ -31,4 +27,3 @@ assert.commandFailedWithCode(testDB.adminCommand({
                              ErrorCodes.QueryFeatureNotAllowed);
 
 MongoRunner.stopMongod(conn);
-}());

@@ -1,7 +1,6 @@
-'use strict';
-
-(function() {
-load('jstests/libs/check_routing_table_consistency_helpers.js');  // For check implementation.
+import {
+    RoutingTableConsistencyChecker
+} from "jstests/libs/check_routing_table_consistency_helpers.js";
 load('jstests/libs/discover_topology.js');  // For Topology and DiscoverTopology.
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
@@ -15,4 +14,3 @@ if (topology.type !== Topology.kShardedCluster) {
         tojson(topology));
 }
 RoutingTableConsistencyChecker.run(db.getMongo());
-})();

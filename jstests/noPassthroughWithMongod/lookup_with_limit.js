@@ -1,15 +1,12 @@
 /**
  * Tests that the $limit stage is pushed before $lookup stages, except when there is an $unwind.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');  // For getWinningPlan().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {flattenQueryPlanTree, getWinningPlan} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE $lookup is not enabled.");
-    return;
+    quit();
 }
 
 const coll = db.lookup_with_limit;
@@ -88,4 +85,3 @@ pipeline = [
 ];
 checkResults(pipeline, false, ["COLLSCAN", "EQ_LOOKUP", "$unwind", "$sort", "$limit"]);
 checkResults(pipeline, true, ["COLLSCAN", "$lookup", "$sort"]);
-}());

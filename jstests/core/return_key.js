@@ -8,10 +8,7 @@
 /**
  * Tests for returnKey.
  */
-load("jstests/libs/analyze_plan.js");
-
-(function() {
-'use strict';
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var results;
 var explain;
@@ -84,4 +81,3 @@ assert.eq(results, [{a: 3, c: [1], d: [1]}, {a: 2, c: [2], d: [2]}, {a: 1, c: [3
 results =
     coll.find({}, {"c.d": {$meta: "sortKey"}}).hint({a: 1}).sort({b: 1}).returnKey().toArray();
 assert.eq(results, [{a: 3, c: {d: [1]}}, {a: 2, c: {d: [2]}}, {a: 1, c: {d: [3]}}]);
-})();

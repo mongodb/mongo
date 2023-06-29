@@ -4,10 +4,7 @@
 //  requires_profiling,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const localColl = db.local;
 const foreignColl = db.foreign;
@@ -54,4 +51,3 @@ if (eqLookupNodes.length === 0) {
     expectedCount += 3;
 }
 assert.eq(expectedCount, actualCount);
-}());

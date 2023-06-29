@@ -9,9 +9,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");  // For getPlanStages.
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.sparse_index_supports_ne_null;
 coll.drop();
@@ -198,5 +196,4 @@ checkQuery({
     nResultsExpected: 0,
     indexKeyPattern: keyPattern
 });
-})();
 })();

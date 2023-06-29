@@ -7,12 +7,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
-load("jstests/libs/feature_flag_util.js");
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const clustered = db.clusteredColl;
 const nonClustered = db.normalColl;
@@ -137,4 +134,3 @@ testResumeAfter(validateFailedResumeAfterInFind);
 if (FeatureFlagUtil.isPresentAndEnabled(db, "ReshardingImprovements")) {
     testResumeAfter(validateFailedResumeAfterInAggregate);
 }
-}());

@@ -1,10 +1,11 @@
 /**
  * Tests that 'internalCostModelCoefficients' can be set on startup.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath
+} from "jstests/libs/optimizer_utils.js";
 
 function getScanCostWith(customScanCost) {
     const costStr = `{"scanIncrementalCost": ${customScanCost}}`;
@@ -51,8 +52,7 @@ function getScanCostWith(customScanCost) {
 const scanCost1 = getScanCostWith(0.2);
 const scanCost2 = getScanCostWith(0.4);
 if (scanCost1 === undefined) {
-    return;
+    quit();
 }
 
 assert.lt(scanCost1, scanCost2);
-}());

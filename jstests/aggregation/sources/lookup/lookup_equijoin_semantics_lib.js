@@ -15,10 +15,10 @@
  */
 
 load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages()'
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
-const JoinAlgorithm = {
+export const JoinAlgorithm = {
     HJ: {name: "HJ", strategy: "HashJoin"},
     NLJ: {name: "NLJ", strategy: "NestedLoopJoin"},
     INLJ_Asc: {name: "INLJ_Asc", indexType: 1, strategy: "IndexedLoopJoin"},
@@ -26,7 +26,7 @@ const JoinAlgorithm = {
     INLJ_Hashed: {name: "INLJ_Hashed", indexType: "hashed", strategy: "IndexedLoopJoin"}
 };
 
-function setupCollections(testConfig, localRecords, foreignRecords, foreignField) {
+export function setupCollections(testConfig, localRecords, foreignRecords, foreignField) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
     localColl.drop();
     assert.commandWorked(localColl.insert(localRecords));
@@ -44,7 +44,7 @@ function setupCollections(testConfig, localRecords, foreignRecords, foreignField
  * Checks that the expected join algorithm has been used (to sanity check that the tests do provide
  * the intended coverage).
  */
-function checkJoinConfiguration(testConfig, explain) {
+export function checkJoinConfiguration(testConfig, explain) {
     const {currentJoinAlgorithm} = testConfig;
     const eqLookupNodes = getAggPlanStages(explain, "EQ_LOOKUP");
     if (checkSBEEnabled(db)) {
@@ -66,7 +66,7 @@ function checkJoinConfiguration(testConfig, explain) {
  * content of the "as" field but only that it's not empty for local records with ids in
  * 'idsExpectToMatch'.
  */
-function runTest_SingleForeignRecord(
+export function runTest_SingleForeignRecord(
     testConfig,
     {testDescription, localRecords, localField, foreignRecord, foreignField, idsExpectedToMatch}) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
@@ -115,7 +115,7 @@ function runTest_SingleForeignRecord(
  * Executes $lookup with exactly one record in the local collection and checks that the "as" field
  * for it contains documents with ids from `idsExpectedToMatch`.
  */
-function runTest_SingleLocalRecord(
+export function runTest_SingleLocalRecord(
     testConfig,
     {testDescription, localRecord, localField, foreignRecords, foreignField, idsExpectedToMatch}) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
@@ -154,7 +154,7 @@ function runTest_SingleLocalRecord(
 /**
  * Executes $lookup and expects it to fail with the specified 'expectedErrorCode`.
  */
-function runTest_ExpectFailure(
+export function runTest_ExpectFailure(
     testConfig,
     {testDescription, localRecords, localField, foreignRecords, foreignField, expectedErrorCode}) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
@@ -182,7 +182,7 @@ function runTest_ExpectFailure(
 /**
  * Tests.
  */
-function runTests(testConfig) {
+export function runTests(testConfig) {
     const {localColl, foreignColl, currentJoinAlgorithm} = testConfig;
 
     // Sanity-test that the join is configured correctly.

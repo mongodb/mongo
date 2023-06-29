@@ -1,10 +1,7 @@
 // Test basic db operations in multitenancy using $tenant.
 
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
-load("jstests/libs/feature_flag_util.js");    // for isEnabled
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({
     nodes: 3,
@@ -615,4 +612,3 @@ const testColl = testDb.getCollection(kCollName);
 }
 
 rst.stopSet();
-})();

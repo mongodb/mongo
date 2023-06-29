@@ -1,11 +1,7 @@
 /**
  * Test OR-pushdown fixes for elemMatch based on SERVER-74954.
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // for "arrayEq".
-load('jstests/libs/analyze_plan.js');         // for "planHasStage".
 
 const coll = db.jstests_elemmatch_or_pushdown_paths;
 
@@ -71,4 +67,3 @@ assert(arrayEq(
         {a: 5, b: [{c: 5, d: 6, e: 8}]},
         {a: 5, b: [{c: 5, d: 5, e: 7}]},
     ]));
-})();

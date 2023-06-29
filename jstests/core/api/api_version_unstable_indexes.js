@@ -14,12 +14,9 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");      // For 'getWinningPlan'.
-load("jstests/libs/fixture_helpers.js");   // For 'isMongos'.
-load("jstests/libs/columnstore_util.js");  // For 'setUpServerForColumnStoreIndexTest'.
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/fixture_helpers.js");  // For 'isMongos'.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const testDb = db.getSiblingDB(jsTestName());
 const collName = "api_verision_unstable_indexes";
@@ -99,4 +96,3 @@ if (setUpServerForColumnStoreIndexTest(testDb)) {
     }),
                                  ErrorCodes.BadValue);
 }
-})();

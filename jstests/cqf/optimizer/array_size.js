@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_array_size;
@@ -26,4 +24,3 @@ assert.eq(2, res.executionStats.nReturned);
 
 res = t.explain("executionStats").aggregate([{$match: {'a.b': {$size: 2}}}]);
 assert.eq(1, res.executionStats.nReturned);
-}());

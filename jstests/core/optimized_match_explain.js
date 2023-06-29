@@ -5,9 +5,7 @@
 /**
  * Tests that the explain output for $match reflects any optimizations.
  */
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.match_explain;
 coll.drop();
@@ -24,4 +22,3 @@ let explain = coll.explain().aggregate(
 
 assert.commandWorked(explain);
 assert.eq(getAggPlanStage(explain, "$match"), {$match: {c: {$eq: 1}}});
-}());

@@ -1,13 +1,10 @@
 //
 // Basic tests for refineCollectionShardKey.
 //
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
-
-(function() {
-'use strict';
-load("jstests/libs/config_shard_util.js");
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/profiler.js');
 load('jstests/sharding/libs/shard_versioning_util.js');
@@ -856,4 +853,3 @@ function compareBoundaries(conn, shardedNs, refinedNs) {
 })();
 
 st.stop();
-})();

@@ -3,10 +3,7 @@
  * various index types.
  */
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/analyze_plan.js");  // For getWinningPlan to analyze explain() output.
-
-(function() {
-"use strict";
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = 'test';
@@ -135,4 +132,3 @@ runTest({
 });
 
 MongoRunner.stopMongod(conn);
-})();

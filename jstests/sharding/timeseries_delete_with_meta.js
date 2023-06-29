@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 Random.setRandomSeed();
 
@@ -341,4 +338,3 @@ TimeseriesTest.run((insert) => {
 }, mainDB);
 
 st.stop();
-})();

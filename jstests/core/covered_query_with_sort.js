@@ -7,10 +7,7 @@
 //   assumes_unsharded_collection,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'isIndexOnly', 'getPlanStage' and 'getWinningPlan'.
+import {getPlanStage, getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db.covered_query_with_sort;
 coll.drop();
@@ -40,4 +37,3 @@ assert.neq(ixScanStage, null, plan);
 
 const results = buildQuery().toArray();
 assert.eq(results, [{y: 0, x: 1}, {y: 0, x: 0}], results);
-}());

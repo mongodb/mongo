@@ -13,13 +13,17 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");
-load("jstests/core/timeseries/libs/timeseries_agg_helpers.js");
-load("jstests/core/timeseries/libs/timeseries_lastpoint_helpers.js");
-load("jstests/libs/analyze_plan.js");
+import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {
+    createBoringCollections,
+    getMapInterestingValuesToEquivalentsStage,
+    createInterestingCollections,
+    expectDistinctScan,
+    expectCollScan,
+    expectIxscan,
+    testAllTimeMetaDirections,
+} from "jstests/core/timeseries/libs/timeseries_lastpoint_helpers.js";
 
 const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());
@@ -141,4 +145,3 @@ function getGroupStage(time, extraFields = []) {
             ];
         });
 }
-})();

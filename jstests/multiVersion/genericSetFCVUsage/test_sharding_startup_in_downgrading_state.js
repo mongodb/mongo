@@ -5,12 +5,8 @@
  *  @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
 load('jstests/multiVersion/libs/verify_versions.js');
 load('jstests/libs/fail_point_util.js');
-load("jstests/libs/feature_flag_util.js");
 
 function runSharding() {
     let fcvDoc;
@@ -115,4 +111,3 @@ function runSharding() {
 }
 
 runSharding();
-})();

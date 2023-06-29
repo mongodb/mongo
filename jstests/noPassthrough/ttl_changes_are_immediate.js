@@ -1,7 +1,5 @@
 // Ensure that changes to the TTL sleep time are reflected immediately.
-(function() {
-"use strict";
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 let runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1000"});
 let db = runner.getDB("test");
@@ -25,4 +23,3 @@ TTLUtil.waitForPass(coll.getDB(), true, 20 * 1000);
 assert.eq(coll.count(), 0, "We should get 0 documents after TTL monitor run");
 
 MongoRunner.stopMongod(runner);
-})();

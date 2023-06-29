@@ -10,10 +10,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_index_skipped_record_tracker;
@@ -34,4 +31,3 @@ TimeseriesTest.run((insert) => {
     const bucketColl = db.getCollection("system.buckets." + coll.getName());
     assert.commandFailedWithCode(bucketColl.createIndex({"control.min.time": "2dsphere"}), 16755);
 });
-}());

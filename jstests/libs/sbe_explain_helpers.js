@@ -3,10 +3,9 @@
  */
 
 // Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");
+import {getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
 
-function isIdIndexScan(db, root, expectedParentStageForIxScan) {
+export function isIdIndexScan(db, root, expectedParentStageForIxScan) {
     const parentStage = getPlanStage(root, expectedParentStageForIxScan);
     if (!parentStage)
         return false;
@@ -27,7 +26,7 @@ function isIdIndexScan(db, root, expectedParentStageForIxScan) {
  * Returns an empty array if the plan does not have the requested stage. Asserts that agg explain
  * structure matches expected format.
  */
-function getSbePlanStages(queryLayerOutput, stage) {
+export function getSbePlanStages(queryLayerOutput, stage) {
     assert(queryLayerOutput);
     const queryInfo = getQueryInfoAtTopLevelOrFirstStage(queryLayerOutput);
     // If execution stats are available, then use the execution stats tree.
@@ -46,7 +45,7 @@ function getSbePlanStages(queryLayerOutput, stage) {
  * SBE, then plan information will be in the 'queryPlanner' object. Currently, this supports find
  * query or pushed-down prefix pipeline stages.
  */
-function getQueryInfoAtTopLevelOrFirstStage(explainOutputV2) {
+export function getQueryInfoAtTopLevelOrFirstStage(explainOutputV2) {
     if (explainOutputV2.hasOwnProperty("queryPlanner")) {
         return explainOutputV2;
     }

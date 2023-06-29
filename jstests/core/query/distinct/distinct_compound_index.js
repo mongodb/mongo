@@ -4,11 +4,12 @@
 //   # Asserts that some queries use a collection scan.
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
-load("jstests/libs/analyze_plan.js");     // For planHasStage.
+import {
+    getWinningPlan,
+    planHasStage,
+    assertStagesForExplainOfCommand
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.distinct_multikey_index;
 
@@ -64,4 +65,3 @@ let result = assertStagesForExplainOfCommand({
     expectedStages: ["COLLSCAN"],
     stagesNotExpected: ["DISTINCT_SCAN"]
 });
-})();

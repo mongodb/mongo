@@ -3,14 +3,11 @@
  *
  * @tags: [requires_fcv_51]
  */
+load("jstests/aggregation/extras/utils.js");  // For arrayEq, documentEq.
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 // Test deliberately inserts orphans.
 TestData.skipCheckOrphans = true;
-
-(function() {
-load("jstests/aggregation/extras/utils.js");         // For arrayEq, documentEq.
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest.
-load("jstests/libs/analyze_plan.js");                // For planHasStage.
 
 const dbName = 'test';
 const collName = 'weather';
@@ -416,4 +413,3 @@ testPipeline({
 });
 
 st.stop();
-})();

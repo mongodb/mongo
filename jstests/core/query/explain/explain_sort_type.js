@@ -10,10 +10,7 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_sort_type;
 coll.drop();
@@ -100,4 +97,3 @@ winningPlan = getWinningPlan(explain.queryPlanner);
 sortStage = getPlanStage(winningPlan, "SORT");
 assert.neq(null, sortStage, explain);
 assert.eq("default", sortStage.type, explain);
-}());

@@ -11,11 +11,8 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 load('jstests/libs/index_catalog_helpers.js');
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
@@ -28,7 +25,7 @@ let db_primary = primary.getDB('test');
 
 if (!setUpServerForColumnStoreIndexTest(db_primary)) {
     rst.stopSet();
-    return;
+    quit();
 }
 
 let coll_primary = db_primary.getCollection(collName);
@@ -74,4 +71,3 @@ coll_primary = db_primary.getCollection(collName);
 }
 
 rst.stopSet();
-})();

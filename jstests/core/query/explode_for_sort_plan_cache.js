@@ -22,11 +22,12 @@
  *   does_not_support_repeated_reads,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");
+import {
+    getPlanCacheKeyFromShape,
+    getPlanStages,
+    getWinningPlan
+} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSBEEnabled(db);
 const coll = db.explode_for_sort_plan_cache;
@@ -216,4 +217,3 @@ assertExplodeForSortCacheParameterizedCorrectly({
     newQueryCount: 0,
     reuseEntry: false,
 });
-}());

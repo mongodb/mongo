@@ -15,14 +15,11 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skip running the test because SBE is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.plan_cache_sbe;
@@ -49,4 +46,3 @@ queryAndVerify({}, 2);
 queryAndVerify({a: 1}, 2);
 // Query with different hint.
 queryAndVerify({a: 1, b: 1}, 3);
-})();

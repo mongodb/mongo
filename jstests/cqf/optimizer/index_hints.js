@@ -1,10 +1,13 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled,
+    removeUUIDsFromExplain,
+    runWithParams,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_index_hints;
@@ -162,4 +165,3 @@ IndexScan [{'<rid>': rid_1}, scanDefName: cqf_index_hints_, indexDefName: a_1, i
     const actualStr = removeUUIDsFromExplain(db, res);
     assert.eq(expectedStr, actualStr);
 }
-}());

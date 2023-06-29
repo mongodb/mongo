@@ -8,10 +8,7 @@
  * Test projections with dotted field paths. Also test that such projections result in covered plans
  * when appropriate.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, isIdhack, isIndexOnly, isIxscan} from "jstests/libs/analyze_plan.js";
 load("jstests/aggregation/extras/utils.js");  // arrayEq
 
 let coll = db["projection_dotted_paths"];
@@ -129,4 +126,3 @@ assert.eq(resultDoc, {x: {y: {y: null, z: null}, z: null}});
     assert(arrayEq(coll.find({}, {_id: 0, "a.x": "$a.x", "a.b.x": "$a.x"}).toArray(),
                    [{a: {x: 1, b: {x: 1}}}]));
 }
-}());

@@ -10,15 +10,12 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-    return;
+    quit();
 }
 
 const testDB = db.getSiblingDB(jsTestName());
@@ -209,5 +206,4 @@ const verifyCreateCommandFails = function(secondsOptions = {}, errorCode) {
     verifyCreateCommandFails(
         {bucketRoundingSeconds: bucketingValueMax + 1, bucketMaxSpanSeconds: bucketingValueMax + 1},
         idlInvalidValueError);
-})();
 })();

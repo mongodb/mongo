@@ -1,10 +1,7 @@
 /**
  * Test that explain output is correctly truncated when it grows too large.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -50,4 +47,3 @@ assert.eq(
 assert(!planHasStage(testDb, explain, "IXSCAN"), explain);
 
 MongoRunner.stopMongod(conn);
-}());

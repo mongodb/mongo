@@ -7,10 +7,7 @@
  * featureFlagFLE2CleanupCommand
  * ]
  */
-load("jstests/fle2/libs/encrypted_client_util.js");
-
-(function() {
-'use strict';
+import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 
 function runTest(mongosConn, shardConn) {
     let dbName = 'testdb';
@@ -37,4 +34,3 @@ jsTestLog("Sharding: Testing fle2 cleanup not allowed against a shard server");
 
     st.stop();
 }
-}());

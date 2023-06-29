@@ -1,10 +1,11 @@
-load("jstests/query_golden/libs/example_data.js");
+import {show} from "jstests/libs/golden_test.js";
+import {sequentialIds} from "jstests/query_golden/libs/example_data.js";
 
 /**
  * Drops 'coll' and repopulates it with 'docs' and 'indexes'. Sequential _ids are added to
  * documents which do not have _id set.
  */
-function resetCollection(coll, docs, indexes = []) {
+export function resetCollection(coll, docs, indexes = []) {
     coll.drop();
 
     const docsWithIds = sequentialIds(docs);

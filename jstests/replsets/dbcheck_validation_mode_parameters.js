@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = "dbCheckValidationModeParameters";
 const colName = "dbCheckValidationModeParameters-collection";
@@ -106,4 +103,3 @@ if (secondaryIndexChecks) {
 }
 
 replSet.stopSet();
-})();

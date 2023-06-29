@@ -5,11 +5,8 @@
  *  requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet({setParameter: {timeseriesIdleBucketExpiryMemoryUsageThreshold: 10485760}});
@@ -110,4 +107,3 @@ for (let i = 0; i < numDocs; i++) {
 assert(foundExpiredBucket, "Did not find an expired bucket");
 
 rst.stopSet();
-})();

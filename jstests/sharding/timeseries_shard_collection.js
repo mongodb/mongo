@@ -6,11 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 Random.setRandomSeed();
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
@@ -323,4 +318,3 @@ assert.commandFailedWithCode(st.s.adminCommand({
                              ErrorCodes.IllegalOperation);
 
 st.stop();
-})();

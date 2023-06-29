@@ -2,10 +2,8 @@
  * Tests that randomly generated documents can be queried from timeseries collections in the same
  * manner as a tradional collection.
  */
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");             // For checkCascadesOptimizerEnabled.
 load('jstests/third_party/fast_check/fc-3.1.0.js');  // For fast-check (fc).
 
 // TODO SERVER-67506: Re-enable this test when a decision is made about how Bonsai will handle
@@ -83,4 +81,3 @@ let testMixedTypeQuerying = () => {
 };  // testMixedTypeQuerying
 
 testMixedTypeQuerying();
-})();

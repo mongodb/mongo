@@ -4,10 +4,7 @@
  *   uses_change_streams,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/config_shard_util.js");
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 const dbName = jsTestName();
 const setupShardedCluster = (shards = 1) => {
@@ -206,4 +203,3 @@ assert(!c.isExhausted());
 assert(!c.hasNext());
 
 st.stop();
-})();

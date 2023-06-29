@@ -1,9 +1,9 @@
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage, isAggregationPlan} from "jstests/libs/analyze_plan.js";
 
 /**
  * Utility for checking if the Cascades optimizer code path is enabled (checks framework control).
  */
-function checkCascadesOptimizerEnabled(theDB) {
+export function checkCascadesOptimizerEnabled(theDB) {
     const val = theDB.adminCommand({getParameter: 1, internalQueryFrameworkControl: 1})
                     .internalQueryFrameworkControl;
     return val == "tryBonsai" || val == "tryBonsaiExperimental" || val == "forceBonsai";
@@ -12,7 +12,7 @@ function checkCascadesOptimizerEnabled(theDB) {
 /**
  * Utility for checking if the Cascades optimizer feature flag is on.
  */
-function checkCascadesFeatureFlagEnabled(theDB) {
+export function checkCascadesFeatureFlagEnabled(theDB) {
     const featureFlag = theDB.adminCommand({getParameter: 1, featureFlagCommonQueryFramework: 1});
     return featureFlag.hasOwnProperty("featureFlagCommonQueryFramework") &&
         featureFlag.featureFlagCommonQueryFramework.value;
@@ -21,7 +21,7 @@ function checkCascadesFeatureFlagEnabled(theDB) {
 /**
  * Given the result of an explain command, returns whether the bonsai optimizer was used.
  */
-function usedBonsaiOptimizer(explain) {
+export function usedBonsaiOptimizer(explain) {
     if (!isAggregationPlan(explain)) {
         return explain.queryPlanner.winningPlan.hasOwnProperty("optimizerPlan");
     }
@@ -40,7 +40,7 @@ function usedBonsaiOptimizer(explain) {
  *
  * This is useful for finding the access path part of a plan, typically a PhysicalScan or IndexScan.
  */
-function leftmostLeafStage(node) {
+export function leftmostLeafStage(node) {
     for (;;) {
         if (node.queryPlanner) {
             node = node.queryPlanner;
@@ -64,7 +64,7 @@ function leftmostLeafStage(node) {
 /**
  * Retrieves the cardinality estimate from a node in explain.
  */
-function extractLogicalCEFromNode(node) {
+export function extractLogicalCEFromNode(node) {
     const ce = node.properties.logicalProperties.cardinalityEstimate[0].ce;
     assert.neq(ce, null, tojson(node));
     return ce;
@@ -73,7 +73,7 @@ function extractLogicalCEFromNode(node) {
 /**
  * Get a very simplified version of a plan, which only includes nodeType and nesting structure.
  */
-function getPlanSkeleton(node, options = {}) {
+export function getPlanSkeleton(node, options = {}) {
     const {extraKeepKeys = [], keepKeysDeep = [], printFilter = false, printLogicalCE = false} =
         options;
 
@@ -120,7 +120,7 @@ function getPlanSkeleton(node, options = {}) {
  * This is completely ignorant of the structure of a query: for example if there
  * are literals match the predicate, it will also match those.
  */
-function findSubtrees(tree, predicate) {
+export function findSubtrees(tree, predicate) {
     let result = [];
     const visit = subtree => {
         if (typeof subtree === 'object' && subtree != null) {
@@ -142,7 +142,7 @@ function findSubtrees(tree, predicate) {
     return result;
 }
 
-function printBound(bound) {
+export function printBound(bound) {
     if (!Array.isArray(bound.bound)) {
         return [false, ""];
     }
@@ -165,7 +165,7 @@ function printBound(bound) {
     return [true, result];
 }
 
-function prettyInterval(compoundInterval) {
+export function prettyInterval(compoundInterval) {
     // Takes an array of intervals, each one applying to one component of a compound index key.
     // Try to format it as a string.
     // If either bound is not Constant, return the original JSON unchanged.
@@ -198,7 +198,7 @@ function prettyInterval(compoundInterval) {
     return result.trim();
 }
 
-function prettyExpression(expr) {
+export function prettyExpression(expr) {
     switch (expr.nodeType) {
         case 'Variable':
             return expr.name;
@@ -237,7 +237,7 @@ function prettyExpression(expr) {
     }
 }
 
-function prettyOp(op) {
+export function prettyOp(op) {
     // See src/mongo/db/query/optimizer/syntax/syntax.h, PATHSYNTAX_OPNAMES.
     switch (op) {
         /* comparison operations */
@@ -289,7 +289,7 @@ function prettyOp(op) {
  * Helper function to remove UUIDs of collections in the supplied database from a V1 or V2 optimizer
  * explain.
  */
-function removeUUIDsFromExplain(db, explain) {
+export function removeUUIDsFromExplain(db, explain) {
     const listCollsRes = db.runCommand({listCollections: 1}).cursor.firstBatch;
     let plan = explain.queryPlanner.winningPlan.optimizerPlan.plan.toString();
 
@@ -300,7 +300,7 @@ function removeUUIDsFromExplain(db, explain) {
     return plan;
 }
 
-function navigateToPath(doc, path) {
+export function navigateToPath(doc, path) {
     let result;
     let field;
 
@@ -319,15 +319,15 @@ function navigateToPath(doc, path) {
     }
 }
 
-function navigateToPlanPath(doc, path) {
+export function navigateToPlanPath(doc, path) {
     return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan." + path);
 }
 
-function navigateToRootNode(doc) {
+export function navigateToRootNode(doc) {
     return navigateToPath(doc, "queryPlanner.winningPlan.optimizerPlan");
 }
 
-function assertValueOnPathFn(value, doc, path, fn) {
+export function assertValueOnPathFn(value, doc, path, fn) {
     try {
         assert.eq(value, fn(doc, path));
     } catch (e) {
@@ -337,15 +337,15 @@ function assertValueOnPathFn(value, doc, path, fn) {
     }
 }
 
-function assertValueOnPath(value, doc, path) {
+export function assertValueOnPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPath);
 }
 
-function assertValueOnPlanPath(value, doc, path) {
+export function assertValueOnPlanPath(value, doc, path) {
     assertValueOnPathFn(value, doc, path, navigateToPlanPath);
 }
 
-function runWithParams(keyValPairs, fn) {
+export function runWithParams(keyValPairs, fn) {
     let prevVals = [];
 
     try {
@@ -380,7 +380,7 @@ function runWithParams(keyValPairs, fn) {
     }
 }
 
-function round2(n) {
+export function round2(n) {
     return (Math.round(n * 100) / 100);
 }
 
@@ -388,7 +388,7 @@ function round2(n) {
  * Force cardinality estimation mode: "histogram", "heuristic", or "sampling". We need to force the
  * use of the new optimizer.
  */
-function forceCE(mode) {
+export function forceCE(mode) {
     assert.commandWorked(
         db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
     assert.commandWorked(

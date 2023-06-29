@@ -5,11 +5,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 load('jstests/replsets/libs/rollback_test.js');
-load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Operations that will be present on both nodes, before the common point.
 const dbName = 'test';
@@ -68,7 +65,7 @@ const rollbackTest = new RollbackTest(jsTestName(), /*replSet=*/ undefined, node
 if (!FeatureFlagUtil.isEnabled(rollbackTest.getPrimary(), "LargeBatchedOperations")) {
     jsTestLog('Skipping test because required feature flag is not enabled.');
     rollbackTest.stop();
-    return;
+    quit();
 }
 
 CommonOps(rollbackTest.getPrimary());
@@ -88,4 +85,3 @@ const coll = primary.getCollection(collName);
 assert.eq(docIds.length, coll.countDocuments({}));
 
 rollbackTest.stop();
-})();

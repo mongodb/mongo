@@ -6,9 +6,7 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Creates two indexes for the given collection. In order for plans to be cached, there need to be
@@ -86,7 +84,7 @@ const coll = db.plan_cache_memory_debug_info;
 if (checkSBEEnabled(db)) {
     jsTest.log("Skipping test because SBE is enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 coll.drop();
@@ -224,4 +222,3 @@ assertCacheEntryHasDebugInfo(largeQueryCacheEntry);
 assert.gt(largeQueryCacheEntry.estimatedSizeBytes, 10 * 1024, largeQueryCacheEntry);
 
 MongoRunner.stopMongod(conn);
-}());

@@ -1,6 +1,7 @@
 /**
  * Example query-correctness test using the golden-data framework.
  */
+import {show} from "jstests/libs/golden_test.js";
 
 const coll = db.query_golden_example;
 coll.drop();

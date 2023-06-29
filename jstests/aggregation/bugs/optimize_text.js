@@ -4,10 +4,7 @@
 //   # because the shard doesn't know whether the merger needs the textScore metadata.
 //   assumes_unsharded_collection,
 // ]
-(function() {
-'use strict';
-
-load("jstests/libs/analyze_plan.js");
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.optimize_text;
 assert.commandWorked(coll.createIndex({"$**": "text"}));
@@ -38,4 +35,3 @@ assert(!planHasStage(db, aggExplain, 'TEXT_OR'), aggExplain);
 // optimization.
 assert(!planHasStage(db, findSingleTermExplain, 'OR'), findSingleTermExplain);
 assert(!planHasStage(db, findSingleTermExplain, 'TEXT_OR'), findSingleTermExplain);
-})();

@@ -4,12 +4,7 @@
  *   requires_fcv_52,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 
 const coll = db.linear_fill;
 coll.drop();
@@ -517,4 +512,3 @@ assert.commandFailedWithCode(db.runCommand({
     cursor: {}
 }),
                              ErrorCodes.TypeMismatch);
-})();

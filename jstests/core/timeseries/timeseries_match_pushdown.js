@@ -9,10 +9,7 @@
  *   directly_against_shardsvrs_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_match_pushdown;
 coll.drop();
@@ -410,4 +407,3 @@ runTest({
     },
     expectedDocs: [],
 });
-})();

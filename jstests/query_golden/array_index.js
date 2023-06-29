@@ -7,10 +7,8 @@
  *   requires_cqf,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For getPlanSkeleton.
+import {show} from "jstests/libs/golden_test.js";
+import {getPlanSkeleton} from "jstests/libs/optimizer_utils.js";
 
 db.setLogLevel(4, "query");
 
@@ -38,4 +36,3 @@ function run(pipeline) {
 
 run([{$match: {a: 2}}, {$unset: '_id'}]);
 run([{$match: {a: {$lt: 2}}}, {$unset: '_id'}]);
-})();

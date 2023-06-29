@@ -8,10 +8,7 @@
 //   assumes_balancer_off,
 //   does_not_support_stepdowns,
 // ]
-(function() {
-'use strict';
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db.covered_negative_1;
 coll.drop();
@@ -96,4 +93,3 @@ assert.neq(0,
            "negative.1.8 - nscannedObjects should not be 0 for a non covered query");
 
 print('all tests passed');
-})();

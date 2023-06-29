@@ -1,8 +1,4 @@
 
-(function() {
-"use strict";
-load("jstests/libs/feature_flag_util.js");
-
 const st = new ShardingTest({shards: 3, chunkSize: 1});
 const configDB = st.s.getDB('config');
 const shard0 = st.shard0.shardName;
@@ -445,4 +441,3 @@ jsTest.log(
 testAddShard();
 
 st.stop();
-}());

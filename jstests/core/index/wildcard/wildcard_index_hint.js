@@ -5,11 +5,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/analyze_plan.js");         // For getPlanStages.
+import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.wildcard_hint;
 coll.drop();
@@ -98,4 +95,3 @@ assertExpectedIndexAnswersQueryWithHint(
 // Hint a $** index by name.
 assertExpectedIndexAnswersQueryWithHint(
     {"a": 1}, "$**_1", "$**_1", [{a: 1, b: 1, c: {d: 1, e: 1}}, {a: 1, b: 2, c: {d: 2, e: 2}}]);
-})();

@@ -9,11 +9,7 @@
  *   requires_replication
  * ]
  */
-
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const memoryLimitMb = 1;
 const memoryLimitBytes = 1 * 1024 * 1024;
@@ -159,4 +155,3 @@ runTest(connRecoverStandalone, true);
 runTest(connRecoverStandalone, false);
 
 MongoRunner.stopMongod(connRecoverStandalone);
-})();

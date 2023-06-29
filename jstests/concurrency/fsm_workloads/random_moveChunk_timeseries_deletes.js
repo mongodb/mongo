@@ -13,7 +13,7 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_inserts.js';
-load('jstests/core/timeseries/libs/timeseries.js');  // For 'TimeseriesTest' helpers.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.generateMetaFieldValueForInitialInserts = () => {

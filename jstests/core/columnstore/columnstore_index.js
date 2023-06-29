@@ -24,14 +24,11 @@
  *   uses_full_validation,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.columnstore_index;
@@ -128,4 +125,3 @@ assert(
         {v: 2, key: {"$**": "columnstore"}, name: "$**_columnstore", columnstoreProjection: {x: 1}},
         listIndexesResult),
     listIndexesResult);
-}());

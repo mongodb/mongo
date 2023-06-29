@@ -14,14 +14,11 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!FeatureFlagUtil.isEnabled(db, "CollModIndexUnique")) {
     jsTestLog('Skipping test because the collMod unique index feature flag is disabled.');
-    return;
+    quit();
 }
 
 const collName = 'collmod_convert_to_unique';
@@ -184,4 +181,3 @@ if (db.getMongo().isMongos()) {
 
 // Tests the index now accepts duplicate keys.
 assert.commandWorked(coll.insert({_id: 100, a: 100}));
-})();

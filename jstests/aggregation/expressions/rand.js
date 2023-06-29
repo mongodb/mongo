@@ -1,11 +1,6 @@
 /**
  * Test the $rand expression.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStage().
-
 const coll = db.expression_rand;
 coll.drop();
 
@@ -29,4 +24,3 @@ print("Average: ", avg);
 const err = 10.0 / Math.sqrt(12.0 * N);
 assert.lte(0.5 - err, avg);
 assert.gte(0.5 + err, avg);
-}());

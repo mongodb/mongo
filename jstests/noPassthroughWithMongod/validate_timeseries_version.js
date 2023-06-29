@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let testCount = 0;
 const collNamePrefix = "validate_timeseries_version";
@@ -133,4 +130,3 @@ res = bucket.validate();
 assert(res.valid, tojson(res));
 assert.eq(res.nNonCompliantDocuments, 2);
 assert.eq(res.warnings.length, 1);
-})();

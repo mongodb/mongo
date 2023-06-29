@@ -9,11 +9,8 @@
  *   expects_explicit_underscore_id_index,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "test";
 const collName = "sbe_plan_cache_does_not_block_range_deletion";
@@ -93,4 +90,3 @@ if (isSBEEnabled) {
 }
 
 st.stop();
-})();

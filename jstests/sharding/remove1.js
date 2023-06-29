@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load("jstests/libs/config_shard_util.js");
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 var s = new ShardingTest({shards: 2, other: {enableBalancer: true}});
 var config = s.s0.getDB('config');
@@ -66,4 +63,3 @@ assert.eq(2, s.config.shards.count(), "new server does not appear in count");
 
 rs.stopSet();
 s.stop();
-})();

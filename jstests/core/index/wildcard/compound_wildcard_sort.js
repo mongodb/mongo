@@ -15,12 +15,9 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For getWinningPlan(), getPlanStages().
-load("jstests/libs/fixture_helpers.js");      // For numberOfShardsForCollection().
+import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
 
 const coll = db.compound_wildcard_sort;
 coll.drop();
@@ -219,4 +216,3 @@ function testIndexesForWildcardField(wildcardField, subFields) {
 initializeDocs();
 testIndexesForWildcardField("wild.$**", ["wild.num1", "wild.str1"]);
 testIndexesForWildcardField("$**", ["num2", "str2"]);
-})();

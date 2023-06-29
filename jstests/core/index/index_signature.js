@@ -9,11 +9,8 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
-load("jstests/libs/fixture_helpers.js");    // For 'isSharded'.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+load("jstests/libs/fixture_helpers.js");  // For 'isSharded'.
 
 const testDB = db.getSiblingDB(jsTestName());
 const coll = testDB.test;
@@ -249,4 +246,3 @@ if (allowCompoundWildcardIndexes) {
                          {name: "cwi_a_sub_b_c_1", wildcardProjection: {"a.c": 1, "a.b": 1}}),
         ErrorCodes.IndexOptionsConflict);
 }
-})();

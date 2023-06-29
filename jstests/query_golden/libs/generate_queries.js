@@ -1,11 +1,11 @@
 /**
  * Helper functions for generating of queries over a collection.
  */
-function makeMatchPredicate(field, boundary, compOp) {
+export function makeMatchPredicate(field, boundary, compOp) {
     return {"$match": {[field]: {[compOp]: boundary}}};
 }
 
-function makeRangePredicate(field, op1, bound1, op2, bound2, isElemMatch = false) {
+export function makeRangePredicate(field, op1, bound1, op2, bound2, isElemMatch = false) {
     if (isElemMatch) {
         return {"$match": {[field]: {"$elemMatch": {[op1]: bound1, [op2]: bound2}}}};
     }
@@ -18,7 +18,7 @@ function makeRangePredicate(field, op1, bound1, op2, bound2, isElemMatch = false
  * explosion in the number of predicates we create all comparison predicates only for 25% of the
  * query values, while for the other 75% we pick one comparison operator in a round-robin fashion.
  */
-function generateComparisons(field, boundaries, fieldType) {
+export function generateComparisons(field, boundaries, fieldType) {
     let predicates = [];
     const compOps = ["$eq", "$lt", "$lte", "$gt", "$gte"];
     // Index over boundaries.
@@ -56,10 +56,10 @@ function generateComparisons(field, boundaries, fieldType) {
     return docs;
 }
 
-const min_char_code = '0'.codePointAt(0);
-const max_char_code = '~'.codePointAt(0);
+export const min_char_code = '0'.codePointAt(0);
+export const max_char_code = '~'.codePointAt(0);
 
-function nextChar(thisChar, distance) {
+export function nextChar(thisChar, distance) {
     const number_of_chars = max_char_code - min_char_code + 1;
     const char_code = thisChar.codePointAt(0);
     assert(min_char_code <= char_code <= max_char_code, "char is out of range");
@@ -73,7 +73,7 @@ function nextChar(thisChar, distance) {
  * Produces a string value at some distance from the argument string.
  * distance: "small", "middle", "large".
  */
-function nextStr(str, distance) {
+export function nextStr(str, distance) {
     var res = 'nextStrUndefined';
     const spec = {"small": 3, "medium": 2, "large": 1};
     if (str.length == 0) {
@@ -90,8 +90,8 @@ function nextStr(str, distance) {
 
         let newStr0 = str.slice(0, pos);
         let nextCh = nextChar(str[pos], 4 - spec[distance] /*char distance*/);
-        newStr1 = newStr0 + nextCh;
-        newStr = newStr1 + str.slice(pos + 1, str.length);
+        const newStr1 = newStr0 + nextCh;
+        const newStr = newStr1 + str.slice(pos + 1, str.length);
         assert(newStr.indexOf("NaN") == -1,
                `Found NaN with inputs: newStr=${newStr}, str=${str}, distance=${distance}; pos=${
                    pos}, nextCh=${nextCh}, newStr0=${newStr0}, newStr1=${newStr1}`);
@@ -110,7 +110,7 @@ function nextStr(str, distance) {
  * types both low and upper bounds are taken from the 'values' array and rangeSize is the distance
  * they are apart from each other.
  */
-function generateRanges(values, fieldType, rangeSize) {
+export function generateRanges(values, fieldType, rangeSize) {
     let ranges = [];
     if (fieldType == 'integer' || fieldType == 'double') {
         for (const val of values) {
@@ -118,7 +118,7 @@ function generateRanges(values, fieldType, rangeSize) {
         }
     } else if (fieldType == 'string') {
         for (const val of values) {
-            nanPos = val.indexOf("NaN");
+            const nanPos = val.indexOf("NaN");
             assert(nanPos == -1, `Found NaN in values: ${values}, ${val}, ${nanPos}`);
             var nextVar = nextStr(val, rangeSize);
             assert(nextVar != 'nextStrUndefined',
@@ -155,7 +155,7 @@ function generateRanges(values, fieldType, rangeSize) {
  * Split an ordered array of values into sub-arrays of the same type.
  * Example: [0, 25, 'an', 'mac', 'zen'] -> [[0, 25], ['an', 'mac', 'zen']].
  */
-function splitValuesPerType(values) {
+export function splitValuesPerType(values) {
     let tp = typeof values[0];
     let changePos = [0];
     let i = 1;
@@ -176,10 +176,10 @@ function splitValuesPerType(values) {
     return typedValues;
 }
 
-function getTypeFromFieldName(fieldName) {
+export function getTypeFromFieldName(fieldName) {
     const fieldMeta = fieldName.split("_");
     let elemType = undefined;
-    for (fieldPart of fieldMeta) {
+    for (let fieldPart of fieldMeta) {
         if (fieldPart == "int") {
             elemType = "integer";
         } else if (fieldPart == "dbl") {
@@ -202,7 +202,7 @@ function getTypeFromFieldName(fieldName) {
  * in the 'queryValues' document: {values: [1, 15, 37, 72, 100], min: 1, max: 100}. The 'values'
  * array is sorted.
  */
-function generateRangePredicates(field, queryValues, fieldType) {
+export function generateRangePredicates(field, queryValues, fieldType) {
     const querySpecs = {"small": 0.001, "medium": 0.01, "large": 0.1};
 
     const opOptions = [["$gt", "$lt"], ["$gt", "$lte"], ["$gte", "$lt"], ["$gte", "$lte"]];
@@ -269,7 +269,7 @@ function generateRangePredicates(field, queryValues, fieldType) {
 /**
  * Helper function to extract positions for a sample of size n from a collection.
  */
-function selectSamplePos(collSize, n) {
+export function selectSamplePos(collSize, n) {
     let samplePos = [];
     let step = Math.round(collSize / n);
     let offset = n * step - collSize;
@@ -284,11 +284,11 @@ function selectSamplePos(collSize, n) {
     return samplePos;
 }
 
-function selectSample(coll, samplePos) {
+export function selectSample(coll, samplePos) {
     return coll.aggregate([{$match: {"_id": {$in: samplePos}}}]).toArray();
 }
 
-function selectFieldValues(sample, field) {
+export function selectFieldValues(sample, field) {
     let values = [];
     for (const doc of sample) {
         values.push(doc[field]);
@@ -299,7 +299,7 @@ function selectFieldValues(sample, field) {
 /**
  * Selects few values from histogram bucket boundaries.
  */
-function selectHistogramBounds(statsColl, field, fieldType) {
+export function selectHistogramBounds(statsColl, field, fieldType) {
     let values = [];
     let stats = statsColl.find({"_id": field})[0];
     // Specify which bucket bound to choose from each histogram type. The number is ratio of the
@@ -332,7 +332,7 @@ function selectHistogramBounds(statsColl, field, fieldType) {
  * Extract min/max values from a field. The initial unwind phase extracts the values in case the
  * field contains arrays.
  */
-function getMinMax(coll, field) {
+export function getMinMax(coll, field) {
     const res = coll.aggregate([
                         {$unwind: field},
                         {$group: {_id: null, min: {$min: field}, max: {$max: field}}},
@@ -346,7 +346,7 @@ function getMinMax(coll, field) {
  * Extract query values from an array of sample arrays. Select up to three values per array element.
  * {[1, 3, 5], [ 2, 4, 6, 8, 10], [100]] -> [1, 3, 5, 2, 6, 10, 100]
  */
-function selectArrayValues(nestedArray) {
+export function selectArrayValues(nestedArray) {
     let values = [];
     nestedArray.forEach(function(array) {
         if (typeof array != "object") {
@@ -366,7 +366,7 @@ function selectArrayValues(nestedArray) {
     return values;
 }
 
-function selectOutOfRangeValues(minMaxDoc, fieldType) {
+export function selectOutOfRangeValues(minMaxDoc, fieldType) {
     let values = [];
     const validTypes = new Set(["integer", "double", "string", "date"]);
     if (!validTypes.has(fieldType)) {
@@ -397,7 +397,7 @@ function selectOutOfRangeValues(minMaxDoc, fieldType) {
     return values;
 }
 
-function sortValues(values) {
+export function sortValues(values) {
     let sortColl = db["sortColl"];
     sortColl.drop();
     for (const x of values) {
@@ -411,7 +411,7 @@ function sortValues(values) {
     return sorted;
 }
 
-function deduplicate(boundaries) {
+export function deduplicate(boundaries) {
     let values = [boundaries[0]];
     let i = 0;
     while (i + 1 < boundaries.length) {
@@ -435,7 +435,7 @@ function deduplicate(boundaries) {
  * values, min, and max for the respective field. Example:
  * {"a": {values: [1, 15, 37, 72, 100], min: 1, max: 100}, "b": {...} }
  */
-function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
+export function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
     const sample = selectSample(coll, samplePos);
 
     let queryValues = {};
@@ -478,7 +478,7 @@ function selectQueryValues(coll, fields, fieldTypes, samplePos, statsColl) {
  * Query generation for a collection 'coll' with given fields and field types.
  * The generation uses values from a collection sample with 'sampleSize'.
  */
-function generateQueries(fields, fieldTypes, queryValues) {
+export function generateQueries(fields, fieldTypes, queryValues) {
     let testCases = [];
     let i = 0;
     while (i < fields.length) {
@@ -508,7 +508,7 @@ function generateQueries(fields, fieldTypes, queryValues) {
  * - step: step to navigate through the testCases array
  * - predicates: array of result predicate documents
  */
-function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, step, predicates) {
+export function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, step, predicates) {
     assert.eq(curPos, chosenIds.length);
     let i = (curPos == 0) ? 0 : chosenIds.at(-1) + 1;
 
@@ -548,7 +548,8 @@ function pickNextTerm(testCases, cnt, curPos, chosenIds, chosenFields, step, pre
  * op: $and or $or
  * comp: array of comparisons for predicate terms
  */
-function makeSingleFieldComplexPredicate(field, values, op, comp, predicates, isArray = false) {
+export function makeSingleFieldComplexPredicate(
+    field, values, op, comp, predicates, isArray = false) {
     let terms = [];
     for (let i = 0; i < comp.length; i++) {
         terms.push({[field]: {[comp[i]]: values[i]}});
@@ -570,7 +571,7 @@ function makeSingleFieldComplexPredicate(field, values, op, comp, predicates, is
 /**
  * Make a single field DNF predicate.
  */
-function makeSingleFieldDNF(field, values, predicates) {
+export function makeSingleFieldDNF(field, values, predicates) {
     let term1 = {"$and": [{[field]: {"$gt": values[0]}}, {[field]: {"$lt": values[1]}}]};
     let term2 = {"$and": [{[field]: {"$gte": values[2]}}, {[field]: {"$lt": values[3]}}]};
 
@@ -586,7 +587,7 @@ function makeSingleFieldDNF(field, values, predicates) {
 /**
  * Generate single-field conjunctions and disjunctions using values from the 'queryValues' document.
  */
-function generateSingleFieldPredicates(fields, fieldTypes, queryValues, predicates) {
+export function generateSingleFieldPredicates(fields, fieldTypes, queryValues, predicates) {
     let i = 0;
     while (i < fields.length) {
         const field = fields[i];
@@ -628,7 +629,7 @@ function generateSingleFieldPredicates(fields, fieldTypes, queryValues, predicat
  * - single-field conjunctions and disjunctions with 2 and 4 terms.
  * - single-field DNFs.
  */
-function generateComplexPredicates(testCases, fields, fieldTypes, queryValues) {
+export function generateComplexPredicates(testCases, fields, fieldTypes, queryValues) {
     let predicates = [];
     // Generate multi-field conjunctions.
     let chosenFields = new Set();

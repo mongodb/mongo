@@ -15,16 +15,13 @@
  *   not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/analyze_plan.js");         // For "planHasStage."
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
-load("jstests/libs/columnstore_util.js");     // For "setUpServerForColumnStoreIndexTest."
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 //
@@ -210,4 +207,3 @@ runTestWithDocsAndIndexes("sibling_paths_5",
 
 // Note that this test does not drop any of its test collections or indexes, so that they will be
 // available to follow-on index validation tests.
-})();

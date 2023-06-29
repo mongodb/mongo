@@ -5,10 +5,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/analyze_plan.js');
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const collName = 'index_bounds_pipe';
 const coll = db.getCollection(collName);
@@ -114,4 +111,3 @@ assertIndexBoundsAndResult({
     bounds: ['["\\|", "\\}")', '[/^\\Q\\|\\E/, /^\\Q\\|\\E/]'],
     results: [{_id: '\\|'}]
 });
-}());

@@ -15,15 +15,12 @@
 //   cqf_experimental_incompatible,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {getPlanCacheKeyFromShape, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skip running the test because SBE is not enabled");
-    return;
+    quit();
 }
 
 function getPlanCacheEntries(query, collection, db) {
@@ -59,4 +56,3 @@ assert.eq(true, planCacheEntries[0].isPinned, planCacheEntries);
 assert.eq(true, planCacheEntries[0].isActive, planCacheEntries);
 // Works is always 0 for pinned plan cache entries.
 assert.eq(0, planCacheEntries[0].works, planCacheEntries);
-}());

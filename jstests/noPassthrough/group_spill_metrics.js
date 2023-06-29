@@ -7,11 +7,8 @@
  *   requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStage().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB('test');
@@ -74,4 +71,3 @@ assert.eq(
     metricsAfter.spilledRecords, expectedSpilledRecords + metricsBefore.spilledRecords, pipeline);
 
 MongoRunner.stopMongod(conn);
-}());

@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");     // For getPlanStages.
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection.
 
 const coll = db.regex_distinct;
@@ -24,4 +22,3 @@ const distinctScanStages =
     getPlanStages(coll.explain().distinct("a", {a: {"$regex": "^ab.*"}}), "DISTINCT_SCAN");
 
 assert.eq(distinctScanStages.length, FixtureHelpers.numberOfShardsForCollection(coll));
-})();

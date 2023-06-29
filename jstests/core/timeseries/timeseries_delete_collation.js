@@ -10,10 +10,8 @@
  * ]
  */
 
-(function() {
-"use strict";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");     // For getPlanStage().
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos'
 
 const timeFieldName = "time";
@@ -416,5 +414,4 @@ function runTest({
         },
         expectedDeleteStage: "DELETE"
     });
-})();
 })();

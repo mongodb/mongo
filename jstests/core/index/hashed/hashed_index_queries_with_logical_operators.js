@@ -7,11 +7,8 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.hashed_index_queries_with_logical_operators;
 coll.drop();
@@ -152,4 +149,3 @@ validateFindCmdOutputAndPlan({
     expectedOutput: [{a: 12, b: 12}, {a: null, b: 12}, {b: 12}],
     expectedStages: ["IXSCAN"]
 });
-})();

@@ -8,11 +8,7 @@
  *   requires_fcv_61,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");
-load("jstests/core/timeseries/libs/timeseries.js");
 
 const coll = db.timeseries_groupby_reorder;
 coll.drop();
@@ -52,4 +48,3 @@ res = coll.aggregate([{
           }])
           .toArray();
 assert.docEq([{"_id": null, "accmin": 2, "accmax": 6}], res);
-})();

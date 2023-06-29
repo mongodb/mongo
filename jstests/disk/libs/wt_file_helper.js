@@ -1,9 +1,9 @@
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 /**
  * Get the URI of the wt collection file given the collection name.
  */
-let getUriForColl = function(coll) {
+export let getUriForColl = function(coll) {
     assert(coll.exists());  // Collection must exist
     return coll.stats().wiredTiger.uri.split("table:")[1];
 };
@@ -11,7 +11,7 @@ let getUriForColl = function(coll) {
 /**
  * Get the URI of the wt index file given the collection name and the index name.
  */
-let getUriForIndex = function(coll, indexName) {
+export let getUriForIndex = function(coll, indexName) {
     assert(coll.exists());  // Collection must exist
     const ret = assert.commandWorked(coll.getDB().runCommand({collStats: coll.getName()}));
     return ret.indexDetails[indexName].uri.split("table:")[1];
@@ -20,7 +20,7 @@ let getUriForIndex = function(coll, indexName) {
 /**
  * 'Corrupt' the file by replacing it with an empty file.
  */
-let corruptFile = function(file) {
+export let corruptFile = function(file) {
     removeFile(file);
     writeFile(file, "");
 };
@@ -29,7 +29,7 @@ let corruptFile = function(file) {
  * Starts a mongod on the provided data path without clearing data. Accepts 'options' as parameters
  * to runMongod.
  */
-let startMongodOnExistingPath = function(dbpath, options) {
+export let startMongodOnExistingPath = function(dbpath, options) {
     let args = {dbpath: dbpath, noCleanData: true};
     for (let attr in options) {
         if (options.hasOwnProperty(attr))
@@ -38,7 +38,7 @@ let startMongodOnExistingPath = function(dbpath, options) {
     return MongoRunner.runMongod(args);
 };
 
-let assertQueryUsesIndex = function(coll, query, indexName) {
+export let assertQueryUsesIndex = function(coll, query, indexName) {
     let res = coll.find(query).explain();
     assert.commandWorked(res);
 
@@ -50,7 +50,7 @@ let assertQueryUsesIndex = function(coll, query, indexName) {
 /**
  * Assert that running MongoDB with --repair on the provided dbpath exits cleanly.
  */
-let assertRepairSucceeds = function(dbpath, port, opts) {
+export let assertRepairSucceeds = function(dbpath, port, opts) {
     let args = ["mongod", "--repair", "--port", port, "--dbpath", dbpath, "--bind_ip_all"];
     for (let a in opts) {
         if (opts.hasOwnProperty(a))
@@ -64,7 +64,7 @@ let assertRepairSucceeds = function(dbpath, port, opts) {
     assert.eq(0, runMongoProgram.apply(this, args));
 };
 
-let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
+export let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
     const param = "failpoint." + failpoint + "={'mode': 'alwaysOn'}";
     jsTestLog("The node should fail to complete repair with --setParameter " + param);
 
@@ -77,7 +77,7 @@ let assertRepairFailsWithFailpoint = function(dbpath, port, failpoint) {
 /**
  * Asserts that running MongoDB with --repair on the provided dbpath fails.
  */
-let assertRepairFails = function(dbpath, port) {
+export let assertRepairFails = function(dbpath, port) {
     jsTestLog("The node should complete repairing the node but fails.");
 
     assert.neq(0, runMongoProgram("mongod", "--repair", "--port", port, "--dbpath", dbpath));
@@ -87,7 +87,7 @@ let assertRepairFails = function(dbpath, port) {
  * Assert that starting MongoDB with --replSet on an existing data path exits with a specific
  * error.
  */
-let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
+export let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
     jsTestLog("The repaired node should fail to start up with the --replSet option");
 
     clearRawMongoProgramOutput();
@@ -103,7 +103,7 @@ let assertErrorOnStartupWhenStartingAsReplSet = function(dbpath, port, rsName) {
  * Assert that starting MongoDB as a standalone on an existing data path exits with a specific
  * error because the previous repair failed.
  */
-let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
+export let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
     jsTestLog("The node should fail to start up because a previous repair did not complete");
 
     clearRawMongoProgramOutput();
@@ -119,7 +119,7 @@ let assertErrorOnStartupAfterIncompleteRepair = function(dbpath, port) {
  * Assert that starting MongoDB as a standalone on an existing data path succeeds. Uses a provided
  * testFunc to run any caller-provided checks on the started node.
  */
-let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFunc) {
+export let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFunc) {
     jsTestLog("The repaired node should start up and serve reads as a standalone");
     let node = MongoRunner.runMongod({dbpath: dbpath, port: port, noCleanData: true});
     assert(node);
@@ -133,7 +133,8 @@ let assertStartAndStopStandaloneOnExistingDbpath = function(dbpath, port, testFu
  *
  * Returns the started node.
  */
-let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResync, testFunc) {
+export let assertStartInReplSet = function(
+    replSet, originalNode, cleanData, expectResync, testFunc) {
     jsTestLog("The node should rejoin the replica set. Clean data: " + cleanData +
               ". Expect resync: " + expectResync);
     // Skip clearing initial sync progress after a successful initial sync attempt so that we
@@ -166,7 +167,7 @@ let assertStartInReplSet = function(replSet, originalNode, cleanData, expectResy
 /**
  * Assert certain error messages are thrown on startup when files are missing or corrupt.
  */
-let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
+export let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, errmsgRegExp) {
     // Start a MongoDB instance, create the collection file.
     const mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
@@ -187,7 +188,7 @@ let assertErrorOnStartupWhenFilesAreCorruptOrMissing = function(
 /**
  * Assert certain error messages are thrown on a specific request when files are missing or corrupt.
  */
-let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
+export let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
     dbpath, dbName, collName, deleteOrCorruptFunc, requestFunc, errmsgRegExp) {
     // Start a MongoDB instance, create the collection file.
     let mongod = MongoRunner.runMongod({dbpath: dbpath, cleanData: true});
@@ -220,7 +221,7 @@ let assertErrorOnRequestWhenFilesAreCorruptOrMissing = function(
 /**
  * Runs the WiredTiger tool with the provided arguments.
  */
-let runWiredTigerTool = function(...args) {
+export let runWiredTigerTool = function(...args) {
     const cmd = ['wt'].concat(args);
     // TODO (SERVER-67632): Check the return code on Windows variants again.
     if (_isWindows()) {
@@ -234,7 +235,7 @@ let runWiredTigerTool = function(...args) {
  * Stops the given mongod, runs the truncate command on the given uri using the WiredTiger tool, and
  * starts mongod again on the same path.
  */
-let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
+export let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
     runWiredTigerTool("-h", conn.dbpath, "truncate", uri);
     return startMongodOnExistingPath(conn.dbpath, mongodOptions);
@@ -243,7 +244,7 @@ let truncateUriAndRestartMongod = function(uri, conn, mongodOptions) {
 /**
  * Stops the given mongod and runs the alter command to modify the index table's metadata.
  */
-let alterIndexFormatVersion = function(uri, conn, formatVersion) {
+export let alterIndexFormatVersion = function(uri, conn, formatVersion) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
     runWiredTigerTool(
         "-h",
@@ -257,8 +258,9 @@ let alterIndexFormatVersion = function(uri, conn, formatVersion) {
  * Stops the given mongod, dumps the table with the uri, modifies the content, and loads it back to
  * the table.
  */
-let count = 0;
-let rewriteTable = function(uri, conn, modifyData) {
+export let count = 0;
+
+export let rewriteTable = function(uri, conn, modifyData) {
     MongoRunner.stopMongod(conn, null, {skipValidation: true});
     const separator = _isWindows() ? '\\' : '/';
     const tempDumpFile = conn.dbpath + separator + "temp_dump";
@@ -281,12 +283,12 @@ let rewriteTable = function(uri, conn, modifyData) {
 
 // In WiredTiger table dumps, the first seven lines are the header and key that we don't want to
 // modify. We will skip them and start from the line containing the first value.
-const wtHeaderLines = 7;
+export const wtHeaderLines = 7;
 
 /**
  * Inserts the documents with duplicate field names into the MongoDB server.
  */
-let insertDocDuplicateFieldName = function(coll, uri, conn, numDocs) {
+export let insertDocDuplicateFieldName = function(coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({a: "aaaaaaa", b: "bbbbbbb"});
     }
@@ -304,7 +306,7 @@ let insertDocDuplicateFieldName = function(coll, uri, conn, numDocs) {
     rewriteTable(uri, conn, makeDuplicateFieldNames);
 };
 
-let insertDocSymbolField = function(coll, uri, conn, numDocs) {
+export let insertDocSymbolField = function(coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({a: "aaaaaaa"});
     }
@@ -324,7 +326,7 @@ let insertDocSymbolField = function(coll, uri, conn, numDocs) {
 /**
  * Inserts array document with non-sequential indexes into the MongoDB server.
  */
-let insertNonSequentialArrayIndexes = function(coll, uri, conn, numDocs) {
+export let insertNonSequentialArrayIndexes = function(coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({arr: [1, 2, [1, [1, 2], 2], 3]});
     }
@@ -343,7 +345,7 @@ let insertNonSequentialArrayIndexes = function(coll, uri, conn, numDocs) {
 /**
  * Inserts documents with invalid regex options into the MongoDB server.
  */
-let insertInvalidRegex = function(coll, mongod, nDocuments) {
+export let insertInvalidRegex = function(coll, mongod, nDocuments) {
     const regex = "a*.conn";
     const options = 'gimsuy';
 
@@ -377,7 +379,7 @@ let insertInvalidRegex = function(coll, mongod, nDocuments) {
 /**
  * Inserts document with invalid UTF-8 string into the MongoDB server.
  */
-let insertInvalidUTF8 = function(coll, uri, conn, numDocs) {
+export let insertInvalidUTF8 = function(coll, uri, conn, numDocs) {
     for (let i = 0; i < numDocs; ++i) {
         coll.insert({validString: "\x70"});
     }

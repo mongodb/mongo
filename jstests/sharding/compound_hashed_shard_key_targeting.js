@@ -7,12 +7,9 @@
  *   requires_majority_read_concern,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
-load("jstests/libs/profiler.js");             // For profilerHas*OrThrow helper functions.
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
@@ -301,4 +298,3 @@ if (WriteWithoutShardKeyTestUtil.isWriteWithoutShardKeyFeatureEnabled(st.s)) {
 }
 
 st.stop();
-})();

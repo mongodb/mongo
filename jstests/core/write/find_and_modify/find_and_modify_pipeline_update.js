@@ -2,11 +2,8 @@
  * Tests the pipeline-style update is accepted by the findAndModify command.
  * @tags: [requires_non_retryable_writes]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");  // For isMongos.
-load("jstests/libs/analyze_plan.js");     // For planHasStage().
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.find_and_modify_pipeline_update;
 coll.drop();
@@ -94,4 +91,3 @@ let err =
     assert.throws(() => coll.findAndModify(
                       {query: {_id: 1}, update: [{$set: {y: 1}}], arrayFilters: [{"i.x": 4}]}));
 assert.eq(err.code, ErrorCodes.FailedToParse);
-}());

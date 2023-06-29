@@ -4,10 +4,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_sample;
 coll.drop();
@@ -33,4 +30,3 @@ assert.gt(multiIteratorStages.reduce((acc, stage) => acc + stage.advanced, 0),
 assert.gt(multiIteratorStages.reduce((acc, stage) => acc + stage.works, 0),
           0,
           tojson(multiIteratorStages));
-}());

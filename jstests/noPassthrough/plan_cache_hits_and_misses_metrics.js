@@ -7,10 +7,7 @@
  *   cqf_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 const db = conn.getDB("plan_cache_hits_and_misses_metrics");
@@ -170,4 +167,3 @@ function runCommandAndCheckPlanCacheMetric(
 ].forEach(testCase => runCommandAndCheckPlanCacheMetric(testCase));
 
 MongoRunner.stopMongod(conn);
-})();

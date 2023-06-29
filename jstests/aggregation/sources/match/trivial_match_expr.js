@@ -10,10 +10,7 @@
 //   # Explicitly testing optimization.
 //   requires_pipeline_optimization,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.trivial_match_expr;
 coll.drop();
@@ -86,4 +83,3 @@ assert.eq(getWinningPlan(explainFind.queryPlanner).filter,
           {$expr: "$foo"},
           "$expr truthy constant expression should be optimized away when used " +
               "in conjunction with $expr containing non-constant expression");
-})();

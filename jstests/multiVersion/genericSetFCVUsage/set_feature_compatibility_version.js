@@ -9,13 +9,9 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 // data.
 TestData.skipCheckDBHashes = true;
 
-(function() {
-"use strict";
-
 load("jstests/libs/index_catalog_helpers.js");
 load("jstests/libs/write_concern_util.js");
 load("jstests/replsets/rslib.js");
-load("jstests/libs/feature_flag_util.js");
 
 let dbpath = MongoRunner.dataPath + "feature_compatibility_version";
 resetDbpath(dbpath);
@@ -523,4 +519,3 @@ if (lastLTSFCV != lastContinuousFCV) {
     runReplicaSetTest('last-continuous');
     runShardingTest('last-continuous');
 }
-})();

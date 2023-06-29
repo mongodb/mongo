@@ -4,10 +4,7 @@
  *
  * This test was originally designed to reproduce SERVER-71636.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const dbName = "test";
 
@@ -213,4 +210,3 @@ assert(stageExplain.hasOwnProperty("$unionWith"), explain);
 assertStageDoesNotHaveRuntimeStats(stageExplain);
 
 st.stop();
-}());

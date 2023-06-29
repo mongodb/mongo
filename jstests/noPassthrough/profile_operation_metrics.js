@@ -11,13 +11,10 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-load("jstests/libs/fixture_helpers.js");             // For isReplSet().
-load("jstests/libs/os_helpers.js");                  // For isLinux().
-load("jstests/libs/sbe_util.js");                    // For checkSBEEnabled().
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+load("jstests/libs/fixture_helpers.js");  // For isReplSet().
+load("jstests/libs/os_helpers.js");       // For isLinux().
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = jsTestName();
 const collName = 'coll';
@@ -1673,5 +1670,4 @@ jsTestLog("Testing replica set");
     const db = rst.getPrimary().getDB(dbName);
     runTest(db);
     rst.stopSet();
-})();
 })();

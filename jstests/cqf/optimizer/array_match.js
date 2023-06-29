@@ -1,10 +1,13 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_array_match;
@@ -79,4 +82,3 @@ assert.commandWorked(t.createIndex({b: 1, a: 1}));
     assertValueOnPath("IndexScan", indexUnionNode, "children.1.nodeType");
     assertValueOnPath(2, indexUnionNode, "children.1.interval.lowBound.bound.1.value");
 }
-}());

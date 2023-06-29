@@ -13,10 +13,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 
 TimeseriesTest.run((insert) => {
@@ -97,4 +94,3 @@ TimeseriesTest.run((insert) => {
     assert.sameMembers(
         Object.keys(indexKeys), multiStageDocs[0].index_names, tojson(multiStageDocs));
 });
-})();

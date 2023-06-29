@@ -1,21 +1,37 @@
-load("jstests/libs/ce_stats_utils.js");
-load("jstests/libs/optimizer_utils.js");
-load("jstests/query_golden/libs/compute_errors.js");
-load("jstests/query_golden/libs/generate_queries.js");
+import {analyzeFields, getRootCE} from "jstests/libs/ce_stats_utils.js";
+import {
+    forceCE,
+    getPlanSkeleton,
+    navigateToRootNode,
+    round2
+} from "jstests/libs/optimizer_utils.js";
+import {
+    aggegateOptimizationTimesPerStrategy,
+    aggregateErrorsPerCategory,
+    aggregateErrorsPerStrategy,
+    populateErrorCollection,
+    printQueriesWithBadAccuracy,
+} from "jstests/query_golden/libs/compute_errors.js";
+import {
+    generateComplexPredicates,
+    generateQueries,
+    selectQueryValues,
+    selectSamplePos,
+} from "jstests/query_golden/libs/generate_queries.js";
 
-function indexedStrategy(strategyName) {
+export function indexedStrategy(strategyName) {
     return strategyName + "Idx";
 }
 
-function timedExplain(coll, pipeline) {
+export function timedExplain(coll, pipeline) {
     const t0 = Date.now();
-    explain = coll.explain().aggregate(pipeline);
+    const explain = coll.explain().aggregate(pipeline);
     const t1 = Date.now();
     const duration = t1 - t0;
     return {explain, duration};
 }
 
-function getCE(pipeline, explain) {
+export function getCE(pipeline, explain) {
     try {
         return round2(getRootCE(explain));
     } catch (e) {
@@ -28,7 +44,7 @@ function getCE(pipeline, explain) {
 /**
  * Run the query specified in the 'testcase' document with the CE 'strategy'.
  */
-function runAggregationWithCE(coll, testcase, strategy) {
+export function runAggregationWithCE(coll, testcase, strategy) {
     let explain = {};
     let duration = -1;
     if (testcase["nReturned"] == null) {
@@ -40,10 +56,10 @@ function runAggregationWithCE(coll, testcase, strategy) {
         }
         testcase["nReturned"] = explain.executionStats.nReturned;
         // Run explain without execution to measure optimization time. Ignore the explain.
-        timedRes = timedExplain(coll, testcase.pipeline);
+        const timedRes = timedExplain(coll, testcase.pipeline);
         duration = timedRes.duration;
     } else {
-        timedRes = timedExplain(coll, testcase.pipeline);
+        const timedRes = timedExplain(coll, testcase.pipeline);
         explain = timedRes.explain;
         duration = timedRes.duration;
     }
@@ -57,7 +73,7 @@ function runAggregationWithCE(coll, testcase, strategy) {
 /**
  * Run queries with complex predicates in batches with a limited number of index fields.
  */
-function runComplexPredicates(coll, testCases, ceStrategies, ceDebugFlag) {
+export function runComplexPredicates(coll, testCases, ceStrategies, ceDebugFlag) {
     const maxIndexCnt = 50;
     let start = 0;
 
@@ -103,7 +119,7 @@ function runComplexPredicates(coll, testCases, ceStrategies, ceDebugFlag) {
  * If 'fields' is not empty, create index for each field and execute all queries on this field.
  * If 'fields' is empty, execute queries with complex predicates in batches.
  */
-function runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag) {
+export function runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag) {
     print("Run queries without indexing.\n");
     ceStrategies.forEach(function(strategy) {
         forceCE(strategy);
@@ -131,7 +147,7 @@ function runQueries(coll, testCases, ceStrategies, fields, ceDebugFlag) {
     }
 }
 
-function printSimpleQueryStats(errorColl, strategies, queries, debugFlag) {
+export function printSimpleQueryStats(errorColl, strategies, queries, debugFlag) {
     jsTestLog("Aggregate errors for all simple predicate queries");
 
     // Aggregate errors for all CE strategies per query category.
@@ -165,7 +181,7 @@ function printSimpleQueryStats(errorColl, strategies, queries, debugFlag) {
     }
 }
 
-function printComplexQueryStats(errorColl, strategies, queries, debugFlag) {
+export function printComplexQueryStats(errorColl, strategies, queries, debugFlag) {
     jsTestLog("Aggregate errors for all complex predicate queries");
     // Aggregate errors for all CE strategies per query category.
     aggregateErrorsPerCategory(errorColl, ["qtype"], strategies);
@@ -182,7 +198,7 @@ function printComplexQueryStats(errorColl, strategies, queries, debugFlag) {
     }
 }
 
-function printAllQueryStats(testDB, errorColl1, errorColl2, strategies) {
+export function printAllQueryStats(testDB, errorColl1, errorColl2, strategies) {
     jsTestLog("Aggregate errors for all queries (simple and complex predicates)");
     let allErrorsColl = testDB.ce_all_errors;
     allErrorsColl.drop();
@@ -196,7 +212,7 @@ function printAllQueryStats(testDB, errorColl1, errorColl2, strategies) {
  * collection metadata. The function assumes that the collection exists and is populated with data.
  * 'sampleSize' is the number of documents used to extract sample values for query generation.
  */
-function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = false) {
+export function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = false) {
     let ceStrategies = ["heuristic", "histogram"];
     if (ceDebugFlag) {
         ceStrategies.push("sampling");
@@ -289,8 +305,8 @@ function runCETestForCollection(testDB, collMeta, sampleSize = 6, ceDebugFlag = 
     testDB.createView('ce_errors_complex_pred_not_empty',
                       'ce_errors_complex_pred',
                       [{$match: {$expr: {$gt: ["$nReturned", 0]}}}]);
-    errorCollNonEmpty = testDB.ce_errors_not_empty;
-    errorCollComplexPredNonEmpty = testDB.ce_errors_complex_pred_not_empty;
+    const errorCollNonEmpty = testDB.ce_errors_not_empty;
+    const errorCollComplexPredNonEmpty = testDB.ce_errors_complex_pred_not_empty;
     print(`Non-empty simple error entries: ${
         errorCollNonEmpty.find().itcount()}; complex error entries: ${
         errorCollComplexPredNonEmpty.find().itcount()}`);

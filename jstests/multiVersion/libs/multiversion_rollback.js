@@ -11,7 +11,6 @@ load("jstests/replsets/libs/rollback_test.js");
 load("jstests/libs/collection_drop_recreate.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/feature_flag_util.js");
 
 function printFCVDoc(nodeAdminDB, logMessage) {
     const fcvDoc = nodeAdminDB.system.version.findOne({_id: 'featureCompatibilityVersion'});

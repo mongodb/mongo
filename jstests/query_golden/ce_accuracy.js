@@ -5,10 +5,9 @@
  * ]
  */
 
-(function() {
-
-load("jstests/query_golden/libs/ce_data.js");
-load("jstests/query_golden/libs/run_queries_ce.js");
+import {runHistogramsTest} from "jstests/libs/ce_stats_utils.js";
+import {getCEDocs, getCEDocs1} from "jstests/query_golden/libs/ce_data.js";
+import {runCETestForCollection} from "jstests/query_golden/libs/run_queries_ce.js";
 
 runHistogramsTest(function() {
     const coll = db.ce_data_20;
@@ -38,4 +37,3 @@ runHistogramsTest(function() {
     const ceDebugFlag = false;
     runCETestForCollection(db, collMeta, 4, ceDebugFlag);
 });
-})();

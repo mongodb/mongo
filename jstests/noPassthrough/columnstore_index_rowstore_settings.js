@@ -8,17 +8,14 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const mongod = MongoRunner.runMongod({});
 const db = mongod.getDB("test");
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     MongoRunner.stopMongod(mongod);
-    return;
+    quit();
 }
 
 const coll = db.columnstore_index_rowstore_settings;
@@ -246,4 +243,3 @@ function getRowstoreStats(explainExec) {
 })();
 
 MongoRunner.stopMongod(mongod);
-}());

@@ -10,11 +10,8 @@
  *   cqf_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For getAggPlanStages() and getPlanStages().
+import {getPlanStages, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 const coll = db.cover_null_queries;
@@ -1021,4 +1018,3 @@ validateGroupCountAggCmdOutputAndPlan({
     expectedCount: 10,
     expectedStages: {"IXSCAN": 1, "FETCH": 1},
 });
-})();

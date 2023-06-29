@@ -7,10 +7,7 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/disk/libs/wt_file_helper.js");
+import {getUriForIndex, truncateUriAndRestartMongod} from "jstests/disk/libs/wt_file_helper.js";
 
 const kIndexKeyLength = 1024 * 1024;
 
@@ -81,4 +78,3 @@ checkValidateLogs();
 checkValidateRepair();
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
-})();

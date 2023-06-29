@@ -18,10 +18,14 @@
 // ]
 
 // Integration tests for the collation feature.
-(function() {
-'use strict';
+import {
+    getPlanStage,
+    getWinningPlan,
+    isCollscan,
+    isIxscan,
+    planHasStage
+} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/index_catalog_helpers.js");
 // For isWiredTiger.
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");
@@ -1861,4 +1865,3 @@ res = testDb.runCommand({create: 'view', viewOn: 'coll'});
 assert(res.ok == 1 || res.errmsg == ErrorCodes.NamespaceExists);
 res = testDb.runCommand({create: 'view', viewOn: 'coll', collation: {locale: 'en'}});
 assert.commandFailedWithCode(res, ErrorCodes.NamespaceExists);
-})();

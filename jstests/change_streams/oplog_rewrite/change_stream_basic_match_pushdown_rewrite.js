@@ -10,10 +10,11 @@
 //   assumes_unsharded_collection,
 //   assumes_read_preference_unchanged
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
+import {
+    assertNumChangeStreamDocsReturnedFromShard,
+    assertNumMatchingOplogEventsForShard,
+    createShardedCollection,
+} from "jstests/libs/change_stream_rewrite_util.js";
 
 const dbName = "change_stream_match_pushdown_and_rewrite";
 const collName = "coll1";
@@ -184,4 +185,3 @@ assert.eq(stringValues.slice(0, 2), ["Value", "vAlue"]);
 assert.sameMembers(stringValues.slice(2, 4), ["vaLue", "valUe"]);
 
 st.stop();
-})();

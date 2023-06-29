@@ -1,10 +1,8 @@
 /**
  * Test $match with $and/$or is supported and returns correct results.
  */
-
-(function() {
-"use strict";
-load("jstests/query_golden/libs/utils.js");
+import {show} from "jstests/libs/golden_test.js";
+import {resetCollection} from "jstests/query_golden/libs/utils.js";
 
 const coll = db.and_or_coll;
 
@@ -105,4 +103,3 @@ for (const op of operators) {
         show(coll.aggregate(pipeline));
     }
 }
-}());

@@ -5,10 +5,7 @@
  *   featureFlagColumnstoreIndexes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -18,7 +15,7 @@ assert.commandWorked(db.dropDatabase());
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 const coll = db.collection;
@@ -66,4 +63,3 @@ assert.eq(planSummary.match(/'_id'/g).length,
           `'_id' should appear once in planSummary. Instead, got: ${planSummary}`);
 
 MongoRunner.stopMongod(conn);
-}());

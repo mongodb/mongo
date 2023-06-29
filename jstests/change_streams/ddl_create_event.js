@@ -4,14 +4,10 @@
  *
  * @tags: [ requires_fcv_60, ]
  */
-(function() {
-"use strict";
-
 load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreateCollection' and
                                                    // 'assertDropCollection'.
 load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
                                                    // 'assertChangeStreamEventEq'.
-load("jstests/libs/feature_flag_util.js");
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -191,4 +187,3 @@ function runTest(startChangeStream) {
 const pipeline = [{$changeStream: {showExpandedEvents: true}}];
 runTest(() => test.startWatchingChanges({pipeline, collection: 1}));
 runTest(() => test.startWatchingChanges({pipeline, collection: collName}));
-}());

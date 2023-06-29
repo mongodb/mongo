@@ -8,7 +8,7 @@
  *  ]
  */
 
-load('jstests/libs/feature_flag_util.js');
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {
     const kCollNamePrefix = 'unsharded_coll_';

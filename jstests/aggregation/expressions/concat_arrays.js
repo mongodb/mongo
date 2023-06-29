@@ -11,12 +11,9 @@
 //   # tests from implicit index creation suites.
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");        // For assertArrayEq.
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
-load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.projection_expr_concat_arrays;
 coll.drop();
@@ -175,4 +172,3 @@ runAndAssert(["$arr1", [1, 2, 3], "$arr2"], [
     null,
     null
 ]);
-}());

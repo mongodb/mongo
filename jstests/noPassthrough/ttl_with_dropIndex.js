@@ -1,9 +1,7 @@
 /**
  * Verify the behavior of dropping TTL index.
  */
-(function() {
-'use strict';
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 let conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 let db = conn.getDB('test');
@@ -39,4 +37,3 @@ TTLUtil.waitForPass(db);
 assert.eq(coll.find().itcount(), 50);
 
 MongoRunner.stopMongod(conn);
-})();

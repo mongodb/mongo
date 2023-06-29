@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load('jstests/sharding/libs/shard_versioning_util.js');
 
 Random.setRandomSeed();
@@ -386,4 +383,3 @@ runTest({
 });
 
 st.stop();
-})();

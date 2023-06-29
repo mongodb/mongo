@@ -8,10 +8,7 @@
  *   requires_scripting,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanStages.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.mr_explain;
 coll.drop();
@@ -62,4 +59,3 @@ runTest({out: {inline: 1}});
 
 // Explain on mapReduce fails when the 3rd 'optionsOrOutString' argument is missing.
 assert.throws(() => coll.explain().mapReduce(mapFunc, reduceFunc));
-}());

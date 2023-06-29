@@ -1,10 +1,11 @@
-load("jstests/query_golden/libs/utils.js");
+import {show} from "jstests/libs/golden_test.js";
+import {resetCollection} from "jstests/query_golden/libs/utils.js";
 
 /**
  * Drops 'coll' and re-populates it according to 'docs' and 'indexes'. Then, runs the specified
  * projections against the collection and prints the results.
  */
-function runProjectionsAgainstColl(coll, docs, indexes, projSpecs) {
+export function runProjectionsAgainstColl(coll, docs, indexes, projSpecs) {
     resetCollection(coll, docs, indexes);
 
     for (const projectionSpec of projSpecs) {
@@ -17,7 +18,7 @@ function runProjectionsAgainstColl(coll, docs, indexes, projSpecs) {
 /**
  * Returns some example docs with interesting values as paths "a", "a.b", and "a.b.c".
  */
-function getProjectionDocs() {
+export function getProjectionDocs() {
     return [
         //
         // Simple documents without any arrays along "a.b.c".
@@ -135,7 +136,7 @@ function getProjectionDocs() {
  * Similar to getProjectionDocs(), but a smaller list where the interesting values are just under
  * the _id field.
  */
-function getIdProjectionDocs() {
+export function getIdProjectionDocs() {
     return [
         {_id: 1, x: 2},
         {_id: {}, x: 1},

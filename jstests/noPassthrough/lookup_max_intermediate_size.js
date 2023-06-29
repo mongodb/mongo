@@ -5,10 +5,7 @@
 // ]
 
 load("jstests/aggregation/extras/utils.js");  // For assertErrorCode.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-
-(function() {
-"use strict";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // Used by testPipeline to sort result documents. All _ids must be primitives.
 function compareId(a, b) {
@@ -119,4 +116,3 @@ assert(sharded.adminCommand({shardCollection: "test.lookUp", key: {_id: 'hashed'
 runTest(sharded.getDB('test').lookUp, sharded.getDB('test').from, 4568);
 
 sharded.stop();
-}());

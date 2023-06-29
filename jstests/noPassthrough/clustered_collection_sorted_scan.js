@@ -2,10 +2,8 @@
  * Tests that clustered collections can be used for sorted scanning without inserting
  * a blocking scan operator.
  */
-(function() {
-"use strict";
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
 Random.setRandomSeed();
@@ -330,4 +328,3 @@ clusteredColl.drop();
 nonClusteredColl.drop();
 
 MongoRunner.stopMongod(testConnection);
-})();

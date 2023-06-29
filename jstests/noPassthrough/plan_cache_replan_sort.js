@@ -5,12 +5,9 @@
  *   requires_profiling,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getCachedPlan} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/profiler.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: false}});
 const db = conn.getDB("test");
@@ -68,4 +65,3 @@ assert.eq(
     profileObj);
 
 MongoRunner.stopMongod(conn);
-}());

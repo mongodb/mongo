@@ -8,10 +8,7 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load('jstests/noPassthrough/libs/index_build.js');
 load("jstests/replsets/rslib.js");
 
@@ -124,4 +121,3 @@ assert.eq(newNodeDB.getCollection(timeseriesCollName).getIndexes().length,
           secondaryDB.getCollection(timeseriesCollName).getIndexes().length);
 
 replSet.stopSet();
-})();

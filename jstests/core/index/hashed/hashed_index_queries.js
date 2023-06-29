@@ -5,10 +5,8 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const collNamePrefix = 'hashed_index_queries_';
 let collCount = 0;
@@ -133,4 +131,3 @@ validateCountCmdOutputAndPlan({
     expectedOutput: 1,
     expectedStages: ["IXSCAN", "FETCH"]
 });
-})();

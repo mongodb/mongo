@@ -11,10 +11,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const collName = "timeseries_collmod";
 const coll = db.getCollection(collName);
@@ -215,4 +212,3 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
     // No-op command should succeed with empty time-series options.
     assert.commandWorked(db.runCommand({"collMod": collName, "timeseries": {}}));
 }
-})();

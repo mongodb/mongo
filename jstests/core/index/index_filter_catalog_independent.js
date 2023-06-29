@@ -13,10 +13,7 @@
  *   tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanStages.
+import {getPlanStages, getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
 
 const collName = "index_filter_catalog_independent";
 const coll = db[collName];
@@ -89,4 +86,3 @@ assertOneIndexFilter({x: 3}, [{x: 1, y: 1}]);
 explain = assert.commandWorked(coll.find({x: 3}).explain());
 checkIndexFilterSet(explain, true);
 assertIsIxScanOnIndex(getWinningPlan(explain.queryPlanner), {x: 1, y: 1});
-})();

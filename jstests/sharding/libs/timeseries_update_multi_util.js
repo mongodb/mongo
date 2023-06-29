@@ -2,9 +2,9 @@
  * Helpers for testing timeseries multi updates.
  */
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-var TimeseriesMultiUpdateUtil = (function() {
+export const TimeseriesMultiUpdateUtil = (function() {
     const timeField = 'time';
     const metaField = 'hostid';
 

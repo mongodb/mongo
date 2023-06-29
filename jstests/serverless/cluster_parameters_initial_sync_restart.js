@@ -10,10 +10,11 @@
  *   serverless
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    runGetClusterParameterNode,
+    runGetClusterParameterReplicaSet,
+    runSetClusterParameter,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 const tenantId = ObjectId();
 
@@ -126,4 +127,3 @@ jsTest.log("Testing cluster restart");
 checkClusterParameterRestart(rst);
 
 rst.stopSet();
-})();

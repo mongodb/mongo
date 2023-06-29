@@ -16,15 +16,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
-    return;
+    quit();
 }
 
 TimeseriesTest.run((insert) => {
@@ -179,4 +176,3 @@ TimeseriesTest.run((insert) => {
 
     assert.commandWorked(timeseriescoll.dropIndex(twoDSphereTimeseriesIndexSpec));
 });
-})();

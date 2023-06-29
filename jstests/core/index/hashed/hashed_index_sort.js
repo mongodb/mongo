@@ -6,10 +6,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For assertStagesForExplainOfCommand().
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.hashed_index_sort;
 coll.drop();
@@ -194,4 +191,3 @@ validateFindCmdOutputAndPlan({
     expectedOutput: [{c: 2}],
     expectedStages: ["IXSCAN", "FETCH", "SORT"]
 });
-})();

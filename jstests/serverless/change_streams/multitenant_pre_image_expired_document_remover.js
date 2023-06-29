@@ -4,15 +4,11 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-"use strict";
-
 // For assertDropAndRecreateCollection.
 load("jstests/libs/collection_drop_recreate.js");
 // For ChangeStreamMultitenantReplicaSetTest.
 load("jstests/serverless/libs/change_collection_util.js");
-// For FeatureFlagUtil.
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const getTenantConnection = ChangeStreamMultitenantReplicaSetTest.getTenantConnection;
 
@@ -166,4 +162,3 @@ if (FeatureFlagUtil.isPresentAndEnabled(connTenant2Secondary.getDB(jsTestName())
 }
 
 rst.stopSet();
-}());

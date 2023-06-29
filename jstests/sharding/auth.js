@@ -6,11 +6,8 @@
  * of 5MB across all sharding tests in wiredTiger.
  * @tags: [resource_intensive]
  */
-(function() {
-'use strict';
 load("jstests/replsets/rslib.js");
 load("jstests/sharding/libs/find_chunks_util.js");
-load("jstests/libs/feature_flag_util.js");
 
 // Replica set nodes started with --shardsvr do not enable key generation until they are added
 // to a sharded cluster and reject commands with gossiped clusterTime from users without the
@@ -58,7 +55,7 @@ var s = new ShardingTest({
 
 if (s.getDB('admin').runCommand('buildInfo').bits < 64) {
     print('Skipping test on 32-bit platforms');
-    return;
+    quit();
 }
 
 print("Configuration: Add user " + tojson(adminUser));
@@ -326,4 +323,3 @@ assert.commandFailed(readOnlyDB.killOp(2000000000));
 s.stop();
 d1.stopSet();
 d2.stopSet();
-})();

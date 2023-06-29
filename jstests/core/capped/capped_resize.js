@@ -10,9 +10,6 @@
  *     assumes_unsharded_collection,
  * ]
  */
-(function() {
-load("jstests/libs/feature_flag_util.js");
-
 const testDB = db.getSiblingDB(jsTestName());
 const cappedColl = testDB["capped_coll"];
 
@@ -167,4 +164,3 @@ let verifyLimitUpdate = function(updates) {
     assert.eq(stats.count, initialDocSize);
     assert.lte(stats.size, maxSize);
 })();
-}());

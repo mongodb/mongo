@@ -5,8 +5,13 @@
  * ]
  */
 
-(function() {
-load("jstests/libs/ce_stats_utils.js");  // For 'getRootCE', 'createHistogram'.
+import {
+    createHistogram,
+    getRootCE,
+    runHistogramsTest,
+    summarizeExplainForCE
+} from "jstests/libs/ce_stats_utils.js";
+import {forceCE} from "jstests/libs/optimizer_utils.js";
 
 const collCard = 300;
 const numberBuckets = 5;
@@ -196,4 +201,3 @@ runHistogramsTest(function() {
         ]
     });
 });
-})();

@@ -1,10 +1,7 @@
 // Test basic db operations in multitenancy using a securityToken.
 
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
-load("jstests/libs/feature_flag_util.js");    // for isEnabled
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function checkNsSerializedCorrectly(kDbName, kCollectionName, nsField) {
     const nss = kDbName + (kCollectionName == "" ? "" : "." + kCollectionName);
@@ -711,4 +708,3 @@ const tokenDB = tokenConn.getDB(kDbName);
 { assert.commandFailedWithCode(tokenDB.runCommand({dbCheck: kCollName}), ErrorCodes.Unauthorized); }
 
 rst.stopSet();
-})();

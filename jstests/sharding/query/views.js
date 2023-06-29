@@ -4,13 +4,8 @@
  *  requires_fcv_63,
  * ]
  */
-(function() {
-"use strict";
-
 // For profilerHasSingleMatchingEntryOrThrow.
 load("jstests/libs/profiler.js");
-// For checkSBEEnabled.
-load("jstests/libs/sbe_util.js");
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 
@@ -205,4 +200,3 @@ profilerHasSingleMatchingEntryOrThrow({
 });
 
 st.stop();
-})();

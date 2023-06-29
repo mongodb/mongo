@@ -2,10 +2,7 @@
  * Tests inserting sample data into the time-series buckets collection. This test is for the
  * exercising the optimized $sample implementation for $_internalUnpackBucket.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {aggPlanHasStage, getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 let conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMaxCount: 100}});
 
@@ -198,4 +195,3 @@ const multiIteratorStage = getPlanStage(sampleFromBucketStage, "MULTI_ITERATOR")
 assert.neq(multiIteratorStage, null, explainRes);
 
 MongoRunner.stopMongod(conn);
-})();

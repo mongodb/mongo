@@ -5,10 +5,7 @@
 //   assumes_read_concern_local,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {assertExplainCount, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 // Setup the test collection.
 let coll = db.index_bounds_timestamp;
@@ -138,4 +135,3 @@ plan = coll.explain("executionStats")
            .finish();
 assert(isIndexOnly(db, plan.queryPlanner.winningPlan),
        "ts $gte, $lte find with project should be a covered query");
-})();

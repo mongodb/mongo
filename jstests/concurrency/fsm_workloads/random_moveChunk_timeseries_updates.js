@@ -15,7 +15,6 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/random_moveChunk_timeseries_inserts.js';
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
 
 const numValues = 10;
 

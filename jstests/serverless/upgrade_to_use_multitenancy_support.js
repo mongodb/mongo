@@ -3,19 +3,15 @@
  * multitenancySupport in a rolling fashion in a replica set.
  */
 
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");
 load("jstests/replsets/rslib.js");
-load("jstests/libs/feature_flag_util.js");
 
 // In production, we will upgrade to start using multitenancySupport before enabling this feature
 // flag, and this test is meant to exercise that upgrade behavior, so don't run if the feature flag
 // is enabled.
 const featureFlagRequireTenantId = TestData.setParameters.featureFlagRequireTenantID;
 if (featureFlagRequireTenantId) {
-    return;
+    quit();
 }
 
 /*
@@ -282,4 +278,3 @@ runFindUsingDollarTenantAndPrefix(
     originalSecondary, tenant2DbPrefixed, kCollName, kTenant2, modifiedTenant2Docs);
 
 rst.stopSet();
-})();

@@ -1,13 +1,15 @@
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
-if (!checkCascadesOptimizerEnabled(db)) {
-    jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
-}
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath
+} from "jstests/libs/optimizer_utils.js";
 
 load("jstests/aggregation/extras/utils.js");
+
+if (!checkCascadesOptimizerEnabled(db)) {
+    jsTestLog("Skipping test because the optimizer is not enabled");
+    quit();
+}
 
 const collA = db.collA;
 collA.drop();
@@ -110,4 +112,3 @@ try {
     assert.commandWorked(
         db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
 }
-}());

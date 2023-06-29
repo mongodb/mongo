@@ -7,13 +7,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/log.js");
 load("jstests/libs/profiler.js");
-load("jstests/libs/sbe_util.js");
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
@@ -23,7 +20,7 @@ const coll = db.coll;
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 assert.commandWorked(db.createCollection(coll.getName()));
@@ -224,4 +221,3 @@ function assertQueryHashAndPlanCacheKey(sbe, classic) {
 })();
 
 MongoRunner.stopMongod(conn);
-}());

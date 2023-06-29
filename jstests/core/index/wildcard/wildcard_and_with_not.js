@@ -16,12 +16,9 @@
  * ]
  */
 
-(function() {
-'use strict';
-
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/analyze_plan.js");         // For getWinningPlan(), getAggPlanStages().
-load("jstests/libs/fixture_helpers.js");      // For numberOfShardsForCollection().
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
 
 const documentList = [
     {
@@ -132,4 +129,3 @@ testAndMatches(false /* useCollScan */);
 assert.commandWorked(that.dropIndexes());
 assert.commandWorked(that.createIndex({"obj.obj.obj.$**": 1, "obj.date": 1}, {}));
 testAndMatches(true /* useCollScan */);
-})();

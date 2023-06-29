@@ -4,10 +4,8 @@
  * @tags: [requires_fcv_51]
  */
 
-(function() {
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 Random.setRandomSeed();
 
 const dbName = "test";
@@ -110,4 +108,3 @@ assert.eq(0, primaryShard.getDB("config").getCollection("rangeDeletions").count(
 assert.eq(16, coll.find().itcount(), coll.find().toArray());
 
 st.stop();
-})();

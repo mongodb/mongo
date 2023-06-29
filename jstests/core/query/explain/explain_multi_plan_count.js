@@ -8,10 +8,14 @@
 //   assumes_unsharded_collection,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {
+    assertExplainCount,
+    getRejectedPlan,
+    getRejectedPlans,
+    getWinningPlan,
+    isIndexOnly,
+    isIxscan,
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_multi_plan_count;
 coll.drop();
@@ -39,4 +43,3 @@ for (let curRejectedPlan of rejectedPlans) {
 }
 
 assert(coll.drop());
-}());

@@ -13,15 +13,12 @@
  *   not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
 load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
-load("jstests/libs/columnstore_util.js");          // For "setUpServerForColumnStoreIndexTest."
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const kCollectionName = "columnstore_validindex";
@@ -192,4 +189,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({create: clusteredCollName, clusteredIndex: {key: kKeyPattern, unique: false}}),
     5979700);
-})();

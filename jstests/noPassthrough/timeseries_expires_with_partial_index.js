@@ -10,13 +10,10 @@
  *   requires_fcv_63,
  * ]
  */
-(function() {
-"use strict";
-
 load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/ttl_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 const testDB = conn.getDB(jsTestName());
@@ -118,4 +115,3 @@ TimeseriesTest.run((insert) => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

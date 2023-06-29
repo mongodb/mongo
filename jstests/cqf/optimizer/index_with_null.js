@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_index_with_null;
@@ -45,4 +46,3 @@ t.createIndex({c: 1});
     // Verify the query **is covered** by the index.
     assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
 }
-}());

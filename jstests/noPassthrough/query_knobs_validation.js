@@ -5,10 +5,7 @@
  * parameter's valid bounds.
  */
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesFeatureFlagEnabled
-
-(function() {
-"use strict";
+import {checkCascadesFeatureFlagEnabled} from "jstests/libs/optimizer_utils.js";
 
 const conn = MongoRunner.runMongod();
 const testDB = conn.getDB("admin");
@@ -310,4 +307,3 @@ assertSetParameterFails("internalQueryDocumentSourceWriterBatchExtraReservedByte
                         9 * 1024 * 1024);
 
 MongoRunner.stopMongod(conn);
-})();

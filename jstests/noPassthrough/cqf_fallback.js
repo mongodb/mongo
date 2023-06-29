@@ -2,11 +2,7 @@
  * Verify that expressions and operators are correctly routed to CQF where eligible. This decision
  * is based on several factors including the query text, collection metadata, etc..
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/optimizer_utils.js");
+import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 let conn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -20,7 +16,7 @@ if (assert.commandWorked(db.adminCommand({getParameter: 1, internalQueryFramewor
         .internalQueryFrameworkControl == "forceClassicEngine") {
     jsTestLog("Skipping test due to forceClassicEngine");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 assert.commandWorked(
@@ -557,4 +553,3 @@ try {
 } catch (_) {
     // This is expected.
 }
-}());

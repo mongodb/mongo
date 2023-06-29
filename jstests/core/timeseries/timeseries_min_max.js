@@ -10,10 +10,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_min_max_';
@@ -127,4 +124,3 @@ TimeseriesTest.run((insert) => {
     runTest({a: NumberDecimal(2.5)}, {a: NumberInt(1)}, {a: NumberDecimal(2.5)});
     runTest({a: Number(0.5)}, {a: Number(0.5)}, {a: NumberDecimal(2.5)});
 });
-})();

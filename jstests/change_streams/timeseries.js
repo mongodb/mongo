@@ -7,11 +7,8 @@
  *     requires_fcv_61,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest.
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 let testDB = db.getSiblingDB(jsTestName());
 testDB.dropDatabase();
@@ -324,4 +321,3 @@ assertNoMoreBucketsEvents(curWithEventsNormal);
 
 // No events cursor should have no system.buckets events.
 assertNoMoreBucketsEvents(curNoEvents);
-}());

@@ -9,10 +9,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.sparse_index_internal_expr;
 coll.drop();
@@ -69,4 +66,3 @@ ixScans = getPlanStages(
 assert.gt(ixScans.length, 0, ixScans);
 assert.eq("missing_1_sparse", ixScans[0].indexName, ixScans);
 assert.eq(true, ixScans[0].isSparse, ixScans);
-}());

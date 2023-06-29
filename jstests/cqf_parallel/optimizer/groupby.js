@@ -1,10 +1,12 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_exchange;
@@ -36,4 +38,3 @@ assertValueOnPlanPath(
     "UnknownPartitioning",
     res,
     "child.child.child.child.child.properties.physicalProperties.distribution.type");
-}());

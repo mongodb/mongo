@@ -15,16 +15,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation.
-load("jstests/core/timeseries/libs/timeseries.js");
-load('jstests/libs/analyze_plan.js');
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
     jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    return;
+    quit();
 }
 
 const timeFieldName = "t";
@@ -262,4 +259,3 @@ function runTest(ascending) {
 
 runTest(false);  // descending
 runTest(true);   // ascending
-})();

@@ -5,10 +5,7 @@
 // @tags: [
 //   assumes_unsharded_collection,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_multikey;
 const keyPattern = {
@@ -82,4 +79,3 @@ verifyMultikeyInfoInExplainOutput({
     commandObj: {distinct: coll.getName(), key: "a"},
     stage: "DISTINCT_SCAN",
 });
-})();

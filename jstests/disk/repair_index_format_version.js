@@ -2,9 +2,11 @@
  * Tests that mismatch of index type and index format version will be resolved during startup.
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    alterIndexFormatVersion,
+    getUriForIndex,
+    startMongodOnExistingPath
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "repair_index_format_version";
 const collNamePrefix = "test_";
@@ -44,4 +46,3 @@ mongod = startMongodOnExistingPath(dbpath);
 checkLog.containsJson(mongod, 6818600);
 
 MongoRunner.stopMongod(mongod, null, {skipValidation: true});
-})();

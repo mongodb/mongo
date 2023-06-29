@@ -15,9 +15,6 @@
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
-(function() {
-load("jstests/libs/config_shard_util.js");
-
 const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;
 const donorRstConfig = st.configRS;
@@ -88,4 +85,3 @@ assert.commandFailedWithCode(donorPrimary.adminCommand(cmdObj), ErrorCodes.Illeg
 tenantMigrationTest.stop();
 recipientRst.stopSet();
 st.stop();
-})();

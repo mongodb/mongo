@@ -20,15 +20,12 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_experimental_incompatible,
 // ]
-(function() {
-'use strict';
-
 load("jstests/libs/profiler.js");  // getLatestProfileEntry.
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is disabled");
-    return;
+    quit();
 }
 
 const testDb = db.getSiblingDB('trial_does_not_discard_work');
@@ -130,4 +127,3 @@ assert.eq(numResults, 0);
 const replanProfileEntry = getLatestProfilerEntry(
     testDb, {'command.find': coll.getName(), 'command.comment': lastComment});
 assert(replanProfileEntry.replanned, replanProfileEntry);
-}());

@@ -6,13 +6,15 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/analyze_plan.js");         // For getPlanStages and planHasStage.
-load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
-load("jstests/libs/fixture_helpers.js");      // For isMongos.
+import {
+    getWinningPlan,
+    getPlanStages,
+    getRejectedPlans,
+    planHasStage
+} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+load("jstests/libs/fixture_helpers.js");  // For isMongos.
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -126,4 +128,3 @@ for (let textIndex of [{'$**': 'text'}, {a: 1, '$**': 'text'}]) {
     // Drop the index so that a different text index can be created.
     assert.commandWorked(coll.dropIndex("textIndex"));
 }
-})();

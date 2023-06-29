@@ -5,10 +5,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/log.js");  // for checkLog
 load('jstests/noPassthrough/libs/index_build.js');
 
@@ -108,4 +106,3 @@ const secondaryColl = secondaryDB.getCollection(coll.getName());
 IndexBuildTest.assertIndexes(secondaryColl, 2, ['_id_', 'a_1']);
 
 rst.stopSet();
-})();

@@ -1,9 +1,6 @@
 // Test server parameter behavior upon FCV downgrade/upgrade.
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function assertParamExistenceInGetParamStar(output, param, expected) {
     if (output.hasOwnProperty('clusterParameters')) {
@@ -194,4 +191,3 @@ function runDowngradeUpgradeTestForCWSP(conn, isMongod, isStandalone, verifyStat
     s.stop();
     jsTest.log('END sharding');
 }
-})();

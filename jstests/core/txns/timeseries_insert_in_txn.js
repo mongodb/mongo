@@ -5,10 +5,7 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     // Use a custom database, to avoid conflict with other tests that use the system.js collection.
@@ -29,4 +26,3 @@ TimeseriesTest.run((insert) => {
     assert.commandFailedWithCode(session.abortTransaction_forTesting(),
                                  ErrorCodes.NoSuchTransaction);
 });
-})();

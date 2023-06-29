@@ -1,9 +1,5 @@
 // Tests that match expression optimization works properly when the failpoint isn't triggered, and
 // is disabled properly when it is triggered.
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For aggPlan functions.
 Random.setRandomSeed();
 
 const conn = MongoRunner.runMongod({});
@@ -39,4 +35,3 @@ const disabledResult = coll.aggregate(pipeline).toArray();
 assert.eq(enabledResult, disabledResult);
 
 MongoRunner.stopMongod(conn);
-}());

@@ -7,7 +7,7 @@
  * ]
  */
 
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const collName = "jstests_explain_distinct_hint";
 const coll = db[collName];

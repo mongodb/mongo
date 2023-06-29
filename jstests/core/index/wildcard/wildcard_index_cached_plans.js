@@ -20,14 +20,17 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');              // For getPlanStage().
+import {
+    getPlanCacheKeyFromExplain,
+    getPlanCacheKeyFromShape,
+    getPlanStage,
+    getPlanStages,
+    getWinningPlan,
+} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/feature_flag_util.js");         // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load('jstests/libs/fixture_helpers.js');  // For getPrimaryForNodeHostingDatabase and isMongos.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.wildcard_cached_plans;
 
@@ -192,4 +195,3 @@ for (const indexSpec of wildcardIndexes) {
                    getPlanCacheKeyFromExplain(queryUnindexedExplain, db));
     }
 }
-})();

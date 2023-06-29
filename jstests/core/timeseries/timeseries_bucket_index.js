@@ -9,11 +9,8 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");  // For 'planHasStage' helper.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_bucket_index;
@@ -54,4 +51,3 @@ TimeseriesTest.run((insert) => {
     assert.commandWorked(bucketsColl.remove({_id: bucketId}));
     assert.docEq([], bucketsColl.find().toArray());
 });
-})();

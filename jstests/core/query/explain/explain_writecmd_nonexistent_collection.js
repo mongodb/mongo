@@ -2,10 +2,7 @@
 //
 // @tags: [requires_non_retryable_writes, requires_fastcount,
 // assumes_no_implicit_collection_creation_after_drop]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 function assertCollectionDoesNotExist(collName) {
     const collectionList = db.getCollectionInfos({name: collName});
@@ -37,4 +34,3 @@ explain = assert.commandWorked(db.runCommand(
 assert(planHasStage(db, explain.queryPlanner.winningPlan, "EOF"), explain);
 assert(!planHasStage(db, explain.queryPlanner.winningPlan, "UPDATE"), explain);
 assertCollectionDoesNotExist(collName);
-}());

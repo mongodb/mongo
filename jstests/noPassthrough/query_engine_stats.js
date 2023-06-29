@@ -3,11 +3,8 @@
  * serverStatus.
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/profiler.js");  // For 'getLatestProfilerEntry()'.
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 let conn = MongoRunner.runMongod({});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -18,7 +15,7 @@ let db = conn.getDB(jsTestName());
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 function initializeTestCollection() {
@@ -281,4 +278,3 @@ cursor.next();  // getMore performed
 verifyProfiler(queryComment, "cqf");
 
 MongoRunner.stopMongod(conn);
-})();

@@ -5,10 +5,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getPlanStages, isIndexOnly, isIxscan} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos'.
 
 const collNamePrefix = 'sort_merge_';
@@ -331,5 +328,4 @@ function runTest(sorts, filters, verifyCallback) {
         ]
     };
     runTest([kSortPattern], [kCoveredFilter], verifyCoveredPlan);
-})();
 })();

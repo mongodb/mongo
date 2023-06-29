@@ -1,8 +1,5 @@
-(function() {
-'use strict';
-
 // Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
+import {getChunkSkipsFromAllShards} from "jstests/libs/analyze_plan.js";
 
 const s = new ShardingTest({name: "shard3", shards: 2, mongos: 2, other: {enableBalancer: true}});
 const s2 = s.s1;
@@ -158,4 +155,3 @@ printjson(dba.foo.stats());
 printjson(dbb.foo.stats());
 
 s.stop();
-})();

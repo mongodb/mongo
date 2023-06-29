@@ -1,8 +1,4 @@
 // Tests that the correct number of results are returned when $limit is coalesced with $sort.
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");
-
 const shardingTest = new ShardingTest({shards: 2});
 const db = shardingTest.getDB("project_limit");
 const coll = db.project_limit_pipe_split;
@@ -75,4 +71,3 @@ assert.eq(
     agg.toArray());
 
 shardingTest.stop();
-})();

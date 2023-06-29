@@ -1,10 +1,6 @@
 /**
  * Tests that the query planning time is captured in the profiler.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 const conn = MongoRunner.runMongod();
@@ -67,4 +63,3 @@ verifyProfilerLog(commandProfilerFilter);
 coll.findOne({});
 verifyProfilerLog(findProfilerFilter);
 MongoRunner.stopMongod(conn);
-}());

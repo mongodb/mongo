@@ -6,10 +6,7 @@
 /**
  * Tests for sorting documents by fields that contain arrays.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {aggPlanHasStage, isQueryPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 let coll = db.jstests_array_sort;
 
@@ -308,4 +305,3 @@ testAggAndFindSort({
     expected: [{_id: 1}, {_id: 0}, {_id: 2}],
     expectBlockingSort: false
 });
-}());

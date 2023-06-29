@@ -7,9 +7,8 @@
  * ]
  */
 
-(function() {
-load("jstests/core/timeseries/libs/timeseries.js");
-load('jstests/libs/analyze_plan.js');
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 Random.setRandomSeed();
 
@@ -144,4 +143,3 @@ function generateDoc(time, metaValue) {
 })();
 
 st.stop();
-})();

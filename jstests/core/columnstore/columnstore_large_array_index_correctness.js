@@ -12,14 +12,11 @@
  *   not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");      // For "planHasStage."
-load("jstests/libs/columnstore_util.js");  // For "setUpServerForColumnStoreIndexTest."
+import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.columnstore_large_array_index_correctness;
@@ -70,4 +67,3 @@ for (let i = 0; i < results.length; i++) {
             `column store index output number: ${results[i]._num}, collection scan output number: ${trueResults[i]._num},
              original document number was: ${originalDoc._num}`);
 }
-})();

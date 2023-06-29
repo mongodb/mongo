@@ -1,10 +1,12 @@
-(function() {
-"use strict";
+import {
+    checkCascadesOptimizerEnabled,
+    removeUUIDsFromExplain,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_sorted_merge;
@@ -75,4 +77,3 @@ IndexScan [{'<rid>': rid_1}, scanDefName: cqf_sorted_merge_, indexDefName: a_1, 
 `;
 assert.eq(removeUUIDsFromExplain(db, getExplain()), multikeyExplain);
 testCorrectness();
-}());

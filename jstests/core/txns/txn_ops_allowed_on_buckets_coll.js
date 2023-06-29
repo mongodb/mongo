@@ -6,10 +6,7 @@
  *   uses_snapshot_read_concern
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const session = db.getMongo().startSession();
 
@@ -59,4 +56,3 @@ jsTestLog("Testing aggregate.");
 assert.eq(systemColl.aggregate([{$match: {}}]).itcount(), 1);
 
 assert.commandWorked(session.commitTransaction_forTesting());
-}());

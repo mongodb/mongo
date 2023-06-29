@@ -10,10 +10,14 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries_writes_util.js");
+import {
+    metaFieldName,
+    prepareShardedCollection,
+    setUpShardedCluster,
+    st,
+    testDB,
+    timeFieldName
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 load("jstests/sharding/updateOne_without_shard_key/libs/write_without_shard_key_test_util.js");
 
 setUpShardedCluster();
@@ -333,4 +337,3 @@ function runTest({collConfig, updateOp, upsertedDoc, errorCode, inTxn = false}) 
 })();
 
 st.stop();
-})();

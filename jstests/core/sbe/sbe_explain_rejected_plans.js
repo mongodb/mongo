@@ -5,17 +5,20 @@
  *    requires_fcv_63,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {
+    getExecutionStages,
+    getPlanStages,
+    getRejectedPlan,
+    getRejectedPlans,
+    getWinningPlan,
+} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/collection_drop_recreate.js");
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSBEEnabled(db);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
-    return;
+    quit();
 }
 
 const coll = assertDropAndRecreateCollection(db, "sbe_explain_rejected_plans");
@@ -66,4 +69,3 @@ for (let rejectedPlan of getRejectedPlans(explain)) {
                rejectedPlan.slotBasedPlan.stages.includes("@\"b_1\""),
            explain);
 }
-})();

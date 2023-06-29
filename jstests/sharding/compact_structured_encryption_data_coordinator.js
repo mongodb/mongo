@@ -4,10 +4,7 @@
 //     requires_fcv_70,
 // ]
 
-(function() {
-'use strict';
-
-load('jstests/fle2/libs/encrypted_client_util.js');
+import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 
 const options = {
     mongos: 1,
@@ -88,4 +85,3 @@ if (kHaveAuditing) {
 st.stop();
 
 jsTest.log(reply);
-})();

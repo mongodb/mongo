@@ -9,11 +9,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const coll = db.timeseries_predicates_with_projections_normal;
 const tsColl = db.timeseries_predicates_with_projections_timeseries;
 coll.drop();
@@ -64,4 +59,3 @@ checkPredicateResult({x: 1}, {"mm.x": {$lt: 0}}, [
     {mm: {x: -1}},
     {mm: {x: 1}},
 ]);
-})();

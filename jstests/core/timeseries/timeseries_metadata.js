@@ -9,10 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_metadata_';
@@ -173,4 +170,3 @@ TimeseriesTest.run((insert) => {
             {_id: 3, time: t[3], meta: {a: [2, 1, 3]}, x: 30},
         ]);
 });
-})();

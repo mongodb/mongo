@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/sharding/libs/reshard_collection_util.js");
 
 const st = new ShardingTest({mongos: 1, shards: 2});
@@ -256,4 +253,3 @@ testShardDistribution(mongos);
 testForceRedistribution(mongos);
 testReshardingWithIndex(mongos);
 st.stop();
-})();

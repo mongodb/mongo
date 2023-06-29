@@ -7,10 +7,7 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'aggPlanHasStage' and other explain helpers.
+import {hasRejectedPlans, isQueryPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.use_query_project_and_sort;
 coll.drop();
@@ -59,4 +56,3 @@ assertQueryCoversProjectionAndSort(
     [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 0, a: 1, x: 1}}]);
 assertQueryCoversProjectionAndSort(
     [{$match: {x: "string"}}, {$sort: {x: 1, a: -1, _id: 1}}, {$project: {_id: 1, x: 1, a: 1}}]);
-}());

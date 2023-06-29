@@ -1,10 +1,8 @@
 // @tags: [requires_non_retryable_writes, requires_fcv_51]
 
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-(function() {
-"use strict";
 const coll = db.partialFilterExpression_with_geoWithin;
 coll.drop();
 
@@ -166,4 +164,3 @@ if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     // inside the limits of our polygon (or in other words, inside the UWS of Manhattan ).
     assert.eq(results.length, 1);
 }
-})();

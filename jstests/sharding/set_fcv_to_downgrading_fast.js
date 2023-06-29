@@ -10,11 +10,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/feature_flag_util.js");
 
 const latest = "latest";
 // The FCV downgrade should be < 1 second but we added a buffer for slow machines.
@@ -147,4 +143,3 @@ function runShardingTest() {
 runStandaloneTest();
 runReplicaSetTest();
 runShardingTest();
-})();

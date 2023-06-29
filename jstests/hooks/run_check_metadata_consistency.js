@@ -1,8 +1,5 @@
-'use strict';
-
-(function() {
-load('jstests/libs/check_metadata_consistency_helpers.js');  // For MetadataConsistencyChecker.
-load('jstests/libs/fixture_helpers.js');                     // For FixtureHelpers.
+import {MetadataConsistencyChecker} from "jstests/libs/check_metadata_consistency_helpers.js";
+load('jstests/libs/fixture_helpers.js');  // For FixtureHelpers.
 
 assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a server?');
 
@@ -16,7 +13,7 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
             jsTest.log(
                 `Aborted metadata consistency check due to retriable error during topology discovery: ${
                     e}`);
-            return;
+            quit();
         } else {
             throw e;
         }
@@ -26,4 +23,3 @@ assert.neq(typeof db, 'undefined', 'No `db` object, is the shell connected to a 
 
 const mongos = db.getMongo();
 MetadataConsistencyChecker.run(mongos);
-})();

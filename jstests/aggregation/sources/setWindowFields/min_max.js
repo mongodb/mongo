@@ -1,10 +1,10 @@
 /**
  * Test that $min/max works as a window function.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -39,4 +39,3 @@ for (let index = 0; index < results.length; index++) {
     assert.eq("hiya", results[index].minStr);
     assert.eq("hiya", results[index].maxStr);
 }
-})();

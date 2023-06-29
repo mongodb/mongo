@@ -17,24 +17,21 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/columnstore_util.js");       // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 load("jstests/libs/discover_topology.js");      // For findNonConfigNodes
 load("jstests/libs/fixture_helpers.js");        // For isMongos
 load("jstests/libs/index_catalog_helpers.js");  // For IndexCatalogHelpers
-load("jstests/libs/sbe_util.js");               // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const columnstoreEnabled =
     checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
-    return;
+    quit();
 }
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.column_store_index_compression;
@@ -178,4 +175,3 @@ for (let {node, indexDetails} of reader.statsForEachMongod(coll, zstdIndex)) {
               "zstd",
               {node, indexDetails});
 }
-}());

@@ -5,10 +5,7 @@
  * Requires random cursor support.
  * @tags: [requires_replication]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/analyze_plan.js');  // For planHasStage.
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 // Set up.
 const rst = new ReplSetTest({nodes: 1});
@@ -49,4 +46,3 @@ assert.gt(randDocs.length, 0, tojson(randDocs));
 // Clean up.
 assert.commandWorked(session.abortTransaction_forTesting());
 rst.stopSet();
-})();

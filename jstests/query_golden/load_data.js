@@ -5,8 +5,8 @@
  * ]
  */
 
-(function() {
 load("jstests/libs/load_ce_test_data.js");
+import {runHistogramsTest} from "jstests/libs/ce_stats_utils.js";
 
 const dbName = 'ce_accuracy_test';
 const dataDir = 'jstests/query_golden/libs/data/';
@@ -35,10 +35,9 @@ for (const collMetadata of dbMetadata) {
     print(`Actual cardinality: ${actualCard}\n`);
     assert.eq(expectedCard, actualCard);
     collMetadata.fields.forEach(function(fieldMetadata) {
-        fieldName = fieldMetadata.fieldName;
+        const fieldName = fieldMetadata.fieldName;
         const fieldCard = coll.find({}, {fieldName: 1}).itcount();
         print(`card(${fieldName}) = ${fieldCard}\n`);
         assert.eq(fieldCard, actualCard);
     });
 }
-})();

@@ -1,10 +1,8 @@
-'use strict';
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Auth test the BulkWrite command.
 // These test cover privilege combination scenarios that commands_lib.js format cannot.
-function runTest(mongod) {
-    load("jstests/libs/feature_flag_util.js");
-
+export function runTest(mongod) {
     const admin = mongod.getDB('admin');
     admin.createUser({user: 'admin', pwd: 'pass', roles: jsTest.adminUserRoles});
     assert(admin.auth('admin', 'pass'));

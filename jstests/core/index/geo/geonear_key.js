@@ -1,11 +1,6 @@
 /**
  * Tests for the 'key' field accepted by the $geoNear aggregation stage.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-
 const coll = db.jstests_geonear_key;
 coll.drop();
 
@@ -98,4 +93,3 @@ assertGeoNearFails({near: {type: "Point", coordinates: [0, 0]}, key: "b.c"},
 //  -- The search point is a legacy coordinate pair.
 assertGeoNearFails({near: [0, 0], key: "b.d"}, ErrorCodes.NoQueryExecutionPlans);
 assertGeoNearFails({near: [0, 0], key: "b.d", spherical: false}, ErrorCodes.NoQueryExecutionPlans);
-}());

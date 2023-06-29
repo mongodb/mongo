@@ -9,10 +9,7 @@
 //   assumes_against_mongod_not_mongos,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getRejectedPlan, getRejectedPlans, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_plan_scores;
 coll.drop();
@@ -52,4 +49,3 @@ assert.commandWorked(coll.createIndex({a: 1, b: 1}));
     assert.commandWorked(explain);
     checkExplainOutput(explain, verbosity);
 });
-}());

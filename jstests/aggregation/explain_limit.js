@@ -8,11 +8,8 @@
 //   # Implicit index creation may change the plan/engine used.
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 let coll = db.explain_limit;
 
@@ -100,4 +97,3 @@ checkResults({results: execLevel, verbosity: "executionStats"});
 
 allPlansExecLevel = coll.explain("allPlansExecution").aggregate(pipeline);
 checkResults({results: allPlansExecLevel, verbosity: "allPlansExecution"});
-})();

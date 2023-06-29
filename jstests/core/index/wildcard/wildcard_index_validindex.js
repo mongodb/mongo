@@ -7,12 +7,9 @@
  *   does_not_support_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/index_catalog_helpers.js");     // For "IndexCatalogHelpers."
 load("jstests/libs/collection_drop_recreate.js");  // For "assertDropCollection."
-load("jstests/libs/feature_flag_util.js");         // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const kCollectionName = "wildcard_validindex";
 const coll = db.getCollection(kCollectionName);
@@ -169,4 +166,3 @@ assert.commandFailedWithCode(
 assert.commandFailedWithCode(
     db.runCommand({create: clusteredCollName, clusteredIndex: {key: {"$**": 1}, unique: true}}),
     ErrorCodes.InvalidIndexSpecificationOption);
-})();

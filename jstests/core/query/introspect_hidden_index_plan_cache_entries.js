@@ -13,9 +13,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 
 const collName = 'introspect_hidden_index_plan_cache_entries';
 const collNotAffectedName = 'introspect_hidden_index_plan_cache_entries_unaffected';
@@ -98,4 +96,3 @@ assert.gt(cachedPlan.length, 0);
 assert.commandWorked(coll.unhideIndex("b_1"));
 cachedPlan = getPlansForCacheEntry(queryShape, coll);
 assert.eq(0, cachedPlan.length);
-})();

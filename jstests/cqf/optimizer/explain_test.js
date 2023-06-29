@@ -1,11 +1,12 @@
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
+import {
+    checkCascadesOptimizerEnabled,
+    removeUUIDsFromExplain,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_explain_test;
@@ -40,4 +41,3 @@ PhysicalScan [{'<root>': scan_0, 'a': evalTemp_2, 'b': evalTemp_3}, cqf_explain_
 
 const actualStr = removeUUIDsFromExplain(db, res);
 assert.eq(expectedStr, actualStr);
-}());

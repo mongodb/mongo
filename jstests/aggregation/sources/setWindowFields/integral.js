@@ -1,10 +1,7 @@
 /**
  * Test the behavior of $integral.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {documentBounds} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db.setWindowFields_integral;
 
@@ -271,4 +268,3 @@ assert.sameMembers(runRangeBasedIntegral([-6, 6]), [
     // Empty window.
     {time: ISODate("2020-01-01T00:00:18.000Z"), y: 6.8, integral: 0.0},
 ]);
-})();

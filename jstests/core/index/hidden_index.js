@@ -15,14 +15,12 @@
  * ]
  */
 
-(function() {
-'use strict';
-load("jstests/libs/analyze_plan.js");              // For getPlanStages.
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.findByName.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
-load("jstests/libs/columnstore_util.js");          // For setUpServerForColumnStoreIndexTest.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const columnstoreEnabled =
     checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */) &&
@@ -176,4 +174,3 @@ assert(idxSpec.hidden);
 assert.commandWorked(coll.unhideIndex("y"));
 idxSpec = IndexCatalogHelpers.findByName(coll.getIndexes(), "y");
 assert.eq(idxSpec.hidden, undefined);
-})();

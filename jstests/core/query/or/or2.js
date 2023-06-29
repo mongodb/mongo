@@ -2,11 +2,8 @@
 //   assumes_read_concern_local,
 // ]
 
-(function() {
-"use strict";
-
 // Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const t = db.jstests_or2;
 t.drop();
@@ -83,4 +80,3 @@ doTest();
 assert(t.drop());
 assert.commandWorked(t.createIndex({x: 1, a: 1, b: 1}));
 doTest();
-})();

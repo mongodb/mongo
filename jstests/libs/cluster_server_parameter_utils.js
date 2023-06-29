@@ -16,9 +16,9 @@
  *   when the featureFlag is disabled.
  */
 
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-const kNonTestOnlyClusterParameters = {
+export const kNonTestOnlyClusterParameters = {
     changeStreamOptions: {
         default: {preAndPostImages: {expireAfterSeconds: 'off'}},
         testValues: [
@@ -38,7 +38,7 @@ const kNonTestOnlyClusterParameters = {
     },
 };
 
-const kTestOnlyClusterParameters = {
+export const kTestOnlyClusterParameters = {
     cwspTestNeedsFeatureFlagClusterWideToaster: {
         default: {intData: 16},
         testValues: [{intData: 17}, {intData: 18}],
@@ -58,21 +58,25 @@ const kTestOnlyClusterParameters = {
     },
 };
 
-const kAllClusterParameters =
+export const kAllClusterParameters =
     Object.assign({}, kNonTestOnlyClusterParameters, kTestOnlyClusterParameters);
-const kAllClusterParameterNames = Object.keys(kAllClusterParameters);
-const kAllClusterParameterDefaults = kAllClusterParameterNames.map(
+
+export const kAllClusterParameterNames = Object.keys(kAllClusterParameters);
+
+export const kAllClusterParameterDefaults = kAllClusterParameterNames.map(
     (name) => Object.assign({_id: name}, kAllClusterParameters[name].default));
-const kAllClusterParameterValues1 = kAllClusterParameterNames.map(
+
+export const kAllClusterParameterValues1 = kAllClusterParameterNames.map(
     (name) => Object.assign({_id: name}, kAllClusterParameters[name].testValues[0]));
-const kAllClusterParameterValues2 = kAllClusterParameterNames.map(
+
+export const kAllClusterParameterValues2 = kAllClusterParameterNames.map(
     (name) => Object.assign({_id: name}, kAllClusterParameters[name].testValues[1]));
 
-const kNonTestOnlyClusterParameterDefaults =
+export const kNonTestOnlyClusterParameterDefaults =
     Object.keys(kNonTestOnlyClusterParameters)
         .map((name) => Object.assign({_id: name}, kAllClusterParameters[name].default));
 
-function considerParameter(paramName, conn) {
+export function considerParameter(paramName, conn) {
     // { featureFlag: 'name' } indicates that the CWSP should only be considered with the FF
     // enabled. { featureFlag: '!name' } indicates that the CWSP should only be considered with the
     // FF disabled.
@@ -125,7 +129,7 @@ function considerParameter(paramName, conn) {
         validateStandalone(cp);
 }
 
-function tenantCommand(command, tenantId) {
+export function tenantCommand(command, tenantId) {
     if (tenantId === undefined) {
         return command;
     } else {
@@ -134,12 +138,12 @@ function tenantCommand(command, tenantId) {
 }
 
 // Set the log level for get/setClusterParameter logging to appear.
-function setupNode(conn) {
+export function setupNode(conn) {
     const adminDB = conn.getDB('admin');
     adminDB.setLogLevel(2);
 }
 
-function setupReplicaSet(rst) {
+export function setupReplicaSet(rst) {
     setupNode(rst.getPrimary());
 
     rst.getSecondaries().forEach(function(secondary) {
@@ -147,7 +151,7 @@ function setupReplicaSet(rst) {
     });
 }
 
-function setupSharded(st) {
+export function setupSharded(st) {
     setupNode(st.s0);
 
     const shards = [st.rs0, st.rs1, st.rs2];
@@ -160,7 +164,7 @@ function setupSharded(st) {
 }
 
 // Upserts config.clusterParameters document with w:majority via setClusterParameter.
-function runSetClusterParameter(conn, update, tenantId) {
+export function runSetClusterParameter(conn, update, tenantId) {
     const paramName = update._id;
     if (!considerParameter(paramName, conn)) {
         return;
@@ -179,7 +183,7 @@ function runSetClusterParameter(conn, update, tenantId) {
 
 // Runs getClusterParameter on a specific mongod or mongos node and returns true/false depending
 // on whether the expected values were returned.
-function runGetClusterParameterNode(
+export function runGetClusterParameterNode(
     conn, getClusterParameterArgs, expectedClusterParameters, tenantId) {
     const adminDB = conn.getDB('admin');
 
@@ -229,7 +233,7 @@ function runGetClusterParameterNode(
 
 // Runs getClusterParameter on each replica set node and asserts that the response matches the
 // expected parameter objects on at least a majority of nodes.
-function runGetClusterParameterReplicaSet(
+export function runGetClusterParameterReplicaSet(
     rst, getClusterParameterArgs, expectedClusterParameters, tenantId) {
     let numMatches = 0;
     const numTotalNodes = rst.getSecondaries().length + 1;
@@ -250,7 +254,7 @@ function runGetClusterParameterReplicaSet(
 
 // Runs getClusterParameter on mongos, each mongod in each shard replica set, and each mongod in
 // the config server replica set.
-function runGetClusterParameterSharded(
+export function runGetClusterParameterSharded(
     st, getClusterParameterArgs, expectedClusterParameters, tenantId) {
     assert(runGetClusterParameterNode(
         st.s0, getClusterParameterArgs, expectedClusterParameters, tenantId));
@@ -265,7 +269,7 @@ function runGetClusterParameterSharded(
 }
 
 // Tests valid usages of set/getClusterParameter and verifies that the expected values are returned.
-function testValidClusterParameterCommands(conn) {
+export function testValidClusterParameterCommands(conn) {
     if (conn instanceof ReplSetTest) {
         // Run getClusterParameter in list format and '*' and ensure it returns all default values
         // on all nodes in the replica set.
@@ -342,12 +346,12 @@ function testValidClusterParameterCommands(conn) {
     }
 }
 
-const tenantId1 = ObjectId();
-const tenantId2 = ObjectId();
+export const tenantId1 = ObjectId();
+export const tenantId2 = ObjectId();
 
 // Tests valid usages of set/getClusterParameter on a serverless replica set and verifies that the
 // expected values are returned.
-function testValidServerlessClusterParameterCommands(conn) {
+export function testValidServerlessClusterParameterCommands(conn) {
     // TODO SERVER-69663 Add serverless sharded cluster tests once supported.
     assert(conn instanceof ReplSetTest);
     assert(
@@ -413,7 +417,7 @@ function testValidServerlessClusterParameterCommands(conn) {
 }
 
 // Assert that explicitly getting a disabled cluster server parameter fails on a node.
-function testExplicitDisabledGetClusterParameter(conn, tenantId) {
+export function testExplicitDisabledGetClusterParameter(conn, tenantId) {
     const adminDB = conn.getDB('admin');
     assert.commandFailedWithCode(adminDB.runCommand(tenantCommand(
                                      {getClusterParameter: "testIntClusterParameter"}, tenantId)),
@@ -426,7 +430,7 @@ function testExplicitDisabledGetClusterParameter(conn, tenantId) {
 
 // Tests that disabled cluster server parameters return errors or are filtered out as appropriate
 // by get/setClusterParameter.
-function testDisabledClusterParameters(conn, tenantId) {
+export function testDisabledClusterParameters(conn, tenantId) {
     if (conn instanceof ReplSetTest) {
         // Assert that explicitly setting a disabled cluster server parameter fails.
         const adminDB = conn.getPrimary().getDB('admin');
@@ -495,7 +499,7 @@ function testDisabledClusterParameters(conn, tenantId) {
 }
 
 // Tests that invalid uses of getClusterParameter fails on a given node.
-function testInvalidGetClusterParameter(conn, tenantId) {
+export function testInvalidGetClusterParameter(conn, tenantId) {
     const adminDB = conn.getDB('admin');
     // Assert that specifying a nonexistent parameter returns an error.
     assert.commandFailedWithCode(
@@ -514,7 +518,7 @@ function testInvalidGetClusterParameter(conn, tenantId) {
 }
 
 // Tests that invalid uses of set/getClusterParameter fail with the appropriate errors.
-function testInvalidClusterParameterCommands(conn, tenantId) {
+export function testInvalidClusterParameterCommands(conn, tenantId) {
     if (conn instanceof ReplSetTest) {
         const adminDB = conn.getPrimary().getDB('admin');
 

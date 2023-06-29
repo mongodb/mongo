@@ -15,16 +15,13 @@
  *   uses_full_validation,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/analyze_plan.js");         // For "planHasStage."
+import {getPlanStages, aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
-load("jstests/libs/columnstore_util.js");     // For "setUpServerForColumnStoreIndexTest."
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.columnstore_index_correctness;
@@ -486,5 +483,4 @@ assert.commandWorked(coll.createIndex({"$**": "columnstore"}));
     runTest({}, 1);                           // no collation
     runTest({locale: "en", strength: 3}, 1);  // case sensitive
     runTest({locale: "en", strength: 2}, 3);  // case insensitive
-})();
 })();

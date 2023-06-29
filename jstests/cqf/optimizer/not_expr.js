@@ -1,8 +1,5 @@
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/optimizer_utils.js");      // For assertValueOnPlanPath.
+import {assertValueOnPlanPath} from "jstests/libs/optimizer_utils.js";
 
 const c = db.cqf_not;
 c.drop();
@@ -270,4 +267,3 @@ assertArrayEq({
         {a: [[3, 3], [3, 3]]},
     ],
 });
-}());

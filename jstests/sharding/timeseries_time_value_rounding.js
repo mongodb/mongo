@@ -6,10 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
 load("jstests/aggregation/extras/utils.js");
 
 Random.setRandomSeed();
@@ -128,4 +124,3 @@ try {
 } finally {
     st.stop();
 }
-})();

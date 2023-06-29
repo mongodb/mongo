@@ -3,10 +3,17 @@
  * histogram with appropriate type counts and retrieve that histogram to estimate a simple match
  * predicate. Note that this tests predicates and histograms on several types.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ce_stats_utils.js');
+import {
+    createAndValidateHistogram,
+    runHistogramsTest,
+    verifyCEForMatch,
+    verifyCEForMatchNodes,
+} from "jstests/libs/ce_stats_utils.js";
+import {
+    extractLogicalCEFromNode,
+    forceCE,
+    navigateToPlanPath
+} from "jstests/libs/optimizer_utils.js";
 
 runHistogramsTest(function testTypeCounts() {
     const coll = db.type_counts;
@@ -871,4 +878,3 @@ runHistogramsTest(function testTypeCounts() {
         expected: []
     });
 });
-}());

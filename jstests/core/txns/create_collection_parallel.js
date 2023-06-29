@@ -7,12 +7,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/create_collection_txn_helpers.js");
 load("jstests/libs/auto_retry_transaction_in_sharding.js");
-load("jstests/libs/feature_flag_util.js");
 
 const dbName = 'test_txns_create_collection_parallel';
 
@@ -187,4 +183,3 @@ runParallelCollectionCreateTest("update", true /*explicitCreate*/);
 runParallelCollectionCreateTest("update", false /*explicitCreate*/);
 runParallelCollectionCreateTest("findAndModify", true /*explicitCreate*/);
 runParallelCollectionCreateTest("findAndModify", false /*explicitCreate*/);
-}());

@@ -7,10 +7,11 @@
  *   requires_persistence,
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    runGetClusterParameterNode,
+    runGetClusterParameterReplicaSet,
+    runSetClusterParameter,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 // Checks that up-to-date cluster parameters are transferred over to newly-added replica set nodes
 // as part of initial sync.
@@ -97,4 +98,3 @@ checkClusterParameterInitialSync(rst);
 checkClusterParameterRestart(rst);
 
 rst.stopSet();
-})();

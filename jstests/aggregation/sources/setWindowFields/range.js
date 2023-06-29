@@ -1,11 +1,6 @@
 /**
  * Test range-based window bounds.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
-
 const coll = db.setWindowFields_range;
 coll.drop();
 
@@ -276,4 +271,3 @@ const pipeline = [{
     }
 }];
 assert.commandWorked(db.runCommand({aggregate: coll.getName(), pipeline: pipeline, cursor: {}}));
-})();

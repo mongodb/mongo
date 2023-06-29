@@ -2,10 +2,10 @@
 // The test runs commands that are not allowed with security token: movechunk, split.
 // @tags: [not_allowed_with_security_token]
 
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/aggregation/extras/utils.js");
 
-var TimeseriesTest = class {
+export var TimeseriesTest = class {
     static getBucketMaxSpanSecondsFromGranularity(granularity) {
         switch (granularity) {
             case 'seconds':

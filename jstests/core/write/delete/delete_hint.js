@@ -10,10 +10,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 function assertCommandUsesIndex(command, expectedHintKeyPattern) {
     const out = assert.commandWorked(coll.runCommand({explain: command}));
@@ -115,4 +112,3 @@ normalIndexTest();
 sparseIndexTest();
 shellHelpersTest();
 failedHintTest();
-})();

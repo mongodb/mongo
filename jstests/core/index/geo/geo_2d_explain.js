@@ -1,10 +1,9 @@
 // @tags: [
 //   assumes_balancer_off,
 // ]
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 var t = db.geo_2d_explain;
-
-load("jstests/libs/analyze_plan.js");
 
 t.drop();
 

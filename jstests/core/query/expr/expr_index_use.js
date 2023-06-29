@@ -4,11 +4,8 @@
 //   requires_fcv_63,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {getAggPlanStage, getPlanStage, hasRejectedPlans} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.expr_index_use;
 coll.drop();
@@ -330,4 +327,3 @@ confirmExpectedExprExecution({$lt: ["$w", {z: undefined, u: ["array"]}]},
                              {nReturned: 6, expectedIndex: {w: 1}});
 confirmExpectedExprExecution({$lte: ["$w", {z: undefined, u: ["array"]}]},
                              {nReturned: 7, expectedIndex: {w: 1}});
-})();

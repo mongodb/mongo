@@ -2,10 +2,7 @@
  * Tests that a $not-$in-$regex query, which cannot be supported by an index, cannot incorrectly
  * hijack the cached plan for an earlier $not-$in query.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');  // For isCollScan and getPlanCacheKeyFromShape.
+import {getPlanCacheKeyFromShape, getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.plan_cache_not_in_regex;
 coll.drop();
@@ -54,4 +51,3 @@ for (let [proj, sort] of [[{}, {}], [{_id: 0, a: 1}, {}], [{_id: 0, a: 1}, {a: 1
     // Flush the plan cache before the next iteration.
     coll.getPlanCache().clear();
 }
-})();

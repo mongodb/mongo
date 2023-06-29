@@ -3,10 +3,8 @@
  * Many of these tests are similar/repeats of core/projection_semantics.js
  */
 
-(function() {
-"use strict";
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load('jstests/libs/optimizer_utils.js');
+import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_project;
 
@@ -187,5 +185,4 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
             [{_id: 0, b: {c: 1, d: 1}}, {_id: 1, b: {c: 2, d: 2}}, {_id: 2, b: {c: 3, d: 3}}],
         interestingIndexes: [],
     });
-}());
 }());

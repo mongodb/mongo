@@ -1,6 +1,6 @@
-'use strict';
-
-load('jstests/libs/check_routing_table_consistency_helpers.js');
+import {
+    RoutingTableConsistencyChecker
+} from "jstests/libs/check_routing_table_consistency_helpers.js";
 
 ShardingTest.prototype.checkRoutingTableConsistency = function() {
     if (jsTest.options().skipCheckRoutingTableConsistency) {

@@ -8,10 +8,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 TestData.skipEnforceFastCountOnValidate = true;
@@ -132,4 +128,3 @@ killopIndexBuildOnSecondaryOnFailpoint(
     rst, 'hangIndexBuildAfterSignalPrimaryForCommitReadiness', /*shouldSucceed*/ false);
 
 rst.stopSet();
-})();

@@ -17,7 +17,7 @@
 
 load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
 load("jstests/libs/uuid_util.js");
-load('jstests/libs/feature_flag_util.js');
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 export const $config = (function() {
     function threadCollectionName(prefix, tid) {

@@ -11,10 +11,7 @@
 // where agg execution differs from query. It also includes confirmation that hint works for find
 // command against views, which is converted to a hinted aggregation on execution.
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStage.
+import {getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB("agg_hint");
 assert.commandWorked(testDB.dropDatabase());
@@ -262,4 +259,3 @@ confirmCommandUsesIndex({
     hintKeyPattern: {_id: 1},
     expectedKeyPattern: {_id: 1}
 });
-})();

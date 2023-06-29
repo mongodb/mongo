@@ -1,10 +1,7 @@
 // Test count and distinct on views use with different values of the allowDiskUseByDefault
 // parameter.
 
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -46,4 +43,3 @@ if (!checkSBEEnabled(viewsDB)) {
 testDiskUse({distinct: "largeView", key: "largeStr"});
 
 MongoRunner.stopMongod(conn);
-})();

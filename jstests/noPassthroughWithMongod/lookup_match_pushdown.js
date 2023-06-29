@@ -1,11 +1,8 @@
 /**
  * Tests that the $match stage is pushed before $lookup stage.
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load('jstests/libs/analyze_plan.js');         // For getWinningPlan().
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.lookup_match_pushdown;
 coll.drop();
@@ -77,4 +74,3 @@ const pipelineExprGt = [
     {$match: {"a.z": 10, $expr: {$gt: ["$x", 5]}}}
 ];
 checkPipelineAndResults(pipelineExprGt, expectedPipeline, expectedResultsGt);
-}());

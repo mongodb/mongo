@@ -11,12 +11,9 @@
 //   not_allowed_with_security_token,
 // ]
 //
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For 'resultsEq'.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-load("jstests/libs/columnstore_util.js");     // For setUpServerForColumnStoreIndexTest.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 function extractAValues(results) {
     return results.map(function(res) {
@@ -818,4 +815,3 @@ coll.drop();
 assert.commandFailedWithCode(
     coll.createIndex({a: 1}, {partialFilterExpression: {a: {$elemMatch: {$ne: null}}}}),
     ErrorCodes.CannotCreateIndex);
-}());

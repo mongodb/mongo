@@ -19,11 +19,8 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // For testing convenience this variable is made an integer "1" if SBE is fully enabled, because the
 // expected amount of plan cache entries differs between the SBE plan cache and the classic one.
@@ -109,4 +106,3 @@ assert.commandWorked(
     db.runCommand({planCacheSetFilter: collName, query: {a: 1, b: 1}, indexes: [{a: 1}]}));
 assert(!existsInPlanCache({a: 1, b: 1}, {}, {}, coll));
 assert(existsInPlanCache({a: 1, b: 1}, {}, {}, collOther));
-})();

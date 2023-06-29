@@ -5,9 +5,13 @@
  * @tags: [requires_wiredtiger, requires_replication]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertErrorOnStartupWhenStartingAsReplSet,
+    assertRepairSucceeds,
+    assertStartAndStopStandaloneOnExistingDbpath,
+    assertStartInReplSet,
+    getUriForColl,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
 TestData.skipEnforceFastCountOnValidate = true;
@@ -124,4 +128,3 @@ secondary = assertStartInReplSet(
     });
 
 replSet.stopSet();
-})();

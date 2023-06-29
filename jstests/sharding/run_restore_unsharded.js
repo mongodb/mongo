@@ -6,10 +6,7 @@
  *      requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const s = new ShardingTest(
     {name: "runRestoreUnsharded", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
@@ -19,7 +16,7 @@ let db = s.getDB("test");
 if (!FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB("test"), "SelectiveBackup")) {
     jsTestLog("Skipping as featureFlagSelectiveBackup is not enabled");
     s.stop();
-    return;
+    quit();
 }
 
 s.adminCommand({enablesharding: "test"});
@@ -59,4 +56,3 @@ assert.eq(0, conn.getDB("config").getCollection("collections").find({_id: "test.
 assert.eq(1, conn.getDB("config").getCollection("databases").find({_id: "test"}).count());
 
 MongoRunner.stopMongod(conn);
-}());

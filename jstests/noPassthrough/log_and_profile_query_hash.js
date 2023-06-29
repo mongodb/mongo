@@ -8,12 +8,8 @@
  *  cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 // For getLatestProfilerEntry().
 load("jstests/libs/profiler.js");
-load("jstests/libs/sbe_util.js");
 
 // Prevent the mongo shell from gossiping its cluster time, since this will increase the amount
 // of data logged for each op. For some of the testcases below, including the cluster time would
@@ -155,4 +151,3 @@ const creationLogList = log.filter(
 assert.eq(1, creationLogList.length);
 
 MongoRunner.stopMongod(conn);
-})();

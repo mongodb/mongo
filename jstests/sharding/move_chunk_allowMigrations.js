@@ -8,10 +8,6 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
 load('jstests/libs/fail_point_util.js');
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/sharding/libs/find_chunks_util.js");
@@ -205,4 +201,3 @@ testAllowMigrationsFalseDisablesBalancer(false /* allowMigrations */, {noBalance
 testAllowMigrationsFalseDisablesBalancer(false /* allowMigrations */, {noBalance: true});
 
 st.stop();
-})();

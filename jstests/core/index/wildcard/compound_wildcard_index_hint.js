@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
-
-load("jstests/libs/wildcard_index_helpers.js");
+import {WildcardIndexHelpers} from "jstests/libs/wildcard_index_helpers.js";
 
 const cwiList = [
     // Note: 'wildcardProjection' cannot be specified if the wildcard field is not "$**".
@@ -75,4 +73,3 @@ for (const testCase of cwiList) {
         coll.find(testCase.query).hint(testCase.keyPattern).explain('executionStats'));
     WildcardIndexHelpers.assertExpectedIndexIsUsed(explain, testCase.indexName);
 }
-})();

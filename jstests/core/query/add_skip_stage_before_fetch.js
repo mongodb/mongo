@@ -8,10 +8,7 @@
 //   operations_longer_than_stepdown_interval_in_txns,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db.add_skip_stage_before_fetch;
 
@@ -66,4 +63,3 @@ explainResult =
     coll.find({a: 0, b: 2}).hint(testIndex).sort({d: 1}).skip(2400).explain("executionStats");
 assert.gte(explainResult.executionStats.totalKeysExamined, 2500);
 assert.eq(explainResult.executionStats.totalDocsExamined, 2500);
-})();

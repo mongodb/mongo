@@ -15,14 +15,17 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");
-load("jstests/core/timeseries/libs/timeseries_agg_helpers.js");
-load("jstests/core/timeseries/libs/timeseries_lastpoint_helpers.js");
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {
+    createBoringCollections,
+    getMapInterestingValuesToEquivalentsStage,
+    createInterestingCollections,
+    expectDistinctScan,
+    expectCollScan,
+    expectIxscan,
+    testAllTimeMetaDirections,
+} from "jstests/core/timeseries/libs/timeseries_lastpoint_helpers.js";
 
 const testDB = TimeseriesAggTests.getTestDb();
 assert.commandWorked(testDB.dropDatabase());
@@ -30,7 +33,7 @@ assert.commandWorked(testDB.dropDatabase());
 // TODO SERVER-73509 The test doesn't work yet, even though this feature flag is gone.
 if (true /* previously guarded by featureFlagLastPointQuery */) {
     jsTestLog("Skipping the test.");
-    return;
+    quit();
 }
 
 /**
@@ -165,4 +168,3 @@ function getGroupStage({time, sortBy, n, extraFields = []}) {
         ]);
     });
 }
-})();

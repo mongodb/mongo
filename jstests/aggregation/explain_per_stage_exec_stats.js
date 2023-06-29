@@ -3,10 +3,8 @@
  * execution time (executionTimeMillisEstimate) when explain is run with verbosities
  * "executionStats" and "allPlansExecution".
  */
-(function() {
-"use strict";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");     // For getAggPlanStages().
 load("jstests/libs/fixture_helpers.js");  // For isReplSet().
 
 const coll = db.explain_per_stage_exec_stats;
@@ -157,4 +155,3 @@ assert.eq(numberOfDocsReturnedByMatchStage(coll.explain("executionStats").aggreg
     };
     checkResults(result, assertOutputBytesSize);
 })();
-}());

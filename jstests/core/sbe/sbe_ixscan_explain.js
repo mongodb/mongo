@@ -7,16 +7,13 @@
 //   requires_fcv_63,
 // ]
 
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');  // For getPlanStages
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getPlanStages, getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSBEEnabled(db);
 if (!isSBEEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
-    return;
+    quit();
 }
 
 function assertStageContainsIndexName(stage) {
@@ -45,4 +42,3 @@ assert(ixscanStages.length !== 0);
 for (let ixscanStage of ixscanStages) {
     assertStageContainsIndexName(ixscanStage);
 }
-}());

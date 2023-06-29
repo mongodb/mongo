@@ -6,7 +6,7 @@ load("jstests/libs/discover_topology.js");  // For findNonConfigNodes.
 // For areAllCollectionsClustered.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
-load("jstests/libs/sbe_util.js");                                // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Updates server parameters to disable column scan query planning heuristics so that column scan
@@ -17,7 +17,7 @@ load("jstests/libs/sbe_util.js");                                // For checkSBE
  * for the planning heuristics behavior is included in unit tests, no passthrough tests, and perf
  * tests.
  */
-function fullyEnableColumnScan(nodes) {
+export function fullyEnableColumnScan(nodes) {
     // Since the CSI query planning heuristics are OR-ed together, we can set any one of
     // [internalQueryColumnScanMinAvgDocSizeBytes, internalQueryColumnScanMinCollectionSizeBytes,
     // internalQueryColumnScanMinNumColumnFilters] to zero in order to fully enable column scan.
@@ -29,12 +29,12 @@ function fullyEnableColumnScan(nodes) {
  * expected to succeed. Otherwise, logs the reason why the test will not create column store indexes
  * and returns false.
  */
-function safeToCreateColumnStoreIndex(db) {
+export function safeToCreateColumnStoreIndex(db) {
     return safeToCreateColumnStoreIndexInCluster(
         DiscoverTopology.findNonConfigNodes(db.getMongo()));
 }
 
-function safeToCreateColumnStoreIndexInCluster(nodes) {
+export function safeToCreateColumnStoreIndexInCluster(nodes) {
     for (const node of nodes) {
         const conn = new Mongo(node);
         if (FixtureHelpers.isMongos(conn.getDB("admin"))) {
@@ -79,7 +79,7 @@ function safeToCreateColumnStoreIndexInCluster(nodes) {
  * Checks if the test is eligible to run and sets the appropriate parameters to use column store
  * indexes. Returns true if setup was successful.
  */
-function setUpServerForColumnStoreIndexTest(db) {
+export function setUpServerForColumnStoreIndexTest(db) {
     if (!checkSBEEnabled(db)) {
         jsTestLog("Skipping column store index test since SBE is disabled");
         return false;

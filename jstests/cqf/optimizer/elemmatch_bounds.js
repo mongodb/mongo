@@ -7,10 +7,7 @@
  *   requires_cqf,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For getPlanSkeleton.
+import {getPlanSkeleton} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_elemmatch_bounds;
 coll.drop();
@@ -205,4 +202,3 @@ assertCount(result, numDuplicates, {c: [[1, 2, 3]]});
 assertCount(result, numDuplicates, {c: [[1], [2], [3]]});
 assertCount(result, numDuplicates, {c: [[2]]});
 assert.eq(result.length, numDuplicates * 3);
-})();

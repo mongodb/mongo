@@ -3,10 +3,8 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
-load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/validation_common.js");
 
 function makeAnalyzeShardKeyAggregateCmdObj(collName, key, splitPointsShardId) {
@@ -117,4 +115,3 @@ function runTest(rst, validationTest, shardName) {
 
     rst.stopSet();
 }
-})();

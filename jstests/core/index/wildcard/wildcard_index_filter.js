@@ -10,10 +10,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos()'.
 
 const coll = db.wildcard_index_filter;
@@ -112,4 +110,3 @@ assert.commandWorked(coll.createIndex(indexAWildcard));
 
 // Filtering on a path specified $** index. Check that the $** is used over other indices.
 assertExpectedIndexAnswersQueryWithFilter({a: "a"}, [indexAWildcard], {a: "a"}, "a.$**_1");
-})();

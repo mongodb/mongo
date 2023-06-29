@@ -6,8 +6,7 @@
  * ]
  */
 
-(function() {
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const st = new ShardingTest({shards: 2});
 
@@ -119,4 +118,3 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(st.shard0)) {
 }
 
 st.stop();
-})();

@@ -4,9 +4,12 @@
  *
  * @tags: [requires_wiredtiger]
  */
-(function() {
+import {
+    assertRepairSucceeds,
+    getUriForColl,
+    startMongodOnExistingPath
+} from "jstests/disk/libs/wt_file_helper.js";
 
-load('jstests/disk/libs/wt_file_helper.js');
 load("jstests/libs/collection_drop_recreate.js");
 
 const dbName = jsTestName();
@@ -84,4 +87,3 @@ docToInsert = {
     "temp": 12
 };
 runRepairTest(clusteredCollOptions, docToInsert, isTimeseries);
-})();

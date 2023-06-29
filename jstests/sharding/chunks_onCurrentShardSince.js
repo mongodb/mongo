@@ -2,10 +2,6 @@
  * Tests that `onCurrentShardSince` is always consistent with  `history[0].validAfter` on
  * config.chunks entries
  */
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 
 Random.setRandomSeed();
@@ -137,4 +133,3 @@ if (!TestData.configShard) {
 }
 
 st.stop();
-})();

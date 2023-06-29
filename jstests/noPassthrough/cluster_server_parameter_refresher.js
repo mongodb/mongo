@@ -9,10 +9,10 @@
  *   requires_sharding
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    kAllClusterParameterDefaults,
+    runGetClusterParameterSharded
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 function runTest(st, startupRefreshIntervalMS) {
     // This assert is necessary because we subtract 8000 MS from this value later on, and we don't
@@ -154,4 +154,3 @@ let options = {
 let st = new ShardingTest(options);
 runTest(st, 10000);
 st.stop();
-})();

@@ -9,12 +9,9 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");     // For arrayEq().
-load("jstests/libs/analyze_plan.js");            // For getPlanStages().
-load("jstests/libs/wildcard_index_helpers.js");  // For WildcardIndexHelpers.
+load("jstests/aggregation/extras/utils.js");  // For arrayEq().
+import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {WildcardIndexHelpers} from "jstests/libs/wildcard_index_helpers.js";
 
 const coll = db.query_on_prefix_of_compound_wildcard_index;
 
@@ -99,4 +96,3 @@ for (const query of supportedQueries) {
         assertArrayEq({actual, expected});
     }
 }
-})();

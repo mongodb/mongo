@@ -8,16 +8,12 @@
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
 //   cqf_incompatible,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
 
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skip running the test because SBE is not enabled");
-    return;
+    quit();
 }
 const testDB = db.getSiblingDB("from_plan_cache_flag");
 assert.commandWorked(testDB.dropDatabase());
@@ -42,4 +38,3 @@ assert.eq(!!profileObj.fromPlanCache, true, profileObj);
 coll.aggregate([{$match: {a: 3}}], {comment}).toArray();
 profileObj = getLatestProfilerEntry(testDB, {"command.comment": comment});
 assert.eq(!!profileObj.fromPlanCache, true, profileObj);
-}());

@@ -22,11 +22,8 @@
 //   references_foreign_collection,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {getAggPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 var colName = "jstests_index_stats";
 var col = db[colName];
@@ -361,4 +358,3 @@ assert.commandWorked(col.unhideIndex("a_1"));
 res = col.findOne({a: 1});
 assert(1, res);
 assert.eq(1, getUsageCount("a_1"));
-})();

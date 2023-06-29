@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_group;
@@ -24,4 +25,3 @@ const res = coll.explain("executionStats").aggregate([
 ]);
 assertValueOnPlanPath("GroupBy", res, "child.child.nodeType");
 assert.eq(4, res.executionStats.nReturned);
-}());

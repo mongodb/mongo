@@ -11,10 +11,7 @@
 //   assumes_unsharded_collection,
 //   do_not_wrap_aggregations_in_facets,
 // ]
-load('jstests/libs/analyze_plan.js');
-
-(function() {
-"use strict";
+import {aggPlanHasStage, getAggPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
 
 var coll = db.countscan;
 coll.drop();
@@ -87,4 +84,3 @@ assert.eq({foo: 0}, countScan.indexBounds.startKey, explained);
 assert.eq(true, countScan.indexBounds.startKeyInclusive, explained);
 assert.eq({foo: 10}, countScan.indexBounds.endKey, explained);
 assert.eq(false, countScan.indexBounds.endKeyInclusive, explained);
-}());

@@ -3,10 +3,7 @@
  * 'featureFlagAdditionalParticipants' is enabled.
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/fail_point_util.js");
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
@@ -166,4 +163,3 @@ const fpDataMultiple = {
 };
 let expectedParticipantListMultiple = [shard0Name, shard1Name, shard2Name, shard3Name];
 testAddingParticipant(true, expectedParticipantListMultiple, fpDataMultiple);
-})();

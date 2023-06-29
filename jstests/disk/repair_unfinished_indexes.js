@@ -5,9 +5,15 @@
  * @tags: [requires_wiredtiger, requires_replication]
  */
 
-(function() {
+import {
+    assertErrorOnStartupWhenStartingAsReplSet,
+    assertRepairSucceeds,
+    assertStartInReplSet,
+    corruptFile,
+    getUriForColl,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
-load('jstests/disk/libs/wt_file_helper.js');
 load('jstests/noPassthrough/libs/index_build.js');
 
 const dbName = "repair_unfinished_indexes";
@@ -92,4 +98,3 @@ assertErrorOnStartupWhenStartingAsReplSet(
 })();
 
 replSet.stopSet();
-})();

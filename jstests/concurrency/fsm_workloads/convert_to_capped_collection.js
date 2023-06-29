@@ -13,8 +13,6 @@
  */
 
 export const $config = (function() {
-    load("jstests/libs/feature_flag_util.js");
-
     // TODO: This workload may fail if an iteration multiplier is specified.
     var data = {prefix: 'convert_to_capped_collection'};
 

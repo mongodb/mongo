@@ -9,10 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const timeFieldName = 'tm';
@@ -100,4 +97,3 @@ TimeseriesTest.run((insert) => {
               indexSpecsString[0].collation.numericOrdering,
               'Invalid index spec for index_string: ' + tojson(indexSpecsString[0]));
 });
-})();

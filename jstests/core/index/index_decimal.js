@@ -6,11 +6,8 @@
 // ]
 
 // Test indexing of decimal numbers
-(function() {
-'use strict';
-
 // Include helpers for analyzing explain output.
-load('jstests/libs/analyze_plan.js');
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var t = db.decimal_indexing;
 t.drop();
@@ -55,4 +52,3 @@ assert.eq(t.find({y: {$lt: NumberDecimal('0.3')}}, {y: 1, _id: 0}).toArray(),
 assert.eq(t.find({_id: 0}, {_id: 1}).toArray(),
           [{_id: NumberDecimal('0E3')}],
           'querying for zero does not return the correct decimal');
-})();

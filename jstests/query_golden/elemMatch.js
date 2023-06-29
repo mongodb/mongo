@@ -1,5 +1,4 @@
-(function() {
-"use strict";
+import {show} from "jstests/libs/golden_test.js";
 
 const coll = db.cqf_elemMatch;
 coll.drop();
@@ -61,4 +60,3 @@ runPipeline(pipeline);
 
 pipeline = [{$match: {a: {$elemMatch: {$elemMatch: {b: {$elemMatch: {$gt: 5}}}}}}}];
 runPipeline(pipeline);
-}());

@@ -7,11 +7,8 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');  // For getCachedPlan().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getCachedPlan} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "test";
 const collName = "coll";
@@ -180,11 +177,10 @@ const secondaryDB = rst.getSecondary().getDB(dbName);
 if (checkSBEEnabled(primaryDB)) {
     jsTest.log("Skipping test because SBE is enabled");
     rst.stopSet();
-    return;
+    quit();
 }
 
 runTest({rst: rst, readDB: primaryDB, writeDB: primaryDB});
 runTest({rst: rst, readDB: secondaryDB, writeDB: primaryDB});
 
 rst.stopSet();
-})();

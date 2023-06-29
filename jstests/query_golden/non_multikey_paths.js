@@ -7,10 +7,7 @@
  *   requires_cqf,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For leftmostLeafStage
+import {leftmostLeafStage, prettyInterval} from "jstests/libs/optimizer_utils.js";
 
 db.setLogLevel(4, "query");
 
@@ -62,4 +59,3 @@ run([{$match: {'one.one.one.many': 2}}]);
 run([{$match: {'many.one.one.one': 2}}]);
 run([{$match: {'many.one.one.many': 2}}]);
 run([{$match: {'many.many.many.many': 2}}]);
-})();

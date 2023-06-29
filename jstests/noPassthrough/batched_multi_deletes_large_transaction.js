@@ -10,10 +10,7 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const rst = new ReplSetTest({
     nodes: [
@@ -61,7 +58,7 @@ if (!FeatureFlagUtil.isEnabled(db, "LargeBatchedOperations")) {
     // Stop test and return early. The rest of the test will test the new multiple oplog entry
     // behavior.
     rst.stopSet();
-    return;
+    quit();
 }
 
 // This document removal request will be replicated over two applyOps oplog entries,
@@ -97,4 +94,3 @@ assert.eq(ops[0].prevOpTime.ts, ops[1].ts);
 assert.eq(ops[1].prevOpTime.ts, Timestamp());
 
 rst.stopSet();
-})();

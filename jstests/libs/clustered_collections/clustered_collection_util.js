@@ -2,7 +2,6 @@
  * Utilities for testing clustered collections.
  */
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/collection_drop_recreate.js");
 
 var ClusteredCollectionUtil = class {

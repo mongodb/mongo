@@ -9,7 +9,7 @@
  */
 
 load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
-load('jstests/libs/feature_flag_util.js');
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;

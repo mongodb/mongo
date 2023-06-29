@@ -2,77 +2,86 @@
  * Helpers for testing timeseries arbitrary writes.
  */
 
-load("jstests/libs/analyze_plan.js");  // For getPlanStage() and getExecutionStages().
+import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
 
-const timeFieldName = "time";
-const metaFieldName = "tag";
-const sysCollNamePrefix = "system.buckets.";
-const closedBucketFilter = {
+export const timeFieldName = "time";
+export const metaFieldName = "tag";
+export const sysCollNamePrefix = "system.buckets.";
+
+export const closedBucketFilter = {
     "control.closed": {$not: {$eq: true}}
 };
+
 // The split point is between the 'A' and 'B' meta values which is _id: 4. [1, 3] goes to the
 // primary shard and [4, 7] goes to the other shard.
-const splitMetaPointBetweenTwoShards = {
+export const splitMetaPointBetweenTwoShards = {
     meta: "B"
 };
+
 // This split point is the same as the 'splitMetaPointBetweenTwoShards'.
-const splitTimePointBetweenTwoShards = {
+export const splitTimePointBetweenTwoShards = {
     [`control.min.${timeFieldName}`]: ISODate("2003-06-30")
 };
 
-function generateTimeValue(index) {
+export function generateTimeValue(index) {
     return ISODate(`${2000 + index}-01-01`);
 }
 
 // Defines sample data set for testing.
-const doc1_a_nofields = {
+export const doc1_a_nofields = {
     _id: 1,
     [timeFieldName]: generateTimeValue(1),
     [metaFieldName]: "A",
 };
-const doc2_a_f101 = {
+
+export const doc2_a_f101 = {
     _id: 2,
     [timeFieldName]: generateTimeValue(2),
     [metaFieldName]: "A",
     f: 101
 };
-const doc3_a_f102 = {
+
+export const doc3_a_f102 = {
     _id: 3,
     [timeFieldName]: generateTimeValue(3),
     [metaFieldName]: "A",
     f: 102
 };
-const doc4_b_f103 = {
+
+export const doc4_b_f103 = {
     _id: 4,
     [timeFieldName]: generateTimeValue(4),
     [metaFieldName]: "B",
     f: 103
 };
-const doc5_b_f104 = {
+
+export const doc5_b_f104 = {
     _id: 5,
     [timeFieldName]: generateTimeValue(5),
     [metaFieldName]: "B",
     f: 104
 };
-const doc6_c_f105 = {
+
+export const doc6_c_f105 = {
     _id: 6,
     [timeFieldName]: generateTimeValue(6),
     [metaFieldName]: "C",
     f: 105
 };
-const doc7_c_f106 = {
+
+export const doc7_c_f106 = {
     _id: 7,
     [timeFieldName]: generateTimeValue(7),
     [metaFieldName]: "C",
     f: 106,
 };
 
-let testDB = null;
-let st = null;
-let primaryShard = null;
-let otherShard = null;
-let mongos0DB = null;
-let mongos1DB = null;
+export let testDB = null;
+export let st = null;
+export let primaryShard = null;
+export let otherShard = null;
+export let mongos0DB = null;
+export let mongos1DB = null;
 
 /**
  * Composes and returns a bucket-level filter for timeseries arbitrary writes.
@@ -81,7 +90,7 @@ let mongos1DB = null;
  * are ANDed together. The closed bucket filter is always the first element of the AND array.
  * Zero or more filters can be passed in as arguments.
  */
-function makeBucketFilter(...args) {
+export function makeBucketFilter(...args) {
     if (!args.length) {
         return closedBucketFilter;
     }
@@ -89,7 +98,7 @@ function makeBucketFilter(...args) {
     return {$and: [closedBucketFilter].concat(Array.from(args))};
 }
 
-function getTestDB() {
+export function getTestDB() {
     if (!testDB) {
         testDB = db.getSiblingDB(jsTestName());
         assert.commandWorked(testDB.dropDatabase());
@@ -97,7 +106,7 @@ function getTestDB() {
     return testDB;
 }
 
-function prepareCollection({dbToUse, collName, initialDocList}) {
+export function prepareCollection({dbToUse, collName, initialDocList}) {
     if (!dbToUse) {
         dbToUse = getTestDB();
     }
@@ -110,7 +119,7 @@ function prepareCollection({dbToUse, collName, initialDocList}) {
     return coll;
 }
 
-function prepareShardedCollection(
+export function prepareShardedCollection(
     {dbToUse, collName, initialDocList, includeMeta = true, shardKey, splitPoint}) {
     if (!dbToUse) {
         assert.neq(
@@ -152,7 +161,7 @@ function prepareShardedCollection(
     return coll;
 }
 
-function makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation) {
+export function makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation) {
     let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, remove: true};
     if (fields) {
         findAndModifyCmd["fields"] = fields;
@@ -167,7 +176,7 @@ function makeFindOneAndRemoveCommand(coll, filter, fields, sort, collation) {
     return findAndModifyCmd;
 }
 
-function makeFindOneAndUpdateCommand(
+export function makeFindOneAndUpdateCommand(
     coll, filter, update, returnNew, upsert, fields, sort, collation) {
     assert(filter !== undefined && update !== undefined);
     let findAndModifyCmd = {findAndModify: coll.getName(), query: filter, update: update};
@@ -196,11 +205,11 @@ function makeFindOneAndUpdateCommand(
  * This is useful for generating unique collection names. If the return function name is not unique
  * and the caller needs to generate a unique collection name, the caller can append a unique suffix.
  */
-function getCallerName(callDepth = 2) {
+export function getCallerName(callDepth = 2) {
     return `${new Error().stack.split('\n')[callDepth].split('@')[0]}`;
 }
 
-function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
+export function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
     let resultDocs = coll.find().toArray();
     assert.eq(resultDocs.length, initialDocList.length - nDeleted, tojson(resultDocs));
 
@@ -212,7 +221,7 @@ function verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted) {
     }
 }
 
-function verifyExplain({
+export function verifyExplain({
     explain,
     rootStageName,
     opType,
@@ -302,7 +311,7 @@ function verifyExplain({
  * - expectedResultDocs: The expected documents in the collection after the delete.
  * - nDeleted: The expected number of documents deleted.
  */
-function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
+export function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
     const callerName = getCallerName();
     jsTestLog(`Running ${callerName}(${tojson(arguments[0])})`);
 
@@ -314,14 +323,14 @@ function testDeleteOne({initialDocList, filter, expectedResultDocs, nDeleted}) {
     verifyResultDocs(coll, initialDocList, expectedResultDocs, nDeleted);
 }
 
-function getBucketCollection(coll) {
+export function getBucketCollection(coll) {
     return coll.getDB()[sysCollNamePrefix + coll.getName()];
 }
 
 /**
  * Ensure the updateOne command operates correctly by examining documents after the update.
  */
-function testUpdateOne({
+export function testUpdateOne({
     initialDocList,
     updateQuery,
     updateObj,
@@ -398,7 +407,7 @@ function testUpdateOne({
  * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
  * - res.nReturned: The expected number of documents returned by the TS_MODIFY stage.
  */
-function testFindOneAndRemove({
+export function testFindOneAndRemove({
     initialDocList,
     cmd: {filter, fields, sort, collation},
     res: {
@@ -488,7 +497,7 @@ function testFindOneAndRemove({
  * - res.nModified: The expected number of documents modified by the TS_MODIFY stage.
  * - res.nUpserted: The expected number of documents upserted by the TS_MODIFY stage.
  */
-function testFindOneAndUpdate({
+export function testFindOneAndUpdate({
     initialDocList,
     cmd: {filter, update, returnNew, upsert, fields, sort, collation},
     res: {
@@ -581,7 +590,7 @@ function testFindOneAndUpdate({
     }
 }
 
-function getRelevantProfilerEntries(db, coll, requestType) {
+export function getRelevantProfilerEntries(db, coll, requestType) {
     const sysCollName = sysCollNamePrefix + coll.getName();
     const profilerFilter = {
         $or: [
@@ -611,7 +620,8 @@ function getRelevantProfilerEntries(db, coll, requestType) {
     return db.system.profile.find(profilerFilter).toArray();
 }
 
-function verifyThatRequestIsRoutedToCorrectShard(coll, requestType, writeType, dataBearingShard) {
+export function verifyThatRequestIsRoutedToCorrectShard(
+    coll, requestType, writeType, dataBearingShard) {
     assert(primaryShard && otherShard, "The sharded cluster must be initialized");
     assert(dataBearingShard === "primary" || dataBearingShard === "other" ||
                dataBearingShard === "none" || dataBearingShard === "any",
@@ -712,7 +722,7 @@ function verifyThatRequestIsRoutedToCorrectShard(coll, requestType, writeType, d
     }
 }
 
-function restartProfiler() {
+export function restartProfiler() {
     assert(primaryShard && otherShard, "The sharded cluster must be initialized");
 
     const primaryDB = primaryShard.getDB(testDB.getName());
@@ -752,7 +762,7 @@ function restartProfiler() {
  * - res.nBucketsUnpacked: The expected number of buckets unpacked by the TS_MODIFY stage.
  * - res.nReturned: The expected number of documents returned by the TS_MODIFY stage.
  */
-function testFindOneAndRemoveOnShardedCollection({
+export function testFindOneAndRemoveOnShardedCollection({
     initialDocList,
     includeMeta = true,
     cmd: {filter, fields, sort, collation},
@@ -868,7 +878,7 @@ function testFindOneAndRemoveOnShardedCollection({
  * - res.nModified: The expected number of documents modified by the TS_MODIFY stage.
  * - res.nUpserted: The expected number of documents upserted by the TS_MODIFY stage.
  */
-function testFindOneAndUpdateOnShardedCollection({
+export function testFindOneAndUpdateOnShardedCollection({
     initialDocList,
     startTxn = false,
     includeMeta = true,
@@ -988,7 +998,7 @@ function testFindOneAndUpdateOnShardedCollection({
 /**
  * Sets up a sharded cluster. 'nMongos' is the number of mongos in the cluster.
  */
-function setUpShardedCluster({nMongos} = {
+export function setUpShardedCluster({nMongos} = {
     nMongos: 1
 }) {
     assert.eq(null, st, "A sharded cluster must not be initialized yet");
@@ -1016,7 +1026,7 @@ function setUpShardedCluster({nMongos} = {
 /**
  * Tears down the sharded cluster created by setUpShardedCluster().
  */
-function tearDownShardedCluster() {
+export function tearDownShardedCluster() {
     assert.neq(null, st, "A sharded cluster must be initialized");
     st.stop();
 }

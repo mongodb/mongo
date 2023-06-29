@@ -1,8 +1,3 @@
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
-
 var s = new ShardingTest({name: "migrateBig", shards: 2, other: {chunkSize: 1}});
 
 assert.commandWorked(
@@ -63,4 +58,3 @@ s.startBalancer();
 s.awaitBalance('foo', 'test', 60 * 1000);
 
 s.stop();
-})();

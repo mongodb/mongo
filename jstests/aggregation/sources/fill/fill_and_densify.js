@@ -5,10 +5,7 @@
  * ]
  */
 
-(function() {
-"use strict";
 load("jstests/libs/fixture_helpers.js");
-load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 
 const coll = db[jsTestName()];
@@ -154,4 +151,3 @@ expected = [
     {"val": 9, "toFill": 16, "possible": 8, "part": 2}
 ];
 assertArrayEq({actual: result, expected: expected});
-})();

@@ -6,7 +6,7 @@
  */
 import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
-load('jstests/libs/analyze_plan.js');  // for planHasStage and isIxscan
+import {isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states = Object.extend({

@@ -5,11 +5,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_index_minmax;
 coll.drop();
@@ -104,4 +101,3 @@ for (const indexSpec of wildcardIndexes) {
     assertArrayEq(coll.find({}, {_id: 0}).min({"a": 0.5}).max({"a": 1.5}).hint({a: 1}).toArray(),
                   [{a: 1, b: 1}, {a: 1, b: 2}]);
 }
-})();

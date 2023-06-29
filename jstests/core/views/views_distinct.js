@@ -9,13 +9,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 // For arrayEq. We don't use array.eq as it does an ordered comparison on arrays but we don't
 // care about order in the distinct response.
 load("jstests/aggregation/extras/utils.js");
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 var viewsDB = db.getSiblingDB("views_distinct");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -169,4 +166,3 @@ assertIdentityViewDistinctMatchesCollection("a");
 assertIdentityViewDistinctMatchesCollection("a.b");
 assertIdentityViewDistinctMatchesCollection("a.b.c");
 assertIdentityViewDistinctMatchesCollection("a.b.c.d");
-}());

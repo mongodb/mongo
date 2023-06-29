@@ -1,10 +1,7 @@
 /**
  * Test that $covariance(Pop/Samp) works as a window function.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {documentBounds} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -138,4 +135,3 @@ function compareCovarianceOfflineAndOnline(bounds) {
 
 // Test various type of window.
 documentBounds.forEach(compareCovarianceOfflineAndOnline);
-})();

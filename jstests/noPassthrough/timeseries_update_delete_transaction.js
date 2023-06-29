@@ -5,11 +5,6 @@
  *     requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const rst = new ReplSetTest({nodes: 1});
 rst.startSet();
 rst.initiate();
@@ -42,4 +37,3 @@ assert.commandFailedWithCode(session.getDatabase(jsTestName()).runCommand({
 assert.commandFailedWithCode(session.commitTransaction_forTesting(), ErrorCodes.NoSuchTransaction);
 session.endSession();
 rst.stopSet();
-})();

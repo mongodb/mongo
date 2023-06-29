@@ -7,9 +7,7 @@
  *   requires_fastcount,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");  // For isIxscan().
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const t = db.single_field_hashed_index;
 t.drop();
@@ -113,4 +111,3 @@ assert.commandFailedWithCode(t.insert({field1: [{field2: {0: []}}]}), 16766);
 assert.commandFailedWithCode(t.insert({field1: {field2: {0: {field4: []}}}}), 16766);
 assert.commandWorked(t.insert({field1: {field2: {0: {otherField: []}}}}));
 assert.commandWorked(t.insert({field1: {field2: {0: {field4: 1}}}}));
-})();

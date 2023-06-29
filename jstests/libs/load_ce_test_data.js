@@ -1,5 +1,3 @@
-load("jstests/libs/ce_stats_utils.js");
-
 /**
  * Analyze all fields and create statistics.
  * Create single-field indexes on the fields with indexed flag.

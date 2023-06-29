@@ -10,10 +10,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");     // For getAggPlanStages
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fail_point_util.js");  // For configureFailPoint
 
 const ts = db.timeseries_streaming_group;
@@ -155,4 +152,3 @@ runTest(
         {$sort: {_id: 1}}
     ],
     ["_id"]);
-})();

@@ -6,10 +6,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load('jstests/noPassthrough/libs/index_build.js');
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
@@ -115,4 +112,3 @@ if (!gracefulIndexBuildFlag) {
 }
 
 rst.stopSet();
-})();

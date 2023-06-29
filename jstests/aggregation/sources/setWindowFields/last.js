@@ -1,10 +1,10 @@
 /**
  * Test the behavior of $last.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -91,4 +91,3 @@ result = coll.runCommand({
     }
 });
 assert.commandFailedWithCode(result, ErrorCodes.FailedToParse, "'window' field must be an object");
-})();

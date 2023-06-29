@@ -1,13 +1,15 @@
 /**
  * Tests scenario related to SERVER-20616.
  */
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_selective_index;
@@ -31,4 +33,3 @@ assert.eq(1, res.executionStats.nReturned);
 const indexNode = navigateToPlanPath(res, "child.leftChild");
 assertValueOnPath("IndexScan", indexNode, "nodeType");
 assertValueOnPath("b_1", indexNode, "indexDefName");
-}());

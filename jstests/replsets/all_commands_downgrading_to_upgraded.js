@@ -10,13 +10,10 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 // This will verify the completeness of our map and run all tests.
 load("jstests/libs/all_commands_test.js");
-load("jstests/libs/fixture_helpers.js");    // For isSharded and isReplSet
-load("jstests/libs/feature_flag_util.js");  // For isPresentAndEnabled
+load("jstests/libs/fixture_helpers.js");  // For isSharded and isReplSet
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load('jstests/replsets/rslib.js');
 
 const name = jsTestName();
@@ -1859,4 +1856,3 @@ let runShardedClusterTest = function() {
 runStandaloneTest();
 runReplicaSetTest();
 runShardedClusterTest();
-})();

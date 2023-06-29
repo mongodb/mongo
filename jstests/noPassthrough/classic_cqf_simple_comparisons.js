@@ -2,10 +2,7 @@
  * Tests that comparisons against a variety of BSON types and shapes are the same in CQF and
  * classic.
  */
-(function() {
-"use strict";
-
-load('jstests/query_golden/libs/example_data.js');  // For smallDocs and leafs.
+import {leafs, smallDocs} from "jstests/query_golden/libs/example_data.js";
 
 const cqfConn = MongoRunner.runMongod({setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, cqfConn, "mongod was unable to start up");
@@ -51,4 +48,3 @@ for (const op of ['$eq', '$lt', '$lte', '$gt', '$gte']) {
 
 MongoRunner.stopMongod(cqfConn);
 MongoRunner.stopMongod(classicConn);
-}());

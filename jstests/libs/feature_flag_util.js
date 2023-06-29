@@ -1,11 +1,9 @@
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");
 
 /**
  * Utilities for feature flags.
  */
-var FeatureFlagUtil = (function() {
+export var FeatureFlagUtil = (function() {
     // A JS attempt at an enum.
     const FlagStatus = {
         kEnabled: 'kEnabled',

@@ -1,10 +1,8 @@
 // Test oplog queries that can be optimized with oplogReplay.
 // @tags: [requires_replication, requires_capped]
 
-(function() {
-"use strict";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/storage_engine_utils.js");
 
 let replSet = new ReplSetTest({nodes: 1});
@@ -237,4 +235,3 @@ collScanStage = getPlanStage(getWinningPlan(res.queryPlanner), "COLLSCAN");
 assert.neq(null, collScanStage, "no collection scan found in explain output: " + tojson(res));
 
 replSet.stopSet();
-}());

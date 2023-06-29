@@ -5,11 +5,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_empty_arrays;
 coll.drop();
@@ -58,4 +55,3 @@ for (const indexSpec of wildcardIndexes) {
     assertArrayEq(coll.find({"b": []}, {_id: 0}).hint(indexSpec.keyPattern).toArray(),
                   [{a: 2, b: [[]], c: 1, d: 4}]);
 }
-})();

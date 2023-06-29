@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_parallel_index;
@@ -21,4 +22,3 @@ assert.commandWorked(coll.createIndex({a: 1}));
 let res = coll.explain("executionStats").aggregate([{$match: {a: {$lt: 10}}}]);
 assert.eq(10, res.executionStats.nReturned);
 assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.child.nodeType");
-}());

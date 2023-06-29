@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_exchange;
@@ -19,4 +20,3 @@ assert.commandWorked(t.insert({a: {b: 5}}));
 const res = t.explain("executionStats").aggregate([{$match: {'a.b': 2}}]);
 assert.eq(1, res.executionStats.nReturned);
 assertValueOnPlanPath("Exchange", res, "child.nodeType");
-}());

@@ -1,8 +1,6 @@
-'use strict';
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-load("jstests/libs/feature_flag_util.js");
-
-var RoutingTableConsistencyChecker = (function() {
+export var RoutingTableConsistencyChecker = (function() {
     const sameObjectFields = (lhsObjFields, rhsObjFields) => {
         if (lhsObjFields.length !== rhsObjFields.length) {
             return false;

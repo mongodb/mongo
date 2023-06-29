@@ -12,10 +12,8 @@
 //   requires_fcv_63,
 // ]
 
-(function() {
-"use strict";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
 const t = db[jsTestName()];
 t.drop();
 
@@ -94,4 +92,3 @@ assert.commandWorked(t.insert({a: 1, b: 1.5}));
 expectedKeys = isSBEEnabled ? 1 : 4;
 numKeys = keysExamined({a: {$in: [1, 2]}, b: {$gt: 1, $lt: 2}}, {a: 1, b: 1});
 assert.eq(numKeys, expectedKeys, errMsg(numKeys));
-})();

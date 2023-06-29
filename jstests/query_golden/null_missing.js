@@ -7,10 +7,7 @@
  *   requires_cqf,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For getPlanSkeleton.
+import {getPlanSkeleton} from "jstests/libs/optimizer_utils.js";
 
 db.setLogLevel(4, "query");
 
@@ -43,4 +40,3 @@ const pipeline = [{$match: {'a.b': null}}];
     print(`Plan skeleton: `);
     printjson(getPlanSkeleton(explain));
 }
-})();

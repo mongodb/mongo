@@ -1,13 +1,11 @@
-(function() {
-"use strict";
-
 // Validate that we can internally generate a special query which along with a document returns its
 // RecordID.
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
+
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_findone_rid;
@@ -30,4 +28,3 @@ try {
 } finally {
     db.cqf_findone_rid_view.drop();
 }
-}());

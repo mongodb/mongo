@@ -9,16 +9,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 load("jstests/core/timeseries/libs/geo.js");
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
+    quit();
 }
 Random.setRandomSeed();
 
@@ -117,4 +114,3 @@ for (const doc of docs) {
     assertSortedAscending(tsResult.map(d => d.dist));
     print('Got ' + result.length + ' results');
 }
-})();

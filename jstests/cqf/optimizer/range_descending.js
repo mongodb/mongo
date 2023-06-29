@@ -7,10 +7,8 @@
  * behavior, the index bounds are swapped when the corresponding index is descending.
  */
 
-(function() {
-"use strict";
+import {assertValueOnPlanPath} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");
 const coll = db.cqf_range_descending;
 /*
  * This is the most basic case: a single range predicate with a descending index.
@@ -84,4 +82,3 @@ const coll = db.cqf_range_descending;
         assertValueOnPlanPath("IndexScan", res, "child.child.leftChild.nodeType");
     }
 }
-}());

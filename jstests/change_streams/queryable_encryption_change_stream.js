@@ -7,16 +7,13 @@
 // featureFlagFLE2CleanupCommand
 // ]
 //
-(function() {
-"use strict";
-
 load("jstests/libs/change_stream_util.js");  // For ChangeStreamTest and
                                              // assert[Valid|Invalid]ChangeStreamNss.
-load("jstests/fle2/libs/encrypted_client_util.js");
+import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 
 if (!buildInfo().modules.includes("enterprise")) {
     jsTestLog("Skipping test as it requires the enterprise module");
-    return;
+    quit();
 }
 
 const dbName = "qetestdb";
@@ -406,4 +403,3 @@ jsTestLog("Testing cleanup");
 cst.cleanUp();
 
 canonicalizeEventForTesting = origCanonicalizeEventForTesting;
-}());

@@ -10,15 +10,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // TODO SERVER-77454: Investigate re-enabling this.
 if (FeatureFlagUtil.isPresentAndEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
     jsTestLog("Skipping test as the always use compressed buckets feature is enabled");
-    return;
+    quit();
 }
 
 const timeFieldName = "time";
@@ -83,4 +80,3 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
               100 - 50 - 1,  // 100 records to start + 50 deleted above + 1 more deleted
               "Expected records matching the filter to be deleted.");
 }
-})();

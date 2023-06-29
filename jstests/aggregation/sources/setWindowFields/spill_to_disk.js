@@ -7,13 +7,13 @@
  * do_not_wrap_aggregations_in_facets,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For setParameterOnAllHosts.
 load("jstests/libs/discover_topology.js");                       // For findNonConfigNodes.
-load("jstests/aggregation/extras/window_function_helpers.js");
-load("jstests/libs/analyze_plan.js");         // For getAggPlanStages().
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 load("jstests/aggregation/extras/utils.js");  // arrayEq.
 load("jstests/libs/profiler.js");             // getLatestProfileEntry.
 
@@ -341,4 +341,3 @@ testErrorsWhenCantSpill();
 
 // Reset profiler.
 FixtureHelpers.runCommandOnEachPrimary({db: db, cmdObj: {profile: 0}});
-})();

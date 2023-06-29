@@ -17,10 +17,8 @@
 //   # Plan cache state is node-local and will not get migrated alongside tenant data.
 //   tenant_migration_incompatible,
 // ]
-(function() {
-'use strict';
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromExplain.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 var coll = db.collation_plan_cache;
 coll.drop();
@@ -229,4 +227,3 @@ assert.commandWorked(coll.runCommand('planCacheClearFilters',
 assert.eq(0,
           coll.runCommand('planCacheListFilters').filters.length,
           'unexpected number of plan cache filters');
-})();

@@ -1,10 +1,10 @@
 load("jstests/aggregation/extras/utils.js");  // arrayEq
-load("jstests/libs/analyze_plan.js");         // For getAggPlanStages().
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 /**
  * Create a collection of tickers and prices.
  */
-function seedWithTickerData(coll, docsPerTicker) {
+export function seedWithTickerData(coll, docsPerTicker) {
     for (let i = 0; i < docsPerTicker; i++) {
         assert.commandWorked(
             coll.insert({_id: i, partIndex: i, ticker: "T1", price: (500 - i * 10)}));
@@ -14,13 +14,13 @@ function seedWithTickerData(coll, docsPerTicker) {
     }
 }
 
-function forEachPartitionCase(callback) {
+export function forEachPartitionCase(callback) {
     callback(null);
     callback("$ticker");
     callback({$toLower: "$ticker"});
 }
 
-const documentBounds = [
+export const documentBounds = [
     ["unbounded", 0],
     ["unbounded", -1],
     ["unbounded", 1],
@@ -39,7 +39,7 @@ const documentBounds = [
     [-2, 3],
 ];
 
-function forEachDocumentBoundsCombo(callback) {
+export function forEachDocumentBoundsCombo(callback) {
     documentBounds.forEach(function(bounds, index) {
         let boundsCombo = [bounds];
         for (let j = index + 1; j < documentBounds.length; j++) {
@@ -74,7 +74,7 @@ function forEachDocumentBoundsCombo(callback) {
  * Note that this function assumes that the data in 'coll' has been seeded with the documents from
  * the seedWithTickerData() method above.
  */
-function computeAsGroup({
+export function computeAsGroup({
     coll,
     partitionKey,
     accumSpec,
@@ -105,7 +105,7 @@ function computeAsGroup({
 /**
  * Helper to calculate the correct skip based on the lowerBound given.
  */
-function calculateSkip(lowerBound, indexInPartition) {
+export function calculateSkip(lowerBound, indexInPartition) {
     let skipValueToUse = 0;
     if (lowerBound === "current") {
         skipValueToUse = indexInPartition;
@@ -123,7 +123,7 @@ function calculateSkip(lowerBound, indexInPartition) {
 /**
  * Helper to calculate the correct limit based on the bounds given.
  */
-function calculateLimit(lowerBound, upperBound, indexInPartition) {
+export function calculateLimit(lowerBound, upperBound, indexInPartition) {
     let limitValueToUse = "unbounded";
     if (upperBound === "current") {
         if (lowerBound === "unbounded") {
@@ -160,7 +160,7 @@ function calculateLimit(lowerBound, upperBound, indexInPartition) {
     return limitValueToUse;
 }
 
-function assertResultsEqual(wfRes, index, groupRes, accum) {
+export function assertResultsEqual(wfRes, index, groupRes, accum) {
     // On DEBUG builds, the computed $group may be slightly different due to precision
     // loss when spilling to disk.
     // TODO SERVER-42616: Enable the exact check for $stdDevPop/Samp.
@@ -180,7 +180,7 @@ function assertResultsEqual(wfRes, index, groupRes, accum) {
                   "Window function result for index " + index + ": " + tojson(wfRes));
 }
 
-function assertExplainResult(explainResult) {
+export function assertExplainResult(explainResult) {
     const stages = getAggPlanStages(explainResult, "$_internalSetWindowFields");
     for (let stage of stages) {
         assert(stage.hasOwnProperty("$_internalSetWindowFields"), stage);
@@ -209,7 +209,7 @@ function assertExplainResult(explainResult) {
  * Note that this function assumes that the documents in 'coll' were initialized using the
  * seedWithTickerData() method above.
  */
-function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs = "$price") {
+export function testAccumAgainstGroup(coll, accum, onNoResults = null, accumArgs = "$price") {
     const accumSpec = {[accum]: accumArgs};
     forEachPartitionCase(function(partition) {
         documentBounds.forEach(function(bounds, index) {

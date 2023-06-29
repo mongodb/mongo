@@ -2,11 +2,6 @@
  * Tests that extra-large BSON objects (>16MB) can be materialized for the '$match' stage in the
  * middle of the query plan without throwing 'BSONObjectTooLarge' exception.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStage()'.
-
 const testDB = db.getSiblingDB("jsTestName");
 assert.commandWorked(testDB.dropDatabase());
 
@@ -24,4 +19,3 @@ const pipeline = [
 ];
 
 assert.doesNotThrow(() => coll.aggregate(pipeline).toArray());
-})();

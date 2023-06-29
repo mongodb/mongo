@@ -12,11 +12,7 @@
 //   # Explain for the aggregate command cannot run within a multi-document transaction.
 //   does_not_support_transactions,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.index_count;
 coll.drop();
@@ -90,4 +86,3 @@ const runTest = function(indexPattern, indexOption = {}) {
 runTest({a: 1});
 runTest({"$**": 1});
 runTest({"$**": -1, b: -1}, {wildcardProjection: {b: 0}});
-}());

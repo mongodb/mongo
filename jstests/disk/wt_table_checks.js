@@ -4,9 +4,7 @@
  *
  * @tags: [requires_wiredtiger]
  */
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
 
 function checkTableLogSettings(conn, enabled) {
     conn.getDBNames().forEach(function(d) {
@@ -124,4 +122,3 @@ checkLog.containsJson(conn, 22432);
 assert(checkLog.checkContainsWithCountJson(conn, 5548302, undefined, 0));
 checkTableLogSettings(conn, /*enabled=*/ true);
 MongoRunner.stopMongod(conn);
-}());

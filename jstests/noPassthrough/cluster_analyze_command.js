@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const st = new ShardingTest({
     shards: 2,
@@ -17,7 +14,7 @@ const db = st.getDB("test");
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
     st.stop();
-    return;
+    quit();
 }
 
 const coll = db.analyze_coll;
@@ -40,4 +37,3 @@ res = db.runCommand({analyze: coll.getName(), writeConcern: {w: 1}});
 assert.commandWorked(res);
 
 st.stop();
-})();

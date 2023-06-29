@@ -6,11 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
-
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 
 //
@@ -172,4 +167,3 @@ testUpdateRouting({
 });
 
 st.stop();
-})();

@@ -7,10 +7,7 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 jsTestLog("Start a replica set with execution control enabled by default");
 let replTest = new ReplSetTest({
@@ -89,4 +86,3 @@ assert.commandWorked(
 assert.commandWorked(
     mongod.adminCommand({setParameter: 1, wiredTigerConcurrentReadTransactions: 30}));
 replTest.stopSet();
-}());

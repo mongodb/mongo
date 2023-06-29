@@ -6,10 +6,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.elemMatch_index;
 coll.drop();
@@ -111,5 +108,4 @@ assert.eq(count, 1);
 const explain = coll.find(query).hint({"arr.x": 1, a: 1}).explain("executionStats");
 assert.commandWorked(explain);
 assert.eq(count, explain.executionStats.totalKeysExamined, explain);
-})();
 })();

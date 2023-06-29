@@ -11,12 +11,14 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");              // for getWinningPlan
+import {
+    getAggPlanStages,
+    getPlanStage,
+    getPlanStages,
+    getWinningPlan
+} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/sbe_util.js");                  // for checkSBEEnabled
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.or_use_clustered_collection;
 assertDropCollection(db, coll.getName());
@@ -369,4 +371,3 @@ validateQueryOR({
 const err =
     assert.throws(() => coll.find({$or: [{$text: {$search: "foo"}}, {noIndex: 1}]}).toArray());
 assert.commandFailedWithCode(err, ErrorCodes.NoQueryExecutionPlans);
-}());

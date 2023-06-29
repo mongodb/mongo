@@ -6,10 +6,7 @@
  *      requires_persistence,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const s =
     new ShardingTest({name: "runRestore", shards: 2, mongos: 1, config: 1, other: {chunkSize: 1}});
@@ -19,7 +16,7 @@ let db = s.getDB("test");
 if (!FeatureFlagUtil.isEnabled(s.configRS.getPrimary().getDB("test"), "SelectiveBackup")) {
     jsTestLog("Skipping as featureFlagSelectiveBackup is not enabled");
     s.stop();
-    return;
+    quit();
 }
 
 s.adminCommand({enablesharding: "test"});
@@ -184,4 +181,3 @@ assert(isNetworkError(error));
 
 // The server should have crashed from fatally asserting on unknown config collection.
 MongoRunner.stopMongod(conn, null, {allowedExitCode: MongoRunner.EXIT_ABORT});
-}());

@@ -5,10 +5,8 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
-load("jstests/libs/config_shard_util.js");
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/chunk_manipulation_util.js');
 
@@ -132,4 +130,3 @@ assert.eq({_id: 5678}, doc);
 st.stop();
 
 MongoRunner.stopMongod(staticMongod);
-})();

@@ -1,10 +1,10 @@
 /**
  * Validate bounded collection scans on a clustered collection.
  */
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
-const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
+export const testClusteredCollectionBoundedScan = function(coll, clusterKey) {
     "use strict";
-    load("jstests/libs/analyze_plan.js");
     load("jstests/libs/collection_drop_recreate.js");
 
     const batchSize = 100;

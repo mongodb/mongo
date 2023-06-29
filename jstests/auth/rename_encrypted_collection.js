@@ -6,11 +6,6 @@
  * requires_fcv_61,
  * ]
  */
-load("jstests/fle2/libs/encrypted_client_util.js");
-
-(function() {
-'use strict';
-
 function runTestWithAuth(conn, allowsRename, verifyFunction) {
     const db = conn.getDB("test");
     const srcDbName = 'rename_encrypted_collection_src_db';
@@ -126,4 +121,3 @@ jsTestLog("Sharding: Testing fle2 collection rename");
 
     st.stop();
 }
-}());

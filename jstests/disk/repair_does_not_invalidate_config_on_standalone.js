@@ -4,9 +4,11 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertRepairSucceeds,
+    assertStartAndStopStandaloneOnExistingDbpath,
+    getUriForColl,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "repair_does_not_invalidate_config_on_standalone";
 const dbName = baseName;
@@ -41,4 +43,3 @@ assertStartAndStopStandaloneOnExistingDbpath(dbpath, port, function(node) {
 
     assert(!nodeDB.getSiblingDB("local")["system.replset"].exists());
 });
-})();

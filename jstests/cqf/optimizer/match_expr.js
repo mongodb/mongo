@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_match_expr;
@@ -46,4 +47,3 @@ const numExpected = 1 * 5 * 5 + 4 * 1 * 1;
     assertValueOnPlanPath("Filter", res, "child.nodeType");
     assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
 }
-}());

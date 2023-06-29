@@ -14,11 +14,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");
 
 TimeseriesTest.run((insert) => {
@@ -378,4 +375,3 @@ TimeseriesTest.run((insert) => {
     assert(planWildcardStage.multiKeyPaths.hasOwnProperty("meta.d.zip"),
            "Index has wrong multikey paths after insert; plan: " + tojson(planWildcardStage));
 });
-})();

@@ -8,11 +8,8 @@
  * meets expectation. It then runs the same test against a sharded collection with a single shard.
  */
 
-load("jstests/libs/profiler.js");      // For profilerHas*OrThrow helper functions.
-load("jstests/libs/analyze_plan.js");  // For getPlanStages helper function.
-
-(function() {
-"use strict";
+load("jstests/libs/profiler.js");  // For profilerHas*OrThrow helper functions.
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 function testArraySorted(arr, key) {
     for (let i = 0; i < arr.length - 1; i++) {
@@ -101,4 +98,3 @@ assert.eq(singleShardColl2.find().skip(nDocs - 1).limit(nDocs).itcount(), 1);
 assert.eq(singleShardColl2.find().skip(nDocs + 1000).limit(nDocs).itcount(), 0);
 
 st.stop();
-})();

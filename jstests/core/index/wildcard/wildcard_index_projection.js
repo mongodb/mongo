@@ -8,11 +8,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");  // For isMongos.
-load("jstests/libs/analyze_plan.js");     // For getRejectedPlan helper to analyze explain() output.
+import {getWinningPlan, getRejectedPlan} from "jstests/libs/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db[collName];
@@ -67,4 +64,3 @@ assert.eq(winningPlan.inputStage.keyPattern, {$_path: 1, _id: 1}, winningPlan.in
 const hintedResults = coll.find({_id: {$eq: 1}}).hint("$**_1").toArray();
 assert.eq(hintedResults.length, 1, hintedResults);
 assert.eq(hintedResults[0]._id, 1, hintedResults);
-})();

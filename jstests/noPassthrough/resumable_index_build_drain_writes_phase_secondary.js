@@ -12,11 +12,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const dbName = "test";
 const collName = jsTestName();
@@ -164,4 +161,3 @@ if (columnstoreEnabled) {
 }
 
 rst.stopSet();
-})();

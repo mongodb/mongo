@@ -1,13 +1,13 @@
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isMongos.
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 /**
  * Create a FLE client that has an unencrypted and encrypted client to the same database
  */
 
-var kSafeContentField = "__safeContent__";
+export var kSafeContentField = "__safeContent__";
 
-var EncryptedClient = class {
+export var EncryptedClient = class {
     /**
      * Create a new encrypted FLE connection to the target server with a local KMS
      *
@@ -430,7 +430,7 @@ var EncryptedClient = class {
     }
 };
 
-function runEncryptedTest(db, dbName, collNames, encryptedFields, runTestsCallback) {
+export function runEncryptedTest(db, dbName, collNames, encryptedFields, runTestsCallback) {
     const dbTest = db.getSiblingDB(dbName);
     dbTest.dropDatabase();
 
@@ -448,7 +448,7 @@ function runEncryptedTest(db, dbName, collNames, encryptedFields, runTestsCallba
         collNames = [collNames];
     }
 
-    for (collName of collNames) {
+    for (let collName of collNames) {
         assert.commandWorked(
             client.createEncryptionCollection(collName, {encryptedFields: encryptedFields}));
     }
@@ -460,21 +460,21 @@ function runEncryptedTest(db, dbName, collNames, encryptedFields, runTestsCallba
 /**
  * @returns Returns true if talking to a replica set
  */
-function isFLE2ReplicationEnabled() {
+export function isFLE2ReplicationEnabled() {
     return typeof (testingReplication) == "undefined" || testingReplication === true;
 }
 
 /**
  * @returns Returns true if featureFlagFLE2CleanupCommand is enabled
  */
-function isFLE2CleanupEnabled(db) {
+export function isFLE2CleanupEnabled(db) {
     return FeatureFlagUtil.isEnabled(db, "FLE2CleanupCommand");
 }
 
 /**
  * @returns Returns true if internalQueryFLEAlwaysUseEncryptedCollScanMode is enabled
  */
-function isFLE2AlwaysUseCollScanModeEnabled(db) {
+export function isFLE2AlwaysUseCollScanModeEnabled(db) {
     const doc = assert.commandWorked(
         db.adminCommand({getParameter: 1, internalQueryFLEAlwaysUseEncryptedCollScanMode: 1}));
     return (doc.internalQueryFLEAlwaysUseEncryptedCollScanMode === true);
@@ -486,7 +486,7 @@ function isFLE2AlwaysUseCollScanModeEnabled(db) {
  *
  * @param {BinData} value bindata value
  */
-function assertIsIndexedEncryptedField(value) {
+export function assertIsIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
     assert(value.hex().startsWith("0e") || value.hex().startsWith("0f"),
@@ -498,7 +498,7 @@ function assertIsIndexedEncryptedField(value) {
  *
  * @param {BinData} value bindata value
  */
-function assertIsEqualityIndexedEncryptedField(value) {
+export function assertIsEqualityIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
     assert(value.hex().startsWith("0e"),
@@ -510,7 +510,7 @@ function assertIsEqualityIndexedEncryptedField(value) {
  *
  * @param {BinData} value bindata value
  */
-function assertIsRangeIndexedEncryptedField(value) {
+export function assertIsRangeIndexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
     assert(value.hex().startsWith("0f"),
@@ -522,7 +522,7 @@ function assertIsRangeIndexedEncryptedField(value) {
  *
  * @param {BinData} value bindata value
  */
-function assertIsUnindexedEncryptedField(value) {
+export function assertIsUnindexedEncryptedField(value) {
     assert(value instanceof BinData, "Expected BinData, found: " + value);
     assert.eq(value.subtype(), 6, "Expected Encrypted bindata: " + value);
     assert(value.hex().startsWith("10"),

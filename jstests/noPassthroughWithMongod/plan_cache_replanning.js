@@ -3,12 +3,9 @@
  * oscillates. It achieves this by creating two indexes, A and B, on a collection, and interleaving
  * queries which are "ideal" for index A with queries that are "ideal" for index B.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');              // For getPlanStage().
+import {getCachedPlan, getPlanCacheKeyFromShape, getPlanStage} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
-load("jstests/libs/sbe_util.js");                  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSbeEnabled = checkSBEEnabled(db);
 
@@ -245,4 +242,3 @@ coll = assertDropAndRecreateCollection(db, "plan_cache_replanning");
                   entryAfterRunningSpecialQuery);
     }
 }
-})();

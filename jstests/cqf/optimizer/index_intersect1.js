@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_index_intersect1;
@@ -32,4 +33,3 @@ res = t.explain("executionStats")
           .aggregate([{$project: {'_id': 0, 'a': 1}}, {$match: {'a': {$gt: 60, $lt: 100}}}]);
 assert.eq(2, res.executionStats.nReturned);
 assertValueOnPlanPath("IndexScan", res, "child.child.nodeType");
-}());

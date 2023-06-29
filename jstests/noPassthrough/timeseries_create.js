@@ -5,10 +5,7 @@
  * @tags: [
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -232,4 +229,3 @@ testTimeseriesNamespaceExists((testDB, collName) => {
 }
 
 MongoRunner.stopMongod(conn);
-})();

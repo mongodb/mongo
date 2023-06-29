@@ -1,10 +1,12 @@
-(function() {
-"use strict";
+import {
+    checkCascadesOptimizerEnabled,
+    removeUUIDsFromExplain,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_sort_compound_pred;
@@ -72,4 +74,3 @@ Union [{disjunction_0, rid_1}]
 IndexScan [{'<indexKey> 0': disjunction_0, '<rid>': rid_1}, scanDefName: cqf_sort_compound_pred_, indexDefName: a_1, interval: {=Const [1]}]
 `);
 }
-}());

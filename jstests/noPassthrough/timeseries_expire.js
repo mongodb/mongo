@@ -7,11 +7,8 @@
  *   requires_getmore,
  * ]
  */
-(function() {
-"use strict";
-
 load('jstests/libs/fixture_helpers.js');  // For 'FixtureHelpers'
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
 const testDB = conn.getDB(jsTestName());
@@ -53,4 +50,3 @@ TimeseriesTest.run((insert) => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

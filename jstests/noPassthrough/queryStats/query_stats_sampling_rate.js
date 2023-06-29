@@ -3,11 +3,6 @@
  * if feature flag is on.
  * @tags: [featureFlagQueryStats]
  */
-load('jstests/libs/analyze_plan.js');
-
-(function() {
-"use strict";
-
 let options = {
     setParameter: {internalQueryStatsRateLimit: 0},
 };
@@ -35,4 +30,3 @@ telStore = assert.commandWorked(
 assert.eq(telStore.cursor.firstBatch.length, 1);
 
 MongoRunner.stopMongod(conn);
-}());

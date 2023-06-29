@@ -6,10 +6,7 @@
  *     requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const replTest = new ReplSetTest({nodes: 2});
 replTest.startSet();
@@ -91,4 +88,3 @@ if (TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB())) {
 }
 
 replTest.stopSet();
-})();

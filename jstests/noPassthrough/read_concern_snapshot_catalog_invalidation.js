@@ -1,11 +1,7 @@
 // Tests that snapshot reads return an error when accessing a collection whose metadata is invalid
 // for the snapshot's point in time.
 // @tags: [uses_transactions]
-(function() {
-"use strict";
-
-load("jstests/libs/curop_helpers.js");      // For waitForCurOpByFailPoint().
-load("jstests/libs/feature_flag_util.js");  // For FeatureFlagUtil.isEnabled().
+load("jstests/libs/curop_helpers.js");  // For waitForCurOpByFailPoint().
 
 const kDbName = "test";
 const kCollName = "coll";
@@ -113,4 +109,3 @@ testCommand({update: kCollName, updates: [{q: {x: 1}, u: {$set: {x: 2}}}]},
             false /*write is expected to fail*/);
 
 rst.stopSet();
-})();

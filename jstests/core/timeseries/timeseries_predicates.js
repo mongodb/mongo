@@ -9,11 +9,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const coll = db.timeseries_predicates_normal;
 const tsColl = db.timeseries_predicates_timeseries;
 coll.drop();
@@ -381,4 +376,3 @@ checkAllBucketings({"mt.a": {$size: 1}}, [
     {mt: {a: [{b: 3}]}},
     {mt: {a: [{b: 2}, {b: 3}]}},
 ]);
-})();

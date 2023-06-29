@@ -2,10 +2,7 @@
 // the pushed down query with SBE.
 // TODO: Remove this file when all agg expressions are supported by SBE.
 
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // Storing the expression we assume is unsupported as a constant, so we can easily change it when we
 // implement $toBool in SBE.
@@ -15,7 +12,7 @@ const kUnsupportedExpression = {
 
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.jstests_sbe_pushdown;
@@ -59,4 +56,3 @@ assertPushdownQueryExecMode([{$match: {a: 2}}, {$project: {_id: 0, c: {kUnsuppor
 // Test query with fully supported expressions are executed with SBE when pushed down.
 assertPushdownQueryExecMode(
     [{$match: {$expr: {$eq: ["$b", {$dateFromParts: {year: 2021, month: 4, day: 28}}]}}}], "2");
-}());

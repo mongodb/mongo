@@ -7,10 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({
@@ -61,4 +57,3 @@ waitForIndexBuild();
 assert.eq(testDB.getCollectionNames().indexOf(coll.getName()), -1, "collection still exists.");
 
 rst.stopSet();
-})();

@@ -5,8 +5,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-load("jstests/libs/analyze_plan.js");  // For getPlanStage.
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.distinct_index1;
 coll.drop();
@@ -81,4 +80,3 @@ explain = getDistinctExplainWithExecutionStats("a", {$or: [{a: 3}, {a: 5}]});
 assert.eq(188, explain.executionStats.nReturned);
 const indexScanStage = getPlanStage(getWinningPlan(explain.queryPlanner), "IXSCAN");
 assert.eq("hashed", indexScanStage.keyPattern.a);
-})();

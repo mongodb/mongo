@@ -3,10 +3,11 @@
  * change stream framework to throw exceptions. Exercises the fix for SERVER-65497.
  * @tags: [ requires_fcv_60 ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
+import {
+    generateChangeStreamWriteWorkload,
+    getAllChangeStreamEvents,
+    isPlainObject
+} from "jstests/libs/change_stream_rewrite_util.js";
 
 const dbName = jsTestName();
 const collName = "coll1";
@@ -84,4 +85,3 @@ for (let fieldName of fieldsToInclude) {
     // Test projection of all accumulated fields.
     assertProjection(Object.assign(accumulatedProjection, currentFieldProjection));
 }
-})();

@@ -13,11 +13,7 @@
  *  2. 'collation' option overrides local collection's collation
  */
 load("jstests/aggregation/extras/utils.js");  // For anyEq.
-load("jstests/libs/analyze_plan.js");         // For getAggPlanStages, getWinningPlan.
-
-(function() {
-
-"use strict";
+import {getWinningPlan, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -216,5 +212,4 @@ let explain;
         explain = collAa.explain().aggregate([lookupStage], {collation: caseSensitive});
         assertIndexJoinStrategy(explain);
     }
-})();
 })();

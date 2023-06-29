@@ -2,7 +2,8 @@
  * Tests $eq against a variety of BSON types and shapes.
  */
 
-load('jstests/query_golden/libs/example_data.js');
+import {show} from "jstests/libs/golden_test.js";
+import {leafs, smallDocs} from "jstests/query_golden/libs/example_data.js";
 
 const docs = smallDocs();
 

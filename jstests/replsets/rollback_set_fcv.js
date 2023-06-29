@@ -9,14 +9,10 @@
  *  @tags: [multiversion_incompatible]
  */
 
-(function() {
-"use strict";
-
 load("jstests/replsets/libs/rollback_test.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load("jstests/libs/fail_point_util.js");
 load("jstests/replsets/rslib.js");
-load("jstests/libs/feature_flag_util.js");
 
 function setFCV(fcv) {
     assert.commandFailedWithCode(db.adminCommand({setFeatureCompatibilityVersion: fcv}),
@@ -367,4 +363,3 @@ rollbackFCVFromUpgradingToDowngrading();
 rollbackFCVFromIsCleaningServerMetadataToDowngrading();
 
 rollbackTest.stop();
-}());

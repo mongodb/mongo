@@ -13,11 +13,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For assertStagesForExplainOfCommand(),
-                                       // assertNoFetchFilter(), assertFetchFilter().
+import {
+    assertFetchFilter,
+    assertNoFetchFilter,
+    assertStagesForExplainOfCommand,
+    getWinningPlan,
+    isCollscan,
+} from "jstests/libs/analyze_plan.js";
 
 function flagVal(n) {
     return (n % 5 > 3) ? true : false;
@@ -221,4 +223,3 @@ const exp =
     coll.find({$and: [{a: {$gte: 90}}, {$or: [{b: {$gte: 80}}, {flag: "true"}]}]}).explain();
 assert(isCollscan(db, exp),
        "Expected collection scan, got " + tojson(getWinningPlan(exp.queryPlanner)));
-})();

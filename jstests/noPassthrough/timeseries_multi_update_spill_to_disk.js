@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getExecutionStages().
+import {getExecutionStages} from "jstests/libs/analyze_plan.js";
 
 const dateTime = ISODate("2021-07-12T16:00:00Z");
 const buckets = ["A", "B", "C", "D", "E", "F", "G"];
@@ -130,4 +127,3 @@ function runTest({memoryLimitBytes, expectedSpills}) {
 })();
 
 MongoRunner.stopMongod(conn);
-})();

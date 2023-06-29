@@ -2,11 +2,7 @@
  * Test mirrored reads in a multi-tenant environment.
  */
 
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
-load("jstests/libs/feature_flag_util.js");    // for isEnabled
 
 const rst = new ReplSetTest({
     nodes: 2,
@@ -109,4 +105,3 @@ verifyMirroredReadStats({
 });
 
 rst.stopSet();
-})();

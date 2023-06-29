@@ -2,11 +2,7 @@
  * Test that calls to read from telemetry store fail when feature flag is turned off and sampling
  * rate > 0.
  */
-load('jstests/libs/analyze_plan.js');
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-"use strict";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Set sampling rate to -1.
 let options = {
@@ -22,7 +18,7 @@ if (!conn || FeatureFlagUtil.isEnabled(testdb, "QueryStats")) {
     if (conn) {
         MongoRunner.stopMongod(conn);
     }
-    return;
+    quit();
 }
 
 var coll = testdb[jsTestName()];
@@ -51,4 +47,3 @@ assert.commandFailedWithCode(testdb.adminCommand({
                              ErrorCodes.QueryFeatureNotAllowed);
 
 MongoRunner.stopMongod(conn);
-}());

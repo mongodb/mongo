@@ -9,10 +9,7 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load("jstests/noPassthrough/libs/index_build.js");
 
 const rst = new ReplSetTest({nodes: 1});
@@ -59,4 +56,3 @@ ResumableIndexBuildTest.run(
     [{numScannedAfterResume: 2}]);
 
 rst.stopSet();
-})();

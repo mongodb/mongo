@@ -5,9 +5,16 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertErrorOnStartupAfterIncompleteRepair,
+    assertQueryUsesIndex,
+    assertRepairFails,
+    assertRepairSucceeds,
+    corruptFile,
+    getUriForColl,
+    getUriForIndex,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_corrupt_files";
 const collName = "test";
@@ -170,4 +177,3 @@ let runTest = function(mongodOptions) {
 runTest({});
 runTest({directoryperdb: ""});
 runTest({wiredTigerDirectoryForIndexes: ""});
-})();

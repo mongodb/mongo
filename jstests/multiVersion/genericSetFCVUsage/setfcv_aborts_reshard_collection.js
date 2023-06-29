@@ -1,10 +1,7 @@
 /**
  * Tests that setFeatureCompatibilityVersion command aborts an ongoing reshardCollection command
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load('jstests/libs/discover_topology.js');
@@ -174,4 +171,3 @@ assert(reshardingImprovementsEnabled !== undefined);
 // to completely clear the config server's state collection.  Because this test takes a while
 // we don't try all combinations of forcePooledCollectionsDropped and withUUID.
 runTest({forcePooledConnectionsDropped: false, withUUID: reshardingImprovementsEnabled});
-})();

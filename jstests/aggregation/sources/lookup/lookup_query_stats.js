@@ -14,13 +14,12 @@
  *     requires_pipeline_optimization
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");         // For 'getAggPlanStages'
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages and
-                                              // getQueryInfoAtTopLevelOrFirstStage.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
+import {
+    getQueryInfoAtTopLevelOrFirstStage,
+    getSbePlanStages
+} from "jstests/libs/sbe_explain_helpers.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBELookupEnabled = checkSBEEnabled(db);
 const testDB = db.getSiblingDB("lookup_query_stats");
@@ -404,4 +403,3 @@ testQueryExecutorStatsWithIndexScan({withUnwind: false});
 // taking place within the lookup stage.
 testQueryExecutorStatsWithCollectionScan({withUnwind: true});
 testQueryExecutorStatsWithIndexScan({withUnwind: true});
-}());

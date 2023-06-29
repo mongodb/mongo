@@ -20,10 +20,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'getPlanStages' and 'isCollscan'.
+import {getPlanStages, getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
 
 const collName = 'hidden_indexes_remain_visible_in_index_filters';
 db[collName].drop();
@@ -120,4 +117,3 @@ validateIxscanOrCollscanUsed(queryShape, null);
 // Unhiding the index should make it able to be used.
 assert.commandWorked(coll.unhideIndex("a_1"));
 validateIxscanOrCollscanUsed(queryShape, "a_1");
-})();

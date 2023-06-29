@@ -1,11 +1,6 @@
 /**
  * Test time-based window bounds.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
-
 const coll = db.setWindowFields_time;
 coll.drop();
 
@@ -196,4 +191,3 @@ error = assert.throws(() => {
     run([range('unbounded', 'unbounded')]);
 });
 assert.commandFailedWithCode(error, 5429513);
-})();

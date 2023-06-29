@@ -1,11 +1,8 @@
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 assert.commandWorked(
@@ -58,4 +55,3 @@ testAnalyzeStats("c", docs, 37);
 
 assert.commandWorked(
     db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "forceBonsai"}));
-}());

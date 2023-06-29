@@ -1,13 +1,15 @@
 /**
  * Tests scenario related to SERVER-22857.
  */
-(function() {
-"use strict";
+import {
+    checkCascadesOptimizerEnabled,
+    removeUUIDsFromExplain,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_redundant_condition;
@@ -40,4 +42,3 @@ PhysicalScan [{'<root>': scan_0, 'a': evalTemp_2}, cqf_redundant_condition_]
     const actualStr = removeUUIDsFromExplain(db, res);
     assert.eq(expectedStr, actualStr);
 }
-}());

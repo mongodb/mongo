@@ -11,10 +11,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries_writes_util.js");
+import {
+    getTestDB,
+    metaFieldName,
+    prepareCollection,
+    testUpdateOne,
+    timeFieldName
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 /**
  * Tests op-style updates.
@@ -518,5 +521,4 @@ load("jstests/core/timeseries/libs/timeseries_writes_util.js");
     const res = assert.commandWorked(testDB.runCommand(updateCommand));
     assert.eq(1, res.n, tojson(res));
     assert.eq(1, res.nModified, tojson(res));
-})();
 })();

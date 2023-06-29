@@ -5,10 +5,7 @@
 // @tags: [
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 function assertShardFilter(explain) {
     const filterStage = getPlanStage(explain.queryPlanner.winningPlan, "SHARDING_FILTER");
@@ -106,4 +103,3 @@ explain = assert.commandWorked(coll.find({b: true}).explain());
 assertShardFilter(explain);
 
 st.stop();
-})();

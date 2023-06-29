@@ -2,7 +2,7 @@
 //
 // @tags: [requires_fastcount]
 
-load("jstests/libs/analyze_plan.js");     // For assertExplainCount.
+import {assertExplainCount, getPlanStage} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
 
 var collName = "jstests_explain_count";

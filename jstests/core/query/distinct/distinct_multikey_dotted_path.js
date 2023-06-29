@@ -11,9 +11,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");  // For planHasStage().
+import {getAggPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.distinct_multikey;
 coll.drop();
@@ -205,5 +203,4 @@ assert.commandWorked(coll.insert({a: {b: {c: []}}}));
 
     // Will not attempt the equivalent query with aggregation, since $group by "a.b.0" will
     // only treat '0' as a field name (not array index).
-})();
 })();

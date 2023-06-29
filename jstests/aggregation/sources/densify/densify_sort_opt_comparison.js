@@ -7,12 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 load("jstests/libs/fixture_helpers.js");      // For FixtureHelpers.
 load("jstests/libs/fail_point_util.js");      // For configureFailPoint
 
@@ -125,4 +120,3 @@ FixtureHelpers.runCommandOnEachPrimary({
 });
 assert.commandWorked(
     db.adminCommand({'configureFailPoint': 'disablePipelineOptimization', 'mode': 'off'}));
-})();

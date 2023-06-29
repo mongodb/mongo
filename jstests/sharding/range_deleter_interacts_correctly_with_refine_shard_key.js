@@ -5,14 +5,9 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 load('jstests/replsets/rslib.js');
-load('jstests/libs/feature_flag_util.js');
 
 TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
@@ -251,5 +246,4 @@ function test(st, description, testBody) {
          });
 
     st.stop();
-})();
 })();

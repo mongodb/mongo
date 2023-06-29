@@ -7,10 +7,7 @@
 /**
  * This test ensures that explain on the distinct command works.
  */
-(function() {
-'use strict';
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getWinningPlan, isCollscan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const collName = "jstests_explain_distinct";
 const coll = db[collName];
@@ -100,4 +97,3 @@ assert.eq(1, explain.executionStats.nReturned);
 assert(!planHasStage(db, winningPlan, "FETCH"));
 assert(planHasStage(db, winningPlan, "PROJECTION_COVERED"));
 assert(planHasStage(db, winningPlan, "DISTINCT_SCAN"));
-})();

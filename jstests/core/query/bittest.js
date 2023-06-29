@@ -4,10 +4,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, isCollscan} from "jstests/libs/analyze_plan.js";
 
 var coll = db.jstests_bitwise;
 
@@ -218,4 +215,3 @@ assertQueryCorrect({
                    4);
 
 assert(coll.drop());
-})();

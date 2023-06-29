@@ -5,10 +5,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const coll = db.wildcard_index_equality_to_empty_obj;
 coll.drop();
@@ -101,4 +98,3 @@ for (const indexSpec of wildcardIndexes) {
               coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).hint({$natural: 1}).toArray());
     assert.eq(results, coll.find({"a.b": {$eq: {}}}, {_id: 1}).sort({_id: 1}).toArray());
 }
-}());

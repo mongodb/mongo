@@ -10,11 +10,8 @@
  *   6. Verify the data consistency after the downgrade procedure
  */
 
-(function() {
-'use strict';
-
 load('jstests/multiVersion/libs/multi_cluster.js');  // For upgradeCluster
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dbName = jsTestName();
 
@@ -189,4 +186,3 @@ for (const oldVersion of [lastLTSFCV, lastContinuousFCV]) {
 
     st.stop();
 }
-})();

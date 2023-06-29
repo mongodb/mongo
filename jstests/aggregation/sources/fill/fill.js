@@ -6,12 +6,7 @@
  * ]
  */
 
-(function() {
-
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");
-load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
 
 const coll = db[jsTestName()];
@@ -383,4 +378,3 @@ for (let i = 0; i < testCases.length; i++) {
     assertArrayEq(
         {actual: result, expected: testCases[i][1], extraErrorMsg: " during testCase " + i});
 }
-})();

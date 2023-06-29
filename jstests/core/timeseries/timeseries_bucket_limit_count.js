@@ -9,11 +9,8 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_bucket_limit_count_';
@@ -107,4 +104,3 @@ TimeseriesTest.run((insert) => {
     runTest(numDocs / 2);
     runTest(numDocs);
 });
-})();

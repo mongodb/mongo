@@ -6,10 +6,7 @@
  *
  * @tags: [assumes_against_mongod_not_mongos]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -214,4 +211,3 @@ function checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotalMe
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "executionStats");
     checkExplainResult(pipeline, expectedFunctionMemUsages, expectedTotal, "allPlansExecution");
 })();
-}());

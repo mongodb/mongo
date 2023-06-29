@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 function validateBatchedDeletes(conn) {
     const db = conn.getDB("test");
@@ -92,4 +90,3 @@ function validateBatchedDeletes(conn) {
     validateBatchedDeletes(rst.getPrimary());
     rst.stopSet();
 }
-})();

@@ -6,12 +6,9 @@
  *   no_selinux,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/analyze_plan.js");         // For planHasStage and getPlanStages.
-load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
+import {getWinningPlan, getPlanStages, planHasStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const assertArrayEq = (l, r) => assert(arrayEq(l, r), tojson(l) + " != " + tojson(r));
 
@@ -225,4 +222,3 @@ for (let testCase of testCases) {
         expectedPath: null
     });
 }
-})();

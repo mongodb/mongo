@@ -1,9 +1,8 @@
 /**
  * Test that $ne: [] queries are cached correctly. See SERVER-39764.
  */
-(function() {
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.ne_array_indexability;
 coll.drop();
@@ -48,4 +47,3 @@ runTest({'obj': {$ne: 'def'}}, {'obj': {$ne: [[1]]}});
 assert.commandWorked(coll.runCommand('planCacheClear'));
 
 runTest({'obj': {$nin: ['abc', 'def']}}, {'obj': {$nin: [[1], 'abc']}});
-})();

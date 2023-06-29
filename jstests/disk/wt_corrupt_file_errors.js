@@ -4,9 +4,13 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertErrorOnRequestWhenFilesAreCorruptOrMissing,
+    assertErrorOnStartupWhenFilesAreCorruptOrMissing,
+    corruptFile,
+    getUriForColl,
+    getUriForIndex,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_corrupt_file_errors";
 const collName = "test";
@@ -81,4 +85,3 @@ assertErrorOnRequestWhenFilesAreCorruptOrMissing(
         });
     },
     new RegExp("Fatal assertion.*50882"));
-})();

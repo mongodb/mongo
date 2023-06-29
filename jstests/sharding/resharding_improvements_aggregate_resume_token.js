@@ -7,10 +7,7 @@
  * ]
  */
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const st = new ShardingTest({mongos: 1, shards: 2});
 const kDbName = 'db';
@@ -29,7 +26,7 @@ assert.commandWorked(bulk.execute());
 
 if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
     jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled.");
-    return;
+    quit();
 }
 
 jsTest.log("aggregate with $requestResumeToken should fail without hint: {$natural: 1}.");
@@ -91,4 +88,3 @@ res = db.runCommand({
     cursor: {batchSize: 1}
 });
 st.stop();
-}());

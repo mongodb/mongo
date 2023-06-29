@@ -6,10 +6,7 @@
  *   requires_fcv_63,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collection = db.index_key_expression;
 
@@ -1095,4 +1092,3 @@ testScenarios.forEach(testScenario => {
                               testScenario.expectedErrorCode);
     }
 });
-})();

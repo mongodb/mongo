@@ -1,15 +1,12 @@
-'use strict';
-
 // Test that the 'cloneCatalogData' command works correctly.
 // Eventually, _shardsvrMovePrimary will use this command.
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 // Do not check metadata consistency as unsharded collections are cloned to non-primary shards for
 // testing purposes.
 TestData.skipCheckMetadataConsistency = true;
 
 (() => {
-    load("jstests/libs/config_shard_util.js");
-
     function sortByName(a, b) {
         if (a.name < b.name)
             return -1;

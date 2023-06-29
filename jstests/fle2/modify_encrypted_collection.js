@@ -6,11 +6,6 @@
  * requires_fcv_70
  * ]
  */
-load("jstests/fle2/libs/encrypted_client_util.js");
-
-(function() {
-'use strict';
-
 let dbTest = db.getSiblingDB('modify_encrypted_collection_db');
 
 dbTest.basic.drop();
@@ -39,4 +34,3 @@ assert.commandFailedWithCode(dbTest.runCommand({collMod: "basic", validationLeve
 
 assert.commandWorked(
     dbTest.runCommand({collMod: "basic", validationLevel: "strict", validationAction: "error"}));
-}());

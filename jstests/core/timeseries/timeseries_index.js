@@ -9,11 +9,8 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/fixture_helpers.js");
 
 TimeseriesTest.run((insert) => {
@@ -309,4 +306,3 @@ TimeseriesTest.run((insert) => {
     testCreateIndexFailed({$natural: -1});
     testCreateIndexFailed({$hint: 'my_index_name'});
 });
-})();

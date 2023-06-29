@@ -6,11 +6,6 @@
  * requires_fcv_70
  * ]
  */
-load("jstests/fle2/libs/encrypted_client_util.js");
-
-(function() {
-'use strict';
-
 let dbTest = db.getSiblingDB('create_encrypted_collection_db');
 
 dbTest.dropDatabase();
@@ -86,4 +81,3 @@ assert.commandWorked(dbTest.createCollection("basic_int32_cf", {
         }]
     }
 }));
-}());

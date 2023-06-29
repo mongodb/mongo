@@ -1,8 +1,5 @@
 // Confirms the $planCacheStats output format includes information about failed plans.
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -12,7 +9,7 @@ const coll = testDB.test;
 if (checkSBEEnabled(testDB)) {
     jsTest.log("Skipping test because SBE is enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 coll.drop();
@@ -51,4 +48,3 @@ assert.eq(candidatePlanScores.length, 2, planCacheEntry);
 assert.eq(candidatePlanScores[1], 0, planCacheEntry);
 
 MongoRunner.stopMongod(conn);
-})();

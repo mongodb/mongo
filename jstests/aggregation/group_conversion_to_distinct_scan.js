@@ -18,10 +18,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.group_conversion_to_distinct_scan;
 coll.drop();
@@ -1068,4 +1065,3 @@ assertPipelineResultsAndExplain({
     expectedOutput: expectedResult,
     validateExplain: (explain) => assertPlanUsesDistinctScan(explain, {_id: 1})
 });
-}());

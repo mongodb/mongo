@@ -7,11 +7,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
-
 const rst = new ReplSetTest({nodes: 2});
 rst.startSet();
 
@@ -183,4 +178,3 @@ assert.eq(atClusterTimeHashBefore,
 
 session.endSession();
 rst.stopSet();
-})();

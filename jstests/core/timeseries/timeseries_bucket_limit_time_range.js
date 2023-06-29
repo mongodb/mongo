@@ -8,10 +8,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const isTimeseriesScalabilityImprovementsEnabled =
@@ -125,4 +122,3 @@ TimeseriesTest.run((insert) => {
     runTest(1);
     runTest(numDocs);
 });
-})();

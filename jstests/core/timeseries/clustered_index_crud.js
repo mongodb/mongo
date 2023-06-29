@@ -6,11 +6,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const collName = 'system.buckets.clustered_index_crud';
 const coll = db[collName];
 coll.drop();
@@ -48,4 +43,3 @@ assert.commandWorked(coll.insert({_id: 'x'.repeat(100), a: 10}));
 
 assert.commandWorked(coll.createIndex({a: 1}));
 assert.commandWorked(coll.dropIndex({a: 1}));
-})();

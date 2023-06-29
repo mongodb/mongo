@@ -7,7 +7,7 @@ load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 /**
  * Returns a sub-element of the 'queryPlanner' explain output which represents a winning plan.
  */
-function getWinningPlan(queryPlanner) {
+export function getWinningPlan(queryPlanner) {
     // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
     // it will hold a serialized winning plan, otherwise it will be stored in the 'winningPlan'
     // field itself.
@@ -18,7 +18,7 @@ function getWinningPlan(queryPlanner) {
 /**
  * Returns an element of explain output which represents a rejected candidate plan.
  */
-function getRejectedPlan(rejectedPlan) {
+export function getRejectedPlan(rejectedPlan) {
     // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present,
     // it will hold a serialized winning plan, otherwise it will be stored in the 'rejectedPlan'
     // element itself.
@@ -28,7 +28,7 @@ function getRejectedPlan(rejectedPlan) {
 /**
  * Returns a sub-element of the 'cachedPlan' explain output which represents a query plan.
  */
-function getCachedPlan(cachedPlan) {
+export function getCachedPlan(cachedPlan) {
     // The 'queryPlan' format is used when the SBE engine is turned on. If this field is present, it
     // will hold a serialized cached plan, otherwise it will be stored in the 'cachedPlan' field
     // itself.
@@ -40,7 +40,7 @@ function getCachedPlan(cachedPlan) {
  * subdocuments whose stage is 'stage'. Returns an empty array if the plan does not have the
  * requested stage. if 'stage' is 'null' returns all the stages in 'root'.
  */
-function getPlanStages(root, stage) {
+export function getPlanStages(root, stage) {
     var results = [];
 
     if (root.stage === stage || stage === undefined) {
@@ -99,7 +99,7 @@ function getPlanStages(root, stage) {
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns a list of
  * all the stages in 'root'.
  */
-function getAllPlanStages(root) {
+export function getAllPlanStages(root) {
     return getPlanStages(root);
 }
 
@@ -108,7 +108,7 @@ function getAllPlanStages(root) {
  * subdocument with its stage as 'stage'. Returns null if the plan does not have such a stage.
  * Asserts that no more than one stage is a match.
  */
-function getPlanStage(root, stage) {
+export function getPlanStage(root, stage) {
     var planStageList = getPlanStages(root, stage);
 
     if (planStageList.length === 0) {
@@ -124,7 +124,7 @@ function getPlanStage(root, stage) {
 /**
  * Returns the set of rejected plans from the given replset or sharded explain output.
  */
-function getRejectedPlans(root) {
+export function getRejectedPlans(root) {
     if (root.queryPlanner.winningPlan.hasOwnProperty("shards")) {
         const rejectedPlans = [];
         for (let shard of root.queryPlanner.winningPlan.shards) {
@@ -141,7 +141,7 @@ function getRejectedPlans(root) {
  * Given the root stage of explain's JSON representation of a query plan ('root'), returns true if
  * the query planner reports at least one rejected alternative plan, and false otherwise.
  */
-function hasRejectedPlans(root) {
+export function hasRejectedPlans(root) {
     function sectionHasRejectedPlans(explainSection) {
         assert(explainSection.hasOwnProperty("rejectedPlans"), tojson(explainSection));
         return explainSection.rejectedPlans.length !== 0;
@@ -184,7 +184,7 @@ function hasRejectedPlans(root) {
 /**
  * Returns an array of execution stages from the given replset or sharded explain output.
  */
-function getExecutionStages(root) {
+export function getExecutionStages(root) {
     if (root.hasOwnProperty("executionStats") &&
         root.executionStats.executionStages.hasOwnProperty("shards")) {
         const executionStages = [];
@@ -216,7 +216,7 @@ function getExecutionStages(root) {
  * Returns an empty array if the plan does not have the requested stage. Asserts that agg explain
  * structure matches expected format.
  */
-function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
+export function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
     let results = [];
 
     function getDocumentSources(docSourceArray) {
@@ -309,7 +309,7 @@ function getAggPlanStages(root, stage, useQueryPlannerSection = false) {
  * If 'useQueryPlannerSection' is set to 'true', the 'queryPlanner' section of the explain output
  * will be used to lookup the given 'stage', even if 'executionStats' section is available.
  */
-function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
+export function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
     let planStageList = getAggPlanStages(root, stage, useQueryPlannerSection);
 
     if (planStageList.length === 0) {
@@ -329,7 +329,7 @@ function getAggPlanStage(root, stage, useQueryPlannerSection = false) {
  * explain plans, and it can search for a query planner stage like "FETCH" or an agg stage like
  * "$group."
  */
-function aggPlanHasStage(root, stage) {
+export function aggPlanHasStage(root, stage) {
     return getAggPlanStages(root, stage).length > 0;
 }
 
@@ -340,7 +340,7 @@ function aggPlanHasStage(root, stage) {
  * Expects that the stage appears once or zero times per node. If the stage appears more than once
  * on one node's query plan, an error will be thrown.
  */
-function planHasStage(db, root, stage) {
+export function planHasStage(db, root, stage) {
     const matchingStages = getPlanStages(root, stage);
 
     // If we are executing against a mongos, we may get more than one occurrence of the stage.
@@ -360,7 +360,7 @@ function planHasStage(db, root, stage) {
  * Given the root stage of explain's BSON representation of a query plan ('root'),
  * returns true if the plan is index only. Otherwise returns false.
  */
-function isIndexOnly(db, root) {
+export function isIndexOnly(db, root) {
     return !planHasStage(db, root, "FETCH") && !planHasStage(db, root, "COLLSCAN");
 }
 
@@ -368,7 +368,7 @@ function isIndexOnly(db, root) {
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * an index scan, and false otherwise.
  */
-function isIxscan(db, root) {
+export function isIxscan(db, root) {
     return planHasStage(db, root, "IXSCAN");
 }
 
@@ -376,7 +376,7 @@ function isIxscan(db, root) {
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * the idhack fast path, and false otherwise.
  */
-function isIdhack(db, root) {
+export function isIdhack(db, root) {
     return planHasStage(db, root, "IDHACK");
 }
 
@@ -384,11 +384,11 @@ function isIdhack(db, root) {
  * Returns true if the BSON representation of a plan rooted at 'root' is using
  * a collection scan, and false otherwise.
  */
-function isCollscan(db, root) {
+export function isCollscan(db, root) {
     return planHasStage(db, root, "COLLSCAN");
 }
 
-function isClusteredIxscan(db, root) {
+export function isClusteredIxscan(db, root) {
     return planHasStage(db, root, "CLUSTERED_IXSCAN");
 }
 
@@ -396,7 +396,7 @@ function isClusteredIxscan(db, root) {
  * Returns true if the BSON representation of a plan rooted at 'root' is using the aggregation
  * framework, and false otherwise.
  */
-function isAggregationPlan(root) {
+export function isAggregationPlan(root) {
     if (root.hasOwnProperty("shards")) {
         const shards = Object.keys(root.shards);
         return shards.reduce(
@@ -410,7 +410,7 @@ function isAggregationPlan(root) {
  * Returns true if the BSON representation of a plan rooted at 'root' is using just the query layer,
  * and false otherwise.
  */
-function isQueryPlan(root) {
+export function isQueryPlan(root) {
     if (root.hasOwnProperty("shards")) {
         const shards = Object.keys(root.shards);
         return shards.reduce(
@@ -424,7 +424,7 @@ function isQueryPlan(root) {
  * Get the "chunk skips" for a single shard. Here, "chunk skips" refer to documents excluded by the
  * shard filter.
  */
-function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
+export function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
     const shardFilterPlanStage = getPlanStage(getWinningPlan(shardPlan), "SHARDING_FILTER");
     if (!shardFilterPlanStage) {
         return 0;
@@ -452,7 +452,7 @@ function getChunkSkipsFromShard(shardPlan, shardExecutionStages) {
  * Get the sum of "chunk skips" from all shards. Here, "chunk skips" refer to documents excluded by
  * the shard filter.
  */
-function getChunkSkipsFromAllShards(explainResult) {
+export function getChunkSkipsFromAllShards(explainResult) {
     const shardPlanArray = explainResult.queryPlanner.winningPlan.shards;
     const shardExecutionStagesArray = explainResult.executionStats.executionStages.shards;
     assert.eq(shardPlanArray.length, shardExecutionStagesArray.length, explainResult);
@@ -468,7 +468,7 @@ function getChunkSkipsFromAllShards(explainResult) {
  * Given explain output at executionStats level verbosity, confirms that the root stage is COUNT or
  * RECORD_STORE_FAST_COUNT and that the result of the count is equal to 'expectedCount'.
  */
-function assertExplainCount({explainResults, expectedCount}) {
+export function assertExplainCount({explainResults, expectedCount}) {
     const execStages = explainResults.executionStats.executionStages;
 
     // If passed through mongos, then the root stage should be the mongos SINGLE_SHARD stage or
@@ -500,7 +500,7 @@ function assertExplainCount({explainResults, expectedCount}) {
 /**
  * Verifies that a given query uses an index and is covered when used in a count command.
  */
-function assertCoveredQueryAndCount({collection, query, project, count}) {
+export function assertCoveredQueryAndCount({collection, query, project, count}) {
     let explain = collection.find(query, project).explain();
     assert(isIndexOnly(db, getWinningPlan(explain.queryPlanner)),
            "Winning plan was not covered: " + tojson(explain.queryPlanner.winningPlan));
@@ -517,7 +517,7 @@ function assertCoveredQueryAndCount({collection, query, project, count}) {
  * present exactly once in the plan returned. When 'stagesNotExpected' array is passed, also
  * verifies that none of those stages are present in the explain() plan.
  */
-function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNotExpected}) {
+export function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNotExpected}) {
     const plan = assert.commandWorked(coll.runCommand({explain: cmdObj}));
     const winningPlan = getWinningPlan(plan.queryPlanner);
     for (let expectedStage of expectedStages) {
@@ -534,7 +534,7 @@ function assertStagesForExplainOfCommand({coll, cmdObj, expectedStages, stagesNo
 /**
  * Utility to obtain a value from 'explainRes' using 'getValueCallback'.
  */
-function getFieldValueFromExplain(explainRes, getValueCallback) {
+export function getFieldValueFromExplain(explainRes, getValueCallback) {
     assert(explainRes.hasOwnProperty("queryPlanner"), explainRes);
     const plannerOutput = explainRes.queryPlanner;
     const fieldValue = getValueCallback(plannerOutput);
@@ -545,7 +545,7 @@ function getFieldValueFromExplain(explainRes, getValueCallback) {
 /**
  * Get the 'planCacheKey' from 'explainRes'.
  */
-function getPlanCacheKeyFromExplain(explainRes, db) {
+export function getPlanCacheKeyFromExplain(explainRes, db) {
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
         return FixtureHelpers.isMongos(db) && plannerOutput.hasOwnProperty("winningPlan") &&
                 plannerOutput.winningPlan.hasOwnProperty("shards")
@@ -557,7 +557,7 @@ function getPlanCacheKeyFromExplain(explainRes, db) {
 /**
  * Get the 'queryHash' from 'explainRes'.
  */
-function getQueryHashFromExplain(explainRes, db) {
+export function getQueryHashFromExplain(explainRes, db) {
     return getFieldValueFromExplain(explainRes, function(plannerOutput) {
         return FixtureHelpers.isMongos(db) ? plannerOutput.winningPlan.shards[0].queryHash
                                            : plannerOutput.queryHash;
@@ -568,7 +568,7 @@ function getQueryHashFromExplain(explainRes, db) {
  * Helper to run a explain on the given query shape and get the "planCacheKey" from the explain
  * result.
  */
-function getPlanCacheKeyFromShape({
+export function getPlanCacheKeyFromShape({
     query = {},
     projection = {},
     sort = {},
@@ -588,7 +588,7 @@ function getPlanCacheKeyFromShape({
  * Helper to run a explain on the given pipeline and get the "planCacheKey" from the explain
  * result.
  */
-function getPlanCacheKeyFromPipeline(pipeline, collection, db) {
+export function getPlanCacheKeyFromPipeline(pipeline, collection, db) {
     const explainRes = assert.commandWorked(collection.explain().aggregate(pipeline));
 
     return getPlanCacheKeyFromExplain(explainRes, db);
@@ -597,7 +597,7 @@ function getPlanCacheKeyFromPipeline(pipeline, collection, db) {
 /**
  * Given the winning query plan, flatten query plan tree into a list of plan stage names.
  */
-function flattenQueryPlanTree(winningPlan) {
+export function flattenQueryPlanTree(winningPlan) {
     let stages = [];
     while (winningPlan) {
         stages.push(winningPlan.stage);
@@ -610,7 +610,7 @@ function flattenQueryPlanTree(winningPlan) {
 /**
  * Assert that a command plan has no FETCH stage or if the stage is present, it has no filter.
  */
-function assertNoFetchFilter({coll, cmdObj}) {
+export function assertNoFetchFilter({coll, cmdObj}) {
     const plan = assert.commandWorked(coll.runCommand({explain: cmdObj}));
     const winningPlan = getWinningPlan(plan.queryPlanner);
     const fetch = getPlanStage(winningPlan, "FETCH");
@@ -623,7 +623,7 @@ function assertNoFetchFilter({coll, cmdObj}) {
  * Assert that a find plan has a FETCH stage with expected filter and returns a specified number of
  * results.
  */
-function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) {
+export function assertFetchFilter({coll, predicate, expectedFilter, nReturned}) {
     const exp = coll.find(predicate).explain("executionStats");
     const plan = getWinningPlan(exp.queryPlanner);
     const fetch = getPlanStage(plan, "FETCH");

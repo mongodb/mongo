@@ -4,7 +4,7 @@
 
 load("jstests/libs/fixture_helpers.js");
 
-const TTLUtil = class {
+export const TTLUtil = class {
     /**
      * Wait until documents inserted before a call to this function have been visited by a TTL
      * monitor pass. On replica sets, by default the function waits for the TTL deletes to become

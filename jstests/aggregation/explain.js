@@ -1,10 +1,7 @@
 // Tests the behavior of explain() when used with the aggregation pipeline.
 // - Explain() should not read or modify the plan cache.
 // - The result should always include serverInfo.
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');  // For getAggPlanStage().
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 let coll = db.explain;
 coll.drop();
@@ -35,4 +32,3 @@ assert.eq(null, getAggPlanStage(result, "CACHED_PLAN"));
 result = coll.explain().aggregate([{$lookup: {from: 'other_coll', pipeline: [], as: 'docs'}}]);
 assert(result.hasOwnProperty('serverInfo'), result);
 assert.hasFields(result.serverInfo, ['host', 'port', 'version', 'gitVersion']);
-})();

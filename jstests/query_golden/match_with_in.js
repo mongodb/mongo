@@ -1,9 +1,7 @@
 /**
  * Test $match with $in is supported and returns correct results.
  */
-
-(function() {
-"use strict";
+import {show} from "jstests/libs/golden_test.js";
 
 const coll = db.cqf_golden_match_with_in;
 coll.drop();
@@ -77,4 +75,3 @@ const testFilters = [
 for (const filter of testFilters) {
     runTest(filter);
 }
-}());

@@ -10,12 +10,10 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-load("jstests/libs/analyze_plan.js");                // For planHasStage().
-load("jstests/libs/fixture_helpers.js");             // For 'FixtureHelpers'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {planHasStage} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -174,4 +172,3 @@ TimeseriesTest.run((insert) => {
         includeMetaField: false
     });
 });
-})();

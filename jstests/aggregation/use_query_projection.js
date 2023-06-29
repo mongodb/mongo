@@ -7,10 +7,13 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'aggPlanHasStage' and other explain helpers.
+import {
+    aggPlanHasStage,
+    hasRejectedPlans,
+    isAggregationPlan,
+    isQueryPlan,
+    planHasStage,
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.use_query_projection;
 coll.drop();
@@ -92,4 +95,3 @@ assertQueryDoesNotCoverProjection(
     {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1}}]});
 assertQueryDoesNotCoverProjection(
     {pipeline: [{$match: {x: "string"}}, {$project: {_id: 1, x: 1, a: 1}}]});
-}());

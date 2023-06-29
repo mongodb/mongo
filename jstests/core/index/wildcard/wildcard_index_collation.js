@@ -12,12 +12,9 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"user strict";
-
-load("jstests/aggregation/extras/utils.js");       // For arrayEq.
-load("jstests/libs/analyze_plan.js");              // For getPlanStages.
-load("jstests/libs/feature_flag_util.js");         // For "FeatureFlagUtil"
+load("jstests/aggregation/extras/utils.js");  // For arrayEq.
+import {getWinningPlan, getPlanStages, isIndexOnly} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/index_catalog_helpers.js");     // For IndexCatalogHelpers.
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For isMongos.
@@ -141,4 +138,3 @@ for (const indexSpec of wildcardIndexes) {
     coll = assertDropAndRecreateCollection(
         db, "wildcard_collation", {collation: {locale: "en_US", strength: 1}});
 }
-})();

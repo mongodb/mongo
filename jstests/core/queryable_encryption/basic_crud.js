@@ -8,15 +8,15 @@
  * does_not_support_stepdowns,
  * ]
  */
-
-(function() {
-'use strict';
-
-load("jstests/fle2/libs/encrypted_client_util.js");
+import {
+    assertIsIndexedEncryptedField,
+    EncryptedClient,
+    kSafeContentField
+} from "jstests/fle2/libs/encrypted_client_util.js";
 
 if (!(buildInfo().modules.includes("enterprise"))) {
     jsTestLog("Skipping test as it requires the enterprise module");
-    return;
+    quit();
 }
 
 const dbName = "qetestdb";
@@ -150,4 +150,3 @@ runIndexedEqualityEncryptedCRUDTest(encryptedClient, 10);
 
 encryptedClient = undefined;
 initialConn.unsetAutoEncryption();
-}());

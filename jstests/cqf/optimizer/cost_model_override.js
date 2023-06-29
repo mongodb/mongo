@@ -3,13 +3,15 @@
  * the cost of produced query plan changed.
  */
 
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cost_model_override;
@@ -51,4 +53,3 @@ function executeAndGetScanCost(scanIncrementalCost) {
 const scanCost1 = executeAndGetScanCost(0.2);
 const scanCost2 = executeAndGetScanCost(0.4);
 assert.lt(scanCost1, scanCost2);
-}());

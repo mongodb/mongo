@@ -2,10 +2,8 @@
  * Tests that we can execute a query which survived a yield using an index scan on a path containing
  * a positional component. This test was designed to reproduce SERVER-52589.
  */
-(function() {
-"use strict";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");         // For explain helpers.
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
 
 // Configure 'internalQueryExecYieldIterations' such that operations will yield on each PlanExecutor
@@ -60,4 +58,3 @@ assert.eq(ixscan.isMultiKey, false, explain);
 assertArrayEq({actual: cursor.toArray(), expected: [doc]});
 
 MongoRunner.stopMongod(conn);
-}());

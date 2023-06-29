@@ -3,10 +3,8 @@
 // @tags: [
 // ]
 //
-(function() {
-"use strict";
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
 
 const testDB = db.getSiblingDB("command_let_variables");
@@ -632,4 +630,3 @@ result = coll.aggregate([{$match: {$expr: {$eq: ["$_id", 2]}}}, {$project: {a: "
                         {let : {b: {$literal: "$notAFieldPath"}}})
              .toArray();
 assert.eq(result, [{_id: 2, a: "$notAFieldPath"}]);
-}());

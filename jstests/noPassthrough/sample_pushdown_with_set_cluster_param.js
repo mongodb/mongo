@@ -5,10 +5,7 @@
  * Requires random cursor support.
  * @tags: [requires_replication]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/analyze_plan.js');  // For planHasStage.
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 const numDocs = 1000;
 const sampleSize = numDocs * .06;
@@ -100,4 +97,3 @@ const pipeline = [{$sample: {size: sampleSize}}, {$match: {a: {$gte: 0}}}];
 
 // // Clean up.
 rst.stopSet();
-})();

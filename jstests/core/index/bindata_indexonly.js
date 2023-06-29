@@ -6,10 +6,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/analyze_plan.js");
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.jstests_bindata_indexonly;
 
@@ -74,4 +71,3 @@ assert.eq(
     2, explain.executionStats.nReturned, "correctcount.$gte.3 - not returning correct documents");
 
 coll.drop();
-})();

@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_basic_find;
@@ -45,4 +46,3 @@ assertValueOnPlanPath("IndexScan", res, "child.leftChild.nodeType");
 res = coll.explain("executionStats").find({'': {$gt: 2}}).finish();
 assert.eq(1, res.executionStats.nReturned);
 assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
-}());

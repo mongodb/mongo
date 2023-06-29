@@ -12,10 +12,7 @@
  *   requires_pipeline_optimization,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'aggPlanHasStages' and other explain helpers.
+import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const coll = db.server39788;
 coll.drop();
@@ -218,4 +215,3 @@ testPipeline(
         SKIP: {path: "skipAmount", expectedValue: [10]}
     },
     ["$sort"]);
-})();

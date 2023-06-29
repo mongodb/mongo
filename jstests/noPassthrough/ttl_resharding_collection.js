@@ -1,7 +1,5 @@
 // Tests that the TTL Monitor is disabled for <database>.system.resharding.* namespaces.
-(function() {
-"use strict";
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 // Launch mongod with shorter TTL monitor sleep interval.
 const runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
@@ -23,4 +21,3 @@ TTLUtil.waitForPass(coll.getDB());
 assert.eq(
     1, coll.find().itcount(), "Wrong number of documents in collection, after TTL monitor run");
 MongoRunner.stopMongod(runner);
-})();

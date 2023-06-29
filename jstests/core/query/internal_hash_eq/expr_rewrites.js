@@ -8,10 +8,7 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getExecutionStages, getPlanStages, isIxscan} from "jstests/libs/analyze_plan.js";
 
 const collName = jsTestName();
 const coll = db.getCollection(collName);
@@ -169,5 +166,4 @@ function assertExplainIxscan(explainPlan, expectedIndexSpec, expectedKeysExamine
 
     // We couldn't create a tight bound for the index scan as the index is not hashed.
     assertExplainIxscan(explainPlan, indexSpec, 3 /* keyExamined */);
-})();
 })();

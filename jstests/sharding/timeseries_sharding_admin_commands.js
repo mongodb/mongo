@@ -9,11 +9,6 @@
 // Cannot run the filtering metadata check on tests that run refineCollectionShardKey.
 TestData.skipCheckShardFilteringMetadata = true;
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 // Connections.
 const mongo = new ShardingTest({shards: 2, rs: {nodes: 3}});
 const dbName = 'testDB';
@@ -273,4 +268,3 @@ function assertRangeMatch(savedRange, paramRange) {
 })();
 
 mongo.stop();
-})();

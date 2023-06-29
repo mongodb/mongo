@@ -4,14 +4,10 @@
  *   requires_profiling,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStages, getCachedPlan, getPlanStage} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/log.js");  // For findMatchingLogLine.
 load("jstests/libs/profiler.js");
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
-load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages()'
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -644,4 +640,3 @@ if (sbeEnabled) {
 }
 
 MongoRunner.stopMongod(conn);
-}());

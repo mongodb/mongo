@@ -1,8 +1,7 @@
 /**
  * Tests foreground validation's ability to fix up allowable multikey metadata problems.
  */
-(function() {
-load("jstests/libs/analyze_plan.js");  // For getWinningPlan to analyze explain() output.
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const dbName = jsTestName();
@@ -110,4 +109,3 @@ runTest((coll) => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

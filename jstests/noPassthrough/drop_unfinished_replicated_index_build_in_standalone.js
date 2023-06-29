@@ -7,10 +7,6 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/disk/libs/wt_file_helper.js');
 load('jstests/noPassthrough/libs/index_build.js');
 
 const dbName = jsTestName();
@@ -71,4 +67,3 @@ assert.commandWorked(secondaryDB.dropDatabase());
 
 MongoRunner.stopMongod(mongod);
 rst.stopSet();
-})();

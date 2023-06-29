@@ -3,12 +3,9 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
 load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/uuid_util.js");  // for 'extractUUIDFromObject'
 
 // This command involves running commands outside a session.
@@ -328,4 +325,3 @@ runTest({isShardedColl: true, execCtxType: execCtxTypes.kClientSessionTransactio
 runTest({isShardedColl: false, execCtxType: execCtxTypes.kNoClientSession});
 
 st.stop();
-})();

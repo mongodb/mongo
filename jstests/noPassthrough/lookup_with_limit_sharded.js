@@ -12,9 +12,13 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {
+    flattenQueryPlanTree,
+    getAggPlanStages,
+    getPlanStage,
+    getWinningPlan
+} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const st = new ShardingTest({shards: 2, config: 1});
 const db = st.s.getDB("test");
@@ -22,7 +26,7 @@ const db = st.s.getDB("test");
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE $lookup is not enabled.");
     st.stop();
-    return;
+    quit();
 }
 
 const coll = db.lookup_with_limit;
@@ -127,4 +131,3 @@ checkShardedResults(sortPipeline, 0);
 checkShardedResults(topKSortPipeline, 2);
 
 st.stop();
-}());

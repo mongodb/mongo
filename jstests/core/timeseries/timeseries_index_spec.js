@@ -9,11 +9,8 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 TimeseriesTest.run(() => {
     const collName = "timeseries_index_spec";
@@ -137,4 +134,3 @@ TimeseriesTest.run(() => {
         assert(foundIndex);
     }
 });
-}());

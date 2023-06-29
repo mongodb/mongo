@@ -3,8 +3,8 @@
  * @tags: [requires_fcv_63, serverless]
  */
 
+import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
 import {assertMigrationState, ShardSplitTest} from "jstests/serverless/libs/shard_split_test.js";
-load("jstests/libs/cluster_server_parameter_utils.js");
 
 const tenantIds = [ObjectId(), ObjectId()];
 

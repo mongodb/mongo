@@ -11,11 +11,9 @@
 // Read ops tests for partial indexes.
 
 // Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {getRejectedPlans, getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-(function() {
-"use strict";
 let explain;
 const coll = db.index_partial_read_ops;
 
@@ -137,7 +135,7 @@ const coll = db.index_partial_read_ops;
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTest.log(
         "Skipping partialFilterExpression testing for $in, $or and non-top level $and as timeseriesMetricIndexesEnabled is false");
-    return;
+    quit();
 }
 
 (function testFilterWithInExpression() {
@@ -194,5 +192,4 @@ if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     explain = coll.explain('executionStats').find({x: 3, a: 5, b: 1}).finish();
     assert.eq(1, explain.executionStats.nReturned);
     assert(isCollscan(db, getWinningPlan(explain.queryPlanner)));
-})();
 })();

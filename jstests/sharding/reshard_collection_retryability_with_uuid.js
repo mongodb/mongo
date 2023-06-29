@@ -11,11 +11,8 @@
  *   featureFlagReshardingImprovements,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/discover_topology.js");
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/parallelTester.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 
@@ -73,7 +70,7 @@ const configsvr = new Mongo(topology.configsvr.nodes[0]);
 if (!FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements")) {
     jsTestLog("Skipping test since featureFlagReshardingImprovements is not enabled");
     reshardingTest.teardown();
-    return;
+    quit();
 }
 
 const pauseBeforeCloningFP =
@@ -208,4 +205,3 @@ finalSourceCollectionUUID =
 assert.neq(newSourceCollectionUUID, finalSourceCollectionUUID);
 
 reshardingTest.teardown();
-})();

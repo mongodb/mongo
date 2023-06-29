@@ -6,11 +6,8 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStage
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 Random.setRandomSeed();
 
@@ -124,4 +121,3 @@ assertAccessPath([forwardSort], {$natural: -1}, "COLLSCAN", 1);
 assertAccessPath([backwardSort], {$natural: 1}, "COLLSCAN", -1);
 
 st.stop();
-})();

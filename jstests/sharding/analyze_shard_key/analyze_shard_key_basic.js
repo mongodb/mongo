@@ -3,10 +3,7 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/config_shard_util.js");
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 const setParameterOpts = {
     analyzeShardKeyNumRanges: 100
@@ -301,4 +298,3 @@ if (!TestData.auth) {
 
     MongoRunner.stopMongod(mongod);
 }
-})();

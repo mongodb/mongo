@@ -7,10 +7,11 @@
  *   multiversion_incompatible
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    setupReplicaSet,
+    testInvalidClusterParameterCommands,
+    testValidClusterParameterCommands,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 // Tests that set/getClusterParameter works on a non-sharded replica set.
 const rst = new ReplSetTest({
@@ -30,4 +31,3 @@ testInvalidClusterParameterCommands(rst);
 testValidClusterParameterCommands(rst);
 
 rst.stopSet();
-})();

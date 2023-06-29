@@ -8,11 +8,10 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js");
+import {
+    testClusteredCollectionBoundedScan
+} from "jstests/libs/clustered_collections/clustered_collection_bounded_scan_common.js";
 
 const conn = MongoRunner.runMongod({setParameter: {supportArbitraryClusterKeyIndex: true}});
 
@@ -23,4 +22,3 @@ const nonReplicatedColl = nonReplicatedDB[collName];
 testClusteredCollectionBoundedScan(nonReplicatedColl, {ts: 1});
 
 MongoRunner.stopMongod(conn);
-})();

@@ -3,10 +3,11 @@
 //   assumes_unsharded_collection,
 //   requires_non_retryable_writes,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For assertCoveredQueryAndCount.
+import {
+    assertCoveredQueryAndCount,
+    getWinningPlan,
+    isIndexOnly
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.index_bounds_object;
 coll.drop();
@@ -59,4 +60,3 @@ assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$gt: {}}}, proj).explain()
 assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$gte: {}}}, proj).explain().queryPlanner)));
 assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$lt: {}}}, proj).explain().queryPlanner)));
 assert(!isIndexOnly(db, getWinningPlan(coll.find({a: {$lte: {}}}, proj).explain().queryPlanner)));
-})();

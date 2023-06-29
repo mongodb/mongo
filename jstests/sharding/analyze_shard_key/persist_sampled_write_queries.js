@@ -4,10 +4,8 @@
  *
  * @tags: [requires_fcv_70]
  */
-(function() {
-"use strict";
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
-load("jstests/libs/config_shard_util.js");
 load("jstests/sharding/analyze_shard_key/libs/query_sampling_util.js");
 
 const supportedTestCases = [
@@ -231,4 +229,3 @@ function testInsertCmd(rst) {
 
     st.stop();
 }
-})();

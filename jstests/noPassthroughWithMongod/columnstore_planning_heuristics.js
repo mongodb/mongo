@@ -6,15 +6,12 @@
  *   featureFlagColumnstoreIndexes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");      // For "planHasStage."
-load("jstests/libs/columnstore_util.js");  // For "setUpServerForColumnStoreIndexTest."
+import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 load("jstests/noPassthrough/libs/server_parameter_helpers.js");  // For "setParameter."
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.columnstore_planning_heuristics;
@@ -76,4 +73,3 @@ assertColumnScanUsed({}, false, "none");
 const explain = coll.find({}, {_id: 0, a: 1}).hint({"$**": "columnstore"}).explain();
 assert(planHasStage(db, explain, "COLUMN_SCAN"),
        `Hint should have overridden heuristics to use column scan: ${tojson(explain)}`);
-})();

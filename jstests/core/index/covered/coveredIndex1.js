@@ -11,14 +11,11 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-(function() {
-"use strict";
+// Include helpers for analyzing explain output.
+import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const coll = db["jstests_coveredIndex1"];
 coll.drop();
-
-// Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
 
 assert.commandWorked(coll.insert({order: 0, fn: "john", ln: "doe"}));
 assert.commandWorked(coll.insert({order: 1, fn: "jack", ln: "doe"}));
@@ -90,4 +87,3 @@ assertIfQueryIsCovered({obj: {a: 1, b: "blah"}}, {obj: 1, _id: 0}, true);
 assert.commandWorked(coll.dropIndex({obj: 1}));
 assert.commandWorked(coll.createIndex({"obj.a": 1, "obj.b": 1}));
 assertIfQueryIsCovered({"obj.a": 1}, {obj: 1}, false);
-}());

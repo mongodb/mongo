@@ -6,13 +6,10 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 // Deliberately inserts orphans outside of migration.
 TestData.skipCheckOrphans = true;
-
-load('jstests/libs/analyze_plan.js');  // For aggPlanHasStage().
 
 // Set up a 2-shard cluster.
 const st = new ShardingTest({name: jsTestName(), shards: 2, rs: {nodes: 1}});
@@ -150,4 +147,3 @@ runSampleAndConfirmResults({
 });
 
 st.stop();
-})();

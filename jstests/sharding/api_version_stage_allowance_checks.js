@@ -9,11 +9,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
-
 const st = new ShardingTest({shards: 2});
 const mongos = st.s0;
 const dbName = jsTestName();
@@ -87,4 +82,3 @@ assert.commandWorked(result);
 })();
 
 st.stop();
-})();

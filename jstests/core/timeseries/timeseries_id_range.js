@@ -15,11 +15,8 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 TimeseriesTest.run((insert) => {
     // These dates will all be inserted into individual buckets.
@@ -240,4 +237,3 @@ TimeseriesTest.run((insert) => {
         assert.eq(3, expl.stages[0].$cursor.executionStats.totalDocsExamined);
     })();
 });
-})();

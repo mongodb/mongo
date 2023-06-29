@@ -1,10 +1,13 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_chess;
@@ -111,4 +114,3 @@ assertValueOnPlanPath("Collation", res, "child.nodeType");
 const indexNode = navigateToPlanPath(res, "child.child.leftChild");
 assertValueOnPath("IndexScan", indexNode, "nodeType");
 assertValueOnPath("minutes_1", indexNode, "indexDefName");
-}());

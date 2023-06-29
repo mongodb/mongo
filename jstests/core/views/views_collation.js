@@ -12,10 +12,7 @@
 /**
  * Tests the behavior of operations when interacting with a view's default collation.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 let viewsDB = db.getSiblingDB("views_collation");
 assert.commandWorked(viewsDB.dropDatabase());
@@ -520,4 +517,3 @@ assert.eq(3, findRes.cursor.firstBatch.length);
 explain = viewsDB.runCommand({explain: {find: "case_insensitive_view", filter: {f: "case"}}});
 assert.neq(null, explain.queryPlanner, tojson(explain));
 assert.eq(1, explain.queryPlanner.collation.strength, tojson(explain));
-}());

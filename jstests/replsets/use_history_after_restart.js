@@ -14,11 +14,6 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
-
 let replTest = new ReplSetTest({
     name: "use_history_after_restart",
     nodes: 1,
@@ -133,4 +128,3 @@ jsTestLog({"Available dneAtOldestTs result": result});
 assert.eq(1, result["cursor"]["firstBatch"].length);
 
 replTest.stopSet();
-})();

@@ -6,10 +6,6 @@
  */
 
 load('jstests/libs/chunk_manipulation_util.js');
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-'use strict';
 
 var staticMongod = MongoRunner.runMongod({});  // For startParallelOps.
 
@@ -169,4 +165,3 @@ assert(!shard1ServerStatus.sharding.migrations);
 
 st.stop();
 MongoRunner.stopMongod(staticMongod);
-})();

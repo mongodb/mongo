@@ -3,9 +3,7 @@
  *
  * This test was originally designed to reproduce SERVER-53760.
  */
-(function() {
-"use strict";
-load('jstests/libs/analyze_plan.js');  // For 'getAggPlanStage()'.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod was unable to start up");
@@ -70,4 +68,3 @@ assert.lt(dataBytesSorted, 3 * totalSize, explain);
 assert.eq(createPipeline(coll).toArray(), [{_id: 0, sumTop900UniqueValues: 94550}], explain);
 
 MongoRunner.stopMongod(conn);
-})();

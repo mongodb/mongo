@@ -1,9 +1,6 @@
 // Test that the collection catalog is restored correctly after a restart in a multitenant
 // environment.
 
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');  // For arrayEq()
 
 const rst =
@@ -71,4 +68,3 @@ assert(adminDb.auth('admin', 'pwd'));
 }
 
 rst.stopSet();
-})();

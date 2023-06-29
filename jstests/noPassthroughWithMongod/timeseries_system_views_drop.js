@@ -8,10 +8,7 @@
  *   requires_getmore,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const testDB = db.getSiblingDB("timeseries_system_views_drop");
 
@@ -39,4 +36,3 @@ TimeseriesTest.run((insert) => {
 
     assert(testDB.system.views.drop());
 });
-})();

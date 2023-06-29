@@ -7,11 +7,8 @@
  *   requires_fcv_61,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {timeseriesBucketMinCount: 1}});
 
@@ -117,4 +114,3 @@ TimeseriesTest.run((insert) => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

@@ -7,11 +7,6 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const timeFieldName = 'time';
 
 const coll = db.timeseries_list_collections_filter_name;
@@ -37,4 +32,3 @@ const collectionOptions = [{
 }];
 
 assert.eq(collections, collectionOptions);
-})();

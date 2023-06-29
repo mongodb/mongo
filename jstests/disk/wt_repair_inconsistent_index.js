@@ -4,9 +4,14 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertQueryUsesIndex,
+    assertRepairSucceeds,
+    getUriForColl,
+    getUriForIndex,
+    startMongodOnExistingPath,
+    truncateUriAndRestartMongod,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_inconsistent_index";
 const collName = "test";
@@ -115,4 +120,3 @@ let runTest = function(mongodOptions) {
 runTest({});
 runTest({directoryperdb: ""});
 runTest({wiredTigerDirectoryForIndexes: ""});
-})();

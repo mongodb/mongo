@@ -16,10 +16,7 @@
  *  tenant_migration_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -172,5 +169,4 @@ coll.drop();
     // a very similar shape, however the predicate parameters are not satisfied by the partial
     // filter expression.
     assert.eq(2, coll.find({num: {$gt: 0, $lt: 12}}).itcount());
-})();
 })();

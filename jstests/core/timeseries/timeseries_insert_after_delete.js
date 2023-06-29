@@ -8,11 +8,8 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
-load("jstests/libs/fixture_helpers.js");             // For 'FixtureHelpers'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
 
 TimeseriesTest.run((insert) => {
     const testDB = db.getSiblingDB(jsTestName());
@@ -36,4 +33,3 @@ TimeseriesTest.run((insert) => {
     assert.docEq([objB], docs);
     assert(coll.drop());
 });
-})();

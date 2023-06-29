@@ -10,13 +10,12 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");              // for getWinningPlan()
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/clustered_collections/clustered_collection_hint_common.js");
+import {
+    validateClusteredCollectionHint
+} from "jstests/libs/clustered_collections/clustered_collection_hint_common.js";
 
 const collatedName = 'clustered_collection_with_collation';
 const collated = db[collatedName];
@@ -334,4 +333,3 @@ validateClusteredCollectionHint(noncollated, {
     expectedWinningPlanStats:
         {stage: "CLUSTERED_IXSCAN", direction: "forward", minRecord: 5, maxRecord: 11}
 });
-})();

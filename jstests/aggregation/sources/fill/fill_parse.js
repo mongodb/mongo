@@ -7,9 +7,7 @@
  * ]
  */
 
-(function() {
 load("jstests/libs/fixture_helpers.js");
-load("jstests/libs/feature_flag_util.js");    // For isEnabled.
 load("jstests/aggregation/extras/utils.js");  // For anyEq and desugarSingleStageAggregation.
 
 const coll = db[jsTestName()];
@@ -256,4 +254,3 @@ for (let i = 0; i < testCases.length; i++) {
            "Test case " + i + " failed.\n" +
                "Expected:\n" + tojson(testCases[i][1]) + "\nGot:\n" + tojson(result));
 }
-})();

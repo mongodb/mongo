@@ -11,12 +11,11 @@
  * ]
  */
 
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load("jstests/libs/fixture_helpers.js");  // For isSharded.
 load('jstests/noPassthrough/libs/index_build.js');
 
-(function() {
 if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     const timeFieldName = "timestamp";
 
@@ -183,4 +182,3 @@ if (FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
                                               .explain());
     assert(isCollscan(db, getWinningPlan(findAndExplain.queryPlanner)));
 }
-})();

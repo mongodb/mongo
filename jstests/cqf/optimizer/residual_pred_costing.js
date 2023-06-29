@@ -1,13 +1,16 @@
 /**
  * Tests scenario related to SERVER-21697.
  */
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+    runWithParams,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_residual_pred_costing;
@@ -34,4 +37,3 @@ assert.eq(nDocs * 0.1, res.executionStats.nReturned);
 const indexNode = navigateToPlanPath(res, "child.leftChild");
 assertValueOnPath("IndexScan", indexNode, "nodeType");
 assertValueOnPath("a_1_b_1_c_1_d_1", indexNode, "indexDefName");
-}());

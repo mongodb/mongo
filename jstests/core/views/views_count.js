@@ -8,10 +8,7 @@
 //   requires_fcv_63,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const sbeEnabled = checkSBEEnabled(db);
 
@@ -95,4 +92,3 @@ assert.commandWorked(viewsDB.runCommand({count: "identityView", hint: "_id_"}));
 assert.commandFailedWithCode(
     viewsDB.runCommand({count: "identityView", collation: {locale: "en_US"}}),
     ErrorCodes.OptionNotSupportedOnView);
-}());

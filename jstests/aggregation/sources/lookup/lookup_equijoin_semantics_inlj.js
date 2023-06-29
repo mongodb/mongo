@@ -1,11 +1,12 @@
 /**
  * Tests for $lookup with localField/foreignField syntax using indexed nested loop join algorithm.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/sources/lookup/lookup_equijoin_semantics_lib.js");  // For runTests and
-                                                                              // runTest_*.
+import {
+    JoinAlgorithm,
+    runTest_SingleForeignRecord,
+    runTest_SingleLocalRecord,
+    runTests,
+} from "jstests/aggregation/sources/lookup/lookup_equijoin_semantics_lib.js";
 
 /**
  * Run the tests with sorted ascending/descending indexes.
@@ -147,5 +148,4 @@ runTests({
             idsExpectedToMatch: [0, 1, 2, 3, 4, 5, 6]
         });
     })();
-})();
 })();

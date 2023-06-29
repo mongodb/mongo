@@ -9,11 +9,8 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
@@ -22,7 +19,7 @@ const db = conn.getDB("sbe_plan_cache_memory_debug_info");
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 function createTestCollection(collectionName) {
@@ -103,4 +100,3 @@ assert.eq(0, classicColl.find({a: 2, b: 4}).itcount());
 assertCacheEntryIsMissingDebugInfo(classicColl, {a: 2, b: 4});
 
 MongoRunner.stopMongod(conn);
-}());

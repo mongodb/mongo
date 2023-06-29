@@ -12,10 +12,7 @@
  *   serverless,
  * ]
  */
-
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
-
-load("jstests/libs/config_shard_util.js");
 
 const st = new ShardingTest({shards: 1});
 const donorRstShard = st.rs0;

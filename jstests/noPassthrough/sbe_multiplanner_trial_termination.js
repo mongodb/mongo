@@ -3,10 +3,7 @@
  * demonstrates that unlike the classic multiplanner, the SBE multiplanner's end condition is by
  * default not proportional to the size of the collection.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const numDocs = 1000;
 const dbName = "sbe_multiplanner_db";
@@ -28,7 +25,7 @@ const db = conn.getDB(dbName);
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 const coll = db[collName];
 
@@ -120,4 +117,3 @@ allPlans = getAllPlansExecution("2");
 verifySbeNumReads(allPlans, trialLengthFromCollFrac);
 
 MongoRunner.stopMongod(conn);
-}());

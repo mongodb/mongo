@@ -7,10 +7,7 @@
  *   featureFlagTransitionToCatalogShard,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/config_shard_util.js");
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/write_concern_util.js");
 
@@ -347,4 +344,3 @@ const newShardName =
 
 st.stop();
 newShardRS.stopSet();
-}());

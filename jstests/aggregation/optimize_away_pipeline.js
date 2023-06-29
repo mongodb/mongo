@@ -14,13 +14,18 @@
 //   requires_pipeline_optimization,
 //   requires_profiling,
 // ]
-(function() {
-"use strict";
-
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // For isWiredTiger.
-load("jstests/libs/analyze_plan.js");     // For 'aggPlanHasStage' and other explain helpers.
+
+import {
+    getPlanStages,
+    getAggPlanStage,
+    aggPlanHasStage,
+    planHasStage,
+    isAggregationPlan,
+    isQueryPlan,
+} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");  // For 'isMongos' and 'isSharded'.
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.optimize_away_pipeline;
 coll.drop();
@@ -799,4 +804,3 @@ if (!FixtureHelpers.isMongos(db) && isWiredTiger(db)) {
             [{op: "query", ns: view.getFullName()}, {op: "getmore", ns: view.getFullName()}]);
     }
 }
-}());

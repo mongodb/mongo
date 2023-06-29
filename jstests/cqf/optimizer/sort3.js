@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_sort3;
@@ -23,4 +21,3 @@ t.createIndex({a: 1, b: -1});
     const resIndexScan = t.find({a: {$gte: 2}}).sort({a: 1, b: -1}).hint({a: 1, b: -1}).toArray();
     assert.eq(resCollScan, resIndexScan);
 }
-}());

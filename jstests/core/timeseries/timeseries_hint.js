@@ -13,11 +13,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_hint;
 coll.drop();
@@ -89,4 +85,3 @@ runTest({
     expectedResult: docsDesc,
     expectedDirection: 'backward',
 });
-})();

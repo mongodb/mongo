@@ -8,12 +8,9 @@
 //  requires_replication,
 //  requires_majority_read_concern,
 // ]
-(function() {
-"use strict";
-
 load('jstests/replsets/rslib.js');                 // For getLatestOp, getFirstOplogEntry.
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropAndRecreateCollection.
-load("jstests/libs/feature_flag_util.js");         // For FeatureFlagUtil.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const docA = {
     _id: 12345,
@@ -188,4 +185,3 @@ rst.nodes.forEach((node) => {
 });
 
 rst.stopSet();
-}());

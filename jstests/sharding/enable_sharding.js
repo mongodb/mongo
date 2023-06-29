@@ -2,11 +2,6 @@
 // Basic tests for enableSharding command.
 //
 
-(function() {
-'use strict';
-
-load("jstests/libs/feature_flag_util.js");  // for FeatureFlagUtil.isEnabled
-
 var st = new ShardingTest({shards: 2});
 
 jsTest.log('enableSharding can run only against the admin database');
@@ -90,4 +85,3 @@ jsTest.log(
 }
 
 st.stop();
-})();

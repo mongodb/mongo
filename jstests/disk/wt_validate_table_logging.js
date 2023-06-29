@@ -5,10 +5,7 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 let conn = MongoRunner.runMongod();
 
@@ -93,4 +90,3 @@ if (csiEnabled) {
 }
 
 MongoRunner.stopMongod(conn, null, {skipValidation: true});
-}());

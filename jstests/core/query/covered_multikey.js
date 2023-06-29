@@ -8,11 +8,8 @@
 /**
  * Test covering behavior for queries over a multikey index.
  */
-(function() {
-"use strict";
-
 // For making assertions about explain output.
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getWinningPlan, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 let coll = db.covered_multikey;
 coll.drop();
@@ -117,4 +114,3 @@ winningPlan = getWinningPlan(explainRes.queryPlanner);
 ixscanStage = getPlanStage(winningPlan, "IXSCAN");
 assert.neq(null, ixscanStage);
 assert.eq(true, ixscanStage.isMultiKey);
-}());

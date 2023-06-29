@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');  // For planHasStage.
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 
 const st = new ShardingTest({shards: 2});
 const mongosDB = st.s.getDB("test");
@@ -66,4 +63,3 @@ const shardDB = st.shard0.getDB(mongosDB.getName());
 explain = shardDB[coll.getName()].explain().aggregate([{$match: {}}]);
 assert(!planHasStage(shardDB, explain.queryPlanner.winningPlan, "SHARDING_FILTER"), explain);
 st.stop();
-}());

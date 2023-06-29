@@ -1,7 +1,4 @@
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For assertValueOnPlanPath.
+import {assertValueOnPlanPath} from "jstests/libs/optimizer_utils.js";
 
 const t = db.cqf_value_elemMatch;
 t.drop();
@@ -42,4 +39,3 @@ assert.commandWorked(t.createIndex({a: 1}));
     assert.eq(0, res.executionStats.nReturned);
     assertValueOnPlanPath("CoScan", res, "child.child.child.nodeType");
 }
-}());

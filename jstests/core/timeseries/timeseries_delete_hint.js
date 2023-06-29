@@ -17,11 +17,7 @@
  *   uses_parallel_shell,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/curop_helpers.js");
-load("jstests/libs/feature_flag_util.js");
 load('jstests/libs/parallel_shell_helpers.js');
 
 const timeFieldName = "time";
@@ -208,4 +204,3 @@ validateDeleteIndex([objA, objB, objC],
                     [{[metaFieldName]: -1}, {[timeFieldName]: 1}],
                     "IXSCAN { control.min.time: 1, control.max.time: 1 }",
                     {expectedErrorCode: ErrorCodes.BadValue});
-})();

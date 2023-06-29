@@ -9,10 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_simple;
@@ -117,4 +114,3 @@ TimeseriesTest.run((insert) => {
                      'invalid bucket data for field ' + key + ': ' + tojson(bucketDoc));
     });
 });
-})();

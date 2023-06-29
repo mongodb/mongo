@@ -10,10 +10,12 @@
  * change as a result of updates to estimation, since estimates for bucket boundaries should always
  * be accurate.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ce_stats_utils.js');
+import {
+    createAndValidateHistogram,
+    runHistogramsTest,
+    verifyCEForMatch
+} from "jstests/libs/ce_stats_utils.js";
+import {forceCE} from "jstests/libs/optimizer_utils.js";
 
 const charCodeA = 65;
 const collName = "ce_histogram";
@@ -253,4 +255,3 @@ runHistogramsTest(function testScalarHistograms() {
     verifyCEForNDV(3);
     verifyCEForNDV(4);
 });
-}());

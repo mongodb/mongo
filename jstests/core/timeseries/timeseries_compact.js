@@ -13,10 +13,7 @@
  *   uses_compact,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run(() => {
     const coll = db.timeseries_compact;
@@ -34,4 +31,3 @@ TimeseriesTest.run(() => {
     assert.commandWorked(db.runCommand({compact: coll.getName(), force: true}));
     assert.commandWorked(db.runCommand({compact: "system.buckets." + coll.getName(), force: true}));
 });
-})();

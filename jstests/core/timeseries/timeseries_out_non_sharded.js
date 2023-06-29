@@ -12,10 +12,7 @@
  *   featureFlagAggOutTimeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries_agg_helpers.js");
+import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
 
 const numHosts = 10;
 const numIterations = 20;
@@ -168,4 +165,3 @@ if (!FixtureHelpers.isMongos(testDB)) {  // can not shard a view.
     assert.throwsWithCode(() => inColl.aggregate(pipeline), 7268703);
     assert.throwsWithCode(() => observerInColl.aggregate(pipeline), 7268703);
 }
-})();

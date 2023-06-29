@@ -5,9 +5,12 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
+import {
+    assertQueryUsesIndex,
+    assertRepairSucceeds,
+    startMongodOnExistingPath
+} from "jstests/disk/libs/wt_file_helper.js";
 
-load('jstests/disk/libs/wt_file_helper.js');
 load("jstests/libs/uuid_util.js");
 
 const baseName = "repair_duplicate_keys";
@@ -255,5 +258,4 @@ runRepairAndVerifyCollectionDocs();
 
     MongoRunner.stopMongod(mongod);
     jsTestLog("Exiting checkLostAndFoundCollForDoubleDup.");
-})();
 })();

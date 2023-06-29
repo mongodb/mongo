@@ -5,11 +5,14 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanCacheKeyFromShape.
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {
+    getAggPlanStage,
+    getCachedPlan,
+    getPlanCacheKeyFromShape,
+    getPlanStage,
+    getPlanStages,
+} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(null, conn, "mongod failed to start up");
@@ -182,4 +185,3 @@ assert.commandWorked(testDb.runCommand({planCacheClear: coll.getName()}));
 assert.eq(0, coll.aggregate([{$planCacheStats: {}}]).itcount());
 
 MongoRunner.stopMongod(conn);
-}());

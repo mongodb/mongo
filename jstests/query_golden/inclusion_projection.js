@@ -3,10 +3,11 @@
  * jstests/cqf/projection.js; both tests will exist pending a decision about the future of golden
  * jstesting for CQF.
  */
-
-(function() {
-"use strict";
-load("jstests/query_golden/libs/projection_helpers.js");
+import {
+    getIdProjectionDocs,
+    getProjectionDocs,
+    runProjectionsAgainstColl
+} from "jstests/query_golden/libs/projection_helpers.js";
 
 const coll = db.cqf_inclusion_project;
 
@@ -42,4 +43,3 @@ const idInclusionProjSpecs = [
 ];
 const idIndexes = [{"_id.a": 1}, {"_id.a": 1, "_id.b": 1}, {"_id.a.b": 1}];
 runProjectionsAgainstColl(coll, getIdProjectionDocs(), idIndexes, idInclusionProjSpecs);
-}());

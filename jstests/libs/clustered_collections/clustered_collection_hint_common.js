@@ -1,12 +1,10 @@
 /**
  * Validate $hint on a clustered collection.
  */
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/collection_drop_recreate.js");
 
-function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
-    "use strict";
-    load("jstests/libs/analyze_plan.js");
-    load("jstests/libs/collection_drop_recreate.js");
-
+export function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     const clusterKeyFieldName = Object.keys(clusterKey)[0];
     const batchSize = 100;
 
@@ -365,7 +363,7 @@ function testClusteredCollectionHint(coll, clusterKey, clusterKeyName) {
     return testHint(coll, clusterKey, clusterKeyName);
 }
 
-function validateClusteredCollectionHint(
+export function validateClusteredCollectionHint(
     coll,
     {expectedNReturned, cmd, expectedWinningPlanStats = {}, unexpectedWinningPlanStats = []}) {
     const explain = assert.commandWorked(coll.runCommand({explain: cmd}));

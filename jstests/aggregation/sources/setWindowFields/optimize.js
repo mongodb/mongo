@@ -7,10 +7,7 @@
  *   requires_pipeline_optimization,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');
+import {aggPlanHasStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 // Find how many stages of the plan are 'stageName'.
 function numberOfStages(explain, stageName) {
@@ -225,4 +222,3 @@ const explain13 = coll.explain().aggregate([
     {$sort: {a: {$meta: "textScore"}}},
 ]);
 assert.eq(2, numberOfStages(explain13, '$sort'), explain13);
-})();

@@ -9,10 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/core/timeseries/libs/timeseries.js');
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_collation;
@@ -93,4 +90,3 @@ TimeseriesTest.run((insert) => {
     assert.eq(buckets[2].control.max.x, null);
     assert.eq(buckets[2].control.max.y, null);
 });
-})();

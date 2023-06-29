@@ -6,11 +6,9 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
 load('jstests/libs/dateutil.js');
-load('jstests/libs/ttl_util.js');
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 // Run TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
@@ -103,4 +101,3 @@ insertAndValidateTTL(replicatedColl, "ttlField");
 replicatedColl.drop();
 
 MongoRunner.stopMongod(conn);
-})();

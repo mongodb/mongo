@@ -1,6 +1,4 @@
-'use strict';
-
-load('jstests/libs/check_metadata_consistency_helpers.js');  // For MetadataConsistencyChecker
+import {MetadataConsistencyChecker} from "jstests/libs/check_metadata_consistency_helpers.js";
 
 ShardingTest.prototype.checkMetadataConsistency = function() {
     if (jsTest.options().skipCheckMetadataConsistency) {

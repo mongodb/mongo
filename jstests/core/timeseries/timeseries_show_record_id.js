@@ -6,10 +6,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const timeFieldName = "time";
@@ -59,4 +56,3 @@ TimeseriesTest.run((insert) => {
     const bucketsColl = db.getCollection("system.buckets." + coll.getName());
     checkRecordId(bucketsColl.find().showRecordId().toArray());
 });
-})();

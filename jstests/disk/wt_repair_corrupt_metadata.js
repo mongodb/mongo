@@ -5,9 +5,7 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {assertRepairSucceeds, startMongodOnExistingPath} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_corrupt_metadata";
 const collName = "test";
@@ -100,4 +98,3 @@ let runTest = function(mongodOptions) {
 };
 
 runTest({});
-})();

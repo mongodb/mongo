@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled, navigateToPlanPath} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_project_expr_dependency;
@@ -23,4 +21,3 @@ const res = t.explain("executionStats").aggregate([
 // Demonstrate we only need to read "b1" and "c1" from the collection.
 const scanNodeProjFieldMap = navigateToPlanPath(res, "child.child.fieldProjectionMap");
 assert.eq(["b1", "c1"], Object.keys(scanNodeProjFieldMap));
-}());

@@ -7,11 +7,8 @@
 /**
  * Tests for JSON Schema document validation.
  */
-(function() {
-"use strict";
-
 load("jstests/libs/assert_schema_match.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const isSBEEnabled = checkSBEEnabled(db);
 
@@ -344,4 +341,3 @@ if (!isSBEEnabled) {
 }
 assert.eq(1, coll.find({$alwaysTrue: 1, b: 2}).itcount());
 assert.eq(0, coll.find({$alwaysFalse: 1, b: 2}).itcount());
-}());

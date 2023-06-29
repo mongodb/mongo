@@ -4,9 +4,7 @@
  * @tags: [requires_wiredtiger]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {getUriForColl} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "wt_repair_orphaned_idents";
 const dbpath = MongoRunner.dataPath + baseName + "/";
@@ -83,4 +81,3 @@ for (let entry of res.cursor.firstBatch) {
 }
 
 MongoRunner.stopMongod(mongod);
-})();

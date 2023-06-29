@@ -6,10 +6,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -145,4 +142,3 @@ if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(testDB)) {
         expireAfterSeconds: NumberLong(100),
     });
 }
-})();

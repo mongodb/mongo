@@ -1,7 +1,4 @@
-(function() {
-'use strict';
-
-load('jstests/libs/feature_flag_util.js');
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 function collectionExists(shard, dbName, collName) {
     return Array.contains(shard.getDB(dbName).getCollectionNames(), collName);
@@ -156,4 +153,3 @@ jsTest.log('Test that metadata has changed');
 }
 
 st.stop();
-})();

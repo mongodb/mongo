@@ -1,10 +1,13 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+    runWithParams,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_index_intersect;
@@ -53,4 +56,3 @@ joinNode = navigateToPlanPath(res, "child.leftChild");
 assertValueOnPath("HashJoin", joinNode, "nodeType");
 assertValueOnPath("IndexScan", joinNode, "leftChild.nodeType");
 assertValueOnPath("IndexScan", joinNode, "rightChild.children.0.child.nodeType");
-}());

@@ -6,11 +6,8 @@
 //  do_not_wrap_aggregations_in_facets,
 //  requires_pipeline_optimization,
 // ]
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');
-load("jstests/libs/analyze_plan.js");
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");
 
 const coll = db.graphlookup_rewrite;
@@ -322,4 +319,3 @@ assertStagesAndOutput({
     msg: "$graphLookup with an internal $unwind should not swap with $sort",
     fieldsToSkip: ["out"]
 });
-})();

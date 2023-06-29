@@ -54,8 +54,6 @@
  * ]
  */
 
-(function() {
-load("jstests/core/timeseries/libs/timeseries.js");
 const numShards = 2;
 const st = new ShardingTest({shards: numShards});
 
@@ -247,4 +245,3 @@ verifyClusterCollStatsResult(
 );
 
 st.stop();
-})();

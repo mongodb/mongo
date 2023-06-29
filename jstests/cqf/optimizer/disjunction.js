@@ -1,13 +1,15 @@
 /**
  * Test that $or is translated to a SargableNode, and executed with correct results.
  */
-(function() {
-"use strict";
+import {
+    checkCascadesOptimizerEnabled,
+    removeUUIDsFromExplain,
+    runWithParams
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_disjunction;
@@ -306,4 +308,3 @@ IndexScan [{'<rid>': rid_1}, scanDefName: cqf_disjunction_, indexDefName: a_1, i
                "Query returned a doc not matching the predicate: ${doc}");
     }
 }
-}());

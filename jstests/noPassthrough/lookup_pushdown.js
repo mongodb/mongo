@@ -3,11 +3,14 @@
  *
  * @tags: [requires_sharding, uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
-load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages' and other explain helpers.
+import {
+    aggPlanHasStage,
+    getAggPlanStage,
+    getAggPlanStages,
+    hasRejectedPlans,
+    planHasStage,
+} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const JoinAlgorithm = {
     Classic: 0,
@@ -116,7 +119,7 @@ const sbeEnabled = checkSBEEnabled(db);
 if (!sbeEnabled) {
     jsTestLog("Skipping test because SBE is disabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 let coll = db[name];
@@ -1025,4 +1028,3 @@ assert.commandWorked(db.createView(shardedViewName, name, [{$match: {b: {$gte: 0
             JoinAlgorithm.Classic /* expectedJoinAlgorithm */);
 }());
 st.stop();
-}());

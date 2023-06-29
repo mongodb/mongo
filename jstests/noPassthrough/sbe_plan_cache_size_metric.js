@@ -13,11 +13,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
-load("jstests/libs/analyze_plan.js");  // For 'getQueryHashFromExplain()'.
+import {getQueryHashFromExplain} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 assert.neq(conn, null, "mongod failed to start");
@@ -26,7 +23,7 @@ const db = conn.getDB("sbe_plan_cache_size_metric");
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 function getCacheEntriesByQueryHashKey(coll, queryHash) {
@@ -109,4 +106,3 @@ assert.commandWorked(db.runCommand({planCacheClear: collectionName, query: sbeQu
 assert.eq(initialPlanCacheSize, getPlanCacheSize());
 
 MongoRunner.stopMongod(conn);
-})();

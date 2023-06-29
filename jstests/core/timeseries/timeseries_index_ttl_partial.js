@@ -9,15 +9,12 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db.getMongo())) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesScalabilityImprovements feature flag is not enabled.");
-    return;
+    quit();
 }
 
 const collName = "timeseries_index_ttl_partial";
@@ -149,4 +146,3 @@ const resetTsColl = function(extraOptions = {}) {
                                      ErrorCodes.CannotCreateIndex);
     }
 }());
-})();

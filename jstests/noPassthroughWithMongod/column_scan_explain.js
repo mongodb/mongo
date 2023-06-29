@@ -5,15 +5,13 @@
  *   featureFlagColumnstoreIndexes,
  * ]
  */
-(function() {
-"use strict";
-
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq
-load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
-load("jstests/libs/columnstore_util.js");     // For setUpServerForColumnStoreIndexTest.
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.column_scan_explain;
@@ -267,5 +265,4 @@ assert.commandWorked(coll.insertMany(docs, {ordered: false}));
                       null /* valueComparator */,
                       ["stage", "planNodeId"]),
            `Mismatching column scan plan stage ${tojson(columnScanPlanStages[0])}`);
-}());
 }());

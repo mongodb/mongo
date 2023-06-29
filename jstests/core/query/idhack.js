@@ -3,15 +3,12 @@
 //   requires_multi_updates,
 //   requires_non_retryable_writes,
 // ]
-(function() {
-"use strict";
+// Include helpers for analyzing explain output.
+import {getWinningPlan, isIdhack} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const t = db.idhack;
 t.drop();
-
-// Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
 
 assert.commandWorked(t.insert({_id: {x: 1}, z: 1}));
 assert.commandWorked(t.insert({_id: {x: 2}, z: 2}));
@@ -114,4 +111,3 @@ assert.eq(0, t.find({_id: 1}).hint({_id: 1}).min({_id: 2}).itcount());
 explain = t.find({_id: 2}).hint({_id: 1}).min({_id: 1}).max({_id: 3}).explain();
 winningPlan = getWinningPlan(explain.queryPlanner);
 assert(!isIdhack(db, winningPlan), winningPlan);
-})();

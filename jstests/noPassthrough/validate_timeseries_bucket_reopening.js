@@ -7,10 +7,7 @@
  *
  * @tags: [requires_replication]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load("jstests/libs/fail_point_util.js");
 
 const rst = new ReplSetTest({nodes: 1});
@@ -24,7 +21,7 @@ if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
     rst.stopSet();
     jsTestLog(
         'Skipping test because the TimeseriesScalabilityImprovements feature flag is disabled.');
-    return;
+    quit();
 }
 
 const collNamePrefix = db.validate_timeseries_bucket_reopening_;
@@ -110,4 +107,3 @@ validateBucketReopening(metaFieldName2);
 
 fpSameStripe.off();
 rst.stopSet();
-})();

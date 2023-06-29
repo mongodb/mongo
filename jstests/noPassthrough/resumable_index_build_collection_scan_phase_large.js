@@ -9,12 +9,9 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const dbName = "test";
 
@@ -71,4 +68,3 @@ if (columnstoreEnabled) {
         [{numScannedAfterResume: numDocuments - maxIndexBuildMemoryUsageMB}]);
 }
 rst.stopSet();
-})();

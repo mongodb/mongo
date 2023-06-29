@@ -7,10 +7,7 @@
  * requires_external_data_source
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // for aggPlanHasStage()
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 // Runs tests on a standalone mongod.
 let conn = MongoRunner.runMongod({setParameter: {enableComputeMode: true}});
@@ -503,4 +500,3 @@ if (hostInfo.os.type != "Windows") {
         }, "Expected mongod died due to an error", 120 * 1000);
     })();
 }
-})();

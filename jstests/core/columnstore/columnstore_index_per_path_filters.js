@@ -16,16 +16,12 @@
  *   not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For "resultsEq."
-load("jstests/libs/analyze_plan.js");         // For "planHasStage."
-load("jstests/libs/sbe_explain_helpers.js");  // For getSbePlanStages.
-load("jstests/libs/columnstore_util.js");     // For "setUpServerForColumnStoreIndexTest."
+import {getSbePlanStages} from "jstests/libs/sbe_explain_helpers.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll_filters = db.columnstore_index_per_path_filters;
@@ -1060,5 +1056,4 @@ function testInExpr(test) {
     assert.lt(x.numSeeks + y.numSeeks,
               2 * expectedToMatchCount,
               "Number of seeks in filtered columns should be small");
-})();
 })();

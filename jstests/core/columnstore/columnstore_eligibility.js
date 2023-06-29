@@ -17,15 +17,12 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
-load("jstests/libs/fixture_helpers.js");   // For FixtureHelpers.isMongos.
+import {aggPlanHasStage, planHasStage} from "jstests/libs/analyze_plan.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos.
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.columnstore_eligibility;
@@ -254,4 +251,3 @@ assert.commandFailedWithCode(db.runCommand({
     hint: {"a.$**": "columnstore"}
 }),
                              6714002);
-}());

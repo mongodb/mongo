@@ -3,10 +3,7 @@
  */
 
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load('jstests/libs/optimizer_utils.js');
-
-(function() {
-"use strict";
+import {usedBonsaiOptimizer} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_match_with_in;
 coll.drop();
@@ -84,4 +81,3 @@ const tests = [
 for (const testData of tests) {
     runTest(testData.filter, testData.expected);
 }
-}());

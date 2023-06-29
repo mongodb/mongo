@@ -7,14 +7,11 @@
  *   assumes_against_mongod_not_mongos,
  * ]
  */
-(function() {
-"use strict";
-
 load('jstests/libs/collection_drop_recreate.js');  // For 'assertDropAndRecreateCollection' and
                                                    // 'assertDropCollection'.
 load('jstests/libs/change_stream_util.js');        // For 'ChangeStreamTest' and
                                                    // 'assertChangeStreamEventEq'.
-load("jstests/libs/columnstore_util.js");          // For setUpServerForColumnStoreIndexTest.
+import {safeToCreateColumnStoreIndex} from "jstests/libs/columnstore_util.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 
@@ -180,4 +177,3 @@ runTest((() => cst.startWatchingChanges({pipeline, collection: 1})), true);
 
 // Run the test using a single collection change stream on a non-empty collection.
 runTest((() => cst.startWatchingChanges({pipeline, collection: collName})), true);
-}());

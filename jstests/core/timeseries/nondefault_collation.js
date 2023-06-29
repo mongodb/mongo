@@ -19,10 +19,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {aggPlanHasStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.timeseries_nondefault_collation;
 const bucketsColl = db.getCollection('system.buckets.' + coll.getName());
@@ -213,5 +210,4 @@ const insensitive = {
     // Numeric queries that don't rely on collation should do index scan.
     query = coll.find({meta: 1}).explain();
     assert(aggPlanHasStage(query, "IXSCAN"), query);
-}());
 }());

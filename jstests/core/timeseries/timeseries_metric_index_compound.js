@@ -8,16 +8,13 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
+    quit();
 }
 
 TimeseriesTest.run((insert) => {
@@ -203,4 +200,3 @@ TimeseriesTest.run((insert) => {
     testBadIndexForData({[metaFieldName + ".loc2"]: "2d", a: 1});
     testBadIndexForData({[metaFieldName + ".r"]: "hashed", a: 1});
 });
-}());

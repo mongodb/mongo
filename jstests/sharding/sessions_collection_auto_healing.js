@@ -6,10 +6,6 @@
  * ]
  */
 load('jstests/libs/sessions_collection.js');
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-"use strict";
 
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 
@@ -172,4 +168,3 @@ var shardConfig = shard.getDB("config");
 
 st.stop();
 rs.stopSet();
-})();

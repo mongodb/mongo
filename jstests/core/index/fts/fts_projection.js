@@ -3,10 +3,7 @@
 //   assumes_read_concern_local,
 // ]
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 var t = db.getSiblingDB("test").getCollection("fts_projection");
 t.drop();
@@ -122,4 +119,3 @@ assert(results[0].score,
        "invalid text score for " + tojson(results[0], '', true) + " when $text is in $or");
 assert(results[1].score,
        "invalid text score for " + tojson(results[0], '', true) + " when $text is in $or");
-})();

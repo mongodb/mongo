@@ -19,10 +19,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest
-load("jstests/aggregation/extras/utils.js");         // For getExplainedPipelineFromAggregation
+load("jstests/aggregation/extras/utils.js");  // For getExplainedPipelineFromAggregation
 
 const collName = "timeseries_bucket_unpacking_with_limit";
 const coll = db[collName];
@@ -161,4 +158,3 @@ assertPlanStagesInPipeline({
     expectedStages: ["$_internalUnpackBucket", "$limit", "$sort"],
     onlyMeta: true
 });
-})();

@@ -2,10 +2,7 @@
  * Tests that the telemetry store can be resized if it is configured, and cannot be resized if it is
  * disabled.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (FeatureFlagUtil.isEnabled(db, "QueryStats")) {
     function testTelemetrySetting(paramName, paramValue) {
@@ -30,4 +27,3 @@ if (FeatureFlagUtil.isEnabled(db, "QueryStats")) {
     assert.commandFailedWithCode(
         db.adminCommand({setParameter: 1, internalQueryStatsRateLimit: 2147483647}), 7506200);
 }
-}());

@@ -1,12 +1,9 @@
 // Test that currentOp works as expected in a multitenant environment.
 // @tags: [requires_fcv_62]
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');     // For arrayEq()
 load("jstests/libs/fail_point_util.js");         // For configureFailPoint()
 load("jstests/libs/parallel_shell_helpers.js");  // For funWithArgs()
-load("jstests/libs/feature_flag_util.js");       // for isEnabled
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const kTenant = ObjectId();
 const kOtherTenant = ObjectId();
@@ -241,4 +238,3 @@ tokenConn._setSecurityToken(securityToken);
 }
 
 rst.stopSet();
-})();

@@ -21,24 +21,22 @@
  *   not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load("jstests/libs/sbe_util.js");             // For checkSBEEnabled.
-// For areAllCollectionsClustered.
-load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
+load(
+    "jstests/libs/clustered_collections/clustered_collection_util.js");  // For
+                                                                         // areAllCollectionsClustered.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const columnstoreEnabled =
     checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"], true /* checkAllNodes */);
 if (!columnstoreEnabled) {
     jsTestLog("Skipping columnstore index test since the feature flag is not enabled.");
-    return;
+    quit();
 }
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const indexedColl = db.column_scan_skip_row_store_projection_indexed;
@@ -254,4 +252,3 @@ function runAllAggregations() {
 
 setupCollections();
 runAllAggregations();
-}());

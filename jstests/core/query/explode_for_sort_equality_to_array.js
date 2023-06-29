@@ -10,10 +10,7 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const testDB = db.getSiblingDB(jsTestName());
 assert.commandWorked(testDB.dropDatabase());
@@ -28,4 +25,3 @@ const explain = assert.commandWorked(
 assert.gt(
     getPlanStages(getWinningPlan(explain.queryPlanner), "SORT_MERGE").length, 0, tojson(explain));
 assert.eq(1, explain.executionStats.nReturned, tojson(explain));
-}());

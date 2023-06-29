@@ -16,11 +16,7 @@
  * ]
  */
 
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-"use strict";
+import {getWinningPlan, isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 
 // Tests the functionality for committed reads for the given read concern level.
 function testReadConcernLevel(level) {
@@ -272,4 +268,3 @@ MongoRunner.stopMongod(conn);
 if (supportsCommittedReads) {
     testReadConcernLevel("majority");
 }
-}());

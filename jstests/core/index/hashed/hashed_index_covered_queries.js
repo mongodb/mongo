@@ -8,11 +8,8 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.compound_hashed_index;
 coll.drop();
@@ -104,4 +101,3 @@ validateCountCmdOutputAndPlan(
 // COUNT_SCAN.
 validateCountCmdOutputAndPlan(
     {filter: {a: {$gt: 25, $lt: 29}}, expectedStages: ["COUNT_SCAN"], expectedOutput: 3});
-})();

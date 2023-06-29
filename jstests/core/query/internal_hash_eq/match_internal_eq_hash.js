@@ -6,10 +6,8 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
+import {isCollscan, isIxscan} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");         // For 'isCollscan()' and similar.
 load("jstests/aggregation/extras/utils.js");  // For 'resultsEq().'
 
 const coll = db.match_internal_eq_hash;
@@ -149,4 +147,3 @@ const coll = db.match_internal_eq_hash;
             db.runCommand({find: "match_internal_eq_hash", filter: {a: {$_internalEqHash: v}}}), 2);
     });
 })();
-}());

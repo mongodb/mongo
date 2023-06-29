@@ -4,11 +4,7 @@
  * @tags: [requires_fcv_70]
  */
 
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/feature_flag_util.js");
 
 const latest = "latest";
 const testName = "fcv_upgrade_fails_during_is_cleaning_server_metadata";
@@ -148,4 +144,3 @@ function runShardedClusterTest() {
 runStandaloneTest();
 runReplicaSetTest();
 runShardedClusterTest();
-})();

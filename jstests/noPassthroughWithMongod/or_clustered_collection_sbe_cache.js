@@ -2,11 +2,8 @@
  * Verifies that $or queries on clustered collections that have plans with IXSCAN and
  * CLUSTERED_IXSCAN stages does not use the SBE plan cache.
  */
-(function() {
-"use strict";
-
 load("jstests/libs/collection_drop_recreate.js");  // For assertDropCollection.
-load("jstests/libs/sbe_util.js");                  // for checkSBEEnabled
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const mongod = MongoRunner.runMongod();
 const dbName = "test";
@@ -124,4 +121,3 @@ validatePlanCacheEntries({
 });
 
 MongoRunner.stopMongod(mongod);
-}());

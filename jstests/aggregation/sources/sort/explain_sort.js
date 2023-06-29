@@ -5,10 +5,7 @@
 //   # Asserts on the number of documents examined in an explain plan.
 //   assumes_no_implicit_index_creation
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
+import {getAggPlanStages, isQueryPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.explain_sort;
 coll.drop();
@@ -70,4 +67,3 @@ for (let verbosity of ["queryPlanner", "executionStats", "allPlansExecution"]) {
     pipeline = [{$project: {_id: 1}}, {$limit: 5}];
     checkResults(coll.explain(verbosity).aggregate(pipeline), verbosity, optimizeDisabled ? 10 : 5);
 }
-})();

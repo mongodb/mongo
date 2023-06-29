@@ -10,10 +10,20 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries_writes_util.js");
+import {
+    doc2_a_f101,
+    doc3_a_f102,
+    doc4_b_f103,
+    doc6_c_f105,
+    generateTimeValue,
+    getCallerName,
+    getTestDB,
+    metaFieldName,
+    prepareShardedCollection,
+    setUpShardedCluster,
+    st,
+    timeFieldName
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
 
 setUpShardedCluster();
 const testDB = getTestDB();
@@ -221,4 +231,3 @@ const runTest = function({
 })();
 
 st.stop();
-})();

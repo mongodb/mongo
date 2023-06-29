@@ -10,10 +10,7 @@
  * will update the index entries associated with that document.
  */
 
-load("jstests/libs/analyze_plan.js");  // For 'isIndexOnly'.
-
-(function() {
-"use strict";
+import {isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 var coll = db.index_type_change;
 coll.drop();
@@ -40,4 +37,3 @@ assert(isIndexOnly(db, explain));
 var updated = coll.findOne({a: 2}, {_id: 0, a: 1});
 
 assert(updated.a instanceof NumberLong, "Index entry did not change type");
-})();

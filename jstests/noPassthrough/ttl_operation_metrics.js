@@ -5,12 +5,9 @@
  *   requires_replication,
  * ]
  */
-(function() {
-'use strict';
-
 load('jstests/noPassthrough/libs/index_build.js');  // For IndexBuildTest
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 var rst = new ReplSetTest({
     nodes: 2,
@@ -116,4 +113,3 @@ assert.eq(primaryDB[collName].count({}), 1);
 assert.eq(secondaryDB[collName].count({}), 1);
 
 rst.stopSet();
-}());

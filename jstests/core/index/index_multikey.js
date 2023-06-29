@@ -5,11 +5,8 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
 // For making assertions about explain output.
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.getCollection("index_multikey");
 coll.drop();
@@ -37,4 +34,3 @@ assert.eq(ixscan.isMultiKey,
 assert.eq(ixscan.multiKeyPaths,
           {a: ["a"], b: []},
           "index has wrong multikey paths after insert; plan: " + ixscan);
-})();

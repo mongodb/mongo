@@ -12,7 +12,7 @@ load("jstests/libs/fixture_helpers.js");    // For 'isMongos'
  * If 'checkAllNodes` is true, explicitly checks if feature flags are enabled for all
  * nodes.
  */
-function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false) {
+export function checkSBEEnabled(theDB, featureFlags = [], checkAllNodes = false) {
     // By default, we find that SBE is enabled. If, for any node, we find that the classic engine is
     // on, `checkResult` will be set to false. This is done intentionally so that in the event that
     // we check all nodes, the effects from previously visited nodes will carry over into the rest.

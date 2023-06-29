@@ -10,10 +10,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load('jstests/core/timeseries/libs/timeseries.js');
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_out_of_order_';
@@ -68,4 +65,3 @@ TimeseriesTest.run((insert) => {
         assert.eq(buckets[1].control.max[timeFieldName], times[2]);
     });
 });
-})();

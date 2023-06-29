@@ -1,12 +1,9 @@
-(function() {
-"use strict";
-
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_agg_expr;
@@ -136,4 +133,3 @@ const t = db.cqf_agg_expr;
         assertArrayEq({actual: res, expected: [{_id: 0, a: 1}, {_id: 1, a: 2}, {_id: 2, a: 3}]});
     }
 }
-}());

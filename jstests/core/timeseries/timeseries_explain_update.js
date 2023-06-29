@@ -15,11 +15,16 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getPlanStage() and getExecutionStages().
-load("jstests/core/timeseries/libs/timeseries_writes_util.js");
+import {
+    getCallerName,
+    getTestDB,
+    makeBucketFilter,
+    metaFieldName,
+    prepareCollection,
+    timeFieldName
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {getExecutionStages, getPlanStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const dateTime = ISODate("2021-07-12T16:00:00Z");
 
@@ -286,4 +291,3 @@ if (FeatureFlagUtil.isPresentAndEnabled(db, "UpdateOneWithoutShardKey")) {
         });
     })();
 }
-})();

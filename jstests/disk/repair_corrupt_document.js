@@ -2,9 +2,12 @@
  * Tests that --repair deletes corrupt BSON documents.
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    assertQueryUsesIndex,
+    assertRepairSucceeds,
+    getUriForIndex,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "repair_corrupt_document";
 const collName = "test";
@@ -83,5 +86,4 @@ let corruptDocumentOnInsert = function(db, coll) {
 
     MongoRunner.stopMongod(mongod);
     jsTestLog("Exiting runValidateWithRepairMode.");
-})();
 })();

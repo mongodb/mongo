@@ -2,9 +2,7 @@
  * Verifies that nested SORT_MERGE plans are handled correctly by the SBE stage builder.
  * Intended to reproduce SERVER-61496.
  */
-(function() {
-
-load("jstests/libs/analyze_plan.js");  // for 'getPlanStages'.
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -98,4 +96,3 @@ for (const doc of queries) {
     }
 }
 MongoRunner.stopMongod(conn);
-})();

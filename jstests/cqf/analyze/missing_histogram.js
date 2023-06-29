@@ -2,10 +2,12 @@
  * This test verifies that we gracefully handle the case where we do not have statistics or a
  * histogram available for a given path. It also tests empty collections are handled appropriately.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ce_stats_utils.js');
+import {
+    createAndValidateHistogram,
+    runHistogramsTest,
+    verifyCEForMatch
+} from "jstests/libs/ce_stats_utils.js";
+import {forceCE} from "jstests/libs/optimizer_utils.js";
 
 runHistogramsTest(function testEmptyAndMissingHistograms() {
     const emptyColl = db.missing_histogram_empty;
@@ -45,4 +47,3 @@ runHistogramsTest(function testEmptyAndMissingHistograms() {
         hint: {notAField: 1},
     });
 });
-}());

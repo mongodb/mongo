@@ -5,11 +5,8 @@
  *   cqf_experimental_incompatible,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/profiler.js");  // For getLatestProfilerEntry.
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -19,7 +16,7 @@ const foreignColl = db.plan_cache_pipeline_foreign;
 if (!checkSBEEnabled(db)) {
     jsTest.log("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 assert.commandWorked(coll.insert({a: 1}));
@@ -226,4 +223,3 @@ const groupStage = {
 })();
 
 MongoRunner.stopMongod(conn);
-})();

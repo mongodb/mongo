@@ -1,9 +1,9 @@
-load("jstests/core/timeseries/libs/timeseries.js");
-
 /**
  * Helper class for aggregate tests with time-series collection.
  */
-var TimeseriesAggTests = class {
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+
+export var TimeseriesAggTests = class {
     /**
      * Gets a test db object based on the test suite name.
      */

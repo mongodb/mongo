@@ -7,10 +7,7 @@
  *   requires_cqf,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For leftmostLeafStage
+import {findSubtrees} from "jstests/libs/optimizer_utils.js";
 
 const coll = db.cqf_not_pushdown;
 coll.drop();
@@ -66,4 +63,3 @@ run('Should stay as Not Traverse Eq', [{$match: {'many.many.many.many': {$ne: 7}
 // We have an $elemMatch (multikey), but no Traverse underneath the Not.
 run('Should be optimized to Neq', [{$match: {'many': {$elemMatch: {'one.one.one': {$ne: 7}}}}}]);
 run('Should be optimized to Neq', [{$match: {'many.one': {$elemMatch: {'one.one': {$ne: 7}}}}}]);
-})();

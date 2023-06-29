@@ -5,10 +5,7 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const collPrefix = "validate_timeseries_minmax";
 const bucketPrefix = "system.buckets.validate_timeseries_minmax";
@@ -294,4 +291,3 @@ if (!FeatureFlagUtil.isEnabled(db, "TimeseriesAlwaysUseCompressedBuckets")) {
     assert.eq(res.nNonCompliantDocuments, 0);
     assert.eq(res.warnings.length, 0);
 }
-})();

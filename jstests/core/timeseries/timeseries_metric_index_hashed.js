@@ -6,15 +6,12 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 if (!TimeseriesTest.timeseriesMetricIndexesEnabled(db.getMongo())) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
+    quit();
 }
 
 TimeseriesTest.run((insert) => {
@@ -47,4 +44,3 @@ TimeseriesTest.run((insert) => {
     testIndex({[`${metaFieldName}.tag`]: 1, x: "hashed"});
     testIndex({x: 1, [`${metaFieldName}.tag`]: -1, y: "hashed"});
 });
-}());

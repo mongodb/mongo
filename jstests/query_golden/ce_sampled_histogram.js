@@ -5,6 +5,16 @@
  *   requires_cqf,
  * ]
  */
+import {
+    createHistogram,
+    getRootCE,
+    runHistogramsTest,
+    summarizeExplainForCE
+} from "jstests/libs/ce_stats_utils.js";
+import {forceCE, round2} from "jstests/libs/optimizer_utils.js";
+import {computeStrategyErrors} from "jstests/query_golden/libs/compute_errors.js";
+
+load("jstests/libs/load_ce_test_data.js");  // For 'loadJSONDataset'.
 
 /**
  * Returns a 2-element array containing the number of documents returned by the 'predicate' and
@@ -46,11 +56,6 @@ function testMatchPredicate(baseColl, sampleColl, predicate, collSize, totSample
     print(`Base error: ${tojson(baseErr)}\n`);
     print(`Sample error: ${tojson(sampleErr)}`);
 }
-
-(function() {
-load("jstests/libs/load_ce_test_data.js");  // For 'loadJSONDataset'.
-load("jstests/libs/ce_stats_utils.js");     // For 'getRootCE', 'createHistogram', runHistogramsTest
-load("jstests/query_golden/libs/compute_errors.js");  // For 'computeStrategyErrors'.
 
 Random.setRandomSeed(6345);
 
@@ -162,4 +167,3 @@ runHistogramsTest(function testSampleHistogram() {
     print(`Average base error: ${tojson(avgBaseErr)}\n`);
     print(`Average sample error: ${tojson(avgSampleErr)}`);
 });
-})();

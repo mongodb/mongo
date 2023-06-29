@@ -1,10 +1,11 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.cqf_basic_unwind;
@@ -22,4 +23,3 @@ assert.commandWorked(coll.insert([
 let res = coll.explain("executionStats").aggregate([{$unwind: '$x'}]);
 assert.eq(4, res.executionStats.nReturned);
 assertValueOnPlanPath("Unwind", res, "child.child.nodeType");
-}());

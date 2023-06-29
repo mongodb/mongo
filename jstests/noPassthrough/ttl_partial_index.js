@@ -1,8 +1,6 @@
 // Test that the TTL monitor will correctly use TTL indexes that are also partial indexes.
 // SERVER-17984.
-(function() {
-"use strict";
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 // Launch mongod with shorter TTL monitor sleep interval.
 var runner = MongoRunner.runMongod({setParameter: "ttlMonitorSleepSecs=1"});
@@ -27,4 +25,3 @@ assert.eq(0,
 assert.eq(
     1, coll.find().itcount(), "Wrong number of documents in collection, after TTL monitor run");
 MongoRunner.stopMongod(runner);
-})();

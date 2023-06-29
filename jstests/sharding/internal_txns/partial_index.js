@@ -4,10 +4,7 @@
  *
  * @tags: [requires_fcv_60, uses_transactions]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const kDbName = "testDb";
 const kCollName = "testColl";
@@ -346,4 +343,3 @@ function runTest(st, alwaysCreateFeatureFlagEnabled) {
     runTest(featureFlagSt, true /* alwaysCreateFeatureFlagEnabled */);
     featureFlagSt.stop();
 }
-})();

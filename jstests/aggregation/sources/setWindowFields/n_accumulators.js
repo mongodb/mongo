@@ -1,10 +1,10 @@
 /**
  * Test that the 'n' family of accumulators work as window functions.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -139,4 +139,3 @@ for (const acc of Object.keys(nAccumulators)) {
         testError({[acc]: {output}, window: {documents: [-1, 1]}}, 5788005);
     }
 }
-})();

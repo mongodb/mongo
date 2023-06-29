@@ -6,10 +6,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const st = new ShardingTest({shards: 2, rs: {nodes: 2}});
 const mongos = st.s0;
@@ -961,4 +958,3 @@ testUpdates({
 });
 
 st.stop();
-})();

@@ -3,10 +3,7 @@
 // We check that the results are correct, the documents are sorted, and the documents we expect to
 // appear, appear.
 // Note: events in buckets that exceed bucketMaxSpan are not included.
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const dbName = jsTestName();
 
@@ -23,7 +20,7 @@ const minsToMillis = (mins) => mins * 60 * 1000;
 
 if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
     jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    return;
+    quit();
 }
 
 printjson(conn.adminCommand({getParameter: 1, featureFlagBucketUnpackWithSort: 1}));
@@ -103,4 +100,3 @@ let resOpt = mergeShellOptimized();
 assert(resOpt == 0);
 
 MongoRunner.stopMongod(conn);
-})();

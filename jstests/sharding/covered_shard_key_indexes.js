@@ -3,10 +3,7 @@
 // particular queries
 //
 
-load("jstests/libs/analyze_plan.js");
-
-(function() {
-'use strict';
+import {getChunkSkipsFromShard} from "jstests/libs/analyze_plan.js";
 
 const st = new ShardingTest({shards: 1});
 const coll = st.s0.getCollection("foo.bar");
@@ -148,4 +145,3 @@ assert.eq(0,
                                  explain.executionStats.executionStages.shards[0]));
 
 st.stop();
-})();

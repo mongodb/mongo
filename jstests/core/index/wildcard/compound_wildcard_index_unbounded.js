@@ -7,10 +7,7 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const coll = db.compound_wildcard_index_unbounded;
 coll.drop();
@@ -54,4 +51,3 @@ const assertNoIndexCorruption = (executionStats) => {
     }
 };
 assertNoIndexCorruption(explain.executionStats);
-})();

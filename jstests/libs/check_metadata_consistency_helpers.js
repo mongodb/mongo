@@ -1,8 +1,6 @@
-'use strict';
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
-load('jstests/libs/feature_flag_util.js');  // For FeatureFlagUtil.
-
-var MetadataConsistencyChecker = (function() {
+export var MetadataConsistencyChecker = (function() {
     const run = (mongos) => {
         const adminDB = mongos.getDB('admin');
 

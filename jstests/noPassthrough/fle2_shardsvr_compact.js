@@ -6,10 +6,7 @@
  * requires_sharding
  * ]
  */
-load("jstests/fle2/libs/encrypted_client_util.js");
-
-(function() {
-'use strict';
+import {EncryptedClient} from "jstests/fle2/libs/encrypted_client_util.js";
 
 function runTest(mongosConn, shardConn) {
     let dbName = 'testdb';
@@ -36,4 +33,3 @@ jsTestLog("Sharding: Testing fle2 drop collection warning");
 
     st.stop();
 }
-}());

@@ -6,11 +6,8 @@
  * ]
  */
 
-load("jstests/libs/analyze_plan.js");     // For 'planHasStage'.
+import {planHasStage} from "jstests/libs/analyze_plan.js";
 load("jstests/libs/fixture_helpers.js");  // For isMongos and isSharded.
-
-(function() {
-"use strict";
 
 var coll = db.record_store_count;
 coll.drop();
@@ -63,7 +60,7 @@ if (!isMongos(db) || !FixtureHelpers.isSharded(coll)) {
     // In an unsharded collection we can use the COUNT_SCAN stage.
     testExplainAndExpectStage(
         {expectedStages: ["COUNT_SCAN"], unexpectedStages: [], hintIndex: {x: 1}});
-    return;
+    quit();
 }
 
 // The remainder of the test is only relevant for sharded clusters.
@@ -87,4 +84,3 @@ testExplainAndExpectStage({
     unexpectedStages: ["FETCH"],
     hintIndex: kNewIndexSpec
 });
-})();

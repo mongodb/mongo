@@ -3,7 +3,7 @@
 
 // Generates interesting "leaf" values: values that don't contain other values.
 // This includes [] and {}.
-function leafs() {
+export function leafs() {
     // See bsontypes.h or https://bsonspec.org/ for a complete list of BSON types.
     // Not every type is represented here.
     return [
@@ -120,16 +120,16 @@ function leafs() {
 
 // Documents with (at most) a single field with the given name.
 // Includes the "missing value" by including one empty doc.
-function unaryDocs(fieldname, values) {
+export function unaryDocs(fieldname, values) {
     return values.map(v => ({[fieldname]: v}));
 }
 
 // Arrays with exactly one element.
-function unaryArrays(values) {
+export function unaryArrays(values) {
     return values.map(v => [v]);
 }
 
-function smallDocs() {
+export function smallDocs() {
     let values = leafs();
     values = values.concat(unaryDocs('x', values)).concat(unaryArrays(values));
     return unaryDocs('a', values);
@@ -137,7 +137,7 @@ function smallDocs() {
 
 // Prepend an '_id' field to each document, numbered sequentially from 0.
 // Preserves any existing '_id' value, but always moves that field to the beginning.
-function sequentialIds(docs) {
+export function sequentialIds(docs) {
     let i = 0;
     return docs.map(d => Object.merge({_id: i++}, d));
 }

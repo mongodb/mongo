@@ -12,10 +12,10 @@
  * ]
  */
 
+import {tenantCommand} from "jstests/libs/cluster_server_parameter_utils.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {isShardMergeEnabled} from "jstests/replsets/libs/tenant_migration_util.js";
 
-load("jstests/libs/cluster_server_parameter_utils.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 

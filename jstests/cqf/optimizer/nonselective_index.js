@@ -1,13 +1,14 @@
 /**
  * Tests scenario related to SERVER-13065.
  */
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_nonselective_index;
@@ -27,4 +28,3 @@ const res = t.explain("executionStats").aggregate([{$match: {a: {$gte: 0}}}]);
 assert.eq(nDocs, res.executionStats.nReturned);
 
 assertValueOnPlanPath("PhysicalScan", res, "child.child.nodeType");
-}());

@@ -1,5 +1,3 @@
-load("jstests/libs/analyze_plan.js");
-
 /**
  * batched_multi_deletes_with_write_conflicts.js
  *
@@ -12,6 +10,7 @@ load("jstests/libs/analyze_plan.js");
  *  requires_fcv_61,
  * ]
  */
+import {getPlanStage, getPlanStages} from "jstests/libs/analyze_plan.js";
 
 export const $config = (function() {
     // 'data' is passed (copied) to each of the worker threads.

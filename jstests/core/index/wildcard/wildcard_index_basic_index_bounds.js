@@ -15,12 +15,14 @@
  *   featureFlagCompoundWildcardIndexes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");       // For getPlanStages.
-load("jstests/libs/fixture_helpers.js");    // For isMongos and numberOfShardsForCollection.
-load("jstests/libs/feature_flag_util.js");  // For "FeatureFlagUtil"
+import {
+    getPlanStages,
+    getRejectedPlan,
+    getRejectedPlans,
+    getWinningPlan
+} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/fixture_helpers.js");  // For isMongos and numberOfShardsForCollection.
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 // Asserts that the given cursors produce identical result sets.
 function assertResultsEq(cursor1, cursor2) {
@@ -354,4 +356,3 @@ runWildcardIndexTest({'$**': 1}, {a: 0, 'b.d': 0}, ['b.c', 'b.f']);
 // Test a compound wildcard index.
 runCompoundWildcardIndexTest({'a': 1, 'b.$**': 1, 'c': 1}, null);
 runCompoundWildcardIndexTest({'a': 1, '$**': 1, 'c': 1}, {'a': 0, 'c': 0});
-})();

@@ -7,11 +7,6 @@
  *   requires_fcv_62,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-
 const coll = db.timeseries_project;
 coll.drop();
 assert.commandWorked(
@@ -128,5 +123,4 @@ pipeline = [{$project: {a: 1, _id: 0}}, {$project: {newMeta: "$x"}}];
 tsDoc = tsColl.aggregate(pipeline).toArray();
 regDoc = regColl.aggregate(pipeline).toArray();
 assert.docEq(regDoc, tsDoc);
-})();
 })();

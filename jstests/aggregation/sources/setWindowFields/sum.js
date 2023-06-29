@@ -1,10 +1,11 @@
 /**
  * Test that $sum works as a window function.
  */
-(function() {
-"use strict";
+import {
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
-load("jstests/aggregation/extras/window_function_helpers.js");
 load("jstests/aggregation/extras/utils.js");  // documentEq
 
 const coll = db[jsTestName()];
@@ -277,4 +278,3 @@ verifyResults(result, function(num, baseObj) {
     }
     return baseObj;
 });
-})();

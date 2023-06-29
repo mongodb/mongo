@@ -9,10 +9,10 @@
  *   serverless
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    setupReplicaSet,
+    testDisabledClusterParameters
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 // Verifies that test-only parameters are disabled and excluded when enableTestCommands is false.
 TestData.enableTestCommands = false;
@@ -31,4 +31,3 @@ setupReplicaSet(rst);
 testDisabledClusterParameters(rst);
 testDisabledClusterParameters(rst, ObjectId());
 rst.stopSet();
-}());

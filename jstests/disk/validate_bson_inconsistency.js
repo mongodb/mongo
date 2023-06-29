@@ -4,9 +4,15 @@
  * @tags: [requires_fcv_62]
  */
 
-(function() {
-
-load('jstests/disk/libs/wt_file_helper.js');
+import {
+    getUriForColl,
+    insertDocDuplicateFieldName,
+    insertDocSymbolField,
+    insertInvalidRegex,
+    insertInvalidUTF8,
+    insertNonSequentialArrayIndexes,
+    startMongodOnExistingPath,
+} from "jstests/disk/libs/wt_file_helper.js";
 
 const baseName = "validate_bson_inconsistency";
 const collNamePrefix = "test_";
@@ -319,5 +325,4 @@ resetDbpath(dbpath);
     assert.eq(res.warnings.length, 1);
 
     MongoRunner.stopMongod(mongod, null, {skipValidation: true});
-})();
 })();

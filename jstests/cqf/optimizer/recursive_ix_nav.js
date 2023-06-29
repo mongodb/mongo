@@ -1,10 +1,13 @@
-(function() {
-"use strict";
+import {
+    assertValueOnPlanPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+    runWithParams,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_recursive_ix_nav;
@@ -219,4 +222,3 @@ assert.commandWorked(t.createIndex({a: 1, b: 1, c: 1, d: 1, e: 1}));
     assertValueOnPlanPath("IndexScan", res, "child.leftChild.rightChild.nodeType");
     assertValueOnPlanPath(false, res, "child.leftChild.rightChild.reversed");
 }
-}());

@@ -7,11 +7,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({});
 assert.neq(conn, null, "mongod failed to start");
@@ -146,4 +142,3 @@ for (const testcase of testcases) {
 }
 
 MongoRunner.stopMongod(conn);
-}());

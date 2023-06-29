@@ -9,11 +9,8 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");             // For 'TimeseriesTest' helpers.
-load("jstests/sharding/libs/timeseries_update_multi_util.js");  // For 'TimeseriesMultiUpdateUtil'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {TimeseriesMultiUpdateUtil} from "jstests/sharding/libs/timeseries_update_multi_util.js";
 
 Random.setRandomSeed();
 
@@ -425,4 +422,3 @@ runOneTestCase("metaSubFieldTimeShardKey", "metaObjectFilterTwoShards");
 runOneTestCase("metaSubFieldTimeShardKey", "metaSubFieldFilterTwoShards");
 
 st.stop();
-})();

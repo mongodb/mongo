@@ -8,10 +8,11 @@
  *   multiversion_incompatible
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    setupSharded,
+    testInvalidClusterParameterCommands,
+    testValidClusterParameterCommands,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 // Tests that set/getClusterParameter works on all nodes of a sharded cluster.
 const options = {
@@ -36,4 +37,3 @@ testInvalidClusterParameterCommands(st);
 testValidClusterParameterCommands(st);
 
 st.stop();
-})();

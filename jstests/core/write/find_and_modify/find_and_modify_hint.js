@@ -9,10 +9,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStage} from "jstests/libs/analyze_plan.js";
 
 function assertCommandUsesIndex(command, expectedHintKeyPattern) {
     const out = assert.commandWorked(coll.runCommand({explain: command}));
@@ -151,5 +148,4 @@ const coll = db.jstests_find_and_modify_hint;
         hint: {badHint: 1}
     };
     assert.commandFailedWithCode(coll.runCommand(famUpdateCmd), ErrorCodes.BadValue);
-})();
 })();

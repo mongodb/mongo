@@ -7,11 +7,8 @@
 //   requires_fcv_70,
 // ]
 
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For assertArrayEq.
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 var coll = db.orToIn;
 coll.drop();
@@ -169,4 +166,3 @@ assert.commandWorked(db.createCollection("orToIn", {collation: {locale: 'de'}}))
 coll = db.orToIn;
 assert.commandWorked(coll.insert(data));
 testOrToIn(positiveTestQueries);
-}());

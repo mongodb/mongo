@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_type_predicate;
@@ -23,4 +21,3 @@ for (let i = 0; i < 10; i++) {
     const res = t.explain("executionStats").aggregate([{$match: {a: {$type: "double"}}}]);
     assert.eq(10, res.executionStats.nReturned);
 }
-}());

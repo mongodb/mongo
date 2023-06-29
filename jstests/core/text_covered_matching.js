@@ -12,10 +12,8 @@
 //   assumes_read_concern_local,
 // ]
 
-load("jstests/libs/analyze_plan.js");
+import {getPlanStages, getWinningPlan, planHasStage} from "jstests/libs/analyze_plan.js";
 
-(function() {
-"use strict";
 const coll = db.text_covered_matching;
 
 coll.drop();
@@ -216,4 +214,3 @@ assert.gt(explainResult.executionStats.totalDocsExamined,
 assert.eq(explainResult.executionStats.nReturned,
           1,
           "Unexpected number of results returned: " + tojson(explainResult));
-})();

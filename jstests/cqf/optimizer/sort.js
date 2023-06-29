@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_sort;
@@ -19,4 +17,3 @@ assert.commandWorked(t.insert({_id: 6, x: 4}));
 
 const res = t.aggregate([{$unwind: '$x'}, {$sort: {'x': 1}}]).toArray();
 assert.eq(4, res.length);
-}());

@@ -23,10 +23,7 @@
  *   assumes_no_implicit_index_creation,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const coll = db.plan_cache_sbe;
 coll.drop();
@@ -68,4 +65,3 @@ if (isSbeEnabled) {
     assert(!stats.cachedPlan.hasOwnProperty("queryPlan"), stats);
     assert(!stats.cachedPlan.hasOwnProperty("slotBasedPlan"), stats);
 }
-})();

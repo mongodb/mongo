@@ -6,10 +6,13 @@
 // @tags: [
 //   do_not_wrap_aggregations_in_facets,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'aggPlanHasStage' and other explain helpers.
+import {
+    aggPlanHasStage,
+    hasRejectedPlans,
+    isAggregationPlan,
+    isQueryPlan,
+    planHasStage,
+} from "jstests/libs/analyze_plan.js";
 
 const coll = db.use_query_sort;
 coll.drop();
@@ -87,4 +90,3 @@ assertHasBlockingQuerySort(
 // sort is currently a supported way to randomize the order of the data, it shouldn't preclude
 // pushdown of the sort into the plan stage layer.
 assertHasBlockingQuerySort([{$sort: {key: {$meta: "randVal"}}}], false);
-}());

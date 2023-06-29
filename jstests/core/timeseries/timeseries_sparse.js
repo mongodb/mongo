@@ -9,10 +9,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const collNamePrefix = 'timeseries_sparse_';
@@ -91,4 +88,3 @@ TimeseriesTest.run((insert) => {
             {_id: 3, time: t[3], c: 33, d: 30},
         ]);
 });
-})();

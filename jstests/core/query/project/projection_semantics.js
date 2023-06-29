@@ -14,19 +14,16 @@
  *   not_allowed_with_security_token,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");          // For checkSBEEnabled.
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 if (!checkSBEEnabled(db, ["featureFlagColumnstoreIndexes"])) {
     jsTestLog("Skipping test since columnstore Indexes are not enabled");
-    return;
+    quit();
 }
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
-    return;
+    quit();
 }
 
 const coll = db.projection_semantics;
@@ -720,5 +717,4 @@ function testInputOutput({input, projection, expectedOutput, interestingIndexes 
         projection: {measurements: {humidity: 0, time: 0}, _id: 0},
         expectedOutput: {measurements: {temperature: 20, pressure: 0.7}},
     });
-}());
 }());

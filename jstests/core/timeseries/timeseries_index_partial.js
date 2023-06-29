@@ -11,16 +11,18 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {
+    getAggPlanStage,
+    getPlanStages,
+    getRejectedPlan,
+    getRejectedPlans
+} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
+    quit();
 }
 
 const coll = db.timeseries_index_partial;
@@ -625,4 +627,3 @@ assert.sameMembers(buckets.getIndexes(), extraBucketIndexes.concat([
         }
     });
 }
-})();

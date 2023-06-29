@@ -6,11 +6,8 @@
  *   requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load('jstests/noPassthrough/libs/index_build.js');
 
 const rst = new ReplSetTest({nodes: 3});
@@ -115,4 +112,3 @@ if (gracefulIndexBuildFlag) {
 }
 
 rst.stopSet();
-})();

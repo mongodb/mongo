@@ -9,13 +9,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");              // For 'TimeseriesTest' helpers.
-load("jstests/core/timeseries/libs/timeseries_writes_util.js");  // For makeBucketFilter().
-load("jstests/libs/analyze_plan.js");                            // For getExecutionStages().
-load("jstests/sharding/libs/timeseries_update_multi_util.js");   // For 'TimeseriesMultiUpdateUtil'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    generateTimeValue,
+    makeBucketFilter
+} from "jstests/core/timeseries/libs/timeseries_writes_util.js";
+import {getExecutionStages} from "jstests/libs/analyze_plan.js";
+import {TimeseriesMultiUpdateUtil} from "jstests/sharding/libs/timeseries_update_multi_util.js";
 
 Random.setRandomSeed();
 
@@ -551,4 +551,3 @@ runOneTestCase("metaObjectShardKey", "metaObjectFilterTwoShards");
 runOneTestCase("metaSubFieldShardKey", "metaSubFieldFilterOneShard");
 
 st.stop();
-})();

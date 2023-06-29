@@ -1,12 +1,9 @@
 /**
  * Tests that serverStatus contains a bucketCatalog section.
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -113,4 +110,3 @@ if (!FeatureFlagUtil.isEnabled(conn, "TimeseriesScalabilityImprovements")) {
 }
 
 MongoRunner.stopMongod(conn);
-})();

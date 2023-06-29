@@ -9,7 +9,7 @@
  * ]
  */
 
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 export const $config = (function() {
     const shardedCollName = i => `sharded_${i}`;

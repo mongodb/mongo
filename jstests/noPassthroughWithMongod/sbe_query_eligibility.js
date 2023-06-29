@@ -1,11 +1,7 @@
 /**
  * Test that verifies which query shapes which are eligible for SBE.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 /**
  * Utility which asserts that when running the given 'query' over 'collection', explain's reported
@@ -28,7 +24,7 @@ function assertEngineUsed(collection, query, isSBE) {
 
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is disabled");
-    return;
+    quit();
 }
 
 const collName = "sbe_eligiblity";
@@ -217,4 +213,3 @@ const fallbackToClassicCases = [
 for (const query of fallbackToClassicCases) {
     assertEngineUsed(coll, query, false /* isSBE */);
 }
-})();

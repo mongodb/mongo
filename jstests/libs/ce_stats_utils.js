@@ -1,10 +1,16 @@
 load('jstests/aggregation/extras/utils.js');  // For assertArrayEq.
-load("jstests/libs/optimizer_utils.js");      // For checkCascadesFeatureFlagEnabled.
+
+import {
+    checkCascadesFeatureFlagEnabled,
+    extractLogicalCEFromNode,
+    getPlanSkeleton,
+    navigateToRootNode,
+} from "jstests/libs/optimizer_utils.js";
 
 /**
  * Returns a simplified skeleton of the physical plan including intervals & logical CE.
  */
-function summarizeExplainForCE(explain) {
+export function summarizeExplainForCE(explain) {
     const node = getPlanSkeleton(navigateToRootNode(explain), {
         extraKeepKeys: ["interval", "properties"],
         printLogicalCE: true,
@@ -15,7 +21,7 @@ function summarizeExplainForCE(explain) {
 /**
  * Extracts the cardinality estimate of the explain root node.
  */
-function getRootCE(explain) {
+export function getRootCE(explain) {
     const rootNode = navigateToRootNode(explain);
     assert.neq(rootNode, null, tojson(explain));
     assert.eq(rootNode.nodeType, "Root", tojson(rootNode));
@@ -25,7 +31,7 @@ function getRootCE(explain) {
 /**
  * Asserts that expected and actual are equal, within a small tolerance.
  */
-function assertApproxEq(expected, actual, msg, tolerance = 0.01) {
+export function assertApproxEq(expected, actual, msg, tolerance = 0.01) {
     assert(Math.abs(expected - actual) < tolerance, msg);
 }
 
@@ -34,7 +40,7 @@ function assertApproxEq(expected, actual, msg, tolerance = 0.01) {
  * if the ce parameter is omitted, we expect our estimate to exactly match what the query actually
  * returns.
  */
-function verifyCEForMatch({coll, predicate, expected, ce, hint}) {
+export function verifyCEForMatch({coll, predicate, expected, ce, hint}) {
     jsTestLog(`Verify CE for match ${tojson(predicate)}`);
     const CEs = ce ? [ce] : undefined;
     return verifyCEForMatchNodes(
@@ -48,7 +54,7 @@ function verifyCEForMatch({coll, predicate, expected, ce, hint}) {
  * expected estimates should be defined in CEs, or it defaults to the number of documents expected
  * to be returned by the query.
  */
-function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint}) {
+export function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint}) {
     // Run aggregation & verify query results.
     const options = hint ? {hint} : {};
     const actual = coll.aggregate([{$match: predicate}], options).toArray();
@@ -76,7 +82,7 @@ function verifyCEForMatchNodes({coll, predicate, expected, getNodeCEs, CEs, hint
 /**
  * Creates a histogram for the given 'coll' along the input field 'key'.
  */
-function createHistogram(coll, key, options = {}) {
+export function createHistogram(coll, key, options = {}) {
     // We can't use forceBonsai here because the new optimizer doesn't know how to handle the
     // analyze command.
     assert.commandWorked(coll.getDB().adminCommand(
@@ -90,7 +96,7 @@ function createHistogram(coll, key, options = {}) {
 /**
  * Validates that the generated histogram for the given "coll" has the expected type counters.
  */
-function createAndValidateHistogram({coll, expectedHistogram, empty = false, options = {}}) {
+export function createAndValidateHistogram({coll, expectedHistogram, empty = false, options = {}}) {
     const field = expectedHistogram._id;
     createHistogram(coll, field, options);
 
@@ -107,7 +113,7 @@ function createAndValidateHistogram({coll, expectedHistogram, empty = false, opt
  * estimation. This ensures that the appropriate flags/query knobs are set and ensures the state of
  * relevant flags is restored after the test.
  */
-function runHistogramsTest(test) {
+export function runHistogramsTest(test) {
     if (!checkCascadesFeatureFlagEnabled(db)) {
         jsTestLog("Skipping test because the optimizer is not enabled");
         return;
@@ -140,7 +146,7 @@ function runHistogramsTest(test) {
 /**
  * Creates a single-field index for each field in the 'fields' array.
  */
-function createIndexes(coll, fields) {
+export function createIndexes(coll, fields) {
     for (const field of fields) {
         assert.commandWorked(coll.createIndex({[field]: 1}));
     }
@@ -149,17 +155,18 @@ function createIndexes(coll, fields) {
 /**
  * Creates statistics for each field in the 'fields' array.
  */
-function analyzeFields(db, coll, fields, bucketCnt = 100) {
+export function analyzeFields(db, coll, fields, bucketCnt = 100) {
     for (const field of fields) {
         assert.commandWorked(
             db.runCommand({analyze: coll.getName(), key: field, numberBuckets: bucketCnt}));
     }
 }
+
 /**
  * Given a scalar histogram document print it combining bounds with the corresponding buckets.
  * hist = { buckets: [{boundaryCount: 1, rangeCount: 0, ...}], bounds: [100, 500]}
  */
-function printScalarHistogram(hist) {
+export function printScalarHistogram(hist) {
     assert.eq(hist.buckets.length, hist.bounds.length);
     let i = 0;
     while (i < hist.buckets.length) {
@@ -168,7 +175,7 @@ function printScalarHistogram(hist) {
     }
 }
 
-function printHistogram(hist) {
+export function printHistogram(hist) {
     jsTestLog(`Histogram on field: ${hist._id}`);
     print("Scalar Histogram:\n");
     printScalarHistogram(hist.statistics.scalarHistogram);

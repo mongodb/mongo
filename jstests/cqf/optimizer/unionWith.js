@@ -1,10 +1,8 @@
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 load("jstests/aggregation/extras/utils.js");
@@ -51,4 +49,3 @@ assert.eq([{_id: 0, a: 1}, {a: 2}], res);
 res = collA.aggregate([{$unionWith: "collB"}, {$project: {_id: 0, a: 1}}]).toArray();
 assert.eq(2, res.length);
 assert.eq([{a: 1}, {a: 2}], res);
-}());

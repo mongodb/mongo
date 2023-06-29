@@ -16,8 +16,7 @@ import {
     $config as $baseConfig
 } from 'jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js';
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');  // for chunk helpers
-load("jstests/core/timeseries/libs/timeseries.js");          // For 'TimeseriesTest' helpers.
-load("jstests/libs/analyze_plan.js");                        // for 'getPlanStages'
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.nonShardCollName = "unsharded";

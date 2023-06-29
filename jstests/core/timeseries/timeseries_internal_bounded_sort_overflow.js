@@ -11,15 +11,12 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 if (!TimeseriesTest.bucketUnpackWithSortEnabled(db.getMongo())) {
     jsTestLog("Skipping test because 'BucketUnpackWithSort' is disabled.");
-    return;
+    quit();
 }
 
 const coll = db.timeseries_internal_bounded_sort_overflow;
@@ -49,4 +46,3 @@ const result = buckets
 // Make sure the result is in order.
 assert.eq(result[0].t, docs[0].t);
 assert.eq(result[1].t, docs[1].t);
-})();

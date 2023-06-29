@@ -6,10 +6,7 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/config_shard_util.js");
+import {ConfigShardUtil} from "jstests/libs/config_shard_util.js";
 
 const kDBName = "foo";
 const kCollName = "bar";
@@ -117,4 +114,3 @@ function runTestCaseExpectSuccess(conn, testCase) {
 
     st.stop();
 }
-}());

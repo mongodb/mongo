@@ -1,9 +1,7 @@
 /**
  * Test $match with $exists is supported and returns correct results.
  */
-
-(function() {
-"use strict";
+import {show} from "jstests/libs/golden_test.js";
 
 const coll = db.cqf_golden_match_with_exists;
 
@@ -66,4 +64,3 @@ runWithData(
         {_id: 2, a: [2]},
     ],
     [{'a': {$elemMatch: {$exists: true}}}, {'a': {$elemMatch: {$exists: false}}}]);
-})();

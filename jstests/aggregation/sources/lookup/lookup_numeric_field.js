@@ -5,10 +5,7 @@
 //   # Using a column scan removes the transformBy we search for.
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getWinningPlan.
+import {getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 const local = db.local;
 const foreign = db.foreign;
@@ -257,4 +254,3 @@ for (const spec of toSpecs) {
                                "to." + spec.singleField,
                                [{_id: 1, to: {[spec.singleField]: 0}}]);
 }
-}());

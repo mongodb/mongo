@@ -7,12 +7,9 @@
  *   requires_non_retryable_writes,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For 'arrayEq'.
-load("jstests/libs/analyze_plan.js");         // For planHasStage().
-load("jstests/libs/fixture_helpers.js");      // For isMongos().
+import {getPlanStage, planHasStage} from "jstests/libs/analyze_plan.js";
+load("jstests/libs/fixture_helpers.js");  // For isMongos().
 
 // Make sure that the test collection is empty before starting the test.
 const testColl = db.update_pipeline_shell_helpers_test;
@@ -130,4 +127,3 @@ assert.throws(() => testColl.replaceOne({_id: 1}, [{$replaceWith: {}}]));
 assert.throws(() => testColl.findOneAndReplace({_id: 1}, [{$replaceWith: {}}]));
 assert.throws(() => testColl.bulkWrite(
                   [{replaceOne: {filter: {_id: 1}, replacement: [{$replaceWith: {}}]}}]));
-})();

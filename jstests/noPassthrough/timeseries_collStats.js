@@ -7,11 +7,9 @@
  *   requires_getmore,
  * ]
  */
-(function() {
-"use strict";
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const kIdleBucketExpiryMemoryUsageThreshold = 1024 * 1024 * 10;
 const conn = MongoRunner.runMongod({
@@ -335,4 +333,3 @@ testIdleBucketExpiry(i => {
 });
 
 MongoRunner.stopMongod(conn);
-})();

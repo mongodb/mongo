@@ -13,7 +13,6 @@ import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 import {
     $config as $baseConfig
 } from "jstests/concurrency/fsm_workloads/write_without_shard_key_base.js";
-load("jstests/libs/feature_flag_util.js");
 
 export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.startState = "init";

@@ -9,10 +9,7 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getWinningPlan, isIndexOnly, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const collName = "covered_index_sort_no_fetch_optimization";
 const coll = db.getCollection(collName);
@@ -240,4 +237,3 @@ findCmd = {
 expected =
     [{"b": {"c": 1}}, {"b": {"c": 2}}, {"b": {"c": 3}}, {"b": {"c": "A"}}, {"b": {"c": "a"}}];
 assertExpectedResult(findCmd, expected, kIsCovered, kBlockingSort);
-})();

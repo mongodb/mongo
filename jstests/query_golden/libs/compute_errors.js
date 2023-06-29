@@ -1,10 +1,12 @@
+import {round2} from "jstests/libs/optimizer_utils.js";
+
 /**
  * Compute cardinality estimation errors for a testcase and CE strategy.
  * Example testcase:
  * { _id: 2, pipeline: [...], nReturned: 2, "heuristic": 4.47, "histogram": 2, ...}
  * Returns : {"qError": 2.23, "relError": 1.23, "selError": 12.35}
  */
-function computeStrategyErrors(testcase, strategy, collSize) {
+export function computeStrategyErrors(testcase, strategy, collSize) {
     const absError = testcase[strategy] - testcase.nReturned;
     let relError = 0.0;
     if (testcase.nReturned > 0) {
@@ -26,7 +28,7 @@ function computeStrategyErrors(testcase, strategy, collSize) {
 /**
  * Compute cardinality estimation errors for a testcase for all CE strategies.
  */
-function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
+export function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
     let errorDoc = {_id: testcase._id, qtype: testcase.qtype};
     if (isComplex == true) {
         errorDoc["numberOfTerms"] = testcase.numberOfTerms;
@@ -46,7 +48,7 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
         print(`${strategy}: ${testcase[strategy]} `);
         print(`QError: ${errors["qError"]}, RelError: ${errors["relError"]}, SelError: ${
             errors["selError"]}%\n`);
-        duration = 'duration_' + strategy;
+        const duration = 'duration_' + strategy;
         errorDoc[duration] = testcase[duration];
     });
     return errorDoc;
@@ -55,7 +57,7 @@ function computeAndPrintErrors(testcase, ceStrategies, collSize, isComplex) {
 /**
  * Compute CE errors for each query and populate the error collection 'errorColl'.
  */
-function populateErrorCollection(errorColl, testCases, ceStrategies, collSize, isComplex) {
+export function populateErrorCollection(errorColl, testCases, ceStrategies, collSize, isComplex) {
     for (const testcase of testCases) {
         jsTestLog(`Query ${testcase._id}: ${tojsononeline(testcase.pipeline)}`);
         print(`Actual cardinality: ${testcase.nReturned}\n`);
@@ -69,7 +71,7 @@ function populateErrorCollection(errorColl, testCases, ceStrategies, collSize, i
  * Given an array of fields on which we want to perform $group, return an expression computing the
  * group key.
  */
-function makeGroupKey(groupFields) {
+export function makeGroupKey(groupFields) {
     let args = [];
     for (let i = 0; i < groupFields.length; i++) {
         args.push({$toString: "$" + groupFields[i]});
@@ -83,7 +85,7 @@ function makeGroupKey(groupFields) {
 /**
  * Aggregate errors in the 'errorColl' on the 'groupFields' for each CE strategy.
  */
-function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
+export function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
     const groupKey = makeGroupKey(groupFields);
     jsTestLog(`Mean errors per ${tojsononeline(groupFields)}:`);
     for (const strategy of ceStrategies) {
@@ -136,7 +138,7 @@ function aggregateErrorsPerCategory(errorColl, groupFields, ceStrategies) {
  * Aggregate errors in the 'errorColl' per CE strategy. If a predicate is provided
  * aggregate only the error documents which satisfy the predicate.
  */
-function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
+export function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
     const msg = (Object.keys(predicate).length == 0) ? "all queries"
                                                      : `predicate ${tojsononeline(predicate)}:`;
     jsTestLog(`Mean errors per strategy for ${msg}:`);
@@ -184,7 +186,7 @@ function aggregateErrorsPerStrategy(errorColl, ceStrategies, predicate = {}) {
     }
 }
 
-function aggegateOptimizationTimesPerStrategy(errorColl, ceStrategies) {
+export function aggegateOptimizationTimesPerStrategy(errorColl, ceStrategies) {
     print("Average optimization time per strategy:");
     for (const strategy of ceStrategies) {
         const strategyDuration = "$" +
@@ -214,7 +216,8 @@ function aggegateOptimizationTimesPerStrategy(errorColl, ceStrategies) {
 /**
  * Find top 10 inacurate estimates for a strategy and an error field.
  */
-function printQueriesWithBadAccuracy(errorColl, testCases, strategy, errorField, count = 10) {
+export function printQueriesWithBadAccuracy(
+    errorColl, testCases, strategy, errorField, count = 10) {
     const errorFieldName = strategy + "." + errorField;
     const res = errorColl
                     .aggregate([
@@ -230,7 +233,8 @@ function printQueriesWithBadAccuracy(errorColl, testCases, strategy, errorField,
     for (const doc of res) {
         const i = doc["_id"];
         const test = testCases[i];
-        print(`Id: ${test._id}: ${tojsononeline(test.pipeline)}, qtype: ${test.qtype}, data type: ${test.dtype}, 
-cardinality: ${test.nReturned}, ${strategy} estimation: ${test[strategy]}, errors: ${tojsononeline(doc[strategy])}\n`);
+        print(`Id: ${test._id}: ${tojsononeline(test.pipeline)}, qtype: ${test.qtype}, data type: ${
+            test.dtype}, \ncardinality: ${test.nReturned}, ${strategy} estimation: ${
+            test[strategy]}, errors: ${tojsononeline(doc[strategy])}\n`);
     }
 }

@@ -13,11 +13,13 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/analyze_plan.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {
+    getAggPlanStage,
+    getPlanStages,
+    getRejectedPlan,
+    getRejectedPlans
+} from "jstests/libs/analyze_plan.js";
 
 const generateTest = (useHint) => {
     return (insert) => {
@@ -433,4 +435,3 @@ const generateTest = (useHint) => {
 // Run the test twice, once without hinting the index, and again hinting the index by spec.
 TimeseriesTest.run(generateTest(false));
 TimeseriesTest.run(generateTest(true));
-})();

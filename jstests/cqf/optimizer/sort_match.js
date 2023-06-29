@@ -1,13 +1,16 @@
 /**
  * Tests scenario related to SERVER-12923.
  */
-(function() {
-"use strict";
+import {
+    assertValueOnPath,
+    checkCascadesOptimizerEnabled,
+    navigateToPlanPath,
+    runWithParams,
+} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_sort_match;
@@ -50,4 +53,3 @@ assert.commandWorked(t.createIndex({b: 1}));
         prev = current;
     }
 }
-}());

@@ -6,10 +6,7 @@
  *    requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // This test runs manual getMores using different connections, which will not inherit the
 // implicit session of the cursor establishing command.
@@ -620,4 +617,3 @@ for (let connType of [rsConn, mongosConn]) {
 }
 
 st.stop();
-})();

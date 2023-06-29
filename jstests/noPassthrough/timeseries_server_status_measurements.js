@@ -7,10 +7,7 @@
  *   requires_fcv_61,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 const conn = MongoRunner.runMongod();
 
@@ -76,4 +73,3 @@ assert.commandWorked(coll.insertMany(batch, {ordered: false}));
 
 checkBucketSize();
 MongoRunner.stopMongod(conn);
-}());

@@ -1,10 +1,11 @@
 /**
  * Test that $avg works as a window function.
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/window_function_helpers.js");
+import {
+    computeAsGroup,
+    seedWithTickerData,
+    testAccumAgainstGroup
+} from "jstests/aggregation/extras/window_function_helpers.js";
 
 const coll = db[jsTestName()];
 coll.drop();
@@ -54,4 +55,3 @@ for (let index = 0; index < results.length; index++) {
     });
     assert.eq(groupRes, results[index].runningAvgLead);
 }
-})();

@@ -6,9 +6,7 @@
  *   assumes_standalone_mongod,
  * ]
  */
-(function() {
-"use strict";
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const mongod = MongoRunner.runMongod();
 const dbName = "test";
@@ -54,4 +52,3 @@ verifyPlanCache("test.readWrite");
 db.logout();
 
 MongoRunner.stopMongod(mongod);
-})();

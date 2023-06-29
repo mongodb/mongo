@@ -5,11 +5,8 @@
  *   assumes_unsharded_collection,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.hashed_index_collation;
 coll.drop();
@@ -111,4 +108,3 @@ validateFindCmdOutputAndPlan({
     expectedStages: ["IXSCAN", "FETCH"],
     expectedOutput: [{a: {e: 5}}, {a: {e: 5}}]
 });
-})();

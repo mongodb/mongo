@@ -14,10 +14,8 @@
  *   cannot_run_during_upgrade_downgrade,
  * ]
  */
-(function() {
-"use strict";
 load('jstests/libs/fixture_helpers.js');  // For and isMongos().
-load("jstests/libs/sbe_util.js");         // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = "query_hash_stability";
 const coll = db[collName];
@@ -125,4 +123,3 @@ if (!checkSBEEnabled(db)) {
         expectedToMatch: true
     });
 }
-})();

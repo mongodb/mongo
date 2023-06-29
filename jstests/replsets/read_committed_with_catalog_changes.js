@@ -28,10 +28,6 @@
 
 load("jstests/libs/parallelTester.js");  // For Thread.
 load("jstests/libs/write_concern_util.js");
-load("jstests/libs/feature_flag_util.js");
-
-(function() {
-"use strict";
 
 // Each test case includes a 'prepare' method that sets up the initial state starting with a
 // database that has been dropped, a 'performOp' method that does some operation, and two
@@ -341,4 +337,3 @@ for (var testName in testCases) {
 }
 
 replTest.stopSet();
-}());

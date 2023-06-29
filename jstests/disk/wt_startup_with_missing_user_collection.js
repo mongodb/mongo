@@ -4,9 +4,12 @@
  *
  * @tags: [requires_wiredtiger]
  */
-(function() {
+import {
+    getUriForColl,
+    getUriForIndex,
+    startMongodOnExistingPath
+} from "jstests/disk/libs/wt_file_helper.js";
 
-load('jstests/disk/libs/wt_file_helper.js');
 load('jstests/noPassthrough/libs/index_build.js');
 
 // This test triggers an unclean shutdown (an fassert), which may cause inaccurate fast counts.
@@ -75,4 +78,3 @@ testDB = mongod.getDB(dbName);
 assert(testDB.getCollection("a").drop());
 
 MongoRunner.stopMongod(mongod);
-}());

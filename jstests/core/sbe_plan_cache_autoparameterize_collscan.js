@@ -18,17 +18,14 @@
  *   requires_scripting,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/sbe_util.js");
+import {getPlanCacheKeyFromShape} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // This test is specifically verifying the behavior of the SBE plan cache, which is only enabled
 // when SBE is enabled.
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
-    return;
+    quit();
 }
 
 const coll = db.sbe_plan_cache_autoparameterize_collscan;
@@ -432,4 +429,3 @@ runTest({query: {a: {$type: ["string", "regex"]}}, projection: {_id: 1}},
         {query: {a: {$type: ["string", "array"]}}, projection: {_id: 1}},
         [{_id: 5}, {_id: 6}, {_id: 8}, {_id: 11}, {_id: 12}, {_id: 13}, {_id: 15}],
         false);
-}());

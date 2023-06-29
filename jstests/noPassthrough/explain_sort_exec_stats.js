@@ -2,11 +2,8 @@
  * Tests that $sort stage reports the correct stats when explain is run with
  * different verbosities.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For getAggPlanStages().
-load("jstests/libs/sbe_util.js");      // For checkSBEEnabled.
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod();
 const db = conn.getDB("test");
@@ -90,4 +87,3 @@ pipelines.forEach(function(pipeline) {
 });
 
 MongoRunner.stopMongod(conn);
-}());

@@ -1,10 +1,7 @@
 /**
  * Tests for the $$NOW and $$CLUSTER_TIME system variable.
  */
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");                   // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 load("jstests/libs/sbe_assert_error_override.js");  // Override error-code-checking APIs.
 
 const coll = db[jsTest.name()];
@@ -194,4 +191,3 @@ assert.eq(0, futureColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount())
 assert.soon(() => {
     return futureColl.find({$expr: {$lt: ["$timeField", "$$NOW"]}}).itcount() == 1;
 }, "$$NOW should catch up after 3 seconds");
-}());

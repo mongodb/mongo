@@ -13,10 +13,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const timeFieldName = "time";
@@ -115,4 +112,3 @@ TimeseriesTest.run((insert) => {
     }),
                                  ErrorCodes.InvalidPipelineOperator);
 });
-})();

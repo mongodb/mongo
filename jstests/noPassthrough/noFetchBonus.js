@@ -2,10 +2,7 @@
 //   requires_replication,
 //   requires_sharding,
 // ]
-(function() {
-"use strict";
-
-load('jstests/libs/analyze_plan.js');
+import {getRejectedPlans, isIndexOnly, planHasStage} from "jstests/libs/analyze_plan.js";
 
 const st = new ShardingTest({shards: 1, rs: {nodes: 1}, config: 1});
 const db = st.s.getDB("test");
@@ -28,4 +25,3 @@ assert(planHasStage(db, rejected[0], 'SHARDING_FILTER'), explain);
 assert(planHasStage(db, rejected[0], 'FETCH'), rejected);
 
 st.stop();
-}());

@@ -11,9 +11,7 @@
  *  assumes_read_preference_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 load('jstests/libs/change_stream_util.js');  // For 'assertChangeStreamEventEq'.
 
 // Create a single-shard cluster for this test.
@@ -185,4 +183,3 @@ const nonSystemEvents =
 assertChangeStreamEventSequence({showSystemEvents: false}, nonSystemEvents);
 
 st.stop();
-}());

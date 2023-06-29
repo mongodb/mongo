@@ -1,9 +1,6 @@
 /**
  * Tests the serverStatus and FTDC metrics for multi planner execution (both classic and SBE).
  */
-(function() {
-"use strict";
-
 function sumHistogramBucketCounts(histogram) {
     let sum = 0;
     for (const bucket of histogram) {
@@ -13,7 +10,7 @@ function sumHistogramBucketCounts(histogram) {
 }
 
 load("jstests/libs/ftdc.js");
-load("jstests/libs/sbe_util.js");  // For 'checkSBEEnabled()'.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const collName = jsTestName();
 const dbName = jsTestName();
@@ -27,7 +24,7 @@ const db = conn.getDB(dbName);
 if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because SBE is not enabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 let coll = db.getCollection(collName);
@@ -110,4 +107,3 @@ assert.soon(() => {
 }, "FTDC output should eventually reflect observed serverStatus metrics.");
 
 MongoRunner.stopMongod(conn);
-}());

@@ -2,11 +2,7 @@
  * Tests that the lookup metrics are recorded correctly in serverStatus.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/sbe_util.js");      // For 'checkSBEEnabled()'.
-load("jstests/libs/analyze_plan.js");  // For 'getAggPlanStages' and other explain helpers.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 const conn = MongoRunner.runMongod({setParameter: {allowDiskUseByDefault: true}});
 assert.neq(null, conn, "mongod was unable to start up");
@@ -17,7 +13,7 @@ if (!checkSBEEnabled(db)) {
     jsTestLog("Skipping test because either the sbe lookup pushdown feature flag is disabled or" +
               " sbe itself is disabled");
     MongoRunner.stopMongod(conn);
-    return;
+    quit();
 }
 
 assert.commandWorked(db.dropDatabase());
@@ -143,4 +139,3 @@ assert.eq(
 compareLookupCounters(expectedCounters);
 
 MongoRunner.stopMongod(conn);
-})();

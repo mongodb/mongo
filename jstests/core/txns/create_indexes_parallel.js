@@ -7,12 +7,8 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/auto_retry_transaction_in_sharding.js");
 load("jstests/libs/create_index_txn_helpers.js");
-load("jstests/libs/feature_flag_util.js");
 
 let doParallelCreateIndexesTest = function(explicitCollectionCreate, multikeyIndex) {
     const dbName = 'test_txns_create_indexes_parallel';
@@ -196,4 +192,3 @@ doParallelCreateIndexesTest(false /*explicitCollectionCreate*/, false /*multikey
 doParallelCreateIndexesTest(true /*explicitCollectionCreate*/, false /*multikeyIndex*/);
 doParallelCreateIndexesTest(false /*explicitCollectionCreate*/, true /*multikeyIndex*/);
 doParallelCreateIndexesTest(true /*explicitCollectionCreate*/, true /*multikeyIndex*/);
-}());

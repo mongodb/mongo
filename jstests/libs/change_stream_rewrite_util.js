@@ -7,7 +7,8 @@ load("jstests/libs/fixture_helpers.js");           // For isMongos.
 
 // Function which generates a write workload on the specified collection, including all events that
 // a change stream may consume. Assumes that the specified collection does not already exist.
-function generateChangeStreamWriteWorkload(db, collName, numDocs, includInvalidatingEvents = true) {
+export function generateChangeStreamWriteWorkload(
+    db, collName, numDocs, includInvalidatingEvents = true) {
     // If this is a sharded passthrough, make sure we shard on something other than _id so that a
     // non-id field appears in the documentKey. This will generate 'create' and 'shardCollection'.
     if (FixtureHelpers.isMongos(db)) {
@@ -99,7 +100,8 @@ function generateChangeStreamWriteWorkload(db, collName, numDocs, includInvalida
 
 // Helper function to fully exhaust a change stream from the specified point and return all events.
 // Assumes that all relevant events can fit into a single 16MB batch.
-function getAllChangeStreamEvents(db, extraPipelineStages = [], csOptions = {}, resumeToken) {
+export function getAllChangeStreamEvents(
+    db, extraPipelineStages = [], csOptions = {}, resumeToken) {
     // Open a whole-cluster stream based on the supplied arguments.
     const csCursor = db.getMongo().watch(
         extraPipelineStages,
@@ -121,12 +123,13 @@ function getAllChangeStreamEvents(db, extraPipelineStages = [], csOptions = {}, 
 }
 
 // Helper function to check whether this value is a plain old javascript object.
-function isPlainObject(value) {
+export function isPlainObject(value) {
     return (value && typeof (value) == "object" && value.constructor === Object);
 }
 
 // Verifies the number of change streams events returned from a particular shard.
-function assertNumChangeStreamDocsReturnedFromShard(stats, shardName, expectedTotalReturned) {
+export function assertNumChangeStreamDocsReturnedFromShard(
+    stats, shardName, expectedTotalReturned) {
     assert(stats.shards.hasOwnProperty(shardName), stats);
     const stages = stats.shards[shardName].stages;
     const lastStage = stages[stages.length - 1];
@@ -134,7 +137,7 @@ function assertNumChangeStreamDocsReturnedFromShard(stats, shardName, expectedTo
 }
 
 // Verifies the number of oplog events read by a particular shard.
-function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalReturned) {
+export function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalReturned) {
     assert(stats.shards.hasOwnProperty(shardName), stats);
     assert.eq(Object.keys(stats.shards[shardName].stages[0])[0], "$cursor", stats);
     const executionStats = stats.shards[shardName].stages[0].$cursor.executionStats;
@@ -145,7 +148,7 @@ function assertNumMatchingOplogEventsForShard(stats, shardName, expectedTotalRet
 }
 
 // Returns a newly created sharded collection sharded by caller provided shard key.
-function createShardedCollection(shardingTest, shardKey, dbName, collName, splitAt) {
+export function createShardedCollection(shardingTest, shardKey, dbName, collName, splitAt) {
     const db = shardingTest.s.getDB(dbName);
     assertDropAndRecreateCollection(db, collName);
 
@@ -173,7 +176,7 @@ function createShardedCollection(shardingTest, shardKey, dbName, collName, split
 // 2. There are no additional events being returned other than the ones in the 'expectedResult'.
 // 3. the filtering is been done at oplog level, and each of the shard read only the
 // 'expectedOplogNReturnedPerShard' documents.
-function verifyChangeStreamOnWholeCluster({
+export function verifyChangeStreamOnWholeCluster({
     st,
     changeStreamSpec,
     userMatchExpr,

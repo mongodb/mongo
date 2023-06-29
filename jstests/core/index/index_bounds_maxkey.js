@@ -3,10 +3,7 @@
 //   assumes_unsharded_collection,
 //   requires_non_retryable_writes,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For assertCoveredQueryAndCount.
+import {assertCoveredQueryAndCount} from "jstests/libs/analyze_plan.js";
 
 const coll = db.index_bounds_maxkey;
 coll.drop();
@@ -34,4 +31,3 @@ assertCoveredQueryAndCount({collection: coll, query: {a: {$gt: MaxKey}}, project
 assertCoveredQueryAndCount({collection: coll, query: {a: {$gte: MaxKey}}, project: proj, count: 0});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$lt: MaxKey}}, project: proj, count: 3});
 assertCoveredQueryAndCount({collection: coll, query: {a: {$lte: MaxKey}}, project: proj, count: 3});
-})();

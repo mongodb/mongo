@@ -5,10 +5,6 @@
  *  resource_intensive,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
 load("jstests/sharding/libs/find_chunks_util.js");
 load('jstests/sharding/libs/remove_shard_util.js');
 
@@ -179,4 +175,3 @@ st.stop();
 addedReplicaSets.forEach(rs => {
     rs.stopSet();
 });
-}());

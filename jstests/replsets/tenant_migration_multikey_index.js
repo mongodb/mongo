@@ -11,10 +11,10 @@
  * ]
  */
 
+import {getPlanStage, getWinningPlan} from "jstests/libs/analyze_plan.js";
 import {TenantMigrationTest} from "jstests/replsets/libs/tenant_migration_test.js";
 import {makeTenantDB, makeX509OptionsForTest} from "jstests/replsets/libs/tenant_migration_util.js";
 
-load("jstests/libs/analyze_plan.js");
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/uuid_util.js");
 

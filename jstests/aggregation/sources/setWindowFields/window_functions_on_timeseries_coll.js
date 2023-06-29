@@ -11,11 +11,8 @@
  *     requires_timeseries,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq.
-load("jstests/libs/analyze_plan.js");         // For getAggPlanStage().
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.window_functions_on_timeseries_coll;
 
@@ -328,4 +325,3 @@ assertExplainBehaviorAndCorrectResults(
         {_id: 5, rank: 2},
         {_id: 3, rank: 3},
     ]);
-})();

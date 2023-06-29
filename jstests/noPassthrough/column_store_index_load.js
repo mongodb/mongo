@@ -1,4 +1,3 @@
-
 /**
  * Test that different methods of loading a column store index all produce the same valid results.
  * Indexes are validated by comparing query results that use the index with results from a control
@@ -10,18 +9,15 @@
  *   featureFlagColumnstoreIndexes,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/columnstore_util.js");  // For setUpServerForColumnStoreIndexTest.
+import {planHasStage} from "jstests/libs/analyze_plan.js";
+import {setUpServerForColumnStoreIndexTest} from "jstests/libs/columnstore_util.js";
 
 const mongod = MongoRunner.runMongod({});
 const db = mongod.getDB("test");
 
 if (!setUpServerForColumnStoreIndexTest(db)) {
     MongoRunner.stopMongod(mongod);
-    return;
+    quit();
 }
 
 //
@@ -242,4 +238,3 @@ for (let i = 0; i < noIndexResults.length; ++i) {
 }
 
 MongoRunner.stopMongod(mongod);
-})();

@@ -7,11 +7,8 @@
  *   does_not_support_stepdowns,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/clustered_collections/clustered_collection_util.js");
-load("jstests/libs/clustered_collections/clustered_capped_utils.js");
+import {ClusteredCappedUtils} from "jstests/libs/clustered_collections/clustered_capped_utils.js";
 
 const replSet = new ReplSetTest({name: "clustered_capped_collections", nodes: 1});
 replSet.startSet({setParameter: {ttlMonitorSleepSecs: 1, supportArbitraryClusterKeyIndex: true}});
@@ -39,4 +36,3 @@ for (let awaitData of [false, true]) {
 }
 
 replSet.stopSet();
-})();

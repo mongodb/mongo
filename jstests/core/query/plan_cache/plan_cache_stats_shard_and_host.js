@@ -12,11 +12,8 @@
 //   cqf_experimental_incompatible,
 //   requires_fcv_71,
 // ]
-(function() {
-"use strict";
-
 load("jstests/libs/fixture_helpers.js");  // For 'FixtureHelpers'.
-load('jstests/libs/analyze_plan.js');     // For getPlanCacheKeyFromExplain().
+import {getPlanCacheKeyFromExplain} from "jstests/libs/analyze_plan.js";
 
 const coll = db.plan_cache_stats_shard_and_host;
 coll.drop();
@@ -81,4 +78,3 @@ for (const entry of planCacheContents) {
 // array.
 coll.getPlanCache().clear();
 assert.eq([], filterPlanCacheEntriesByKey(planCacheKey, planCache.list()));
-}());

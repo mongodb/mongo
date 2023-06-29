@@ -5,10 +5,7 @@
  *   assumes_no_implicit_collection_creation_after_drop,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getPlanStages} from "jstests/libs/analyze_plan.js";
 
 const numericOrdering = {
     collation: {locale: "en_US", numericOrdering: true}
@@ -160,5 +157,4 @@ const kSorts = [
     ];
 
     runTest(kSorts, kFilterPredicates);
-})();
 })();

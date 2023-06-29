@@ -8,10 +8,11 @@
  *   serverless
  *  ]
  */
-(function() {
-'use strict';
-
-load('jstests/libs/cluster_server_parameter_utils.js');
+import {
+    setupReplicaSet,
+    testInvalidClusterParameterCommands,
+    testValidServerlessClusterParameterCommands,
+} from "jstests/libs/cluster_server_parameter_utils.js";
 
 // Tests that set/getClusterParameter works on a non-sharded replica set.
 const rst = new ReplSetTest({
@@ -39,4 +40,3 @@ for (const tenantId of [undefined, ObjectId()]) {
 testValidServerlessClusterParameterCommands(rst);
 
 rst.stopSet();
-})();

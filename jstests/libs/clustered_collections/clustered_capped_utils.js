@@ -1,6 +1,6 @@
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
-var ClusteredCappedUtils = class {
+export var ClusteredCappedUtils = class {
     // Validate TTL-based deletion on a clustered, capped collection.
     static testClusteredCappedCollectionWithTTL(db, collName, clusterKeyField) {
         jsTest.log("Validating TTL operation on capped clustered collection");

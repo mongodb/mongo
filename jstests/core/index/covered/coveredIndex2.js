@@ -8,14 +8,11 @@
 //   # plans.
 //   assumes_no_implicit_index_creation,
 // ]
-(function() {
-"use strict";
+// Include helpers for analyzing explain output.
+import {getWinningPlan, isIndexOnly} from "jstests/libs/analyze_plan.js";
 
 const t = db["jstests_coveredIndex2"];
 t.drop();
-
-// Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
 
 assert.commandWorked(t.insert({a: 1}));
 assert.commandWorked(t.insert({a: 2}));
@@ -38,4 +35,3 @@ assert.commandWorked(t.insert({a: [3, 4]}));
 plan = t.find({a: 1}, {a: 1, _id: 0}).explain();
 assert(!isIndexOnly(db, getWinningPlan(plan.queryPlanner)),
        "Find is using covered index even after multikey insert");
-}());

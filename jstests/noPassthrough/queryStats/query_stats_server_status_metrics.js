@@ -2,11 +2,6 @@
  * Test the telemetry related serverStatus metrics.
  * @tags: [featureFlagQueryStats]
  */
-load('jstests/libs/analyze_plan.js');
-
-(function() {
-"use strict";
-
 function runTestWithMongodOptions(mongodOptions, test, testOptions) {
     const conn = MongoRunner.runMongod(mongodOptions);
     const testDB = conn.getDB('test');
@@ -217,4 +212,3 @@ runTestWithMongodOptions({
     setParameter: {internalQueryStatsCacheSize: "0.00001MB", internalQueryStatsRateLimit: -1},
 },
                          telemetryStoreWriteErrorsTest);
-}());

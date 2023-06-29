@@ -1,10 +1,12 @@
 /**
  * This test verifies array histograms are both generated and estimated correctly.
  */
-(function() {
-"use strict";
-
-load('jstests/libs/ce_stats_utils.js');
+import {
+    createAndValidateHistogram,
+    runHistogramsTest,
+    verifyCEForMatch
+} from "jstests/libs/ce_stats_utils.js";
+import {forceCE} from "jstests/libs/optimizer_utils.js";
 
 runHistogramsTest(function verifyArrayHistograms() {
     const coll = db.array_histogram;
@@ -283,4 +285,3 @@ runHistogramsTest(function verifyArrayHistograms() {
         hint: idx
     });
 });
-}());

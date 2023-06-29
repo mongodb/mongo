@@ -12,12 +12,11 @@
  */
 
 // Tests for the .explain() shell helper, which provides syntactic sugar for the explain command.
+// Include helpers for analyzing explain output.
+import {getPlanStage, getWinningPlan, isIxscan, planHasStage} from "jstests/libs/analyze_plan.js";
 
 var t = db.jstests_explain_helpers;
 t.drop();
-
-// Include helpers for analyzing explain output.
-load("jstests/libs/analyze_plan.js");
 
 var explain;
 var stage;

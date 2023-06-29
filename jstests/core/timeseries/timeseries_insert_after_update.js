@@ -14,10 +14,7 @@
  *   assumes_read_preference_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 load("jstests/libs/fixture_helpers.js");
 
 TimeseriesTest.run((insert) => {
@@ -63,4 +60,3 @@ TimeseriesTest.run((insert) => {
         assert.eq(bucketsColl.find().itcount(), 3, bucketsColl.find().toArray());
     }
 });
-})();

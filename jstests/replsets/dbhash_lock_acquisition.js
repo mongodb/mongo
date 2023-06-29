@@ -6,10 +6,6 @@
  *   uses_transactions,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/parallelTester.js");  // for Thread
 
 const rst = new ReplSetTest({nodes: 1});
@@ -105,4 +101,3 @@ assert.commandWorked(threadDBHash.returnData());
 
 session.endSession();
 rst.stopSet();
-})();

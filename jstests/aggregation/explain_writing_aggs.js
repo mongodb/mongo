@@ -8,11 +8,8 @@
  *   assumes_write_concern_unchanged,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");              // For FixtureHelpers.isMongos().
-load("jstests/libs/analyze_plan.js");                 // For getAggPlanStage().
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.isMongos().
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 load("jstests/aggregation/extras/merge_helpers.js");  // For withEachMergeMode().
 
 let sourceColl = db.explain_writing_aggs_source;
@@ -72,4 +69,3 @@ withEachMergeMode(function({whenMatchedMode, whenNotMatchedMode}) {
     assert.eq(mergeExplain.$merge.on, "_id", mergeExplain);
     assert.eq(targetColl.find().itcount(), 0, explain);
 });
-}());

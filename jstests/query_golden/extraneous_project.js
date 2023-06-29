@@ -6,10 +6,8 @@
  *   requires_cqf,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/optimizer_utils.js");  // For getPlanSkeleton.
+import {show} from "jstests/libs/golden_test.js";
+import {getPlanSkeleton} from "jstests/libs/optimizer_utils.js";
 
 db.setLogLevel(4, "query");
 
@@ -39,4 +37,3 @@ run([
 ]);
 
 run([{$match: {username: "/^user8/"}}, {$group: {_id: 1, count: {$sum: 1}}}]);
-})();

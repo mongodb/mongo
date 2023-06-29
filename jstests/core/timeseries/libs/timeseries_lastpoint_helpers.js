@@ -3,19 +3,19 @@
  */
 
 load("jstests/aggregation/extras/utils.js");
-load("jstests/core/timeseries/libs/timeseries_agg_helpers.js");
-load("jstests/libs/analyze_plan.js");
+import {TimeseriesAggTests} from "jstests/core/timeseries/libs/timeseries_agg_helpers.js";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 // These are functions instead of const variables to avoid tripping up the parallel jstests.
-function getEquivalentStrings() {
+export function getEquivalentStrings() {
     return ['a', 'A', 'b', 'B'];
 }
 
-function getEquivalentNumbers() {
+export function getEquivalentNumbers() {
     return [7, NumberInt(7), NumberLong(7), NumberDecimal(7)];
 }
 
-function verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter, expectStage}) {
+export function verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter, expectStage}) {
     // Verify lastpoint optmization.
     const explain = tsColl.explain().aggregate(pipeline);
     expectStage({explain, precedingFilter});
@@ -26,7 +26,7 @@ function verifyLastpoint({tsColl, observerColl, pipeline, precedingFilter, expec
     assertArrayEq({actual, expected});
 }
 
-function createBoringCollections(includeIdleMeasurements = false) {
+export function createBoringCollections(includeIdleMeasurements = false) {
     // Prepare collections. Note: we usually test without idle measurements (all meta subfields are
     // non-null). If we allow the insertion of idle measurements, we will obtain multiple lastpoints
     // per bucket, and may have different results on the observer and timeseries collections.
@@ -37,7 +37,7 @@ function createBoringCollections(includeIdleMeasurements = false) {
 }
 
 // Generate interesting values.
-function generateInterestingValues() {
+export function generateInterestingValues() {
     const epoch = ISODate('1970-01-01');
 
     // Pick values with interesting equality behavior.
@@ -94,7 +94,7 @@ function generateInterestingValues() {
     return docs;
 }
 
-function getMapInterestingValuesToEquivalentsStage() {
+export function getMapInterestingValuesToEquivalentsStage() {
     const firstElemInId = {$arrayElemAt: ["$_id", 0]};
     const isIdArray = {$isArray: "$_id"};
     const equivalentStrings = getEquivalentStrings();
@@ -135,7 +135,7 @@ function getMapInterestingValuesToEquivalentsStage() {
     };
 }
 
-function createInterestingCollections() {
+export function createInterestingCollections() {
     const testDB = TimeseriesAggTests.getTestDb();
     const collation = {locale: 'en_US', strength: 2};
 
@@ -164,7 +164,7 @@ function createInterestingCollections() {
     return [tsColl, observerColl];
 }
 
-function expectDistinctScan({explain}) {
+export function expectDistinctScan({explain}) {
     // The query can utilize DISTINCT_SCAN.
     assert.neq(getAggPlanStage(explain, "DISTINCT_SCAN"), null, explain);
 
@@ -172,7 +172,7 @@ function expectDistinctScan({explain}) {
     assert.eq(getAggPlanStage(explain, "SORT"), null, explain);
 }
 
-function expectCollScan({explain, precedingFilter, noSortInCursor}) {
+export function expectCollScan({explain, precedingFilter, noSortInCursor}) {
     if (noSortInCursor) {
         // We need a separate sort stage.
         assert.eq(getAggPlanStage(explain, "SORT"), null, explain);
@@ -189,7 +189,7 @@ function expectCollScan({explain, precedingFilter, noSortInCursor}) {
     }
 }
 
-function expectIxscan({explain, noSortInCursor}) {
+export function expectIxscan({explain, noSortInCursor}) {
     if (noSortInCursor) {
         // We can rely on the index without a cursor $sort.
         assert.eq(getAggPlanStage(explain, "SORT"), null, explain);
@@ -209,7 +209,7 @@ function expectIxscan({explain, noSortInCursor}) {
      3. Lastpoint queries on indexes with ascending time and $last/$bottom and an additional
    secondary index so that we can use the DISTINCT_SCAN optimization.
 */
-function testAllTimeMetaDirections(tsColl, observerColl, getTestCases) {
+export function testAllTimeMetaDirections(tsColl, observerColl, getTestCases) {
     const testDB = TimeseriesAggTests.getTestDb();
     const testCases = [
         {time: -1, useBucketsIndex: false},

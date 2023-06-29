@@ -3,11 +3,6 @@
  * FCV is still in downgrading state and we can change FCV to upgraded state.
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
-
 const latest = "latest";
 const testName = "restart_during_downgrading_fcv";
 const dbpath = MongoRunner.dataPath + testName;
@@ -92,4 +87,3 @@ const runShardedClusterTest = function() {
 runStandaloneTest();
 runReplicaSetTest();
 runShardedClusterTest();
-})();

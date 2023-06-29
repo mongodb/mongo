@@ -6,12 +6,8 @@
  *     requires_replication,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/libs/fail_point_util.js");
 load("jstests/noPassthrough/libs/index_build.js");
-load("jstests/libs/feature_flag_util.js");
 
 const replTest = new ReplSetTest({
     nodes: 1,
@@ -226,4 +222,3 @@ assert.eq(4, findWithIndex(insertAfterIndexBuildTS)["cursor"]["firstBatch"].leng
 assert.eq(5, findWithIndex(insertAfterRestartAfterIndexBuild)["cursor"]["firstBatch"].length);
 
 replTest.stopSet();
-})();

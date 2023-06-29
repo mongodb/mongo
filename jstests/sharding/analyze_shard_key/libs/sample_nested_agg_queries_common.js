@@ -2,15 +2,15 @@
  * Utilities for testing basic support for sampling nested aggregate queries (i.e. ones inside
  * $lookup, $graphLookup, $unionWith) on a sharded cluster.
  */
-
-load("jstests/libs/sbe_util.js");  // For checkSBEEnabled.
+import {checkSBEEnabled} from "jstests/libs/sbe_util.js";
 
 // Make the periodic jobs for refreshing sample rates and writing sampled queries and diffs have a
 // period of 1 second to speed up the test.
-const queryAnalysisSamplerConfigurationRefreshSecs = 1;
-const queryAnalysisWriterIntervalSecs = 1;
+export const queryAnalysisSamplerConfigurationRefreshSecs = 1;
 
-const outerAggTestCases = [
+export const queryAnalysisWriterIntervalSecs = 1;
+
+export const outerAggTestCases = [
     // The test cases for singly-nested aggregate queries.
     {
         name: "lookup_custom_pipeline",
@@ -187,7 +187,7 @@ const outerAggTestCases = [
     }
 ];
 
-const innerAggTestCases = [
+export const innerAggTestCases = [
     {
         // The filter is in the first stage.
         containInitialFilter: true,
@@ -215,17 +215,17 @@ const innerAggTestCases = [
  * Tests that a nested aggregate query run internally by an aggregation stage that takes in a
  * "pipeline" is sampled correctly.
  */
-function testCustomInnerPipeline(makeOuterPipelineFunc,
-                                 makeInnerPipelineFunc,
-                                 containInitialFilter,
-                                 st,
-                                 dbName,
-                                 localCollName,
-                                 foreignCollName,
-                                 filter,
-                                 shardNames,
-                                 explain,
-                                 requireShardToRoute) {
+export function testCustomInnerPipeline(makeOuterPipelineFunc,
+                                        makeInnerPipelineFunc,
+                                        containInitialFilter,
+                                        st,
+                                        dbName,
+                                        localCollName,
+                                        foreignCollName,
+                                        filter,
+                                        shardNames,
+                                        explain,
+                                        requireShardToRoute) {
     const mongosDB = st.s.getDB(dbName);
     const foreignNs = dbName + "." + foreignCollName;
     const foreignCollUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);
@@ -266,13 +266,13 @@ function testCustomInnerPipeline(makeOuterPipelineFunc,
  * Tests that a nested aggregate query run internally by an aggregation stage that does not take in
  * a "pipeline" is sampled correctly.
  */
-function testNoCustomInnerPipeline(makeOuterPipelineFunc,
-                                   st,
-                                   dbName,
-                                   localCollName,
-                                   foreignCollName,
-                                   explain,
-                                   requireShardToRoute) {
+export function testNoCustomInnerPipeline(makeOuterPipelineFunc,
+                                          st,
+                                          dbName,
+                                          localCollName,
+                                          foreignCollName,
+                                          explain,
+                                          requireShardToRoute) {
     const mongosDB = st.s.getDB(dbName);
     const foreignNs = dbName + "." + foreignCollName;
     const foreignCollUuid = QuerySamplingUtil.getCollectionUuid(mongosDB, foreignCollName);

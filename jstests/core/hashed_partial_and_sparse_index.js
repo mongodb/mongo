@@ -6,11 +6,8 @@
  *   assumes_read_concern_local,
  * ]
  */
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For assertStagesForExplainOfCommand().
+import {assertStagesForExplainOfCommand} from "jstests/libs/analyze_plan.js";
 
 const coll = db.hashed_partial_index;
 coll.drop();
@@ -92,4 +89,3 @@ testSparseHashedIndex({a: "hashed", b: 1});
     validateFindCmdOutputAndPlan(
         {filter: {b: 6}, expectedOutput: [{a: 1, b: 6}], expectedStages: ["IXSCAN", "FETCH"]});
 });
-})();

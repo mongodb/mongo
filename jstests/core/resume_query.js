@@ -11,10 +11,7 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/feature_flag_util.js");
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const testName = TestData.testName;
 
@@ -147,4 +144,3 @@ const testAggregateCmd = function() {
 
 testFindCmd();
 testAggregateCmd();
-})();

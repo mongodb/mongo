@@ -10,10 +10,7 @@
  *   requires_timeseries,
  * ]
  */
-(function() {
-'use strict';
-
-load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest'.
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
 
 TimeseriesTest.run((insert) => {
     const coll = db.timeseries_bucket_manual_removal;
@@ -69,4 +66,3 @@ TimeseriesTest.run((insert) => {
     assert.eq(buckets.length, 1, 'Expected one bucket but found ' + tojson(buckets));
     assert.neq(buckets[0]._id, bucketId);
 });
-})();

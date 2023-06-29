@@ -11,10 +11,7 @@
 //   # Don't disable the thing we are specifically testing for!
 //   requires_pipeline_optimization,
 // ]
-load('jstests/libs/analyze_plan.js');
-
-(function() {
-"use strict";
+import {getAggPlanStage, getPlanStage} from "jstests/libs/analyze_plan.js";
 
 const coll = db.getSiblingDB("split_match_and_swap_with_sort")["test"];
 coll.drop();
@@ -66,4 +63,3 @@ assert.commandWorked(
               collScanStage.filter,
               collScanStage);
 }
-}());

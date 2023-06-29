@@ -11,10 +11,7 @@
 //   do_not_wrap_aggregations_in_facets,
 //   requires_pipeline_optimization,
 // ]
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");  // For 'getPlanStage'.
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
 const t = db.jstests_aggregation_server6192;
 t.drop();
@@ -72,4 +69,3 @@ assertNotOptimized({$and: ['$x', '$x']});
 assertNotOptimized({$or: ['$x', '$x']});
 assertNotOptimized({$and: ['$x']});
 assertNotOptimized({$or: ['$x']});
-}());

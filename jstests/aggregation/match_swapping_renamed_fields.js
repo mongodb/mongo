@@ -6,10 +6,7 @@
  *   requires_pipeline_optimization,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
+import {getAggPlanStage, getAggPlanStages} from "jstests/libs/analyze_plan.js";
 
 let coll = db.match_swapping_renamed_fields;
 coll.drop();
@@ -204,4 +201,3 @@ explain = coll.explain().aggregate(pipeline);
 // applicable rename that allows swapping, while the other does not.
 let matchStages = getAggPlanStages(explain, "$match");
 assert.eq(2, matchStages.length);
-}());

@@ -11,11 +11,8 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/aggregation/extras/utils.js");     // For arrayEq().
-load("jstests/libs/wildcard_index_helpers.js");  // For WildcardIndexHelpers.
+load("jstests/aggregation/extras/utils.js");  // For arrayEq().
+import {getPlanStages, getWinningPlan} from "jstests/libs/analyze_plan.js";
 
 const documentList = [
     {
@@ -188,4 +185,3 @@ for (const stage of planStages) {
     }
 }
 assert.eq(idxUsedCnt, 2, winningPlan);
-})();

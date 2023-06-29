@@ -4,11 +4,7 @@
  *   requires_sharding,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/fixture_helpers.js");             // For FixtureHelpers.
-load("jstests/core/timeseries/libs/timeseries.js");  // For TimeseriesTest.
+load("jstests/libs/fixture_helpers.js");  // For FixtureHelpers.
 
 const dbName = jsTestName();
 const collName = "coll1";
@@ -96,4 +92,3 @@ const st = new ShardingTest({shards: 2});
 st.shardColl(dbName + "." + collName, {_id: 1}, {_id: 1});
 runTest(st.s);
 st.stop();
-}());

@@ -1,13 +1,11 @@
 /**
  * Tests scenario related to SERVER-74954.
  */
-(function() {
-"use strict";
+import {checkCascadesOptimizerEnabled} from "jstests/libs/optimizer_utils.js";
 
-load("jstests/libs/optimizer_utils.js");  // For checkCascadesOptimizerEnabled.
 if (!checkCascadesOptimizerEnabled(db)) {
     jsTestLog("Skipping test because the optimizer is not enabled");
-    return;
+    quit();
 }
 
 const t = db.cqf_elemmatch_exists;
@@ -33,4 +31,3 @@ const res = t.find({
 assert.eq(2, res.length);
 assert.eq(1, res[0].a);
 assert.eq(4, res[1].a);
-}());

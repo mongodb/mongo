@@ -3,13 +3,10 @@
 //   assumes_read_concern_local,
 //   does_not_support_stepdowns,
 // ]
-(function() {
-"use strict";
-
 load("jstests/aggregation/extras/utils.js");  // For arrayEq().
-load("jstests/libs/analyze_plan.js");         // For getPlanStages().
-load("jstests/libs/feature_flag_util.js");    // For "FeatureFlagUtil"
-load("jstests/libs/fixture_helpers.js");      // For numberOfShardsForCollection().
+import {getWinningPlan, getPlanStages} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
+load("jstests/libs/fixture_helpers.js");  // For numberOfShardsForCollection().
 
 // TODO SERVER-68303: Remove the feature flag and update corresponding tests.
 const allowCompoundWildcardIndexes =
@@ -115,4 +112,3 @@ if (allowCompoundWildcardIndexes) {
         }
     }
 }
-})();

@@ -8,10 +8,7 @@
  *   requires_ttl_index,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/libs/ttl_util.js");
+import {TTLUtil} from "jstests/libs/ttl_util.js";
 
 // Runs TTL monitor constantly to speed up this test.
 const conn = MongoRunner.runMongod({setParameter: 'ttlMonitorSleepSecs=1'});
@@ -43,4 +40,3 @@ TTLUtil.waitForPass(testDB);
 assert.eq(0, coll.find().itcount());
 
 MongoRunner.stopMongod(conn);
-})();

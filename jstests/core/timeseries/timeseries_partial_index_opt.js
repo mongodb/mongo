@@ -14,10 +14,8 @@
  *   requires_fcv_70,
  * ]
  */
-(function() {
-"use strict";
+import {getAggPlanStage} from "jstests/libs/analyze_plan.js";
 
-load("jstests/libs/analyze_plan.js");
 const coll = db.timeseries_partial_index_opt;
 
 coll.drop();
@@ -55,4 +53,3 @@ checkIndexScanAndFilter(coll, {time: {$gte: timeDate}, tag: {$gt: 1}}, "time_1_t
 assert.commandWorked(
     coll.createIndex({tag: 1}, {name: "tag_1_b", partialFilterExpression: {b: {$gte: 10}}}));
 checkIndexScanAndFilter(coll, {tag: {$gt: 1}, b: {$gte: 10}}, "tag_1_b", "b");
-})();

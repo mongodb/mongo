@@ -11,11 +11,8 @@
  *   requires_wiredtiger,
  * ]
  */
-(function() {
-"use strict";
-
-load("jstests/core/timeseries/libs/timeseries.js");
-load("jstests/libs/feature_flag_util.js");
+import {TimeseriesTest} from "jstests/core/timeseries/libs/timeseries.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 const defaultBucketMaxSize = 128000;                                           //  125 KB
 const minWiredTigerCacheSizeGB = 0.256;                                        //  256 MB
@@ -44,7 +41,7 @@ if (!TimeseriesTest.timeseriesScalabilityImprovementsEnabled(db)) {
     replSet.stopSet();
     jsTestLog(
         'Skipping test because the TimeseriesScalabilityImprovements feature flag is disabled.');
-    return;
+    quit();
 }
 
 // Helper to log timeseries stats.
@@ -216,4 +213,3 @@ const initializeBuckets = function(numOfBuckets = 1) {
 })();
 
 replSet.stopSet();
-})();

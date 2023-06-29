@@ -22,16 +22,13 @@
  * ]
  */
 
-(function() {
-"use strict";
-
-load("jstests/libs/analyze_plan.js");
-load("jstests/libs/feature_flag_util.js");
+import {aggPlanHasStage, getAggPlanStage} from "jstests/libs/analyze_plan.js";
+import {FeatureFlagUtil} from "jstests/libs/feature_flag_util.js";
 
 if (!FeatureFlagUtil.isEnabled(db, "TimeseriesMetricIndexes")) {
     jsTestLog(
         "Skipped test as the featureFlagTimeseriesMetricIndexes feature flag is not enabled.");
-    return;
+    quit();
 }
 Random.setRandomSeed();
 
@@ -655,4 +652,3 @@ function runExamples(coll, isTimeseries, has2dsphereIndex) {
     insertTestData(coll);
     runExamples(coll, true /* isTimeseries */, true /* has2dsphereIndex */);
 }
-})();
