@@ -50,6 +50,13 @@ StatusWith<HostAndPort> HostAndPort::parse(StringData text) {
     return StatusWith<HostAndPort>(result);
 }
 
+Status validateHostAndPort(const std::string& hostAndPortStr, const boost::optional<TenantId>&) {
+    if (hostAndPortStr.empty()) {
+        return Status::OK();
+    }
+    return HostAndPort::parse(hostAndPortStr).getStatus();
+}
+
 HostAndPort::HostAndPort() : _port(-1) {}
 
 HostAndPort::HostAndPort(StringData text) {
