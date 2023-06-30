@@ -8071,24 +8071,47 @@ tasks:
 
 - <<: *task_template
   name: cqf
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_disabled_pipeline_opt
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_parallel
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
+
+- <<: *task_template
+  name: cqf_experimental_jscore_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: cqf_experimental_aggregation_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
+  name: cqf_experimental_no_passthrough_gen
+  tags: ["cqf"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: cqf_experimental_no_passthrough
+      use_large_distro: "true"
 
 - <<: *task_template
   name: streams
@@ -8287,7 +8310,7 @@ tasks:
 
 - <<: *task_template
   name: query_golden_cqf
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"

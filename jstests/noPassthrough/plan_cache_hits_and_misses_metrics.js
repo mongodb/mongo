@@ -3,7 +3,7 @@
  * is recovered from the plan cache.
  *
  * @tags: [
- *   # Bonsai optimizer cannot use the plan cache yet.
+ *   # TODO SERVER-67607: Test plan cache with CQF enabled.
  *   cqf_incompatible,
  * ]
  */

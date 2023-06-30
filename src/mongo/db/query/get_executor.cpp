@@ -1623,8 +1623,8 @@ StatusWith<std::unique_ptr<PlanExecutor, PlanExecutor::Deleter>> getExecutor(
                     ServerParameterSet::getNodeParameterSet()->get<QueryFrameworkControl>(
                         "internalQueryFrameworkControl");
                 tassert(7319400,
-                        "Optimization failed either without tryBonsai set, or without a hint.",
-                        queryControl->_data.get() == QueryFrameworkControlEnum::kTryBonsai &&
+                        "Optimization failed either with forceBonsai set, or without a hint.",
+                        queryControl->_data.get() != QueryFrameworkControlEnum::kForceBonsai &&
                             !canonicalQuery->getFindCommandRequest().getHint().isEmpty() &&
                             !fastIndexNullHandling);
             }

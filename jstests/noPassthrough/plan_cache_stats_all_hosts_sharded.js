@@ -4,7 +4,7 @@
 //   assumes_read_concern_unchanged,
 //   assumes_read_preference_unchanged,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
-//   cqf_incompatible,
+//   cqf_experimental_incompatible,
 // ]
 (function() {
 "use strict";

@@ -33,9 +33,6 @@ const documents = [
 ];
 assert.commandWorked(coll.insert(documents));
 
-assert.commandWorked(coll.createIndex({a: 1}));
-assert.commandWorked(coll.createIndex({z: 1}));
-
 function checkQuery(
     {expected = [], query = {}, proj = {}, sort = null, limit = null, skip = null, desc = null},
     hint) {
@@ -803,6 +800,10 @@ runIDHackTest();
 runCollScanTests();
 
 runFindTestsWithHint({$natural: 1});
+
+assert.commandWorked(coll.createIndex({a: 1}));
+assert.commandWorked(coll.createIndex({z: 1}));
+
 runFindTestsWithHint({a: 1});
 runFindTestsWithHint({z: 1});  // Multi-key
 }());

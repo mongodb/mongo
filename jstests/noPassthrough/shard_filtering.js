@@ -5,7 +5,7 @@
  * @tags: [
  *   requires_sharding,
  *   # TODO SERVER-71169: Implement shard filtering for CQF.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

@@ -1,7 +1,7 @@
 // @tags: [
 //   requires_persistence,
-//   # TODO: SERVER-64007 Plans produced by Cascades don't yield
-//   cqf_incompatible,
+//   # TODO: SERVER-70446 Enable yielding for index plans in CQF.
+//   cqf_experimental_incompatible,
 // ]
 (function() {
 "use strict";

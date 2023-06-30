@@ -704,7 +704,6 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_parallel
   - name: query_golden_classic
-  - name: query_golden_cqf
   # - name: burn_in_tasks_gen
   #   depends_on:
   #   - name: version_burn_in_gen
@@ -1220,7 +1219,6 @@ buildvariants:
   - name: cqf_disabled_pipeline_opt
   - name: cqf_parallel
   - name: query_golden_classic
-  - name: query_golden_cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   # - name: burn_in_tasks_gen
@@ -1370,6 +1368,7 @@ buildvariants:
   - name: .misc_js
   - name: .multi_shard
   - name: .query_fuzzer
+  - name: query_golden_classic
   - name: .random_multiversion_ds
   - name: .read_only
   - name: .read_write_concern !.large
@@ -1456,11 +1455,7 @@ buildvariants:
       --mongodSetParameters="{featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: 'tryBonsai'}"
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
-  - name: cqf
-  - name: cqf_disabled_pipeline_opt
-  - name: cqf_parallel
-  - name: query_golden_classic
-  - name: query_golden_cqf
+  - name: .cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   # - name: burn_in_tasks_gen
@@ -1962,7 +1957,6 @@ buildvariants:
   tasks:
   - name: analyze_shard_key_jscore_passthrough_gen
   - name: query_golden_classic
-  - name: query_golden_cqf
   - name: lint_fuzzer_sanity_patch
   - name: test_api_version_compatibility
   - name: check_feature_flag_tags
@@ -2242,7 +2236,6 @@ buildvariants:
   - name: .misc_js
   - name: .multi_shard .common
   - name: query_golden_classic
-  - name: query_golden_cqf
   - name: .query_fuzzer
   - name: .read_write_concern
   - name: replica_sets_large_txns_format_jscore_passthrough
@@ -2367,7 +2360,6 @@ buildvariants:
   # - name: multiversion_gen # Multiversion does not pass yet, also making this work is going to be pretty tricky
   - name: .query_fuzzer
   - name: query_golden_classic
-  - name: query_golden_cqf
   # - name: .random_multiversion_ds # Multiversion does not pass yet, also making this work is going to be pretty tricky
   # - name: .read_write_concern .large # Not passing
   #   distros:
