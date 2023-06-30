@@ -74,14 +74,12 @@ public:
              const DatabaseName&,
              const BSONObj& cmdObj,
              BSONObjBuilder& result) override {
-        const Date_t startTime(Date_t::now());
-        const auto service = txn->getServiceContext();
-        const auto clock = service->getFastClockSource();
-
         double cpuFactor = 1;
         if (cmdObj["cpuFactor"].isNumber()) {
             cpuFactor = cmdObj["cpuFactor"].number();
         }
+
+        Timer t{};
         long long limit = 10000 * cpuFactor;
         // volatile used to ensure that loop is not optimized away
         volatile uint64_t lresult [[maybe_unused]] = 0;  // NOLINT
@@ -91,9 +89,9 @@ public:
         }
         lresult = x;
 
-        auto durationTime = clock->now() - startTime;
-        result.append("durationMillis", durationCount<Milliseconds>(durationTime));
-        result.append("durationSeconds", durationCount<Seconds>(durationTime));
+        //add time-consuming statistics
+        result.append("durationMillis", t.millis());
+        result.append("durationSeconds", t.seconds());
         return true;
     }
     virtual bool supportsWriteConcern(const BSONObj& cmd) const {
