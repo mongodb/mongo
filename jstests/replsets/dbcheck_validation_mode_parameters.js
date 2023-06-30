@@ -1,6 +1,9 @@
 /**
  * Test the validity of parameters in the dbCheck command.
  *
+ * @tags: [
+ *   requires_fcv_71
+ * ]
  */
 
 (function() {
