@@ -125,7 +125,7 @@ private:
     LogicalSessionIdMap<Session> _childSessions;
 
     // Map partitioning the session pool by logged in user.
-    stdx::unordered_map<SHA256Block, std::list<Session>> _perUserSessionPool;
+    stdx::unordered_map<SHA256Block, std::list<Session>, SHA256Block::Hash> _perUserSessionPool;
 
     // Protects the internal data structures.
     mutable Mutex _mutex = MONGO_MAKE_LATCH("InternalSessionPool::_mutex");
