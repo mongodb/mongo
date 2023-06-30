@@ -4879,6 +4879,107 @@ TEST_F(ReevalSyncSourceTest, NoChangeWhenSyncSourceForcedByFailPoint) {
                                                                     ReadPreference::Nearest));
 }
 
+// Test that we will select the node specified by the 'unsupportedSyncSource' parameter as a sync
+// source even if it is farther away.
+TEST_F(ReevalSyncSourceTest, ChooseSyncSourceForcedByStartupParameterEvenIfFarther) {
+    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
+                                                              "host2:27017"};
+
+    // Make the desired host much farther away.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+
+    // Select a sync source.
+    auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+}
+
+// Test that we will not change from the node specified by the 'unsupportedSyncSource' parameter
+// due to ping time.
+TEST_F(ReevalSyncSourceTest, NoChangeDueToPingTimeWhenSyncSourceForcedByStartupParameter) {
+    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
+                                                              "host2:27017"};
+    // Select a sync source.
+    auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+
+    // Set up so that without forcing the sync source, the node otherwise would have changed sync
+    // sources.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+
+    ASSERT_FALSE(getTopoCoord().shouldChangeSyncSourceDueToPingTime(HostAndPort("host2"),
+                                                                    MemberState::RS_SECONDARY,
+                                                                    lastOpTimeFetched,
+                                                                    now(),
+                                                                    ReadPreference::Nearest));
+}
+
+// Test that we will not change sync sources due to the replSetSyncFrom command being run when
+// the 'unsupportedSyncSource' startup parameter is set - that is, the parameter should always
+// take priority.
+TEST_F(ReevalSyncSourceTest, NoChangeDueToReplSetSyncFromWhenSyncSourceForcedByStartupParameter) {
+    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
+                                                              "host2:27017"};
+    // Select a sync source.
+    auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+
+    // Simulate calling replSetSyncFrom and selecting host3.
+    BSONObjBuilder response;
+    auto result = Status::OK();
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("host3:27017"), &response, &result);
+
+    // Assert the command failed.
+    ASSERT_EQ(result.code(), ErrorCodes::IllegalOperation);
+
+    // Reselect a sync source, and confirm it hasn't changed.
+    syncSource = getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+}
+
+// Test that if a node is REMOVED but has 'unsupportedSyncSource' specified, we select no sync
+// source.
+TEST_F(ReevalSyncSourceTest, RemovedNodeSpecifiesSyncSourceStartupParameter) {
+    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
+                                                              "host2:27017"};
+    // Remove ourselves from the config.
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 2 << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))),
+                 -1);
+    // Confirm we were actually removed.
+    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+    // Confirm we select no sync source.
+    auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+    ASSERT_EQUALS(syncSource, HostAndPort());
+}
+
+// Test that we crash if the 'unsupportedSyncSource' parameter specifies a node that is not in the
+// replica set config.
+DEATH_TEST_F(ReevalSyncSourceTest, CrashOnSyncSourceParameterNotInReplSet, "7785600") {
+    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
+                                                              "host4:27017"};
+    auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+}
+
+// Test that we crash if the 'unsupportedSyncSource' parameter specifies ourself as a node.
+DEATH_TEST_F(ReevalSyncSourceTest, CrashOnSyncSourceParameterIsSelf, "7785601") {
+    RAIIServerParameterControllerForTest syncSourceParamGuard{"unsupportedSyncSource",
+                                                              "host1:27017"};
+    auto syncSource =
+        getTopoCoord().chooseNewSyncSource(now()++, OpTime(), ReadPreference::Nearest);
+}
+
 class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {
 public:
     virtual void setUp() {

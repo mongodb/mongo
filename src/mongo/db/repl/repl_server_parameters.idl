@@ -760,6 +760,17 @@ server_parameters:
         cpp_vartype: bool
         cpp_varname: disableTransitionFromLatestToLastContinuous
         default: true
+    
+    unsupportedSyncSource:
+        description: >-
+            **Not a supported feature**. Specifies the host/port for a node to use as a sync source.
+            It is a fatal error to specify a node that is not a part of the replica set config or to
+            specify the node itself.
+        set_at: startup
+        cpp_vartype: std::string
+        cpp_varname: unsupportedSyncSource
+        default: ""
+        validator: { callback: 'validateHostAndPort' }
 
 feature_flags:
     featureFlagRetryableFindAndModify:
