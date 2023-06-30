@@ -45,6 +45,10 @@ selector:
   # This test uses 'system' database and '$tenant' cannot be injected in 'system.$cmd' namespace.
   - jstests/change_streams/global_index.js
 
+  # Queryable encryption test requires an internal connection for the keyvault that does not
+  # inject a $tenant.
+  - jstests/change_streams/queryable_encryption_change_stream.js
+
   exclude_with_any_tags:
   ##
   # The next tags correspond to the special errors thrown by the
