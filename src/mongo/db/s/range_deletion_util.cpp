@@ -108,6 +108,12 @@ StatusWith<int> deleteNextBatch(OperationContext* opCtx,
                                 << keyPattern.toString() << "'");
     }
 
+    const auto rangeDeleterPriority = rangeDeleterHighPriority.load()
+        ? AdmissionContext::Priority::kImmediate
+        : AdmissionContext::Priority::kLow;
+
+    ScopedAdmissionPriorityForLock priority{opCtx->lockState(), rangeDeleterPriority};
+
     // Extend bounds to match the index we found
     const KeyPattern indexKeyPattern(shardKeyIdx->keyPattern());
     const auto extend = [&](const auto& key) {

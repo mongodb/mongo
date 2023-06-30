@@ -68,6 +68,16 @@ server_parameters:
           gte: 0
         default: 20
 
+    rangeDeleterHighPriority:
+        description:
+            "By default, this parameter is set to 'false' meaning that range deletions have a
+            lower priority than user operations. Setting this parameter to true prioritizes
+            range deletions over user operations."
+        set_at: [ startup, runtime ]
+        cpp_vartype: AtomicWord<bool>
+        cpp_varname: rangeDeleterHighPriority
+        default: false
+
     receiveChunkWaitForRangeDeleterTimeoutMS:
         description: >-
           Amount of time in milliseconds an incoming migration will wait for an intersecting range
