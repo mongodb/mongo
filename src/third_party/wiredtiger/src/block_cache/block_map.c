@@ -94,7 +94,7 @@ __wt_blkcache_map_read(
 
     bm = S2BT(session)->bm;
 
-    if (!bm->map) /* FIXME WT-8728. */
+    if (!bm->map)
         return (0);
 
     WT_ASSERT(session, !bm->is_multi_handle);
