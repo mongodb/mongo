@@ -319,11 +319,11 @@ SnapshotedServices acquireServicesSnapshot(OperationContext* opCtx,
         std::move(collOrView), std::move(collectionDescription), std::move(optOwnershipFilter)};
 }
 
-std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViewsWithoutTakingLocks(
+ScopedCollectionOrViewAcquisitions acquireResolvedCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx,
     const CollectionCatalog& catalog,
     ResolvedNamespaceOrViewAcquisitionRequestsMap sortedAcquisitionRequests) {
-    std::vector<ScopedCollectionOrViewAcquisition> acquisitions;
+    ScopedCollectionOrViewAcquisitions acquisitions;
     for (auto& acquisitionRequest : sortedAcquisitionRequests) {
         tassert(7328900,
                 "Cannot acquire for write without locks",
@@ -371,7 +371,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
                      std::move(std::get<CollectionPtr>(snapshotedServices.collectionPtrOrView))});
 
             ScopedCollectionAcquisition scopedAcquisition(opCtx, acquiredCollection);
-            acquisitions.emplace_back(std::move(scopedAcquisition));
+            acquisitions.emplace(prerequisites.nss, std::move(scopedAcquisition));
         } else {
             // It's a view.
             auto& acquiredView = TransactionResources::get(opCtx).addAcquiredView(
@@ -382,7 +382,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireResolvedCollectionsOrViews
                      snapshotedServices.collectionPtrOrView))});
 
             ScopedViewAcquisition scopedAcquisition(opCtx, acquiredView);
-            acquisitions.emplace_back(std::move(scopedAcquisition));
+            acquisitions.emplace(prerequisites.nss, std::move(scopedAcquisition));
         }
     }
 
@@ -666,7 +666,7 @@ ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
     return ScopedCollectionAcquisition(acquireCollectionOrView(opCtx, acquisitionRequest, mode));
 }
 
-std::vector<ScopedCollectionAcquisition> acquireCollections(
+ScopedCollectionAcquisitions acquireCollections(
     OperationContext* opCtx,
     std::vector<CollectionAcquisitionRequest> acquisitionRequests,
     LockMode mode) {
@@ -680,12 +680,11 @@ std::vector<ScopedCollectionAcquisition> acquireCollections(
     auto acquisitions = acquireCollectionsOrViews(opCtx, namespaceOrViewAcquisitionRequests, mode);
 
     // Transform the acquisitions to ScopedCollectionAcquisitions
-    std::vector<ScopedCollectionAcquisition> collectionAcquisitions;
+    ScopedCollectionAcquisitions collectionAcquisitions;
     for (auto& acquisition : acquisitions) {
         // It must be a collection, because that's what the acquisition request stated.
-        invariant(acquisition.isCollection());
-
-        collectionAcquisitions.emplace_back(std::move(acquisition));
+        invariant(acquisition.second.isCollection());
+        collectionAcquisitions.emplace(std::move(acquisition));
     }
     return collectionAcquisitions;
 }
@@ -694,7 +693,7 @@ ScopedCollectionOrViewAcquisition acquireCollectionOrView(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest, LockMode mode) {
     auto acquisition = acquireCollectionsOrViews(opCtx, {std::move(acquisitionRequest)}, mode);
     invariant(acquisition.size() == 1);
-    return std::move(acquisition.front());
+    return std::move(acquisition.begin()->second);
 }
 
 ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
@@ -702,7 +701,7 @@ ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
     auto acquisition =
         acquireCollectionsOrViewsWithoutTakingLocks(opCtx, {std::move(acquisitionRequest)});
     invariant(acquisition.size() == 1);
-    return std::move(acquisition.front());
+    return std::move(acquisition.begin()->second);
 }
 
 namespace shard_role_details {
@@ -833,7 +832,7 @@ ResolvedNamespaceOrViewAcquisitionRequestsMap generateSortedAcquisitionRequests(
 }
 }  // namespace shard_role_details
 
-std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
+ScopedCollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
     LockMode mode) {
@@ -952,7 +951,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
     }
 }
 
-std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutTakingLocks(
+ScopedCollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests) {
     if (acquisitionRequests.size() == 0) {
         return {};

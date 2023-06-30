@@ -349,8 +349,10 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
                                                           AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_EQ(nssUnshardedCollection1, acquisitions.begin()->first);
+        ASSERT_TRUE(acquisitions.at(nssUnshardedCollection1).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(nssUnshardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -514,8 +516,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
                 opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead)});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_TRUE(acquisitions.at(nssUnshardedCollection1).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(nssUnshardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -595,8 +598,9 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
                                                           AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_TRUE(acquisitions.at(nssShardedCollection1).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(nssShardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -767,8 +771,9 @@ TEST_F(ShardRoleTest, AcquireCollectionNonExistentNamespace) {
                 opCtx(), inexistentNss, AcquisitionPrerequisites::kRead)});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_TRUE(acquisitions.at(inexistentNss).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(inexistentNss).getCollection();
 
         ASSERT(!acquisition.getCollectionPtr());
         ASSERT(!acquisition.getShardingDescription().isSharded());
@@ -884,24 +889,12 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
 
     ASSERT_EQ(2, acquisitions.size());
 
-    const auto& acquisitionUnshardedColl =
-        std::find_if(acquisitions.begin(),
-                     acquisitions.end(),
-                     [nss = nssUnshardedCollection1](const auto& acquisition) {
-                         return acquisition.nss() == nss;
-                     });
-    ASSERT(acquisitionUnshardedColl != acquisitions.end());
-    ASSERT_FALSE(acquisitionUnshardedColl->getShardingDescription().isSharded());
+    const auto& acquisitionUnshardedColl = acquisitions.at(nssUnshardedCollection1);
+    ASSERT_FALSE(acquisitionUnshardedColl.getShardingDescription().isSharded());
 
-    const auto& acquisitionShardedColl =
-        std::find_if(acquisitions.begin(),
-                     acquisitions.end(),
-                     [nss = nssShardedCollection1](const auto& acquisition) {
-                         return acquisition.nss() == nss;
-                     });
-    ASSERT(acquisitionShardedColl != acquisitions.end());
-    ASSERT_TRUE(acquisitionShardedColl->getShardingDescription().isSharded());
-    ASSERT_TRUE(acquisitionShardedColl->getShardingFilter().has_value());
+    const auto& acquisitionShardedColl = acquisitions.at(nssShardedCollection1);
+    ASSERT_TRUE(acquisitionShardedColl.getShardingDescription().isSharded());
+    ASSERT_TRUE(acquisitionShardedColl.getShardingFilter().has_value());
 
     // Assert the DB lock is held, but not recursively (i.e. only once).
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
@@ -1164,7 +1157,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
                                                     }});
 
     ASSERT_EQ(1, acquisitions.size());
-    ASSERT_TRUE(acquisitions.front().isCollection());
+    ASSERT_TRUE(acquisitions.at(nss).isCollection());
 
     ASSERT_TRUE(opCtx()->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_IS));
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));

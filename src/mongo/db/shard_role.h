@@ -52,6 +52,7 @@
 #include "mongo/db/s/scoped_collection_metadata.h"
 #include "mongo/db/transaction_resources.h"
 #include "mongo/db/views/view.h"
+#include "mongo/stdx/unordered_map.h"
 #include "mongo/util/assert_util_core.h"
 #include "mongo/util/uuid.h"
 
@@ -310,6 +311,12 @@ private:
         _collectionOrViewAcquisition;
 };
 
+using ScopedCollectionAcquisitions =
+    stdx::unordered_map<NamespaceString, ScopedCollectionAcquisition>;
+
+using ScopedCollectionOrViewAcquisitions =
+    stdx::unordered_map<NamespaceString, ScopedCollectionOrViewAcquisition>;
+
 /**
  * Takes into account the specified namespace acquisition requests and if they can be satisfied,
  * adds the acquired collections to the set ot TransactionResources for the current operation.
@@ -321,7 +328,7 @@ ScopedCollectionAcquisition acquireCollection(OperationContext* opCtx,
                                               CollectionAcquisitionRequest acquisitionRequest,
                                               LockMode mode);
 
-std::vector<ScopedCollectionAcquisition> acquireCollections(
+ScopedCollectionAcquisitions acquireCollections(
     OperationContext* opCtx,
     std::vector<CollectionAcquisitionRequest> acquisitionRequests,
     LockMode mode);
@@ -333,7 +340,7 @@ ScopedCollectionOrViewAcquisition acquireCollectionOrView(
 ScopedCollectionOrViewAcquisition acquireCollectionOrViewWithoutTakingLocks(
     OperationContext* opCtx, CollectionOrViewAcquisitionRequest acquisitionRequest);
 
-std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
+ScopedCollectionOrViewAcquisitions acquireCollectionsOrViews(
     OperationContext* opCtx,
     std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests,
     LockMode mode);
@@ -342,7 +349,7 @@ std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViews(
  * Same semantics as `acquireCollectionsOrViews` above, but will not acquire or hold any of the
  * 2-phase hierarchical locks.
  */
-std::vector<ScopedCollectionOrViewAcquisition> acquireCollectionsOrViewsWithoutTakingLocks(
+ScopedCollectionOrViewAcquisitions acquireCollectionsOrViewsWithoutTakingLocks(
     OperationContext* opCtx, std::vector<CollectionOrViewAcquisitionRequest> acquisitionRequests);
 
 /**
