@@ -1063,19 +1063,18 @@ Status runAggregate(OperationContext* opCtx,
         if (ctx && ctx->getView() &&
             (!liteParsedPipeline.startsWithCollStats() || ctx->getView()->timeseries())) {
             try {
-                invariant(collatorToUse);
-                // We can't move out of collatorToUse as it's needed for runAggregateOnView(). Clone
-                // instead.
-                auto&& expCtxAndPipeline =
-                    parsePipeline(*collatorToUse ? (*collatorToUse)->clone() : nullptr);
-                auto expCtx = expCtxAndPipeline.first;
-                auto pipeline = std::move(expCtxAndPipeline.second);
-
-                query_stats::registerRequest(expCtx, nss, [&]() {
+                invariant(collatorToUse.has_value());
+                query_stats::registerRequest(opCtx, nss, [&]() {
                     // In this path we haven't yet parsed the pipeline, but we need to do so for
                     // query shape stats - which should track the queries before views are resolved.
                     // Inside this callback we know we have already checked that query stats are
                     // enabled and know that this request has not been rate limited.
+
+                    // We can't move out of collatorToUse as it's needed for runAggregateOnView().
+                    // Clone instead.
+                    auto&& [expCtx, pipeline] = parsePipeline(
+                        *collatorToUse == nullptr ? nullptr : (*collatorToUse)->clone());
+
                     return std::make_unique<query_stats::AggregateKeyGenerator>(
                         request,
                         *pipeline,
@@ -1137,7 +1136,7 @@ Status runAggregate(OperationContext* opCtx,
         // with encrypted fields. We still collect query stats on collection-less aggregations.
         if (!(ctx && ctx->getCollection() &&
               ctx->getCollection()->getCollectionOptions().encryptedFieldConfig)) {
-            query_stats::registerRequest(expCtx, nss, [&]() {
+            query_stats::registerRequest(opCtx, nss, [&]() {
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
                     request,
                     *pipeline,

@@ -251,7 +251,7 @@ QueryStatsStore& getQueryStatsStore(OperationContext* opCtx);
  *   collecting stats is not needed due to the feature being disabled or the request being rate
  *   limited.
  */
-void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator);
 

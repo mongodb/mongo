@@ -313,7 +313,7 @@ std::unique_ptr<Pipeline, PipelineDeleter> parsePipelineAndRegisterQueryStats(
     auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
     // Skip query stats recording for queryable encryption queries.
     if (!shouldDoFLERewrite) {
-        query_stats::registerRequest(expCtx, executionNss, [&]() {
+        query_stats::registerRequest(opCtx, executionNss, [&]() {
             return std::make_unique<query_stats::AggregateKeyGenerator>(
                 request, *pipeline, expCtx, involvedNamespaces, executionNss);
         });
@@ -492,7 +492,7 @@ Status ClusterAggregate::runAggregate(OperationContext* opCtx,
             // We want to hold off parsing the pipeline until it's clear we must. Because of that,
             // we wait to parse the pipeline until this callback is invoked within
             // query_stats::registerRequest.
-            query_stats::registerRequest(expCtx, namespaces.executionNss, [&]() {
+            query_stats::registerRequest(opCtx, namespaces.executionNss, [&]() {
                 auto pipeline = Pipeline::parse(request.getPipeline(), expCtx);
                 return std::make_unique<query_stats::AggregateKeyGenerator>(
                     request, *pipeline, expCtx, involvedNamespaces, namespaces.executionNss);

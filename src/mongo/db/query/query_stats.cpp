@@ -271,10 +271,9 @@ BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
             : boost::none);
 }
 
-void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
-    auto opCtx = expCtx->opCtx;
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }
