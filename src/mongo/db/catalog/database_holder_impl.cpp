@@ -168,7 +168,7 @@ Database* DatabaseHolderImpl::openDb(OperationContext* opCtx,
     lk.unlock();
 
     if (CollectionCatalog::get(opCtx)->getAllCollectionUUIDsFromDb(dbName).empty()) {
-        audit::logCreateDatabase(opCtx->getClient(), DatabaseNameUtil::serialize(dbName));
+        audit::logCreateDatabase(opCtx->getClient(), dbName);
         if (justCreated)
             *justCreated = true;
     }
@@ -216,7 +216,7 @@ void DatabaseHolderImpl::dropDb(OperationContext* opCtx, Database* db) {
                                 << coll->ns().toStringForErrorMsg() << "'.");
     }
 
-    audit::logDropDatabase(opCtx->getClient(), DatabaseNameUtil::serialize(name));
+    audit::logDropDatabase(opCtx->getClient(), name);
 
     auto const serviceContext = opCtx->getServiceContext();
 
