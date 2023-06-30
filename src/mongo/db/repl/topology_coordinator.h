@@ -906,6 +906,9 @@ private:
     // Returns a HostAndPort if one is forced via the 'replSetSyncFrom' command.
     boost::optional<HostAndPort> _chooseSyncSourceReplSetSyncFrom(Date_t now);
 
+    // Returns a HostAndPort if one is forced via the 'unsupportedSyncSource' startup parameter.
+    boost::optional<HostAndPort> _chooseSyncSourceUnsupportedSyncSourceParameter(Date_t now);
+
     // Does preliminary checks involved in choosing sync source
     // * Do we have a valid configuration?
     // * Is the 'forceSyncSourceCandidate' failpoint enabled?
