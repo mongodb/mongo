@@ -98,7 +98,7 @@ public:
     private:
         KillAllSessionsByPatternSet _patterns;
         LogicalSessionIdMap<const KillAllSessionsByPattern*> _lsids;
-        stdx::unordered_map<SHA256Block, const KillAllSessionsByPattern*, SHA256Block::Hash> _uids;
+        stdx::unordered_map<SHA256Block, const KillAllSessionsByPattern*> _uids;
         const KillAllSessionsByPattern* _killAll = nullptr;
     };
 

@@ -29,9 +29,11 @@
 
 #pragma once
 
+#include <absl/hash/hash.h>
 #include <array>
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "mongo/base/data_range.h"
@@ -301,12 +303,28 @@ public:
      * Custom hasher so HashBlocks can be used in unordered data structures.
      *
      * ex: std::unordered_set<HashBlock, HashBlock::Hash> shaSet;
+     *
+     * Cryptographically secure hashes are good hashes so no need to hash them again. Just truncate
+     * the hash and return it.
      */
     struct Hash {
-        std::size_t operator()(const HashBlock& hashBlock) const {
-            return murmur3<sizeof(uint32_t)>(hashBlock.toCDR(), 0 /*seed*/);
+        std::size_t operator()(const HashBlock& HashBlock) const {
+            static_assert(kHashLength >= sizeof(std::size_t));
+
+            return ConstDataView(reinterpret_cast<const char*>(HashBlock.data()))
+                .read<LittleEndian<std::size_t>>();
         }
     };
+
+    /**
+     * Hash function compatible with absl::Hash for absl::unordered_{map,set}
+     */
+    template <typename H>
+    friend H AbslHashValue(H h, const HashBlock& HashBlock) {
+        static_assert(kHashLength >= sizeof(std::size_t));
+
+        return H::combine(std::move(h), Hash()(HashBlock));
+    }
 
 private:
     // The backing array of bytes for the sha block
