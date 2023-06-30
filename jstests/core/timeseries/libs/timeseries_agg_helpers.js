@@ -37,7 +37,7 @@ var TimeseriesAggTests = class {
         const observerInColl = testDB.getCollection("observer_in");
         observerInColl.drop();
         assert.commandWorked(testDB.createCollection(observerInColl.getName()));
-        const currTime = new Date();
+        let currTime = new Date();
 
         // Inserts exactly the same random measurement to both inColl and observerInColl.
         for (let i = 0; i < numIterations; i++) {
@@ -45,7 +45,7 @@ var TimeseriesAggTests = class {
                 const userUsage = TimeseriesTest.getRandomUsage();
                 let newMeasurement = {
                     tags: host.tags,
-                    time: new Date(currTime + i),
+                    time: new Date(currTime++),
                     usage_guest: TimeseriesTest.getRandomUsage(),
                     usage_guest_nice: TimeseriesTest.getRandomUsage(),
                     usage_idle: TimeseriesTest.getRandomUsage(),
@@ -63,7 +63,7 @@ var TimeseriesAggTests = class {
                 if (includeIdleMeasurements && (i % 2)) {
                     let idleMeasurement = {
                         tags: host.tags,
-                        time: new Date(currTime + i),
+                        time: new Date(currTime++),
                         idle_user: 100 - userUsage
                     };
                     assert.commandWorked(inColl.insert(idleMeasurement));
