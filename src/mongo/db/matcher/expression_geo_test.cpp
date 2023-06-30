@@ -340,12 +340,29 @@ TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
                 "$geometry": {
                     "type": "Polygon",
                     "coordinates": [
-                        []
+                        [
+                            [
+                                0,
+                                0
+                            ],
+                            [
+                                0,
+                                1
+                            ],
+                            [
+                                1,
+                                1
+                            ],
+                            [
+                                0,
+                                0
+                            ]
+                        ]
                     ],
                     "crs": {
-                        "type": "?",
+                        "type": "name",
                         "properties": {
-                            "name": "?"
+                            "name": "urn:x-mongodb:crs:strictwinding:EPSG:4326"
                         }
                     }
                 }
@@ -359,12 +376,29 @@ TEST(ExpressionGeoTest, SerializeWithCRSIFSpecifiedWithChangedOptions) {
                 "$geometry": {
                     "type": "Polygon",
                     "coordinates": [
-                        []
+                        [
+                            [
+                                0,
+                                0
+                            ],
+                            [
+                                0,
+                                1
+                            ],
+                            [
+                                1,
+                                1
+                            ],
+                            [
+                                0,
+                                0
+                            ]
+                        ]
                     ],
                     "crs": {
-                        "type": "?",
+                        "type": "name",
                         "properties": {
-                            "name": "?"
+                            "name": "urn:x-mongodb:crs:strictwinding:EPSG:4326"
                         }
                     }
                 }

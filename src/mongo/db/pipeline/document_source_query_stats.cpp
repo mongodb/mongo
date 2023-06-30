@@ -186,13 +186,17 @@ DocumentSource::GetNextResult DocumentSourceQueryStats::doGetNext() {
                             "Error encountered when applying hmac to query shape, will not publish "
                             "queryStats for this entry.",
                             "status"_attr = ex.toStatus(),
-                            "hash"_attr = *key);
+                            "hash"_attr = *key,
+                            "representativeQueryShape"_attr =
+                                metrics->getRepresentativeQueryShapeForDebug());
                 if (kDebugBuild || internalQueryStatsErrorsAreCommandFatal.load()) {
                     auto keyString = std::to_string(*key);
-                    tasserted(
-                        7349401,
-                        "Was not able to re-parse queryStats key when reading queryStats. Status: "s +
-                            ex.toString() + " Hash: " + keyString);
+                    auto queryShape = metrics->getRepresentativeQueryShapeForDebug();
+                    tasserted(7349401,
+                              "Was not able to re-parse queryStats key when reading queryStats. "
+                              "Status: " +
+                                  ex.toString() + " Hash: " + keyString +
+                                  " Query Shape: " + queryShape.toString());
                 }
             }
         }

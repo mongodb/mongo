@@ -155,6 +155,10 @@ public:
                                  TransformAlgorithmEnum algorithm,
                                  std::string hmacKey) const;
 
+    BSONObj getRepresentativeQueryShapeForDebug() const {
+        return keyGenerator->getRepresentativeQueryShapeForDebug();
+    }
+
     /**
      * Timestamp for when this query shape was added to the store. Set on construction.
      */

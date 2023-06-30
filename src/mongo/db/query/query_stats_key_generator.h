@@ -107,6 +107,10 @@ public:
             optionalObjSize(_readPreference);
     }
 
+    BSONObj getRepresentativeQueryShapeForDebug() const {
+        return _parseableQueryShape;
+    }
+
 protected:
     KeyGenerator(OperationContext* opCtx,
                  BSONObj parseableQueryShape,
