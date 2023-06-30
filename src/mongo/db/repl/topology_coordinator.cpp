@@ -166,6 +166,12 @@ void TopologyCoordinator::PingStats::miss() {
     }
 }
 
+void TopologyCoordinator::PingStats::set_forTest(Milliseconds millis) {
+    _state = HeartbeatState::SUCCEEDED;
+
+    averagePingTimeMs = millis;
+}
+
 TopologyCoordinator::TopologyCoordinator(Options options)
     : _role(Role::kFollower),
       _topologyVersion(instanceId, 0),
@@ -440,6 +446,11 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
         return HostAndPort();
     }
 
+    auto maybeSyncSource = _chooseSyncSourceUnsupportedSyncSourceParameter(now);
+    if (maybeSyncSource) {
+        return maybeSyncSource;
+    }
+
     if (auto sfp = forceSyncSourceCandidate.scoped(); MONGO_unlikely(sfp.isActive())) {
         const auto& data = sfp.getData();
         const auto hostAndPortElem = data["hostAndPort"];
@@ -506,6 +517,41 @@ boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceInitialStep(D
         return HostAndPort();
     }
     return boost::none;
+}
+
+boost::optional<HostAndPort> TopologyCoordinator::_chooseSyncSourceUnsupportedSyncSourceParameter(
+    Date_t now) {
+    invariant(_selfIndex != -1, "Unexpectedly not in the replica set config");
+
+    auto syncSourceStr = repl::unsupportedSyncSource;
+    if (syncSourceStr.empty()) {
+        return boost::none;
+    }
+    auto syncSource = HostAndPort(syncSourceStr);
+    const int syncSourceIndex = _rsConfig.findMemberIndexByHostAndPort(syncSource);
+    if (syncSourceIndex < 0) {
+        LOGV2_FATAL(
+            7785600,
+            "Selecting node specified in 'unsupportedSyncSource' parameter failed due to host "
+            "and port not in replica set config.",
+            "unsupportedSyncSource"_attr = syncSourceStr);
+    }
+
+    if (_selfIndex == syncSourceIndex) {
+        LOGV2_FATAL(
+            7785601,
+            "Node specified in 'unsupportedSyncSource' parameter is self: cannot select self as "
+            "a sync source",
+            "unsupportedSyncSource"_attr = syncSourceStr);
+    }
+
+    LOGV2(7785602,
+          "Choosing sync source candidate specified by 'unsupportedSyncSource' parameter",
+          "syncSource"_attr = syncSourceStr,
+          "syncsourceobj"_attr = syncSource);
+    std::string msg(str::stream() << "syncing from: " << syncSourceStr << " by request");
+    setMyHeartbeatMessage(now, msg);
+    return syncSource;
 }
 
 HostAndPort TopologyCoordinator::_choosePrimaryAsSyncSource(Date_t now,
@@ -600,6 +646,13 @@ void TopologyCoordinator::prepareSyncFromResponse(const HostAndPort& target,
     }
     if (_selfIndex == _currentPrimaryIndex) {
         *result = Status(ErrorCodes::NotSecondary, "primaries don't sync");
+        return;
+    }
+
+    if (!repl::unsupportedSyncSource.empty()) {
+        *result =
+            Status(ErrorCodes::IllegalOperation,
+                   "replSetSyncFrom may not be used when 'unsupportedSyncSource' parameter is set");
         return;
     }
 
@@ -2415,6 +2468,11 @@ Milliseconds TopologyCoordinator::_getPing(const HostAndPort& host) {
     return _pings[host].getMillis();
 }
 
+void TopologyCoordinator::setPing_forTest(const HostAndPort& host, const Milliseconds ping) {
+    PingStats& pingStats = _pings[host];
+    pingStats.set_forTest(ping);
+}
+
 void TopologyCoordinator::_setElectionTime(const Timestamp& newElectionTime) {
     _electionTime = newElectionTime;
 }
@@ -2923,6 +2981,13 @@ bool TopologyCoordinator::shouldChangeSyncSource(const HostAndPort& currentSourc
 
     if (_selfIndex == -1) {
         LOGV2(21828, "Not choosing new sync source because we are not in the config");
+        return false;
+    }
+
+    if (!repl::unsupportedSyncSource.empty()) {
+        LOGV2(7785604,
+              "Not choosing new sync source because sync source is forced via "
+              "'unsupportedSyncSource' parameter");
         return false;
     }
 

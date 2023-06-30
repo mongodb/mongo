@@ -783,6 +783,11 @@ public:
      */
     void populateAllMembersConfigVersionAndTerm_forTest();
 
+    /**
+     * Records the ping for the given host. For use only in testing.
+     */
+    void setPing_forTest(const HostAndPort& host, Milliseconds ping);
+
     // Returns _electionTime.  Only used in unittests.
     Timestamp getElectionTime() const;
 
@@ -853,6 +858,9 @@ private:
     // Returns a HostAndPort if one is decided (may be empty), boost:none if we need to move to the
     // next step.
     boost::optional<HostAndPort> _chooseSyncSourceInitialStep(Date_t now);
+
+    // Returns a HostAndPort if one is forced via the 'unsupportedSyncSource' startup parameter.
+    boost::optional<HostAndPort> _chooseSyncSourceUnsupportedSyncSourceParameter(Date_t now);
 
     // Returns the primary node if it is a valid sync source, otherwise returns an empty
     // HostAndPort.
@@ -1081,6 +1089,11 @@ public:
      * were spent for a single network roundtrip plus remote processing time.
      */
     void hit(Milliseconds millis);
+
+    /**
+     * Sets the ping time without considering previous pings. For use only in testing.
+     */
+    void set_forTest(Milliseconds millis);
 
     /**
      * Records that a heartbeat request failed.

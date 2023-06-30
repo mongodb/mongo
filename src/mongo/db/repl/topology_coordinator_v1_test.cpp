@@ -4534,6 +4534,212 @@ TEST_F(HeartbeatResponseTestV1, ShouldNotChangeSyncSourceWhenMemberNotInConfig) 
         HostAndPort("host4"), replMetadata, makeOplogQueryMetadata(), now()));
 }
 
+class UnsupportedSyncSourceTest : public TopoCoordTest {
+public:
+    virtual void setUp() {
+        TopoCoordTest::setUp();
+        updateConfig(BSON("_id"
+                          << "rs0"
+                          << "version" << 5 << "term" << 1 << "members"
+                          << BSON_ARRAY(BSON("_id" << 0 << "host"
+                                                   << "host1:27017")
+                                        << BSON("_id" << 1 << "host"
+                                                      << "host2:27017")
+                                        << BSON("_id" << 2 << "host"
+                                                      << "host3:27017"))
+                          << "protocolVersion" << 1),
+                     0);
+
+        // Receive an up heartbeat from both sync sources. This will allow
+        // '_chooseSyncSourceInitialStep()' to pass if the node reaches that check. We repeat this 2
+        // times to satisfy that we have received at least 2N heartbeats before re-evaluating our
+        // sync source.
+        for (auto i = 0; i < 2; i++) {
+            HeartbeatResponseAction nextAction = receiveUpHeartbeat(
+                HostAndPort("host2"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+            ASSERT_NO_ACTION(nextAction.getAction());
+            nextAction = receiveUpHeartbeat(
+                HostAndPort("host3"), "rs0", MemberState::RS_SECONDARY, election, syncSourceOpTime);
+            ASSERT_NO_ACTION(nextAction.getAction());
+        }
+    }
+
+    const OpTime election = OpTime(Timestamp(1, 0), 0);
+    const OpTime syncSourceOpTime = OpTime(Timestamp(4, 0), 0);
+    const Milliseconds pingTime = Milliseconds(7);
+    const Milliseconds significantlyCloserPingTime = Milliseconds(1);
+};
+
+// Test that we will select the node specified by the 'unsupportedSyncSource' parameter as a
+// sync source even if it is farther away.
+TEST_F(UnsupportedSyncSourceTest, ChooseSyncSourceForcedByStartupParameterEvenIfFarther) {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("unsupportedSyncSource")
+                  ->second->setFromString("host2:27017"));
+    ON_BLOCK_EXIT([&] {
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("unsupportedSyncSource")
+                      ->second->setFromString(""));
+    });
+
+    // Make the desired host much farther away.
+    getTopoCoord().setPing_forTest(HostAndPort("host2"), pingTime);
+    getTopoCoord().setPing_forTest(HostAndPort("host3"), significantlyCloserPingTime);
+
+    // Select a sync source.
+    auto syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+}
+
+
+// Test that we select the node specified by the 'unsupportedSyncSource' parameter as a sync source
+// even if doesn't match the specified read preference - that is, confirm that we check this
+// parameter before factoring in read preference when selecting a sync source.
+TEST_F(UnsupportedSyncSourceTest,
+       ChooseSyncSourceForcedByStartupParameterEvenIfDoesntMatchReadPreference) {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("unsupportedSyncSource")
+                  ->second->setFromString("host2:27017"));
+    ON_BLOCK_EXIT([&] {
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("unsupportedSyncSource")
+                      ->second->setFromString(""));
+    });
+
+    // Select a sync source. If we factored in read preference, this would fail because we are the
+    // primary and host2 is a secondary.
+    auto syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::PrimaryOnly);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+}
+
+// Test that we will not change sync sources due to the replSetSyncFrom command being run when
+// the 'unsupportedSyncSource' startup parameter is set - that is, the parameter should always
+// take priority.
+TEST_F(UnsupportedSyncSourceTest,
+       NoChangeDueToReplSetSyncFromWhenSyncSourceForcedByStartupParameter) {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("unsupportedSyncSource")
+                  ->second->setFromString("host2:27017"));
+    ON_BLOCK_EXIT([&] {
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("unsupportedSyncSource")
+                      ->second->setFromString(""));
+    });
+
+    // Select a sync source.
+    auto syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+
+    // Simulate calling replSetSyncFrom and selecting host3.
+    BSONObjBuilder response;
+    auto result = Status::OK();
+    getTopoCoord().prepareSyncFromResponse(HostAndPort("host3:27017"), &response, &result);
+
+    // Assert the command failed.
+    ASSERT_EQ(result.code(), ErrorCodes::IllegalOperation);
+
+    // Reselect a sync source, and confirm it hasn't changed.
+    syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::Nearest);
+    ASSERT_EQ(syncSource, HostAndPort("host2:27017"));
+}
+
+// Test that if a node is REMOVED but has 'unsupportedSyncSource' specified, we select no sync
+// source.
+TEST_F(UnsupportedSyncSourceTest, RemovedNodeSpecifiesSyncSourceStartupParameter) {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("unsupportedSyncSource")
+                  ->second->setFromString("host2:27017"));
+    ON_BLOCK_EXIT([&] {
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("unsupportedSyncSource")
+                      ->second->setFromString(""));
+    });
+
+    // Remove ourselves from the config.
+    updateConfig(BSON("_id"
+                      << "rs0"
+                      << "version" << 2 << "members"
+                      << BSON_ARRAY(BSON("_id" << 1 << "host"
+                                               << "host2:27017")
+                                    << BSON("_id" << 2 << "host"
+                                                  << "host3:27017"))),
+                 -1);
+    // Confirm we were actually removed.
+    ASSERT_EQUALS(MemberState::RS_REMOVED, getTopoCoord().getMemberState().s);
+    // Confirm we select no sync source.
+    auto syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::Nearest);
+    ASSERT_EQUALS(syncSource, HostAndPort());
+}
+
+// Test that we crash if the 'unsupportedSyncSource' parameter specifies a node that is not in
+// the replica set config.
+DEATH_TEST_F(UnsupportedSyncSourceTest, CrashOnSyncSourceParameterNotInReplSet, "7785600") {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("unsupportedSyncSource")
+                  ->second->setFromString("host4:27017"));
+    ON_BLOCK_EXIT([&] {
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("unsupportedSyncSource")
+                      ->second->setFromString(""));
+    });
+
+    auto syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::Nearest);
+}
+
+// Test that we crash if the 'unsupportedSyncSource' parameter specifies ourself as a node.
+DEATH_TEST_F(UnsupportedSyncSourceTest, CrashOnSyncSourceParameterIsSelf, "7785601") {
+    ASSERT_OK(ServerParameterSet::getGlobal()
+                  ->getMap()
+                  .find("unsupportedSyncSource")
+                  ->second->setFromString("host1:27017"));
+    ON_BLOCK_EXIT([&] {
+        ASSERT_OK(ServerParameterSet::getGlobal()
+                      ->getMap()
+                      .find("unsupportedSyncSource")
+                      ->second->setFromString(""));
+    });
+
+    auto syncSource = getTopoCoord().chooseNewSyncSource(
+        now()++,
+        OpTime(),
+        TopologyCoordinator::ChainingPreference::kUseConfiguration,
+        ReadPreference::Nearest);
+}
+
 class HeartbeatResponseReconfigTestV1 : public TopoCoordTest {
 public:
     virtual void setUp() {

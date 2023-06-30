@@ -45,6 +45,12 @@ class StatusWith;
 class StringData;
 
 /**
+ * Validate that a string is either empty or is parseable to a HostAndPort. This is intended for use
+ * as an IDL validator callback.
+ */
+Status validateHostAndPort(const std::string& hostAndPortStr);
+
+/**
  * Name of a process on the network.
  *
  * Composed of some name component, followed optionally by a colon and a numeric port.  The name
