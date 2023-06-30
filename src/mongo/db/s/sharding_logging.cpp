@@ -187,10 +187,10 @@ Status ShardingLogging::_log(OperationContext* opCtx,
     Status result = catalogClient->insertConfigDocument(opCtx, nss, changeLogBSON, writeConcern);
 
     if (!result.isOK()) {
-        LOGV2_ERROR(5538900,
-                    "Error encountered while logging config change",
-                    "changeDocument"_attr = changeLog,
-                    "error"_attr = redact(result));
+        LOGV2_WARNING(5538900,
+                      "Error encountered while logging config change",
+                      "changeDocument"_attr = changeLog,
+                      "error"_attr = redact(result));
     }
 
     return result;
