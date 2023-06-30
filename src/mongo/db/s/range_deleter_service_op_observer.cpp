@@ -105,6 +105,11 @@ void registerTaskWithOngoingQueriesOnOpLogEntryCommit(OperationContext* opCtx,
     });
 }
 
+bool isStandaloneOrPrimary(OperationContext* opCtx) {
+    auto replCoord = repl::ReplicationCoordinator::get(opCtx);
+    return replCoord->canAcceptWritesForDatabase(opCtx, DatabaseName::kAdmin);
+}
+
 }  // namespace
 
 RangeDeleterServiceOpObserver::RangeDeleterServiceOpObserver() = default;
@@ -117,6 +122,10 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
                                               std::vector<bool> fromMigrate,
                                               bool defaultFromMigrate,
                                               OpStateAccumulator* opAccumulator) {
+    if (!isStandaloneOrPrimary(opCtx)) {
+        return;
+    }
+
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         for (auto it = begin; it != end; ++it) {
             auto deletionTask = RangeDeletionTask::parse(
@@ -131,6 +140,10 @@ void RangeDeleterServiceOpObserver::onInserts(OperationContext* opCtx,
 void RangeDeleterServiceOpObserver::onUpdate(OperationContext* opCtx,
                                              const OplogUpdateEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
+    if (!isStandaloneOrPrimary(opCtx)) {
+        return;
+    }
+
     if (args.coll->ns() == NamespaceString::kRangeDeletionNamespace) {
         const bool pendingFieldIsRemoved = [&] {
             return update_oplog_entry::isFieldRemovedByUpdate(
@@ -167,20 +180,26 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              StmtId stmtId,
                                              const OplogDeleteEntryArgs& args,
                                              OpStateAccumulator* opAccumulator) {
-    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        const auto& deletedDoc = deletedDocumentDecoration(args);
+    if (!isStandaloneOrPrimary(opCtx)) {
+        return;
+    }
 
-        auto deletionTask =
-            RangeDeletionTask::parse(IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
-        try {
-            RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
-                                                            deletionTask.getRange());
-        } catch (const DBException& ex) {
-            dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                    str::stream() << "No error different from `NotYetInitialized` is expected "
-                                     "to be propagated to the range deleter observer. Got error: "
-                                  << ex.toStatus());
-        }
+    if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
+        opCtx->recoveryUnit()->onCommit([deletedDoc = std::move(deletedDocumentDecoration(args))](
+                                            OperationContext* opCtx, boost::optional<Timestamp>) {
+            auto deletionTask = RangeDeletionTask::parse(
+                IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
+            try {
+                RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
+                                                                deletionTask.getRange());
+            } catch (const DBException& ex) {
+                dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                        str::stream()
+                            << "No error different from `NotYetInitialized` is expected "
+                               "to be propagated to the range deleter observer. Got error: "
+                            << ex.toStatus());
+            }
+        });
     }
 }
 
