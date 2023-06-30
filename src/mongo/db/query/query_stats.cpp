@@ -235,11 +235,12 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     }
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() <= 0) {
+    auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
+    if (samplingRate <= 0) {
         return false;
     }
     // Check if rate limiting allows us to collect queryStats for this request.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() < INT_MAX &&
+    if (samplingRate < INT_MAX &&
         !queryStatsRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         queryStatsRateLimitedRequestsMetric.increment();
         return false;

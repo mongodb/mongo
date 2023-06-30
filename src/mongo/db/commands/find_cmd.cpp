@@ -221,12 +221,11 @@ std::unique_ptr<CanonicalQuery> parseQueryAndBeginOperation(
     // It is important to do this before canonicalizing and optimizing the query, each of which
     // would alter the query shape.
     if (!(collection && collection.get()->getCollectionOptions().encryptedFieldConfig)) {
-        BSONObj queryShape = query_shape::extractQueryShape(
-            *parsedRequest,
-            SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
-            expCtx);
-
         query_stats::registerRequest(expCtx, nss, [&]() {
+            BSONObj queryShape = query_shape::extractQueryShape(
+                *parsedRequest,
+                SerializationOptions::kRepresentativeQueryShapeSerializeOptions,
+                expCtx);
             return std::make_unique<query_stats::FindKeyGenerator>(
                 expCtx, *parsedRequest, std::move(queryShape), ctx.getCollectionType());
         });
