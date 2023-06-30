@@ -192,11 +192,6 @@ public:
                 ([&]() -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
                     FixedFCVRegion fixedFcv(opCtx);
 
-                    uassert(ErrorCodes::CommandNotSupported,
-                            "reshardCollection command not enabled",
-                            resharding::gFeatureFlagResharding.isEnabled(
-                                serverGlobalParams.featureCompatibility));
-
                     // (Generic FCV reference): To run this command and ensure the consistency of
                     // the metadata we need to make sure we are on a stable state.
                     uassert(

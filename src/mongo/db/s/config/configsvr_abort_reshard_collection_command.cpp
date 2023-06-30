@@ -126,11 +126,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "abortReshardCollection command not enabled",
-                    resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
 
             uassert(ErrorCodes::IllegalOperation,

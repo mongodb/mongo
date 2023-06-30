@@ -95,10 +95,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    format(FMT_STRING("{} command not enabled"), definition()->getName()),
-                    resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
             opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
             uassert(
                 ErrorCodes::IllegalOperation,

@@ -99,10 +99,7 @@ public:
     std::string help() const override {
         return "Abort and cleanup any in-progress resharding operations for this collection.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CleanupReshardCollectionCmd,
-                                       resharding::gFeatureFlagResharding);
+} cleanupReshardCollectionCmd;
 
 }  // namespace
 }  // namespace mongo

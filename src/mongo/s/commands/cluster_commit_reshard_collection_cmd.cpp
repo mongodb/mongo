@@ -103,10 +103,7 @@ public:
                "as possible. This may mean a longer critical interval "
                "during which writes are blocked.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(CommitReshardCollectionCmd,
-                                       resharding::gFeatureFlagResharding);
+} commitReshardCollectionCmd;
 
 }  // namespace
 }  // namespace mongo

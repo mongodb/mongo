@@ -168,12 +168,10 @@ public:
     void reportDataTransformMetrics(OperationContext* opCtx, BSONObjBuilder* bob) const {
         auto sCtx = opCtx->getServiceContext();
         using Metrics = ShardingDataTransformCumulativeMetrics;
+        Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
 
         // The serverStatus command is run before the FCV is initialized so we ignore it when
-        // checking whether the resharding and global index features are enabled here.
-        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
-        }
+        // checking whether the global index feature is enabled here.
         if (gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
         }

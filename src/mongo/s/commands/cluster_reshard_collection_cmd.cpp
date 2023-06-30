@@ -133,9 +133,7 @@ public:
     std::string help() const override {
         return "Reshard an already sharded collection on a new shard key.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(ReshardCollectionCmd, resharding::gFeatureFlagResharding);
+} reshardCollectionCmd;
 
 }  // namespace
 }  // namespace mongo

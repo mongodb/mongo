@@ -100,10 +100,7 @@ public:
     std::string help() const override {
         return "Abort any in-progress resharding operations for this collection.";
     }
-};
-
-MONGO_REGISTER_FEATURE_FLAGGED_COMMAND(AbortReshardCollectionCommand,
-                                       resharding::gFeatureFlagResharding);
+} abortReshardCollectionCmd;
 
 }  // namespace
 }  // namespace mongo

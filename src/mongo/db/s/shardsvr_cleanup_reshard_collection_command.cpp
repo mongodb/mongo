@@ -69,11 +69,6 @@ public:
         using InvocationBase::InvocationBase;
 
         void typedRun(OperationContext* opCtx) {
-            uassert(ErrorCodes::CommandNotSupported,
-                    "cleanupReshardCollection command not enabled",
-                    resharding::gFeatureFlagResharding.isEnabled(
-                        serverGlobalParams.featureCompatibility));
-
             uassert(ErrorCodes::IllegalOperation,
                     "_shardsvrCleanupReshardCollection can only be run on shard servers",
                     serverGlobalParams.clusterRole.has(ClusterRole::ShardServer));
