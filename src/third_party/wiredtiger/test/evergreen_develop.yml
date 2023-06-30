@@ -25,6 +25,7 @@ variables:
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
     make_command: ninja
+    database: WTPerformanceDataDB
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
