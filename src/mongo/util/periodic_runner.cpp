@@ -72,7 +72,7 @@ void PeriodicJobAnchor::setPeriod(Milliseconds ms) {
     _handle->setPeriod(ms);
 }
 
-Milliseconds PeriodicJobAnchor::getPeriod() {
+Milliseconds PeriodicJobAnchor::getPeriod() const {
     invariant(_handle);
     return _handle->getPeriod();
 }

@@ -198,7 +198,7 @@ void PeriodicRunnerImpl::PeriodicJobImpl::stop() {
     stopFuture.get();
 }
 
-Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() {
+Milliseconds PeriodicRunnerImpl::PeriodicJobImpl::getPeriod() const {
     stdx::lock_guard<Latch> lk(_mutex);
     return _job.interval;
 }

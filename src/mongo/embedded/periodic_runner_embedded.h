@@ -68,7 +68,7 @@ private:
         void pause() override;
         void resume() override;
         void stop() override;
-        Milliseconds getPeriod() override;
+        Milliseconds getPeriod() const override;
         void setPeriod(Milliseconds ms) override;
 
         bool isAlive(WithLock lk);
@@ -89,7 +89,7 @@ private:
 
         // The mutex is protecting _execStatus, the variable that can be accessed from other
         // threads.
-        Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
+        mutable Mutex _mutex = MONGO_MAKE_LATCH("PeriodicJobImpl::_mutex");
 
         // The current execution status of the job.
         ExecutionStatus _execStatus{ExecutionStatus::kNotScheduled};
