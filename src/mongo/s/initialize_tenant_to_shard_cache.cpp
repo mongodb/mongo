@@ -28,6 +28,11 @@
  */
 
 #include "mongo/s/initialize_tenant_to_shard_cache.h"
+
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
 #include "mongo/db/service_context.h"
 #include "mongo/util/assert_util.h"
 

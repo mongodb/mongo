@@ -13,7 +13,7 @@
 
 load("jstests/libs/change_stream_rewrite_util.js");  // For rewrite helpers.
 
-const dbName = "change_stream_rewrite_null_existence_test";
+const dbName = "rewrite_null_existence_test";
 const collName = "coll1";
 const testDB = db.getSiblingDB(dbName);
 

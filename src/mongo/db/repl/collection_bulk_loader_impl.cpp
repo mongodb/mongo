@@ -311,7 +311,7 @@ Status CollectionBulkLoaderImpl::commit() {
                                 }
 
                                 SharedBufferFragmentBuilder pooledBuilder{
-                                    KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+                                    key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
 
                                 InsertDeleteOptions options;
                                 options.dupsAllowed = !entry->descriptor()->unique();

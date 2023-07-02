@@ -29,10 +29,9 @@
 
 #pragma once
 
-#include <memory>
-
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
 
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
@@ -128,7 +127,7 @@ public:
                             NamespaceString toNss,
                             bool stayTemp) const final;
 
-    static Status validateDBName(StringData dbname);
+    static Status validateDBName(const DatabaseName& dbname);
 
     const NamespaceString& getSystemViewsName() const final {
         return _viewsName;

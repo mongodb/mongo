@@ -30,6 +30,7 @@
 #ifndef UTIL_VERSION_HEADER
 #define UTIL_VERSION_HEADER
 
+#include <iosfwd>
 #include <string>
 #include <vector>
 

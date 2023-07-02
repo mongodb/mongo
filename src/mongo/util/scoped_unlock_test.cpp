@@ -29,9 +29,14 @@
 
 #include "mongo/util/scoped_unlock.h"
 
+#include <ostream>
+#include <string>
+
+#include "mongo/base/string_data.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

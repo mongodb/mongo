@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_large.js
  *
@@ -8,10 +6,10 @@
  * value is a string large enough to make the whole index key be 1K, which is
  * the maximum.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.indexedField = 'indexed_insert_large';
 
     // Remove the shard key, since it cannot be greater than 512 bytes

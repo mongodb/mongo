@@ -30,8 +30,8 @@
 
 #include <fmt/format.h>
 
-#include "mongo/base/error_codes.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/ctype.h"
 #include "mongo/util/pcre.h"
 
 namespace mongo::pcre_util {

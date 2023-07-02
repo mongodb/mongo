@@ -29,7 +29,6 @@
 
 
 // IWYU pragma: no_include "cxxabi.h"
-#include <future>
 #include <string>
 #include <system_error>
 

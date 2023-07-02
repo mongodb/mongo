@@ -28,8 +28,17 @@
  */
 
 #include "mongo/s/catalog_cache_mock.h"
+
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/service_context.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/sharding_index_catalog_cache.h"
 
 namespace mongo {
 

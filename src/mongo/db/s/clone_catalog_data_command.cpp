@@ -55,7 +55,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/clone_catalog_data_gen.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
@@ -120,18 +120,17 @@ public:
 
         const auto cloneCatalogDataRequest =
             CloneCatalogData::parse(IDLParserContext("_shardsvrCloneCatalogData"), cmdObj);
-        const auto dbname =
-            NamespaceStringUtil::serialize(cloneCatalogDataRequest.getCommandParameter());
+        const auto dbname = cloneCatalogDataRequest.getCommandParameter().dbName();
 
         uassert(
             ErrorCodes::InvalidNamespace,
-            str::stream() << "invalid db name specified: " << dbname,
+            str::stream() << "invalid db name specified: " << dbname.toStringForErrorMsg(),
             NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
 
         uassert(ErrorCodes::InvalidOptions,
-                str::stream() << "Can't clone catalog data for " << dbname << " database",
-                dbname != DatabaseName::kAdmin.db() && dbname != DatabaseName::kConfig.db() &&
-                    dbname != DatabaseName::kLocal.db());
+                str::stream() << "Can't clone catalog data for " << dbname.toStringForErrorMsg()
+                              << " database",
+                !dbname.isAdminDB() && !dbname.isConfigDB() && !dbname.isLocalDB());
 
         auto from = cloneCatalogDataRequest.getFrom();
 
@@ -141,7 +140,9 @@ public:
 
         auto const catalogClient = Grid::get(opCtx)->catalogClient();
         const auto shardedColls = catalogClient->getAllShardedCollectionsForDb(
-            opCtx, dbname, repl::ReadConcernLevel::kMajorityReadConcern);
+            opCtx,
+            DatabaseNameUtil::serialize(dbname),
+            repl::ReadConcernLevel::kMajorityReadConcern);
 
         DisableDocumentValidation disableValidation(opCtx);
 
@@ -149,7 +150,11 @@ public:
         std::set<std::string> clonedColls;
 
         Cloner cloner;
-        uassertStatusOK(cloner.copyDb(opCtx, dbname, from.toString(), shardedColls, &clonedColls));
+        uassertStatusOK(cloner.copyDb(opCtx,
+                                      DatabaseNameUtil::serialize(dbname),
+                                      from.toString(),
+                                      shardedColls,
+                                      &clonedColls));
         {
             BSONArrayBuilder cloneBarr = result.subarrayStart("clonedColls");
             cloneBarr.append(clonedColls);

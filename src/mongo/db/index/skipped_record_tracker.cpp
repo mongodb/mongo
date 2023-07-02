@@ -175,7 +175,7 @@ Status SkippedRecordTracker::retrySkippedRecords(OperationContext* opCtx,
         progress.get(lk)->hit();
     };
 
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     auto& executionCtx = StorageExecutionContext::get(opCtx);
 
     auto recordStore = _skippedRecordsTable->rs();

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs a variety commands which need to interact with the global cursor manager. This test was
  * designed to reproduce SERVER-33959.
@@ -7,10 +5,12 @@
  * The "grandparent test," invalidated_cursors.js, uses $currentOp.
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/kill_multicollection_aggregation.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.listCollections = function listCollections(unusedDB, _) {
         const db = unusedDB.getSiblingDB(this.uniqueDBName);
         const cmdRes =

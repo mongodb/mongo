@@ -10,8 +10,10 @@ load('jstests/replsets/libs/two_phase_drops.js');  // For 'TwoPhaseDropCollectio
 load("jstests/libs/collection_drop_recreate.js");  // For assert[Drop|Create]Collection.
 load("jstests/libs/fixture_helpers.js");           // For FixtureHelpers.
 
-const testDB = db.getSiblingDB(jsTestName());
+const testDB = db.getSiblingDB("whole_db_metadata_notifs");
+const otherDB = testDB.getSiblingDB("whole_db_metadata_notifs_other");
 testDB.dropDatabase();
+otherDB.dropDatabase();
 let cst = new ChangeStreamTest(testDB);
 
 // Write a document to the collection and test that the change stream returns it
@@ -55,7 +57,6 @@ assert.commandWorked(testDB.runCommand(
     {aggregate: 1, pipeline: [{$changeStream: {resumeAfter: resumeToken}}], cursor: {}}));
 
 // Test that invalidation entries for other databases are filtered out.
-const otherDB = testDB.getSiblingDB(jsTestName() + "other");
 const otherDBColl = otherDB[collName + "_other"];
 assert.commandWorked(otherDBColl.insert({_id: 0}));
 

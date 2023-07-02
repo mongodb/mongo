@@ -37,7 +37,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <deque>
-#include <future>
 #include <iterator>
 #include <memory>
 #include <string>
@@ -306,6 +305,15 @@ public:
 
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) override {
+        MONGO_UNREACHABLE;
+    }
+
+    bool timeseriesBucketingParametersMayHaveChanged() const override {
+        return _coll->timeseriesBucketingParametersMayHaveChanged();
+    }
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) override {
         MONGO_UNREACHABLE;
     }
 

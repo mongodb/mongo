@@ -70,7 +70,7 @@ class ColumnsAccessMethodTest : public CatalogTestFixture {
 public:
 protected:
     ColumnsAccessMethodTest()
-        : _pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes) {}
+        : _pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes) {}
 
     const CollectionPtr& collection() const {
         return _coll->getCollection();

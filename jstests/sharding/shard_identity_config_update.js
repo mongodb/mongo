@@ -12,10 +12,6 @@ TestData.skipCheckingUUIDsConsistentAcrossCluster = true;
 
 load('jstests/replsets/rslib.js');
 
-const notInMultiversionTest = !jsTestOptions().shardMixedBinVersions &&
-    jsTestOptions().mongosBinVersion !== "last-lts" &&
-    jsTestOptions().mongosBinVersion !== "last-continuous";
-
 var st = new ShardingTest({shards: {rs0: {nodes: 2}}});
 
 // Note: Adding new replica set member by hand because of SERVER-24011.
@@ -71,25 +67,21 @@ st.rs0.getSecondaries().forEach(secConn => {
     });
 });
 
-// Config servers in 7.0 also maintain the connection string in their shard identity document.
-// TODO SERVER-75391: Always run config server assertions.
-if (notInMultiversionTest) {
-    assert.soon(function() {
-        return checkConfigStrUpdated(st.configRS.getPrimary(), expectedConfigStr);
-    });
+assert.soon(function() {
+    return checkConfigStrUpdated(st.configRS.getPrimary(), expectedConfigStr);
+});
 
-    st.configRS.getSecondaries().forEach(secConn => {
-        secConn.setSecondaryOk();
-        assert.soon(function() {
-            return checkConfigStrUpdated(secConn, expectedConfigStr);
-        });
-    });
-
-    newNode.setSecondaryOk();
+st.configRS.getSecondaries().forEach(secConn => {
+    secConn.setSecondaryOk();
     assert.soon(function() {
-        return checkConfigStrUpdated(newNode, expectedConfigStr);
+        return checkConfigStrUpdated(secConn, expectedConfigStr);
     });
-}
+});
+
+newNode.setSecondaryOk();
+assert.soon(function() {
+    return checkConfigStrUpdated(newNode, expectedConfigStr);
+});
 
 //
 // Remove the newly added member from the config replSet while the shards are down.
@@ -132,19 +124,16 @@ st.rs0.getSecondaries().forEach(secConn => {
 });
 
 // Config servers in 7.0 also maintain the connection string in their shard identity document.
-// TODO SERVER-75391: Always run config server assertions.
-if (notInMultiversionTest) {
-    assert.soon(function() {
-        return checkConfigStrUpdated(st.configRS.getPrimary(), origConfigConnStr);
-    });
+assert.soon(function() {
+    return checkConfigStrUpdated(st.configRS.getPrimary(), origConfigConnStr);
+});
 
-    st.configRS.getSecondaries().forEach(secConn => {
-        secConn.setSecondaryOk();
-        assert.soon(function() {
-            return checkConfigStrUpdated(secConn, origConfigConnStr);
-        });
+st.configRS.getSecondaries().forEach(secConn => {
+    secConn.setSecondaryOk();
+    assert.soon(function() {
+        return checkConfigStrUpdated(secConn, origConfigConnStr);
     });
-}
+});
 
 st.stop();
 })();

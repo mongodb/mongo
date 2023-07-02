@@ -344,7 +344,10 @@ boost::intrusive_ptr<DocumentSource> DocumentSourceOut::createFromBson(
 Value DocumentSourceOut::serialize(SerializationOptions opts) const {
     BSONObjBuilder bob;
     DocumentSourceOutSpec spec;
-    // TODO SERVER-74284: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
+    // TODO SERVER-77000: use SerializatonContext from expCtx and DatabaseNameUtil to serialize
+    // spec.setDb(DatabaseNameUtil::serialize(
+    //     _outputNs.dbName(),
+    //     SerializationContext::stateCommandReply(pExpCtx->serializationCtxt)));
     spec.setDb(_outputNs.dbName().db());
     spec.setColl(_outputNs.coll());
     spec.setTimeseries(_timeseries);

@@ -28,15 +28,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
-#include "mongo/dbtests/storage_debug_util.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/ordering.h"
+#include "mongo/db/catalog/collection.h"
+#include "mongo/db/catalog/index_catalog.h"
+#include "mongo/db/catalog/index_catalog_entry.h"
 #include "mongo/db/catalog/validate_results.h"
-#include "mongo/db/db_raii.h"
+#include "mongo/db/catalog_raii.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/index/index_access_method.h"
+#include "mongo/db/index/index_descriptor.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/storage/index_entry_comparison.h"
 #include "mongo/db/storage/key_string.h"
+#include "mongo/db/storage/record_data.h"
+#include "mongo/db/storage/record_store.h"
+#include "mongo/db/storage/sorted_data_interface.h"
+#include "mongo/dbtests/storage_debug_util.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
@@ -80,10 +101,10 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         auto indexCursor = iam->newCursor(opCtx, /*forward*/ true);
 
         const BSONObj& keyPattern = indexDescriptor->keyPattern();
-        const KeyString::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
+        const key_string::Version version = iam->getSortedDataInterface()->getKeyStringVersion();
         const auto ordering = Ordering::make(keyPattern);
-        KeyString::Builder firstKeyString(
-            version, BSONObj(), ordering, KeyString::Discriminator::kExclusiveBefore);
+        key_string::Builder firstKeyString(
+            version, BSONObj(), ordering, key_string::Discriminator::kExclusiveBefore);
 
         LOGV2(51810,
               "[Debugging] {keyPattern_str} index table entries:",
@@ -92,15 +113,15 @@ void printCollectionAndIndexTableEntries(OperationContext* opCtx, const Namespac
         for (auto keyStringEntry = indexCursor->seekForKeyString(firstKeyString.getValueCopy());
              keyStringEntry;
              keyStringEntry = indexCursor->nextKeyString()) {
-            auto keyString = KeyString::toBsonSafe(keyStringEntry->keyString.getBuffer(),
-                                                   keyStringEntry->keyString.getSize(),
-                                                   ordering,
-                                                   keyStringEntry->keyString.getTypeBits());
-            KeyString::logKeyString(keyStringEntry->loc,
-                                    keyStringEntry->keyString,
-                                    keyPattern,
-                                    keyString,
-                                    "[Debugging](index)");
+            auto keyString = key_string::toBsonSafe(keyStringEntry->keyString.getBuffer(),
+                                                    keyStringEntry->keyString.getSize(),
+                                                    ordering,
+                                                    keyStringEntry->keyString.getTypeBits());
+            key_string::logKeyString(keyStringEntry->loc,
+                                     keyStringEntry->keyString,
+                                     keyPattern,
+                                     keyString,
+                                     "[Debugging](index)");
         }
     }
 }

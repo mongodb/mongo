@@ -56,7 +56,7 @@ public:
                         const FTSSpec& spec,
                         const BSONObj& document,
                         KeyStringSet* keys,
-                        KeyString::Version keyStringVersion,
+                        key_string::Version keyStringVersion,
                         Ordering ordering,
                         const boost::optional<RecordId>& id = boost::none);
 

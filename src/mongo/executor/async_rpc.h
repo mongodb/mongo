@@ -29,13 +29,30 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <tuple>
+#include <utility>
+#include <vector>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/client/async_remote_command_targeter_adapter.h"
+#include "mongo/client/connection_string.h"
+#include "mongo/client/hedging_mode_gen.h"
 #include "mongo/client/mongo_uri.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/client/remote_command_targeter.h"
 #include "mongo/client/remote_command_targeter_factory_impl.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/db/pipeline/aggregation_request_helper.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/async_rpc_error_info.h"
 #include "mongo/executor/async_rpc_retry_policy.h"
@@ -43,15 +60,21 @@
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/generic_args_with_types_gen.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
 #include "mongo/rpc/get_status_from_command_result.h"
 #include "mongo/s/async_rpc_shard_targeter.h"
+#include "mongo/s/catalog/type_tags.h"
+#include "mongo/transport/baton.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/future.h"
 #include "mongo/util/future_util.h"
 #include "mongo/util/net/hostandport.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 /**
  * This header provides an API of `sendCommand(...)` functions that can be used to asynchronously

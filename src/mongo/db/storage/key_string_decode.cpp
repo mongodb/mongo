@@ -159,35 +159,35 @@ struct KSDecodeOptions {
 };
 
 void decode(const KSDecodeOptions& options) {
-    KeyString::TypeBits typeBits(KeyString::Version::kLatestVersion);
+    key_string::TypeBits typeBits(key_string::Version::kLatestVersion);
     if (!options.binTypeBits.empty()) {
         BufReader reader(options.binTypeBits.c_str(), options.binTypeBits.size());
         typeBits.resetFromBuffer(&reader);
     }
 
-    auto builder = KeyString::HeapBuilder(KeyString::Version::kLatestVersion);
+    auto builder = key_string::HeapBuilder(key_string::Version::kLatestVersion);
     builder.resetFromBuffer(options.binKeyString.c_str(), options.binKeyString.size());
 
     if (OutputFormat::kExplain == options.outputFormat) {
-        std::cout << KeyString::explain(builder.getBuffer(),
-                                        builder.getSize(),
-                                        options.keyPattern,
-                                        typeBits,
-                                        options.keyFormat);
+        std::cout << key_string::explain(builder.getBuffer(),
+                                         builder.getSize(),
+                                         options.keyPattern,
+                                         typeBits,
+                                         options.keyFormat);
     } else if (OutputFormat::kBson == options.outputFormat) {
-        auto bson = KeyString::toBsonSafe(
+        auto bson = key_string::toBsonSafe(
             builder.getBuffer(), builder.getSize(), Ordering::make(options.keyPattern), typeBits);
-        auto rehydrated = KeyString::rehydrateKey(options.keyPattern, bson);
+        auto rehydrated = key_string::rehydrateKey(options.keyPattern, bson);
         str::stream out;
         if (options.binKeyString.size() >= 2 && options.keyFormat) {
             BSONObjBuilder bob(rehydrated);
             RecordId recordId;
             if (*options.keyFormat == KeyFormat::Long) {
-                recordId = KeyString::decodeRecordIdLongAtEnd(options.binKeyString.c_str(),
-                                                              options.binKeyString.size());
+                recordId = key_string::decodeRecordIdLongAtEnd(options.binKeyString.c_str(),
+                                                               options.binKeyString.size());
             } else {
-                recordId = KeyString::decodeRecordIdStrAtEnd(options.binKeyString.c_str(),
-                                                             options.binKeyString.size());
+                recordId = key_string::decodeRecordIdStrAtEnd(options.binKeyString.c_str(),
+                                                              options.binKeyString.size());
             }
             recordId.serializeToken("$recordId", &bob);
             out << bob.obj();

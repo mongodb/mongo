@@ -30,9 +30,17 @@
 
 #include "mongo/s/grid.h"
 
+#include <mutex>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/s/balancer_configuration.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

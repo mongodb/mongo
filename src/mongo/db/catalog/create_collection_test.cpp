@@ -52,10 +52,12 @@
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/create_gen.h"
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/concurrency/exception_util.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/db_raii.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
 #include "mongo/db/query/query_knobs_gen.h"
 #include "mongo/db/repl/member_state.h"
@@ -68,6 +70,7 @@
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/timeseries/timeseries_gen.h"
 #include "mongo/stdx/utility.h"
 #include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
@@ -317,6 +320,33 @@ TEST_F(CreateCollectionTest,
 
     ASSERT_TRUE(collectionExists(opCtx.get(), dropPendingNss));
     ASSERT_FALSE(collectionExists(opCtx.get(), newNss));
+}
+
+TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagTrue) {
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+    auto bucketsColl =
+        NamespaceString::createNamespaceString_forTest("test.system.buckets.curColl");
+
+    auto opCtx = makeOpCtx();
+    auto tsOptions = TimeseriesOptions("t");
+    CreateCommand cmd = CreateCommand(curNss);
+    cmd.setTimeseries(std::move(tsOptions));
+    uassertStatusOK(createCollection(opCtx.get(), cmd));
+
+    ASSERT_TRUE(collectionExists(opCtx.get(), bucketsColl));
+    AutoGetCollectionForRead bucketsCollForRead(opCtx.get(), bucketsColl);
+    ASSERT_FALSE(bucketsCollForRead->timeseriesBucketingParametersMayHaveChanged());
+}
+
+TEST_F(CreateCollectionTest, TimeseriesBucketingParametersChangedFlagFalse) {
+    NamespaceString curNss = NamespaceString::createNamespaceString_forTest("test.curColl");
+
+    auto opCtx = makeOpCtx();
+    uassertStatusOK(createCollection(opCtx.get(), CreateCommand(curNss)));
+
+    ASSERT_TRUE(collectionExists(opCtx.get(), curNss));
+    AutoGetCollectionForRead collForRead(opCtx.get(), curNss);
+    ASSERT_TRUE(collForRead->timeseriesBucketingParametersMayHaveChanged());
 }
 
 TEST_F(CreateCollectionTest, ValidationOptions) {

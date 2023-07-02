@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests that the analyzeShardKey command returns correct metrics.
  *
@@ -13,7 +11,8 @@
  *  incompatible_with_concurrency_simultaneous,
  * ]
  */
-load("jstests/concurrency/fsm_libs/extend_workload.js");
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+
 load("jstests/concurrency/fsm_workload_helpers/server_types.js");  // for isMongos
 load("jstests/libs/fail_point_util.js");
 load("jstests/libs/retryable_writes_util.js");
@@ -23,22 +22,18 @@ load("jstests/sharding/analyze_shard_key/libs/analyze_shard_key_util.js");
 const aggregateInterruptErrors =
     [ErrorCodes.CursorNotFound, ErrorCodes.CursorKilled, ErrorCodes.QueryPlanKilled];
 
-if ($config === undefined) {
-    // There is no workload to extend. Define a noop base workload to make the 'extendWorkload' call
-    // below still work.
-    $config = {
-        threadCount: 1,
-        iterations: 1,
-        startState: "init",
-        data: {},
-        states: {init: function(db, collName) {}},
-        transitions: {init: {init: 1}},
-        setup: function(db, collName) {},
-        teardown: function(db, collName) {},
-    };
-}
+const kBaseConfig = {
+    threadCount: 1,
+    iterations: 1,
+    startState: "init",
+    data: {},
+    states: {init: function(db, collName) {}},
+    transitions: {init: {init: 1}},
+    setup: function(db, collName) {},
+    teardown: function(db, collName) {},
+};
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload(kBaseConfig, function($config, $super) {
     $config.threadCount = 10;
     $config.iterations = 500;
 
@@ -459,7 +454,8 @@ var $config = extendWorkload($config, function($config, $super) {
      * Verifies that the metrics about the characteristics of the shard key are within acceptable
      * ranges.
      */
-    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(res) {
+    $config.data.assertKeyCharacteristicsMetrics = function assertKeyCharacteristicsMetrics(
+        res, isSampling) {
         // Perform basic validation of the metrics.
         AnalyzeShardKeyUtil.assertContainKeyCharacteristicsMetrics(res);
         const metrics = res.keyCharacteristics;
@@ -476,7 +472,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // not unique, they are calculated using an aggregation with readConcern "available" (i.e.
         // it opts out of shard versioning and filtering). If the shard key is unique, they are
         // inferred from fast count of the documents.
-        if (metrics.numDistinctValues < this.numInitialDistinctValues) {
+        if (!isSampling && (metrics.numDistinctValues < this.numInitialDistinctValues)) {
             if (!TestData.runningWithBalancer) {
                 assert(this.shardKeyOptions.isUnique, metrics);
                 if (!TestData.runningWithShardStepdowns) {
@@ -497,7 +493,7 @@ var $config = extendWorkload($config, function($config, $super) {
         // since chunk migration deletes documents from the donor shard and re-inserts them on the
         // recipient shard so there is no guarantee that the insertion order from the client is
         // preserved.
-        if (!TestData.runningWithBalancer) {
+        if (!isSampling && !TestData.runningWithBalancer) {
             assert.eq(metrics.monotonicity.type,
                       this.shardKeyOptions.isMonotonic && !this.shardKeyOptions.isHashed
                           ? "monotonic"
@@ -674,7 +670,21 @@ var $config = extendWorkload($config, function($config, $super) {
             print(`Failed to analyze the shard key because the document for one of the most ` +
                   `common shard key values got deleted while the command was running. ${
                       tojsononeline(err)}`);
-            return err;
+            return true;
+        }
+        if (err.code == 7826501) {
+            print(`Failed to analyze the shard key because $collStats indicates that the ` +
+                  `collection is empty. ${tojsononeline(err)}`);
+            // Inaccurate fast count is only expected when there is unclean shutdown.
+            return TestData.runningWithShardStepdowns;
+        }
+        if (err.code == ErrorCodes.IllegalOperation && err.errmsg &&
+            err.errmsg.includes("monotonicity") && err.errmsg.includes("empty collection")) {
+            print(`Failed to analyze the shard key because the fast count during the ` +
+                  `step for calculating the monotonicity metrics indicates that collection ` +
+                  `is empty. ${tojsononeline(err)}`);
+            // Inaccurate fast count is only expected when there is unclean shutdown.
+            return TestData.runningWithShardStepdowns;
         }
         return false;
     };
@@ -954,14 +964,25 @@ var $config = extendWorkload($config, function($config, $super) {
             return;
         }
 
-        print("Starting analyzeShardKey state");
         const ns = db.getName() + "." + collName;
-        const res = db.adminCommand({analyzeShardKey: ns, key: this.shardKeyOptions.shardKey});
+        const cmdObj = {analyzeShardKey: ns, key: this.shardKeyOptions.shardKey};
+        const rand = Math.random();
+        if (rand < 0.25) {
+            cmdObj.sampleRate = Math.random() * 0.5 + 0.5;
+        } else if (rand < 0.25) {
+            cmdObj.sampleSize =
+                NumberLong(Math.floor(Math.random() * 1.5 * this.numInitialDocuments));
+        }
+        const isSampling =
+            cmdObj.hasOwnProperty("sampleRate") || cmdObj.hasOwnProperty("sampleSize");
+
+        print("Starting analyzeShardKey state " + tojsononeline(cmdObj));
+        const res = db.adminCommand(cmdObj);
         try {
             assert.commandWorked(res);
             print("Metrics: " +
                   tojsononeline({res: this.truncateAnalyzeShardKeyResponseForLogging(res)}));
-            this.assertKeyCharacteristicsMetrics(res);
+            this.assertKeyCharacteristicsMetrics(res, isSampling);
             this.assertReadWriteDistributionMetrics(res, false /* isFinal */);
             // Persist the metrics so we can do the final validation during teardown.
             assert.commandWorked(
@@ -1073,13 +1094,8 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            if (res.n == 0 || res.nModified == 0) {
-                // TODO (SERVER-77116): Make this state always validate the response.
-                assert(TestData.runningWithBalancer);
-            } else {
-                assert.eq(res.nModified, 1, {cmdObj, res});
-                assert.eq(res.n, 1, {cmdObj, res});
-            }
+            assert.eq(res.nModified, 1, {cmdObj, res});
+            assert.eq(res.n, 1, {cmdObj, res});
         } catch (e) {
             if (!this.isAcceptableUpdateError(res) &&
                 !(res.hasOwnProperty("writeErrors") &&
@@ -1104,12 +1120,8 @@ var $config = extendWorkload($config, function($config, $super) {
         };
         print("Starting remove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
-        if (res.n == 0) {
-            // TODO (SERVER-77116): Make this state always validate the response.
-            assert(TestData.runningWithBalancer);
-        } else {
-            assert.eq(res.n, 1, {cmdObj, res});
-        }
+        assert.eq(res.n, 1, {cmdObj, res});
+
         // Insert a random document to restore the original number of documents.
         assert.commandWorked(
             db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));
@@ -1133,13 +1145,8 @@ var $config = extendWorkload($config, function($config, $super) {
         const res = db.runCommand(cmdObj);
         try {
             assert.commandWorked(res);
-            if (res.lastErrorObject.n == 0) {
-                // TODO (SERVER-77116): Make this state always validate the response.
-                assert(TestData.runningWithBalancer);
-            } else {
-                assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
-                assert.eq(res.lastErrorObject.updatedExisting, true, {cmdObj, res});
-            }
+            assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+            assert.eq(res.lastErrorObject.updatedExisting, true, {cmdObj, res});
         } catch (e) {
             if (!this.isAcceptableUpdateError(res)) {
                 throw e;
@@ -1162,12 +1169,8 @@ var $config = extendWorkload($config, function($config, $super) {
         };
         print("Starting findAndModifyRemove state " + tojsononeline(cmdObj));
         const res = assert.commandWorked(db.runCommand(cmdObj));
-        if (res.lastErrorObject.n == 0) {
-            // TODO (SERVER-77116): Make this state always validate the response.
-            assert(TestData.runningWithBalancer);
-        } else {
-            assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
-        }
+        assert.eq(res.lastErrorObject.n, 1, {cmdObj, res});
+
         // Insert a random document to restore the original number of documents.
         assert.commandWorked(
             db.runCommand({insert: collName, documents: [this.generateRandomDocument(this.tid)]}));

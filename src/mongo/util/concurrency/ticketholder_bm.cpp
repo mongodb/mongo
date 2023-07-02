@@ -28,18 +28,25 @@
  */
 
 #include <benchmark/benchmark.h>
-
-#include <string>
-#include <vector>
+// IWYU pragma: no_include "cxxabi.h"
+#include <map>
+#include <memory>
+#include <ratio>
 
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
-#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/stdx/condition_variable.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/concurrency/priority_ticketholder.h"
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 #include "mongo/util/concurrency/ticketholder.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/latency_distribution.h"
+#include "mongo/util/tick_source.h"
 #include "mongo/util/tick_source_mock.h"
+#include "mongo/util/time_support.h"
 #include "mongo/util/timer.h"
 
 namespace mongo {

@@ -95,9 +95,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << kStageName << " is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             auto spec = DocumentSourceListSampledQueriesSpec::parse(IDLParserContext(kStageName),
                                                                     specElem.embeddedObject());
@@ -110,12 +107,14 @@ public:
         explicit LiteParsed(std::string parseTimeName,
                             NamespaceString nss,
                             DocumentSourceListSampledQueriesSpec spec)
-            : LiteParsedDocumentSource(std::move(parseTimeName)), _nss(std::move(nss)) {}
+            : LiteParsedDocumentSource(std::move(parseTimeName)),
+              _nss(std::move(nss)),
+              _privileges({Privilege(ResourcePattern::forClusterResource(_nss.tenantId()),
+                                     ActionType::listSampledQueries)}) {}
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const override {
-            return {
-                Privilege(ResourcePattern::forClusterResource(), ActionType::listSampledQueries)};
+            return _privileges;
         }
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const override {
@@ -132,6 +131,7 @@ public:
 
     private:
         const NamespaceString _nss;
+        const PrivilegeVector _privileges;
     };
 
     DocumentSourceListSampledQueries(const boost::intrusive_ptr<ExpressionContext>& pExpCtx,

@@ -27,11 +27,18 @@
  *    it in the license file.
  */
 
-#include "mongo/db/service_context_test_fixture.h"
-#include "mongo/logv2/log.h"
+#include <memory>
+#include <ostream>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/util/log_with_sampling.h"
-#include "mongo/util/scopeguard.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

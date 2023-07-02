@@ -928,7 +928,7 @@ Status MultiIndexBlock::dumpInsertsFromBulk(
                 entry,
                 dupsAllowed,
                 kYieldIterations,
-                [=, this](const KeyString::Value& duplicateKey) {
+                [=, this](const key_string::Value& duplicateKey) {
                     // Do not record duplicates when explicitly ignored. This may be the case on
                     // secondaries.
                     return writeConflictRetry(

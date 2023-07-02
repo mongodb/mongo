@@ -63,7 +63,7 @@
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/network_connection_hook.h"
 #include "mongo/executor/remote_command_request.h"
-#include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/task_executor_test_fixture.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 #include "mongo/s/balancer_configuration.h"

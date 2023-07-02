@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs refineCollectionShardKey and zone operations concurrently.
  *
@@ -20,7 +18,7 @@
 
 load('jstests/libs/parallelTester.js');
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         oldShardKeyField: 'a',
         newShardKeyFields: ['a', 'b'],

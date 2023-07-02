@@ -31,10 +31,13 @@
  * sock.{h,cpp} unit tests.
  */
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <vector>
 
-#include "mongo/db/repl/isself.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/base/string_data.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/net/socket_utils.h"
 

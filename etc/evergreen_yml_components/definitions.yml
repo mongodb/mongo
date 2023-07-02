@@ -165,7 +165,12 @@ variables:
   is_jstestfuzz: true
   num_files: 15
   num_tasks: 5  # Upperbound by `max_sub_suites` specified through the variant with each task still running `num_files` files.
-  resmoke_args: --help # resmoke_args needs to be overridden to specify one of the jstestfuzz suites
+  # It is error prone to require each fuzzer-related Evergreen task to need to override the
+  # resmoke_args variable. However, the resmoke_args variable must be defined as a string in the
+  # task generation configuration to satisfy mongodb/mongo-task-generator. We therefore specify an
+  # empty string for the variable to reflect there are no additional arguments provided to resmoke
+  # by default for the fuzzer-related tasks.
+  resmoke_args: ""
   resmoke_jobs_max: 1
   should_shuffle: false
   continue_on_failure: false
@@ -8056,32 +8061,57 @@ tasks:
       resmoke_jobs_max: 1
 
 - <<: *task_template
-  name: cqf
+  name: vector_search
   tags: []
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+    vars:
+      resmoke_jobs_max: 1
+
+- <<: *task_template
+  name: cqf
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_disabled_pipeline_opt
-  tags: []
-  commands:
-  - func: "do setup"
-  - func: "run tests"
-
-- <<: *task_template
-  name: cqf_passthrough
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
 
 - <<: *task_template
   name: cqf_parallel
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"
+
+- <<: *task_template
+  name: cqf_experimental_jscore_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *task_template
+  name: cqf_experimental_aggregation_passthrough
+  tags: [cqf]
+  commands:
+  - func: "do setup"
+  - func: "run tests"
+
+- <<: *gen_task_template
+  name: cqf_experimental_no_passthrough_gen
+  tags: ["cqf"]
+  commands:
+  - func: "generate resmoke tasks"
+    vars:
+      suite: cqf_experimental_no_passthrough
+      use_large_distro: "true"
 
 - <<: *task_template
   name: streams
@@ -8280,7 +8310,7 @@ tasks:
 
 - <<: *task_template
   name: query_golden_cqf
-  tags: []
+  tags: [cqf]
   commands:
   - func: "do setup"
   - func: "run tests"

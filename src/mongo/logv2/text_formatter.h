@@ -29,7 +29,14 @@
 
 #pragma once
 
+#include <cstdint>
+
+#include <boost/log/core/record_view.hpp>
+#include <boost/log/utility/formatting_ostream_fwd.hpp>
+
+#include "mongo/logv2/log_format.h"
 #include "mongo/logv2/plain_formatter.h"
+#include "mongo/platform/atomic_word.h"
 
 namespace mongo::logv2 {
 

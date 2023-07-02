@@ -177,7 +177,7 @@ TEST_F(AuthorizationManagerTest, testAcquireV2User) {
     ASSERT_EQUALS(RoleName("clusterAdmin", "admin"), clusterRoles.next());
     ASSERT_FALSE(clusterRoles.more());
     privilegeMap = v2cluster->getPrivileges();
-    auto clusterPrivilege = privilegeMap[ResourcePattern::forClusterResource()];
+    auto clusterPrivilege = privilegeMap[ResourcePattern::forClusterResource(boost::none)];
     ASSERT(clusterPrivilege.getActions().contains(ActionType::serverStatus));
     // Make sure user's refCount is 0 at the end of the test to avoid an assertion failure
 }

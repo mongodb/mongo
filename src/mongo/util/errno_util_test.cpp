@@ -27,14 +27,16 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #if !defined(_WIN32)
-#include <cerrno>   // For the E* error codes
 #include <clocale>  // For setlocale()
 #endif
 
-#include "mongo/unittest/unittest.h"
+#include <array>
+#include <climits>
+
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/errno_util.h"
 
 namespace mongo {

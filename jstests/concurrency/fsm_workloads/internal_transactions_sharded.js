@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs insert, update, delete and findAndModify commands against a sharded collection inside
  * single-shard and cross-shard internal transactions using all the available client session
@@ -12,13 +10,19 @@
  *  antithesis_incompatible,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
-load('jstests/concurrency/fsm_workloads/internal_transactions_unsharded.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    extendWithInternalTransactionsUnsharded
+} from "jstests/concurrency/fsm_workloads/internal_transactions_unsharded.js";
+import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/random_moveChunk_base.js';
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 load('jstests/libs/fail_point_util.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+const parsedBaseConfig = parseConfig($baseConfig);
+const $extendedBaseConfig = extendWithInternalTransactionsUnsharded(
+    Object.extend({}, parsedBaseConfig, true), parsedBaseConfig);
+
+export const $config = extendWorkload($extendedBaseConfig, function($config, $super) {
     $config.data.getQueryForDocument = function getQueryForDocument(doc) {
         // The query for a write command against a sharded collection must contain the shard key.
         const query = $super.data.getQueryForDocument.apply(this, arguments);

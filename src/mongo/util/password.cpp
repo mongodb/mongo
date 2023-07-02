@@ -27,9 +27,6 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/password.h"
 
 #include <iostream>
@@ -38,8 +35,13 @@
 #include <termios.h>
 #endif
 
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/util/errno_util.h"
 #include "mongo/util/password_params_gen.h"
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

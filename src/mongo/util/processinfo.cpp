@@ -28,17 +28,21 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/base/init.h"
-#include "mongo/util/processinfo.h"
-
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/path.hpp>
-#include <fstream>
-#include <iostream>
+#include <fstream>  // IWYU pragma: keep
+#include <system_error>
 
+#include <boost/filesystem/file_status.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/processinfo.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

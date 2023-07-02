@@ -230,11 +230,7 @@ const allCommands = {
             assert.commandWorked(conn.getDB(dbName).runCommand({create: collName}));
         },
         command: {analyze: collName},
-        expectFailure: true,
-        expectedErrorCode: [
-            6660400,
-            6765500
-        ],  // Analyze command requires common query framework feature flag to be enabled.
+        checkFeatureFlag: "CommonQueryFramework",
         teardown: function(conn) {
             assert.commandWorked(conn.getDB(dbName).runCommand({drop: collName}));
         },

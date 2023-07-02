@@ -195,5 +195,28 @@ TEST(DatabaseNameTest, FromDataEquality) {
     ASSERT_EQ(testTwo.dbName(), DatabaseName::createDatabaseName_forTest(boost::none, "foo"));
 }
 
+TEST(DatabaseNameTest, ValidDbNameLength) {
+    const std::string longStr =
+        "1234567890123456789012345678901234567890123456789012345678901234567890";
+    const auto dbName = DatabaseName::createDatabaseName_forTest(
+        boost::none, longStr.substr(0, DatabaseName::kMaxDatabaseNameLength));
+    ASSERT_EQ(dbName.toString_forTest().size(), DatabaseName::kMaxDatabaseNameLength);
+    ASSERT_THROWS_CODE(
+        DatabaseName::createDatabaseName_forTest(
+            boost::none, longStr.substr(0, DatabaseName::kMaxDatabaseNameLength + 1)),
+        DBException,
+        ErrorCodes::InvalidNamespace);
+
+    const TenantId tenantId(OID::gen());
+    const auto tenantDbName = DatabaseName::createDatabaseName_forTest(
+        tenantId, longStr.substr(0, DatabaseName::kMaxTenantDatabaseNameLength));
+    ASSERT_EQ(tenantDbName.toString_forTest().size(), DatabaseName::kMaxTenantDatabaseNameLength);
+    ASSERT_THROWS_CODE(
+        DatabaseName::createDatabaseName_forTest(
+            tenantId, longStr.substr(0, DatabaseName::kMaxTenantDatabaseNameLength + 1)),
+        DBException,
+        ErrorCodes::InvalidNamespace);
+}
+
 }  // namespace
 }  // namespace mongo

@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <array>
+#include <cstddef>
+#include <mutex>
 #include <string>
 #include <vector>
 

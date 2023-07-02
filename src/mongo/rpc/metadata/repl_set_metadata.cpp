@@ -29,11 +29,18 @@
 
 #include "mongo/rpc/metadata/repl_set_metadata.h"
 
-#include "mongo/bson/util/bson_check.h"
+#include <utility>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/db/repl/bson_extract_optime.h"
-#include "mongo/rpc/metadata.h"
+#include "mongo/util/str.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace rpc {

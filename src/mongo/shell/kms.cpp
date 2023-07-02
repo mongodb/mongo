@@ -29,10 +29,16 @@
 
 #include "kms.h"
 
-#include "mongo/platform/random.h"
+#include <utility>
+
+#include <absl/container/node_hash_map.h>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/idl/idl_parser.h"
 #include "mongo/shell/kms_gen.h"
-#include "mongo/util/net/hostandport.h"
-#include "mongo/util/text.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 
 
 namespace mongo {

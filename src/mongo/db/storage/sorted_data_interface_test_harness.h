@@ -121,14 +121,14 @@ void registerSortedDataInterfaceHarnessHelperFactory(
 
 std::unique_ptr<SortedDataInterfaceHarnessHelper> newSortedDataInterfaceHarnessHelper();
 
-KeyString::Value makeKeyString(SortedDataInterface* sorted,
-                               BSONObj bsonKey,
-                               const boost::optional<RecordId>& rid = boost::none);
+key_string::Value makeKeyString(SortedDataInterface* sorted,
+                                BSONObj bsonKey,
+                                const boost::optional<RecordId>& rid = boost::none);
 
-KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
-                                      BSONObj bsonKey,
-                                      bool isForward,
-                                      bool inclusive);
+key_string::Value makeKeyStringForSeek(SortedDataInterface* sorted,
+                                       BSONObj bsonKey,
+                                       bool isForward,
+                                       bool inclusive);
 
 /**
  * Inserts all entries in toInsert into index.
@@ -140,13 +140,6 @@ KeyString::Value makeKeyStringForSeek(SortedDataInterface* sorted,
 void insertToIndex(OperationContext* opCtx,
                    SortedDataInterface* index,
                    std::initializer_list<IndexKeyEntry> toInsert);
-
-inline void insertToIndex(HarnessHelper* harness,
-                          SortedDataInterface* index,
-                          std::initializer_list<IndexKeyEntry> toInsert) {
-    auto client = harness->serviceContext()->makeClient("insertToIndex");
-    insertToIndex(harness->newOperationContext(client.get()).get(), index, toInsert);
-}
 
 /**
  * Removes all entries in toRemove from index.

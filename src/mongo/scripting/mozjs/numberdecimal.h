@@ -29,7 +29,13 @@
 
 #pragma once
 
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
+
 #include "mongo/platform/decimal128.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {

@@ -29,7 +29,11 @@
 
 #include "mongo/platform/mutex.h"
 
-#include "mongo/base/init.h"
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo::latch_detail {

@@ -27,14 +27,21 @@
  *    it in the license file.
  */
 
+#include <cstdint>
 #include <memory>
 
-#include "mongo/base/init.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
-#include "mongo/logv2/log.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/tick_source_mock.h"
 #include "mongo/util/tracing_support.h"

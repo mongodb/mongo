@@ -29,14 +29,25 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/client/connection_string.h"
 #include "mongo/db/commands/bulk_write_gen.h"
 #include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/repl/optime.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/write_concern_options.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batch_write_op.h"
 #include "mongo/s/write_ops/write_op.h"
+#include "mongo/stdx/unordered_map.h"
 
 namespace mongo {
 namespace bulk_write_exec {

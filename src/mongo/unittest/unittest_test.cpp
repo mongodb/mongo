@@ -32,15 +32,36 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <functional>
+#include <array>
+#include <boost/optional.hpp>
+#include <cstddef>
+#include <exception>
+#include <fmt/format.h>
 #include <limits>
+#include <memory>
+#include <optional>
+#include <ostream>
 #include <string>
+#include <type_traits>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/none_t.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/stringify.h"
 #include "mongo/unittest/unittest.h"
 #include "mongo/util/assert_util.h"
 

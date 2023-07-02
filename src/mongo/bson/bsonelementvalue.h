@@ -29,15 +29,19 @@
 
 #pragma once
 
+#include <cstdint>
 #include <cstring>  // strlen
 
 #include "mongo/base/data_type_endian.h"
 #include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/bson/bsontypes_util.h"
 #include "mongo/bson/oid.h"
 #include "mongo/bson/timestamp.h"
 #include "mongo/platform/decimal128.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 class BSONObj;

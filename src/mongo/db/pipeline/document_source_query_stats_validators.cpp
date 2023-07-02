@@ -1,5 +1,5 @@
 /**
- *    Copyright (C) 2023-present MongoDB, Inc.
+ *    Copyright (C) 2021-present MongoDB, Inc.
  *
  *    This program is free software: you can redistribute it and/or modify
  *    it under the terms of the Server Side Public License, version 1,
@@ -27,23 +27,28 @@
  *    it in the license file.
  */
 
-#include "mongo/db/s/move_primary/move_primary_metrics_field_name_provider.h"
+#include "mongo/db/pipeline/document_source_query_stats_validators.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
-namespace {
-constexpr auto kState = "state";
+
+Status validateAlgo(TransformAlgorithmEnum algorithm) {
+    if (algorithm == TransformAlgorithmEnum::kNone) {
+        return {ErrorCodes::FailedToParse,
+                str::stream() << "Algorithm specified but found no valid algorithm"};
+    }
+    return Status::OK();
 }
 
-StringData MovePrimaryMetricsFieldNameProvider::getForCoordinatorState() const {
-    return kState;
+Status validateHmac(std::vector<uint8_t> hmacKey) {
+    if (hmacKey.size() < 32) {
+        return {ErrorCodes::BadValue,
+                str::stream() << "hmacKey must be greater than or equal to 32 bytes, found length: "
+                              << hmacKey.size()};
+    }
+    // length check
+    return Status::OK();
 }
-
-StringData MovePrimaryMetricsFieldNameProvider::getForDonorState() const {
-    return kState;
-}
-
-StringData MovePrimaryMetricsFieldNameProvider::getForRecipientState() const {
-    return kState;
-}
-
 }  // namespace mongo

@@ -4,7 +4,8 @@
  * Theory of operation: Create a long running operation from a user which does not have the killOp
  * or inProg privileges. Using the same user, run currentOp to get the opId, and then run killOp
  * against it.
- * @tags: [requires_sharding]
+ * TODO SERVER-78101: Investigate the test failure and re-enable the test with CQF enabled.
+ * @tags: [requires_sharding, cqf_incompatible]
  */
 
 (function() {

@@ -28,16 +28,15 @@
  */
 
 
-#include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <initializer_list>
-#include <list>
-#include <string>
-#include <tuple>
-
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
+#include <initializer_list>
+#include <list>
+#include <memory>
+#include <string>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/timestamp.h"

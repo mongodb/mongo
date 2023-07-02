@@ -28,12 +28,15 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <absl/container/node_hash_set.h>
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/s/session_catalog_router.h"
-
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_helpers.h"
 #include "mongo/db/session/sessions_collection.h"
+#include "mongo/s/session_catalog_router.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util_core.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

@@ -31,12 +31,14 @@
 
 #include <cstdint>
 #include <functional>
+#include <mutex>
 #include <vector>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
+#include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 namespace executor {

@@ -30,39 +30,52 @@
 
 #include "mongo/transport/service_entry_point_impl.h"
 
-#include <boost/optional.hpp>
-#include <cstdint>
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <fmt/format.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/auth/restriction_environment.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/variant.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
-#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl_gen.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_fixed.h"
-#include "mongo/transport/service_executor_gen.h"
 #include "mongo/transport/service_executor_reserved.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_id.h"
 #include "mongo/transport/session_workflow.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/duration.h"
-#include "mongo/util/hierarchical_acquisition.h"
 #include "mongo/util/net/cidr.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/uuid.h"
 
 #if !defined(_WIN32)
 #include <sys/resource.h>

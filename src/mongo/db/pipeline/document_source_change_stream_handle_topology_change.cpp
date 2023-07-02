@@ -40,7 +40,6 @@
 #include <string>
 #include <utility>
 
-#include "mongo/base/status_with.h"
 #include "mongo/bson/bsontypes.h"
 #include "mongo/client/read_preference.h"
 #include "mongo/db/api_parameters.h"

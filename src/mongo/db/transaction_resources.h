@@ -29,14 +29,13 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <list>
 #include <memory>
 #include <utility>
 #include <variant>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/db/catalog/collection.h"
 #include "mongo/db/concurrency/d_concurrency.h"
@@ -224,6 +223,12 @@ struct TransactionResources {
 
     ~TransactionResources();
 
+    static TransactionResources& get(OperationContext* opCtx);
+
+    static std::unique_ptr<TransactionResources> detachFromOpCtx(OperationContext* opCtx);
+    static void attachToOpCtx(OperationContext* opCtx,
+                              std::unique_ptr<TransactionResources> transactionResources);
+
     AcquiredCollection& addAcquiredCollection(AcquiredCollection&& acquiredCollection);
     const AcquiredView& addAcquiredView(AcquiredView&& acquiredView);
 
@@ -236,9 +241,6 @@ struct TransactionResources {
      */
     void assertNoAcquiredCollections() const;
 
-    // Indicates whether yield has been performed on these resources
-    bool yielded{false};
-
     ////////////////////////////////////////////////////////////////////////////////////////
     // Global resources (cover all collections for the operation)
 
@@ -249,24 +251,22 @@ struct TransactionResources {
     // Set of locks acquired by the operation or nullptr if yielded.
     std::unique_ptr<Locker> locker;
 
-    // If '_locker' has been yielded, contains a snapshot of the locks which have been yielded.
-    // Otherwise boost::none.
-    boost::optional<Locker::LockSnapshot> yieldedLocker;
-
-    // The storage engine snapshot associated with this transaction (when yielded).
-    struct YieldedRecoveryUnit {
-        std::unique_ptr<RecoveryUnit> recoveryUnit;
-        WriteUnitOfWork::RecoveryUnitState recoveryUnitState;
-    };
-
-    boost::optional<YieldedRecoveryUnit> yieldedRecoveryUnit;
-
     ////////////////////////////////////////////////////////////////////////////////////////
     // Per-collection resources
 
     // Set of all collections which are currently acquired
     std::list<AcquiredCollection> acquiredCollections;
     std::list<AcquiredView> acquiredViews;
+
+    ////////////////////////////////////////////////////////////////////////////////////////
+    // Yield/restore logic
+
+    // If this value is set, indicates that yield has been performed on the owning
+    // TransactionResources resources and the yielded state is contained in the structure below.
+    struct YieldedStateHolder {
+        Locker::LockSnapshot yieldedLocker;
+    };
+    boost::optional<YieldedStateHolder> yielded;
 };
 
 }  // namespace shard_role_details

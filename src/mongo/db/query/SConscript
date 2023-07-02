@@ -442,11 +442,14 @@ env.Library(
     ],
 )
 
+env.Library(target='query_stats_parse', source=['query_stats_transform_algorithm.idl'], LIBDEPS=[
+    '$BUILD_DIR/mongo/base',
+    '$BUILD_DIR/mongo/idl/idl_parser',
+])
+
 env.Library(
     target='op_metrics',
-    source=[
-        'query_stats.cpp',
-    ],
+    source=['query_stats.cpp'],
     LIBDEPS=[
         '$BUILD_DIR/mongo/base',
         '$BUILD_DIR/mongo/bson/mutable/mutable_bson',
@@ -463,6 +466,7 @@ env.Library(
         'command_request_response',
         'memory_util',
         'query_knobs',
+        'query_stats_parse',
         'rate_limiting',
     ],
     LIBDEPS_PRIVATE=[

@@ -27,8 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
+#include <string>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 
 namespace mongo {
 namespace {

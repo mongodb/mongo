@@ -29,8 +29,18 @@
 
 #pragma once
 
+#include <set>
+#include <vector>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/unittest.h"
 
 namespace mongo {

@@ -395,6 +395,17 @@ public:
     virtual void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                             boost::optional<bool> setting) = 0;
 
+    virtual bool timeseriesBucketingParametersMayHaveChanged() const = 0;
+
+    /**
+     * Sets the 'timeseriesBucketingParametersHaveChanged' catalog entry flag to 'value' for this
+     * collection.
+     *
+     * Throws if this is not a time-series collection.
+     */
+    virtual void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                         boost::optional<bool> value) = 0;
+
     /**
      * Returns true if the passed in time-series bucket document contains mixed-schema data.
      */

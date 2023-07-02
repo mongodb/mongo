@@ -136,8 +136,8 @@ void _validateClusteredCollectionRecordId(OperationContext* opCtx,
     }
 
     const auto ksFromBSON =
-        KeyString::Builder(KeyString::Version::kLatestVersion, ridFromDoc.getValue());
-    const auto ksFromRid = KeyString::Builder(KeyString::Version::kLatestVersion, rid);
+        key_string::Builder(key_string::Version::kLatestVersion, ridFromDoc.getValue());
+    const auto ksFromRid = key_string::Builder(key_string::Version::kLatestVersion, rid);
 
     const auto clusterKeyField = clustered_util::getClusterKeyFieldName(indexSpec);
     if (ksFromRid != ksFromBSON) {
@@ -600,7 +600,7 @@ Status ValidateAdaptor::validateRecord(OperationContext* opCtx,
                                              results);
     }
 
-    SharedBufferFragmentBuilder pool(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     for (const auto& indexIdent : _validateState->getIndexIdents()) {
         const IndexDescriptor* descriptor =

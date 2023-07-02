@@ -29,11 +29,24 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <functional>
+#include <memory>
+
 #include "mongo/base/status.h"
-#include "mongo/config.h"
+#include "mongo/base/status_with.h"
+#include "mongo/config.h"  // IWYU pragma: keep
+#include "mongo/db/wire_version.h"
+#include "mongo/executor/connection_metrics.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/ssl_connection_context.h"
 #include "mongo/transport/transport_layer.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/net/ssl_options.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/net/ssl_types.h"
 #include "mongo/util/time_support.h"

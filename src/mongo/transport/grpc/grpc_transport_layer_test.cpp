@@ -98,7 +98,7 @@ public:
                 _setState(State::kStop);
             }
 
-            Milliseconds getPeriod() override {
+            Milliseconds getPeriod() const override {
                 return _job.interval;
             }
 

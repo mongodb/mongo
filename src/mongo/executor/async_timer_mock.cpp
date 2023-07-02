@@ -29,8 +29,13 @@
 
 #include "mongo/executor/async_timer_mock.h"
 
+#include <functional>
 #include <memory>
+#include <utility>
 
+#include <absl/container/node_hash_set.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/system_error.h"
 
 namespace mongo {

@@ -28,6 +28,10 @@
  */
 #include "mongo/transport/hello_metrics.h"
 
+#include <utility>
+
+#include "mongo/util/decorable.h"
+
 namespace mongo {
 namespace {
 const auto HelloMetricsDecoration = ServiceContext::declareDecoration<HelloMetrics>();

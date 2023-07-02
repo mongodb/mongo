@@ -449,6 +449,14 @@ public:
     }
 
     /**
+     * Returns a namespace string without tenant id.  Only to be used when a tenant id cannot be
+     * tolerated in the serialized output, and should otherwise be avoided whenever possible.
+     */
+    std::string serializeWithoutTenantPrefix_UNSAFE() const {
+        return toString();
+    }
+
+    /**
      * Gets a namespace string with tenant id.
      *
      * MUST only be used for tests.
@@ -703,7 +711,7 @@ public:
      * valid.
      */
     bool isValid(DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Allow) const {
-        return validDBName(db(), behavior) && !coll().empty();
+        return validDBName(dbName(), behavior) && !coll().empty();
     }
 
     /**
@@ -745,7 +753,7 @@ public:
 
     static bool validDBName(const DatabaseName& dbName,
                             DollarInDbNameBehavior behavior = DollarInDbNameBehavior::Disallow) {
-        return validDBName(dbName.db(), behavior);
+        return validDBName(dbName.toStringWithTenantId(), behavior);
     }
 
     /**

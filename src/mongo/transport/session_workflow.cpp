@@ -28,44 +28,66 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/transport/session_workflow.h"
-
+#include <array>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <fmt/format.h>
 #include <memory>
-#include <tuple>
+#include <ratio>
+#include <string>
+#include <type_traits>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
 #include "mongo/db/connection_health_metrics_parameter_gen.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/kill_cursors_gen.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/stats/counters.h"
 #include "mongo/db/traffic_recorder.h"
 #include "mongo/executor/split_timer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
 #include "mongo/transport/ingress_handshake_metrics.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/message_compressor_manager.h"
 #include "mongo/transport/service_entry_point.h"
+#include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
+#include "mongo/transport/session_workflow.h"
 #include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
-#include "mongo/util/debug_util.h"
 #include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
-#include "mongo/util/net/socket_exception.h"
-#include "mongo/util/net/ssl_manager.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/net/ssl_peer_info.h"
 #include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 

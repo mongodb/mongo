@@ -473,7 +473,7 @@ using VariableIdToSlotMap = stdx::unordered_map<Variables::Id, sbe::value::SlotI
  */
 struct IndexBoundsEvaluationInfo {
     IndexEntry index;
-    KeyString::Version keyStringVersion;
+    key_string::Version keyStringVersion;
     Ordering ordering;
     int direction;
     std::vector<interval_evaluation_tree::IET> iets;

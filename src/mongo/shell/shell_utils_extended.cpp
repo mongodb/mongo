@@ -28,32 +28,57 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <boost/filesystem/directory.hpp>
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/file_status.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <fmt/format.h>
+#include <fstream>  // IWYU pragma: keep
+#include <string>
+#include <system_error>
+#include <vector>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
 #include <sys/stat.h>
-#include <sys/types.h>
 #endif
 
-#include <boost/filesystem.hpp>
-#include <boost/filesystem/fstream.hpp>
-#include <fmt/format.h>
-#include <fstream>
-
+#include "mongo/base/data_range_cursor.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bson_bin_util.h"
 #include "mongo/bson/bson_validate.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bsoncolumn.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
-#include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/errno_util.h"
-#include "mongo/util/file.h"
+#include "mongo/util/md5.h"
 #include "mongo/util/md5.hpp"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/password.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
+
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
+#endif
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

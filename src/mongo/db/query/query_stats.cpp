@@ -33,12 +33,10 @@
 #include <absl/hash/hash.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <climits>
 #include <list>
-
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/status_with.h"
 #include "mongo/crypto/hash_block.h"
@@ -235,11 +233,12 @@ bool shouldCollect(const ServiceContext* serviceCtx) {
     }
     // Cannot collect queryStats if sampling rate is not greater than 0. Note that we do not
     // increment queryStatsRateLimitedRequestsMetric here since queryStats is entirely disabled.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() <= 0) {
+    auto samplingRate = queryStatsRateLimiter(serviceCtx)->getSamplingRate();
+    if (samplingRate <= 0) {
         return false;
     }
     // Check if rate limiting allows us to collect queryStats for this request.
-    if (queryStatsRateLimiter(serviceCtx)->getSamplingRate() < INT_MAX &&
+    if (samplingRate < INT_MAX &&
         !queryStatsRateLimiter(serviceCtx)->handleRequestSlidingWindow()) {
         queryStatsRateLimitedRequestsMetric.increment();
         return false;
@@ -260,20 +259,19 @@ std::size_t hash(const BSONObj& obj) {
 }  // namespace
 
 BSONObj QueryStatsEntry::computeQueryStatsKey(OperationContext* opCtx,
-                                              TransformAlgorithm algorithm,
+                                              TransformAlgorithmEnum algorithm,
                                               std::string hmacKey) const {
     return keyGenerator->generate(
         opCtx,
-        algorithm == TransformAlgorithm::kHmacSha256
+        algorithm == TransformAlgorithmEnum::kHmacSha256
             ? boost::optional<SerializationOptions::TokenizeIdentifierFunc>(
                   [&](StringData sd) { return sha256HmacStringDataHasher(hmacKey, sd); })
             : boost::none);
 }
 
-void registerRequest(const boost::intrusive_ptr<ExpressionContext>& expCtx,
+void registerRequest(OperationContext* opCtx,
                      const NamespaceString& collection,
                      std::function<std::unique_ptr<KeyGenerator>(void)> makeKeyGenerator) {
-    auto opCtx = expCtx->opCtx;
     if (!isQueryStatsEnabled(opCtx->getServiceContext())) {
         return;
     }

@@ -27,21 +27,68 @@
  *    it in the license file.
  */
 
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <fmt/format.h>
+#include <string>
+
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/catalog/collection_options.h"
 #include "mongo/db/catalog/collection_uuid_mismatch_info.h"
 #include "mongo/db/catalog/create_collection.h"
+#include "mongo/db/catalog/database.h"
 #include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog_raii.h"
+#include "mongo/db/client.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/repl_settings.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/s/collection_metadata.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/database_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/sharding_state.h"
+#include "mongo/db/server_options.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
+#include "mongo/db/shard_id.h"
 #include "mongo/db/shard_role.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/storage/write_unit_of_work.h"
+#include "mongo/db/tenant_id.h"
+#include "mongo/s/catalog/type_chunk.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/chunk_version.h"
+#include "mongo/s/database_version.h"
+#include "mongo/s/index_version.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
+#include "mongo/s/shard_key_pattern.h"
+#include "mongo/s/shard_version.h"
 #include "mongo/s/shard_version_factory.h"
+#include "mongo/s/stale_exception.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/future.h"
 
 namespace mongo {
 namespace {
@@ -349,8 +396,10 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithCorrectPlacementVersion) {
                                                           AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_EQ(nssUnshardedCollection1, acquisitions.begin()->first);
+        ASSERT_TRUE(acquisitions.at(nssUnshardedCollection1).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(nssUnshardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -514,8 +563,9 @@ TEST_F(ShardRoleTest, AcquireUnshardedCollWithoutSpecifyingPlacementVersion) {
                 opCtx(), nssUnshardedCollection1, AcquisitionPrerequisites::kRead)});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_TRUE(acquisitions.at(nssUnshardedCollection1).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(nssUnshardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -595,8 +645,9 @@ TEST_F(ShardRoleTest, AcquireShardedCollWithCorrectPlacementVersion) {
                                                           AcquisitionPrerequisites::kRead}});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_TRUE(acquisitions.at(nssShardedCollection1).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(nssShardedCollection1).getCollection();
 
         ASSERT_FALSE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IS));
         ASSERT_FALSE(
@@ -767,8 +818,9 @@ TEST_F(ShardRoleTest, AcquireCollectionNonExistentNamespace) {
                 opCtx(), inexistentNss, AcquisitionPrerequisites::kRead)});
 
         ASSERT_EQ(1, acquisitions.size());
-        ASSERT_TRUE(acquisitions.front().isCollection());
-        const ScopedCollectionAcquisition& acquisition = acquisitions.front().getCollection();
+        ASSERT_TRUE(acquisitions.at(inexistentNss).isCollection());
+        const ScopedCollectionAcquisition& acquisition =
+            acquisitions.at(inexistentNss).getCollection();
 
         ASSERT(!acquisition.getCollectionPtr());
         ASSERT(!acquisition.getShardingDescription().isSharded());
@@ -884,24 +936,12 @@ TEST_F(ShardRoleTest, AcquireMultipleCollectionsAllWithCorrectPlacementConcern) 
 
     ASSERT_EQ(2, acquisitions.size());
 
-    const auto& acquisitionUnshardedColl =
-        std::find_if(acquisitions.begin(),
-                     acquisitions.end(),
-                     [nss = nssUnshardedCollection1](const auto& acquisition) {
-                         return acquisition.nss() == nss;
-                     });
-    ASSERT(acquisitionUnshardedColl != acquisitions.end());
-    ASSERT_FALSE(acquisitionUnshardedColl->getShardingDescription().isSharded());
+    const auto& acquisitionUnshardedColl = acquisitions.at(nssUnshardedCollection1);
+    ASSERT_FALSE(acquisitionUnshardedColl.getShardingDescription().isSharded());
 
-    const auto& acquisitionShardedColl =
-        std::find_if(acquisitions.begin(),
-                     acquisitions.end(),
-                     [nss = nssShardedCollection1](const auto& acquisition) {
-                         return acquisition.nss() == nss;
-                     });
-    ASSERT(acquisitionShardedColl != acquisitions.end());
-    ASSERT_TRUE(acquisitionShardedColl->getShardingDescription().isSharded());
-    ASSERT_TRUE(acquisitionShardedColl->getShardingFilter().has_value());
+    const auto& acquisitionShardedColl = acquisitions.at(nssShardedCollection1);
+    ASSERT_TRUE(acquisitionShardedColl.getShardingDescription().isSharded());
+    ASSERT_TRUE(acquisitionShardedColl.getShardingFilter().has_value());
 
     // Assert the DB lock is held, but not recursively (i.e. only once).
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(dbNameTestDb, MODE_IX));
@@ -1164,7 +1204,7 @@ TEST_F(ShardRoleTest, YieldAndRestoreAcquisitionWithoutLocks) {
                                                     }});
 
     ASSERT_EQ(1, acquisitions.size());
-    ASSERT_TRUE(acquisitions.front().isCollection());
+    ASSERT_TRUE(acquisitions.at(nss).isCollection());
 
     ASSERT_TRUE(opCtx()->lockState()->isLockHeldForMode(resourceIdGlobal, MODE_IS));
     ASSERT_TRUE(opCtx()->lockState()->isDbLockedForMode(nss.dbName(), MODE_NONE));

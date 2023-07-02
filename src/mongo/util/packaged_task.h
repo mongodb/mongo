@@ -28,9 +28,13 @@
  */
 #pragma once
 
-#include "mongo/base/error_codes.h"
+#include <type_traits>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/stdx/type_traits.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
 
 namespace mongo {

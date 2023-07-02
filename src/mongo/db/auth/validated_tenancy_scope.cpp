@@ -127,11 +127,16 @@ ValidatedTenancyScope::ValidatedTenancyScope(Client* client, TenantId tenant)
             "Multitenancy not enabled, refusing to accept $tenant parameter",
             gMultitenancySupport);
 
-    uassert(ErrorCodes::Unauthorized,
-            "'$tenant' may only be specified with the useTenant action type",
-            client &&
-                AuthorizationSession::get(client)->isAuthorizedForActionsOnResource(
-                    ResourcePattern::forClusterResource(), ActionType::useTenant));
+    auto as = AuthorizationSession::get(client);
+    // The useTenant action type allows the action of impersonating any tenant, so we check against
+    // the cluster resource with the current authenticated user's tenant ID rather than the specific
+    // tenant ID being impersonated.
+    uassert(
+        ErrorCodes::Unauthorized,
+        "'$tenant' may only be specified with the useTenant action type",
+        client &&
+            as->isAuthorizedForActionsOnResource(
+                ResourcePattern::forClusterResource(as->getUserTenantId()), ActionType::useTenant));
 }
 
 boost::optional<ValidatedTenancyScope> ValidatedTenancyScope::create(Client* client,

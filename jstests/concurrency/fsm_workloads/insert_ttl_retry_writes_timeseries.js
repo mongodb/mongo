@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * insert_ttl_retry_writes_timeseries.js
  *
@@ -13,10 +11,10 @@
  *   uses_ttl,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');             // for extendWorkload
-load('jstests/concurrency/fsm_workloads/insert_ttl_timeseries.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/insert_ttl_timeseries.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.getCollectionName = function getCollectionName(collName) {
         return "insert_ttl_retry_writes_timeseries_" + collName;
     };

@@ -126,9 +126,9 @@ TEST_F(SBEKeyStringTest, Basic) {
     bob.appendNull("null-descending");
     auto testValues = bob.done();
 
-    // Copy each element from 'testValues' into a KeyString::Value. Each KeyString::Value has a
+    // Copy each element from 'testValues' into a key_string::Value. Each key_string::Value has a
     // maximum number of components, so we have to break the elements up into groups.
-    std::queue<std::tuple<KeyString::Value, Ordering, size_t>> keyStringQueue;
+    std::queue<std::tuple<key_string::Value, Ordering, size_t>> keyStringQueue;
     std::vector<BSONElement> elements;
     testValues.elems(elements);
 
@@ -141,7 +141,7 @@ TEST_F(SBEKeyStringTest, Basic) {
         }
         auto ordering = Ordering::make(patternBob.done());
 
-        KeyString::Builder keyStringBuilder(KeyString::Version::V1, ordering);
+        key_string::Builder keyStringBuilder(key_string::Version::V1, ordering);
         for (auto j = i; j < endBound; ++j) {
             keyStringBuilder.appendBSONElement(elements[j]);
         }
@@ -207,7 +207,7 @@ TEST_F(SBEKeyStringTest, Basic) {
 }
 
 TEST(SBEKeyStringTest, KeyComponentInclusion) {
-    KeyString::Builder keyStringBuilder(KeyString::Version::V1, KeyString::ALL_ASCENDING);
+    key_string::Builder keyStringBuilder(key_string::Version::V1, key_string::ALL_ASCENDING);
     keyStringBuilder.appendNumberLong(12345);  // Included
     keyStringBuilder.appendString("I've information vegetable, animal, and mineral"_sd);
     keyStringBuilder.appendString(
@@ -224,7 +224,7 @@ TEST(SBEKeyStringTest, KeyComponentInclusion) {
 
     BufBuilder builder;
     readKeyStringValueIntoAccessors(
-        keyString, KeyString::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
+        keyString, key_string::ALL_ASCENDING, &builder, &accessors, indexKeysToInclude);
 
     auto value = accessors[0].getViewOfValue();
     ASSERT(value::TypeTags::NumberInt64 == value.first &&

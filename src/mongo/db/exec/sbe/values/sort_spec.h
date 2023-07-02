@@ -59,7 +59,7 @@ public:
 
     SortSpec& operator=(const SortSpec&) = delete;
 
-    KeyString::Value generateSortKey(const BSONObj& obj, const CollatorInterface* collator);
+    key_string::Value generateSortKey(const BSONObj& obj, const CollatorInterface* collator);
 
 
     /*

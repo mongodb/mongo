@@ -60,7 +60,7 @@ class PlanStageSlots;
  * A list of low and high key values representing ranges over a particular index.
  */
 using IndexIntervals =
-    std::vector<std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>>;
+    std::vector<std::pair<std::unique_ptr<key_string::Value>, std::unique_ptr<key_string::Value>>>;
 
 /**
  * This method returns a pair containing: (1) an SBE plan stage tree implementing an index scan;
@@ -95,8 +95,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                 const std::string& indexName,
                                 const BSONObj& keyPattern,
                                 bool forward,
-                                std::unique_ptr<KeyString::Value> lowKey,
-                                std::unique_ptr<KeyString::Value> highKey,
+                                std::unique_ptr<key_string::Value> lowKey,
+                                std::unique_ptr<key_string::Value> highKey,
                                 sbe::IndexKeysInclusionSet indexKeysToInclude,
                                 sbe::value::SlotVector indexKeySlots,
                                 const PlanStageReqs& reqs,
@@ -111,7 +111,7 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
  */
 IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                                             bool forward,
-                                            KeyString::Version version,
+                                            key_string::Version version,
                                             Ordering ordering);
 
 /**

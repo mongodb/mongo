@@ -33,7 +33,6 @@ var ReshardingTest = class {
         writePeriodicNoops: writePeriodicNoops = undefined,
         enableElections: enableElections = false,
         logComponentVerbosity: logComponentVerbosity = undefined,
-        storeFindAndModifyImagesInSideCollection: storeFindAndModifyImagesInSideCollection = true,
         oplogSize: oplogSize = undefined,
         maxNumberOfTransactionOperationsInSingleOplogEntry:
             maxNumberOfTransactionOperationsInSingleOplogEntry = undefined,
@@ -66,8 +65,6 @@ var ReshardingTest = class {
         this._enableElections = enableElections;
         /** @private */
         this._logComponentVerbosity = logComponentVerbosity;
-        /** @private */
-        this._storeFindAndModifyImagesInSideCollection = storeFindAndModifyImagesInSideCollection;
         this._oplogSize = oplogSize;
         this._maxNumberOfTransactionOperationsInSingleOplogEntry =
             maxNumberOfTransactionOperationsInSingleOplogEntry;
@@ -111,12 +108,7 @@ var ReshardingTest = class {
     setup() {
         const mongosOptions = {setParameter: {}};
         let configOptions = {setParameter: {}};
-        let rsOptions = {
-            setParameter: {
-                storeFindAndModifyImagesInSideCollection:
-                    this._storeFindAndModifyImagesInSideCollection
-            }
-        };
+        let rsOptions = {setParameter: {}};
         if (this._oplogSize) {
             rsOptions.oplogSize = this._oplogSize;
         }
@@ -332,17 +324,6 @@ var ReshardingTest = class {
         return this._tempNs;
     }
 
-    get presetReshardedChunks() {
-        assert.neq(
-            undefined, this._presetReshardedChunks, "createShardedCollection must be called first");
-        return this._presetReshardedChunks;
-    }
-
-    get sourceCollectionUUID() {
-        assert.neq(
-            undefined, this._sourceCollectionUUID, "createShardedCollection must be called first");
-        return this._sourceCollectionUUID;
-    }
     /**
      * Reshards an existing collection using the specified new shard key and new chunk ranges.
      *
@@ -358,8 +339,8 @@ var ReshardingTest = class {
     }
 
     /** @private */
-    _startReshardingInBackgroundAndAllowCommandFailure(
-        {newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID}, expectedErrorCode) {
+    _startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
+                                                       expectedErrorCode) {
         for (let disallowedErrorCode of [ErrorCodes.FailedToSatisfyReadPreference,
                                          ErrorCodes.HostUnreachable,
         ]) {
@@ -373,7 +354,6 @@ var ReshardingTest = class {
 
         newChunks = newChunks.map(
             chunk => ({min: chunk.min, max: chunk.max, recipientShardId: chunk.shard}));
-        this._presetReshardedChunks = newChunks;
 
         this._newShardKey = Object.assign({}, newShardKeyPattern);
 
@@ -393,14 +373,8 @@ var ReshardingTest = class {
 
         this._commandDoneSignal = new CountDownLatch(1);
 
-        this._reshardingThread = new Thread(
-            function(host,
-                     ns,
-                     newShardKeyPattern,
-                     newChunks,
-                     forceRedistribution,
-                     reshardingUUID,
-                     commandDoneSignal) {
+        this._reshardingThread =
+            new Thread(function(host, ns, newShardKeyPattern, newChunks, commandDoneSignal) {
                 const conn = new Mongo(host);
 
                 // We allow the client to retry the reshardCollection a large but still finite
@@ -412,21 +386,11 @@ var ReshardingTest = class {
 
                 let res;
                 for (let i = 1; i <= kMaxNumAttempts; ++i) {
-                    let command = {
+                    res = conn.adminCommand({
                         reshardCollection: ns,
                         key: newShardKeyPattern,
                         _presetReshardedChunks: newChunks,
-                    };
-                    if (forceRedistribution !== undefined) {
-                        command = Object.merge(command, {forceRedistribution: forceRedistribution});
-                    }
-                    if (reshardingUUID !== undefined) {
-                        // UUIDs are passed in as strings because the UUID type cannot pass
-                        // through the thread constructor.
-                        reshardingUUID = eval(reshardingUUID);
-                        command = Object.merge(command, {reshardingUUID: reshardingUUID});
-                    }
-                    res = conn.adminCommand(command);
+                    });
 
                     if (res.ok === 1 ||
                         (res.code !== ErrorCodes.FailedToSatisfyReadPreference &&
@@ -442,14 +406,7 @@ var ReshardingTest = class {
                 }
 
                 return res;
-            },
-            this._st.s.host,
-            this._ns,
-            newShardKeyPattern,
-            newChunks,
-            forceRedistribution,
-            reshardingUUID ? reshardingUUID.toString() : undefined,
-            this._commandDoneSignal);
+            }, this._st.s.host, this._ns, newShardKeyPattern, newChunks, this._commandDoneSignal);
 
         this._reshardingThread.start();
         this._isReshardingActive = true;
@@ -482,7 +439,7 @@ var ReshardingTest = class {
      * finishes but before checking the the state post resharding. By the time afterReshardingFn
      * is called the temporary resharding collection will either have been dropped or renamed.
      */
-    withReshardingInBackground({newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID},
+    withReshardingInBackground({newShardKeyPattern, newChunks},
                                duringReshardingFn = (tempNs) => {},
                                {
                                    expectedErrorCode = ErrorCodes.OK,
@@ -490,9 +447,8 @@ var ReshardingTest = class {
                                    postDecisionPersistedFn = () => {},
                                    afterReshardingFn = () => {}
                                } = {}) {
-        this._startReshardingInBackgroundAndAllowCommandFailure(
-            {newShardKeyPattern, newChunks, forceRedistribution, reshardingUUID},
-            expectedErrorCode);
+        this._startReshardingInBackgroundAndAllowCommandFailure({newShardKeyPattern, newChunks},
+                                                                expectedErrorCode);
 
         assert.soon(() => {
             const op = this._findReshardingCommandOp();
@@ -788,11 +744,9 @@ var ReshardingTest = class {
 
     /** @private */
     _checkCoordinatorPostState(expectedErrorCode) {
-        assert.eq(
-            [],
-            this._st.config.reshardingOperations.find({ns: this._ns, state: {$ne: "quiesced"}})
-                .toArray(),
-            "expected config.reshardingOperations to be empty (except quiesced operations), but found it wasn't");
+        assert.eq([],
+                  this._st.config.reshardingOperations.find({ns: this._ns}).toArray(),
+                  "expected config.reshardingOperations to be empty, but found it wasn't");
 
         assert.eq([],
                   this._st.config.collections.find({reshardingFields: {$exists: true}}).toArray(),

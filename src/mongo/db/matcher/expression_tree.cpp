@@ -43,7 +43,6 @@
 #include "mongo/db/matcher/expression_always_boolean.h"
 #include "mongo/db/matcher/expression_leaf.h"
 #include "mongo/db/matcher/expression_path.h"
-#include "mongo/db/matcher/expression_text_base.h"
 #include "mongo/db/matcher/expression_tree.h"
 #include "mongo/db/query/collation/collator_interface.h"
 

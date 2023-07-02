@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_ordered_bulk_inc.js
  *
@@ -14,7 +12,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     var states = {
         init: function init(db, collName) {
             this.fieldName = 't' + this.tid;

@@ -29,11 +29,10 @@
 
 
 #include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/smart_ptr.hpp>
 #include <tuple>
 #include <utility>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/concurrency/d_concurrency.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/repl/repl_client_info.h"
 #include "mongo/db/repl/replication_coordinator.h"

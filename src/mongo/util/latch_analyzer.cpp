@@ -30,18 +30,39 @@
 #include "mongo/util/latch_analyzer.h"
 
 #include <boost/iterator/transform_iterator.hpp>
+#include <cstdint>
 #include <deque>
-
 #include <fmt/format.h>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_map.h>
+#include <absl/container/node_hash_set.h>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/client.h"
+#include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/logv2/attribute_storage.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/log_truncation.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/hierarchical_acquisition.h"
-#include "mongo/util/latch_analyzer.h"
+#include "mongo/util/registry_list.h"
 #include "mongo/util/testing_proctor.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

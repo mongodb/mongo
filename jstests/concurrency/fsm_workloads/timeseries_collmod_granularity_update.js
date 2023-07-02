@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Tests read and write operations concurrent with granularity updates on sharded time-series
  * collection.
@@ -13,7 +11,7 @@
 
 load("jstests/core/timeseries/libs/timeseries.js");  // For 'TimeseriesTest' helpers.
 
-var $config = (function() {
+export const $config = (function() {
     const shardedCollName = i => `sharded_${i}`;
     const unshardedCollName = i => `unsharded_${i}`;
     const collCount = 50;

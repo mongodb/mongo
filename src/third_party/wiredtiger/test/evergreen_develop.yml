@@ -8,7 +8,10 @@ variables:
 - &perf-tasks-template
   batchtime: 1440 # 1 day
   expansions: &ubuntu2004-perf-tests-expansions-template
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_BUILDDIR/test/utility/
@@ -22,6 +25,7 @@ variables:
     smp_command: -j $(echo "`grep -c ^processor /proc/cpuinfo` * 2" | bc)
     cmake_generator: Ninja
     make_command: ninja
+    database: WTPerformanceDataDB
   display_tasks:
     - name: Wiredtiger-perf-btree-jobs
       execution_tasks:
@@ -108,7 +112,7 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
-    doc_update_branches: develop,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
+    doc_update_branches: develop,mongodb-7.0,mongodb-6.0,mongodb-5.0,mongodb-4.4,mongodb-4.2
   tasks:
     - name: doc-update
 
@@ -117,6 +121,8 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
@@ -163,7 +169,10 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    configure_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
+    compile_env_vars: PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
       LD_LIBRARY_PATH=$WT_BUILDDIR:$WT_TOPDIR/TCMALLOC_LIB/lib

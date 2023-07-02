@@ -1,15 +1,13 @@
-'use strict';
-
 /*
  * yield_and_sorted.js (extends yield_rooted_or.js)
  *
  * Intersperse queries which use the AND_SORTED stage with updates and deletes of documents they
  * may match.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');       // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield_rooted_or.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_rooted_or.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     /*
      * Issue a query that will use the AND_SORTED stage. This is a little tricky, so use
      * stagedebug to force it to happen. Unfortunately this means it can't be batched.

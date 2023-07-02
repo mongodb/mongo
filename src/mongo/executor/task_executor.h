@@ -29,19 +29,30 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <cstddef>
 #include <functional>
 #include <memory>
 #include <string>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/baton.h"
 #include "mongo/util/cancellation.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
 #include "mongo/util/future.h"
+#include "mongo/util/interruptible.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/time_support.h"
 

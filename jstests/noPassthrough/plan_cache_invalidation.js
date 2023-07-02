@@ -3,7 +3,7 @@
  * and clearing.
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 

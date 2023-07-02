@@ -29,8 +29,18 @@
 
 #pragma once
 
+#include <memory>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_loader_mock.h"
+#include "mongo/s/chunk_manager.h"
 
 namespace mongo {
 

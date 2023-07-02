@@ -29,12 +29,13 @@
 
 #pragma once
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <list>
 #include <memory>
 #include <string>
 #include <utility>
 
-#include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,6 +46,7 @@
 #include "mongo/db/pipeline/document_source.h"
 #include "mongo/db/pipeline/expression_context.h"
 #include "mongo/db/pipeline/lite_parsed_document_source.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -61,24 +63,28 @@ static constexpr StringData kStageName = "$shardedDataDistribution"_sd;
 class LiteParsed final : public LiteParsedDocumentSource {
 public:
     static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss, const BSONElement& spec) {
-        return std::make_unique<LiteParsed>(spec.fieldName());
+        return std::make_unique<LiteParsed>(spec.fieldName(), nss.tenantId());
     }
 
-    explicit LiteParsed(std::string parseTimeName)
-        : LiteParsedDocumentSource(std::move(parseTimeName)) {}
+    explicit LiteParsed(std::string parseTimeName, const boost::optional<TenantId>& tenantId)
+        : LiteParsedDocumentSource(std::move(parseTimeName)),
+          _privileges({Privilege(ResourcePattern::forClusterResource(tenantId),
+                                 ActionType::shardedDataDistribution)}) {}
 
     stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
         return {NamespaceString::kConfigsvrCollectionsNamespace};
     }
 
     PrivilegeVector requiredPrivileges(bool isMongos, bool bypassDocumentValidation) const final {
-        return {
-            Privilege(ResourcePattern::forClusterResource(), ActionType::shardedDataDistribution)};
+        return _privileges;
     }
 
     bool isInitialSource() const final {
         return true;
     }
+
+private:
+    const PrivilegeVector _privileges;
 };
 
 static std::list<boost::intrusive_ptr<DocumentSource>> createFromBson(

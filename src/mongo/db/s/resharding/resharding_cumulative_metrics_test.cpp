@@ -173,6 +173,7 @@ protected:
         addExpectedField(RecipientStateEnum::kAwaitingFetchTimestamp);
         addExpectedField(RecipientStateEnum::kCreatingCollection);
         addExpectedField(RecipientStateEnum::kCloning);
+        addExpectedField(RecipientStateEnum::kBuildingIndex);
         addExpectedField(RecipientStateEnum::kApplying);
         addExpectedField(RecipientStateEnum::kError);
         addExpectedField(RecipientStateEnum::kStrictConsistency);

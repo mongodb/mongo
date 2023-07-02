@@ -29,19 +29,19 @@
 
 #include "mongo/db/transaction_resources.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <ostream>
 #include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/db/logical_time.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -51,6 +51,9 @@ const PlacementConcern AcquisitionPrerequisites::kPretendUnsharded =
 
 namespace shard_role_details {
 namespace {
+
+auto getTransactionResources = OperationContext::declareDecoration<
+    std::unique_ptr<shard_role_details::TransactionResources>>();
 
 /**
  * This method ensures that two read concerns are equivalent for the purposes of acquiring a
@@ -74,10 +77,28 @@ TransactionResources::TransactionResources() = default;
 
 TransactionResources::~TransactionResources() {
     invariant(!locker);
-    invariant(!yieldedLocker);
-    invariant(!yieldedRecoveryUnit);
     invariant(acquiredCollections.empty());
     invariant(acquiredViews.empty());
+    invariant(!yielded);
+}
+
+TransactionResources& TransactionResources::get(OperationContext* opCtx) {
+    auto& transactionResources = getTransactionResources(opCtx);
+    return *transactionResources;
+}
+
+std::unique_ptr<TransactionResources> TransactionResources::detachFromOpCtx(
+    OperationContext* opCtx) {
+    auto& transactionResources = getTransactionResources(opCtx);
+    invariant(transactionResources);
+    return std::move(transactionResources);
+}
+
+void TransactionResources::attachToOpCtx(
+    OperationContext* opCtx, std::unique_ptr<TransactionResources> newTransactionResources) {
+    auto& transactionResources = getTransactionResources(opCtx);
+    invariant(!transactionResources);
+    transactionResources = std::move(newTransactionResources);
 }
 
 AcquiredCollection& TransactionResources::addAcquiredCollection(
@@ -97,10 +118,9 @@ const AcquiredView& TransactionResources::addAcquiredView(AcquiredView&& acquire
 void TransactionResources::releaseAllResourcesOnCommitOrAbort() noexcept {
     readConcern.reset();
     locker.reset();
-    yieldedLocker.reset();
-    yieldedRecoveryUnit.reset();
     acquiredCollections.clear();
     acquiredViews.clear();
+    yielded.reset();
 }
 
 void TransactionResources::assertNoAcquiredCollections() const {

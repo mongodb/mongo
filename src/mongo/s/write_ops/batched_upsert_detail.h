@@ -31,6 +31,8 @@
 
 #include <string>
 
+#include "mongo/bson/bson_field.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/jsobj.h"
 
 namespace mongo {

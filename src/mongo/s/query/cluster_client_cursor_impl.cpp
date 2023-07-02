@@ -29,15 +29,28 @@
 
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <memory>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/db/commands/server_status_metric.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/query/query_stats.h"
-#include "mongo/logv2/log.h"
+#include "mongo/db/query/tailable_mode_gen.h"
+#include "mongo/db/service_context.h"
+#include "mongo/s/query/async_results_merger.h"
 #include "mongo/s/query/router_stage_limit.h"
 #include "mongo/s/query/router_stage_merge.h"
 #include "mongo/s/query/router_stage_remove_metadata_fields.h"
 #include "mongo/s/query/router_stage_skip.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/string_map.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

@@ -252,10 +252,3 @@ feature_flags:
         cpp_varname: feature_flags::gTimeseriesAlwaysUseCompressedBuckets
         default: false
         shouldBeFCVGated: true
-    featureFlagGloballyUniqueReplicatedRecordIds:
-        description: >-
-            When enabled, all RecordIds for newly created collections are globally unique across
-            shards and consistent within a replica set.
-        cpp_varname: feature_flags::gGloballyUniqueReplicatedRecordIds
-        default: false
-        shouldBeFCVGated: true

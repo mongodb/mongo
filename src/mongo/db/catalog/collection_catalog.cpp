@@ -85,6 +85,7 @@
 #include "mongo/util/assert_util.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
+#include "mongo/util/namespace_string_util.h"
 #include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
@@ -1743,7 +1744,7 @@ std::shared_ptr<const ViewDefinition> CollectionCatalog::lookupView(
 
     if (!viewsForDb->valid() && opCtx->getClient()->isFromUserConnection()) {
         // We want to avoid lookups on invalid collection names.
-        if (!NamespaceString::validCollectionName(ns.ns())) {
+        if (!NamespaceString::validCollectionName(NamespaceStringUtil::serializeForCatalog(ns))) {
             return nullptr;
         }
 

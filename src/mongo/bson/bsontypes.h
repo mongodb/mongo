@@ -30,13 +30,18 @@
 #pragma once
 
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <cstdint>
+#include <fmt/format.h>
 #include <iosfwd>
+#include <limits>
 #include <type_traits>
 
 #include "mongo/base/counter.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/base/string_data.h"
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/decimal128.h"
 #include "mongo/util/assert_util.h"
 

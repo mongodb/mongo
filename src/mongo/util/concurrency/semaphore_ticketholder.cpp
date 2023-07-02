@@ -29,12 +29,21 @@
 
 #include "mongo/util/concurrency/semaphore_ticketholder.h"
 
-#include <iostream>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <cerrno>
+#include <ctime>
+#include <string>
+
+#include <boost/optional/optional.hpp>
 
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/concurrency/ticketholder.h"
-#include "mongo/util/str.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/errno_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

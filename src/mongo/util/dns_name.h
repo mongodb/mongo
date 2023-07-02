@@ -30,15 +30,20 @@
 #pragma once
 
 #include <algorithm>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
 #include <iostream>
 #include <iterator>
 #include <sstream>
+#include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 

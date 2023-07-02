@@ -1551,7 +1551,7 @@ void ExecCommandDatabase::_initiateCommand() {
     auto const replCoord = repl::ReplicationCoordinator::get(opCtx);
 
     _sessionOptions = initializeOperationSessionInfo(opCtx,
-                                                     request.body,
+                                                     request,
                                                      command->requiresAuth(),
                                                      command->attachLogicalSessionsToOpCtx(),
                                                      replCoord->getReplicationMode() ==
@@ -1563,18 +1563,17 @@ void ExecCommandDatabase::_initiateCommand() {
 
     CommandHelpers::evaluateFailCommandFailPoint(opCtx, _invocation.get());
 
-    const auto dbname = request.getDatabase().toString();
+    const auto dbName =
+        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
     uassert(ErrorCodes::InvalidNamespace,
-            fmt::format("Invalid database name: '{}'", dbname),
-            NamespaceString::validDBName(dbname, NamespaceString::DollarInDbNameBehavior::Allow));
+            fmt::format("Invalid database name: '{}'", dbName.toStringForErrorMsg()),
+            NamespaceString::validDBName(dbName, NamespaceString::DollarInDbNameBehavior::Allow));
+
 
     // Connections from mongod or mongos clients (i.e. initial sync, mirrored reads, etc.) should
     // not contribute to resource consumption metrics.
     const bool collect = command->collectsResourceConsumptionMetrics() && !_isInternalClient();
-    _scopedMetrics.emplace(
-        opCtx,
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase()),
-        collect);
+    _scopedMetrics.emplace(opCtx, dbName, collect);
 
     const auto allowTransactionsOnConfigDatabase =
         (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
@@ -1582,7 +1581,6 @@ void ExecCommandDatabase::_initiateCommand() {
         client->isFromSystemConnection();
 
     const auto invocationNss = _invocation->ns();
-
     validateSessionOptions(
         _sessionOptions, command->getName(), invocationNss, allowTransactionsOnConfigDatabase);
 
@@ -1636,8 +1634,6 @@ void ExecCommandDatabase::_initiateCommand() {
     }
 
     _invocation->checkAuthorization(opCtx, request);
-    const auto dbName =
-        DatabaseNameUtil::deserialize(request.getValidatedTenantId(), request.getDatabase());
 
     if (!opCtx->getClient()->isInDirectClient() &&
         !MONGO_unlikely(skipCheckingForNotPrimaryInCommandDispatch.shouldFail())) {
@@ -1810,8 +1806,9 @@ void ExecCommandDatabase::_initiateCommand() {
             const bool hasDirectShardOperations = !authIsEnabled ||
                 ((AuthorizationSession::get(opCtx->getClient()) != nullptr &&
                   AuthorizationSession::get(opCtx->getClient())
-                      ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                         ActionType::issueDirectShardOperations)));
+                      ->isAuthorizedForActionsOnResource(
+                          ResourcePattern::forClusterResource(dbName.tenantId()),
+                          ActionType::issueDirectShardOperations)));
 
             if (!hasDirectShardOperations) {
                 bool timeUpdated = false;
@@ -1925,8 +1922,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
         .onError<ErrorCodes::StaleDbVersion>([this](Status s) -> Future<void> {
             auto opCtx = _execContext->getOpCtx();
 
-            if (!opCtx->getClient()->isInDirectClient() &&
-                !serverGlobalParams.clusterRole.exclusivelyHasConfigRole() && !_refreshedDatabase) {
+            if (!opCtx->getClient()->isInDirectClient() && !_refreshedDatabase) {
                 auto sce = s.extraInfo<StaleDbRoutingVersion>();
                 invariant(sce);
 
@@ -1956,9 +1952,7 @@ Future<void> ExecCommandDatabase::_commandExec() {
             auto opCtx = _execContext->getOpCtx();
             ShardingStatistics::get(opCtx).countStaleConfigErrors.addAndFetch(1);
 
-            if (!opCtx->getClient()->isInDirectClient() &&
-                !serverGlobalParams.clusterRole.exclusivelyHasConfigRole() &&
-                !_refreshedCollection) {
+            if (!opCtx->getClient()->isInDirectClient() && !_refreshedCollection) {
                 if (auto sce = s.extraInfo<StaleConfigInfo>()) {
                     bool inCriticalSection = sce->getCriticalSectionSignal().has_value();
                     bool stableLocalVersion = !inCriticalSection && sce->getVersionWanted();
@@ -2003,10 +1997,6 @@ Future<void> ExecCommandDatabase::_commandExec() {
             return s;
         })
         .onError<ErrorCodes::ShardCannotRefreshDueToLocksHeld>([this](Status s) -> Future<void> {
-            // This exception can never happen on the config server. Config servers can't receive
-            // SSV either, because they never have commands with shardVersion sent.
-            invariant(!serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
-
             auto opCtx = _execContext->getOpCtx();
             if (!opCtx->getClient()->isInDirectClient() && !_refreshedCatalogCache) {
                 invariant(!opCtx->lockState()->isLocked());

@@ -149,13 +149,13 @@ Status S2GetKeysForElement(const BSONElement& element,
 /*
  * We take the cartesian product of all keys when appending.
  */
-void appendToS2Keys(const std::vector<KeyString::HeapBuilder>& existingKeys,
-                    std::vector<KeyString::HeapBuilder>* out,
-                    KeyString::Version keyStringVersion,
+void appendToS2Keys(const std::vector<key_string::HeapBuilder>& existingKeys,
+                    std::vector<key_string::HeapBuilder>* out,
+                    key_string::Version keyStringVersion,
                     SortedDataIndexAccessMethod::GetKeysContext context,
                     Ordering ordering,
                     size_t maxKeys,
-                    const std::function<void(KeyString::HeapBuilder&)>& fn) {
+                    const std::function<void(key_string::HeapBuilder&)>& fn) {
     if (context == SortedDataIndexAccessMethod::GetKeysContext::kAddingKeys &&
         existingKeys.size() + out->size() > maxKeys) {
         if (!relaxIndexMaxNumGeneratedKeysPerDocument.shouldFail()) {
@@ -187,9 +187,9 @@ void appendToS2Keys(const std::vector<KeyString::HeapBuilder>& existingKeys,
 bool getS2GeoKeys(const BSONObj& document,
                   const BSONElementSet& elements,
                   const S2IndexingParams& params,
-                  const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                  std::vector<KeyString::HeapBuilder>* out,
-                  KeyString::Version keyStringVersion,
+                  const std::vector<key_string::HeapBuilder>& keysToAdd,
+                  std::vector<key_string::HeapBuilder>* out,
+                  key_string::Version keyStringVersion,
                   SortedDataIndexAccessMethod::GetKeysContext context,
                   Ordering ordering,
                   size_t maxKeys) {
@@ -229,7 +229,7 @@ bool getS2GeoKeys(const BSONObj& document,
                        context,
                        ordering,
                        maxKeys,
-                       [](KeyString::HeapBuilder& ks) { ks.appendNull(); });
+                       [](key_string::HeapBuilder& ks) { ks.appendNull(); });
     }
     return everGeneratedMultipleCells;
 }
@@ -243,9 +243,9 @@ bool getS2GeoKeys(const BSONObj& document,
 bool getS2BucketGeoKeys(const BSONObj& document,
                         const BSONElementSet& elements,
                         const S2IndexingParams& params,
-                        const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                        std::vector<KeyString::HeapBuilder>* out,
-                        KeyString::Version keyStringVersion,
+                        const std::vector<key_string::HeapBuilder>& keysToAdd,
+                        std::vector<key_string::HeapBuilder>* out,
+                        key_string::Version keyStringVersion,
                         SortedDataIndexAccessMethod::GetKeysContext context,
                         Ordering ordering,
                         size_t maxKeys) {
@@ -323,7 +323,7 @@ bool getS2BucketGeoKeys(const BSONObj& document,
                        context,
                        ordering,
                        maxKeys,
-                       [](KeyString::HeapBuilder& ks) { ks.appendNull(); });
+                       [](key_string::HeapBuilder& ks) { ks.appendNull(); });
     }
     return generatedMultipleCells;
 }
@@ -334,9 +334,9 @@ bool getS2BucketGeoKeys(const BSONObj& document,
  */
 void getS2LiteralKeysArray(const BSONObj& obj,
                            const CollatorInterface* collator,
-                           const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                           std::vector<KeyString::HeapBuilder>* out,
-                           KeyString::Version keyStringVersion,
+                           const std::vector<key_string::HeapBuilder>& keysToAdd,
+                           std::vector<key_string::HeapBuilder>* out,
+                           key_string::Version keyStringVersion,
                            SortedDataIndexAccessMethod::GetKeysContext context,
                            Ordering ordering,
                            size_t maxKeys) {
@@ -349,7 +349,7 @@ void getS2LiteralKeysArray(const BSONObj& obj,
                        context,
                        ordering,
                        maxKeys,
-                       [](KeyString::HeapBuilder& ks) { ks.appendUndefined(); });
+                       [](key_string::HeapBuilder& ks) { ks.appendUndefined(); });
     } else {
         // Non-empty arrays are exploded.
         while (objIt.more()) {
@@ -360,7 +360,7 @@ void getS2LiteralKeysArray(const BSONObj& obj,
                            context,
                            ordering,
                            maxKeys,
-                           [&](KeyString::HeapBuilder& ks) {
+                           [&](key_string::HeapBuilder& ks) {
                                if (collator) {
                                    ks.appendBSONElement(elem, [&](StringData stringData) {
                                        return collator->getComparisonString(stringData);
@@ -381,9 +381,9 @@ void getS2LiteralKeysArray(const BSONObj& obj,
  */
 bool getS2OneLiteralKey(const BSONElement& elt,
                         const CollatorInterface* collator,
-                        const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                        std::vector<KeyString::HeapBuilder>* out,
-                        KeyString::Version keyStringVersion,
+                        const std::vector<key_string::HeapBuilder>& keysToAdd,
+                        std::vector<key_string::HeapBuilder>* out,
+                        key_string::Version keyStringVersion,
                         SortedDataIndexAccessMethod::GetKeysContext context,
                         Ordering ordering,
                         size_t maxKeys) {
@@ -399,7 +399,7 @@ bool getS2OneLiteralKey(const BSONElement& elt,
                        context,
                        ordering,
                        maxKeys,
-                       [&](KeyString::HeapBuilder& ks) {
+                       [&](key_string::HeapBuilder& ks) {
                            if (collator) {
                                ks.appendBSONElement(elt, [&](StringData stringData) {
                                    return collator->getComparisonString(stringData);
@@ -421,9 +421,9 @@ bool getS2OneLiteralKey(const BSONElement& elt,
  */
 bool getS2LiteralKeys(const BSONElementSet& elements,
                       const CollatorInterface* collator,
-                      const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                      std::vector<KeyString::HeapBuilder>* out,
-                      KeyString::Version keyStringVersion,
+                      const std::vector<key_string::HeapBuilder>& keysToAdd,
+                      std::vector<key_string::HeapBuilder>* out,
+                      key_string::Version keyStringVersion,
                       SortedDataIndexAccessMethod::GetKeysContext context,
                       Ordering ordering,
                       size_t maxKeys) {
@@ -436,7 +436,7 @@ bool getS2LiteralKeys(const BSONElementSet& elements,
                        context,
                        ordering,
                        maxKeys,
-                       [](KeyString::HeapBuilder& ks) { ks.appendNull(); });
+                       [](key_string::HeapBuilder& ks) { ks.appendNull(); });
     } else {
         for (BSONElementSet::iterator i = elements.begin(); i != elements.end(); ++i) {
             const bool thisElemIsArray = getS2OneLiteralKey(
@@ -515,7 +515,7 @@ void ExpressionKeysPrivate::get2DKeys(SharedBufferFragmentBuilder& pooledBufferB
                                       const BSONObj& obj,
                                       const TwoDIndexingParams& params,
                                       KeyStringSet* keys,
-                                      KeyString::Version keyStringVersion,
+                                      key_string::Version keyStringVersion,
                                       Ordering ordering,
                                       const boost::optional<RecordId>& id) {
     BSONElementMultiSet bSet;
@@ -570,7 +570,7 @@ void ExpressionKeysPrivate::get2DKeys(SharedBufferFragmentBuilder& pooledBufferB
                     continue;
             }
 
-            KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
+            key_string::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
             params.geoHashConverter->hash(locObj, &obj).appendHashMin(&keyString);
 
             // Go through all the other index keys
@@ -607,7 +607,7 @@ void ExpressionKeysPrivate::getFTSKeys(SharedBufferFragmentBuilder& pooledBuffer
                                        const BSONObj& obj,
                                        const fts::FTSSpec& ftsSpec,
                                        KeyStringSet* keys,
-                                       KeyString::Version keyStringVersion,
+                                       key_string::Version keyStringVersion,
                                        Ordering ordering,
                                        const boost::optional<RecordId>& id) {
     fts::FTSIndexFormat::getKeys(
@@ -623,13 +623,13 @@ void ExpressionKeysPrivate::getHashKeys(SharedBufferFragmentBuilder& pooledBuffe
                                         bool isSparse,
                                         const CollatorInterface* collator,
                                         KeyStringSet* keys,
-                                        KeyString::Version keyStringVersion,
+                                        key_string::Version keyStringVersion,
                                         Ordering ordering,
                                         bool ignoreArraysAlongPath,
                                         const boost::optional<RecordId>& id) {
     static const BSONObj nullObj = BSON("" << BSONNULL);
     auto hasFieldValue = false;
-    KeyString::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
+    key_string::PooledBuilder keyString(pooledBufferBuilder, keyStringVersion, ordering);
     for (auto&& indexEntry : keyPattern) {
         auto indexPath = indexEntry.fieldNameStringData();
         auto* cstr = indexPath.rawData();
@@ -697,11 +697,11 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
                                       const S2IndexingParams& params,
                                       KeyStringSet* keys,
                                       MultikeyPaths* multikeyPaths,
-                                      KeyString::Version keyStringVersion,
+                                      key_string::Version keyStringVersion,
                                       SortedDataIndexAccessMethod::GetKeysContext context,
                                       Ordering ordering,
                                       const boost::optional<RecordId>& id) {
-    std::vector<KeyString::HeapBuilder> keysToAdd;
+    std::vector<key_string::HeapBuilder> keysToAdd;
 
     // Does one of our documents have a geo field?
     bool haveGeoField = false;
@@ -734,7 +734,7 @@ void ExpressionKeysPrivate::getS2Keys(SharedBufferFragmentBuilder& pooledBufferB
             //   requires
             //       multiple cells for its covering.
             bool lastPathComponentCausesIndexToBeMultikey;
-            std::vector<KeyString::HeapBuilder> updatedKeysToAdd;
+            std::vector<key_string::HeapBuilder> updatedKeysToAdd;
 
             if (IndexNames::GEO_2DSPHERE_BUCKET == keyElem.str()) {
                 auto elementStorage =

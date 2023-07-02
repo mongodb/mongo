@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * kill_multicollection_aggregation.js
  *
@@ -12,10 +10,10 @@
  * The parent test, invalidated_cursors.js, uses $currentOp.
  * @tags: [uses_curop_agg_stage, state_functions_share_cursor]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/invalidated_cursors.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/invalidated_cursors.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     /**
      * Runs the specified aggregation pipeline and stores the resulting cursor (if the command
      * is successful) in 'this.cursor'.

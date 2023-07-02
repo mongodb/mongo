@@ -385,19 +385,21 @@ const ProjectionName& RIDUnionNode::getScanProjectionName() const {
 
 static ProjectionNameVector createSargableBindings(const PartialSchemaRequirements& reqMap) {
     ProjectionNameVector result;
-    PSRExpr::visitDNF(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
-        if (auto binding = e.second.getBoundProjectionName()) {
-            result.push_back(*binding);
-        }
-    });
+    PSRExpr::visitDNF(reqMap.getRoot(),
+                      [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                          if (auto binding = e.second.getBoundProjectionName()) {
+                              result.push_back(*binding);
+                          }
+                      });
     return result;
 }
 
 static ProjectionNameVector createSargableReferences(const PartialSchemaRequirements& reqMap) {
     ProjectionNameOrderPreservingSet result;
-    PSRExpr::visitDNF(reqMap.getRoot(), [&](const PartialSchemaEntry& e) {
-        result.emplace_back(*e.first._projectionName);
-    });
+    PSRExpr::visitDNF(reqMap.getRoot(),
+                      [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                          result.emplace_back(*e.first._projectionName);
+                      });
     return result.getVector();
 }
 
@@ -435,44 +437,49 @@ SargableNode::SargableNode(PartialSchemaRequirements reqMap,
     // projections, or non-trivial multikey requirements which also bind. Further assert that under
     // a conjunction 1) non-multikey paths have at most one req and 2) there are no duplicate bound
     // projection names.
-    PSRExpr::visitDisjuncts(_reqMap.getRoot(), [&](const PSRExpr::Node& disjunct, const size_t) {
-        PartialSchemaKeySet seenKeys;
-        ProjectionNameSet seenProjNames;
-        PSRExpr::visitConjuncts(disjunct, [&](const PSRExpr::Node& conjunct, const size_t) {
-            PSRExpr::visitAtom(conjunct, [&](const PartialSchemaEntry& e) {
-                const auto& [key, req] = e;
-                if (auto projName = req.getBoundProjectionName()) {
-                    tassert(
-                        6624094,
-                        "SargableNode has a multikey requirement with a non-trivial interval which "
-                        "also binds",
-                        isIntervalReqFullyOpenDNF(req.getIntervals()) ||
-                            !checkPathContainsTraverse(key._path));
-                    tassert(6624095,
-                            "SargableNode has a perf only binding requirement",
-                            !req.getIsPerfOnly());
+    PSRExpr::visitDisjuncts(
+        _reqMap.getRoot(), [&](const PSRExpr::Node& disjunct, const PSRExpr::VisitorContext&) {
+            PartialSchemaKeySet seenKeys;
+            ProjectionNameSet seenProjNames;
+            PSRExpr::visitConjuncts(
+                disjunct, [&](const PSRExpr::Node& conjunct, const PSRExpr::VisitorContext&) {
+                    PSRExpr::visitAtom(
+                        conjunct, [&](const PartialSchemaEntry& e, const PSRExpr::VisitorContext&) {
+                            const auto& [key, req] = e;
+                            if (auto projName = req.getBoundProjectionName()) {
+                                tassert(6624094,
+                                        "SargableNode has a multikey requirement with a "
+                                        "non-trivial interval which "
+                                        "also binds",
+                                        isIntervalReqFullyOpenDNF(req.getIntervals()) ||
+                                            !checkPathContainsTraverse(key._path));
+                                tassert(6624095,
+                                        "SargableNode has a perf only binding requirement",
+                                        !req.getIsPerfOnly());
 
-                    auto insertedBoundProj = seenProjNames.insert(*projName).second;
-                    tassert(6624087,
-                            "PartialSchemaRequirements has duplicate bound projection names in "
-                            "a conjunction",
-                            insertedBoundProj);
-                }
+                                auto insertedBoundProj = seenProjNames.insert(*projName).second;
+                                tassert(6624087,
+                                        "PartialSchemaRequirements has duplicate bound projection "
+                                        "names in "
+                                        "a conjunction",
+                                        insertedBoundProj);
+                            }
 
-                tassert(6624088,
-                        "SargableNode cannot reference an internally bound projection",
-                        boundsProjectionNameSet.count(*key._projectionName) == 0);
+                            tassert(6624088,
+                                    "SargableNode cannot reference an internally bound projection",
+                                    boundsProjectionNameSet.count(*key._projectionName) == 0);
 
-                if (!checkPathContainsTraverse(key._path)) {
-                    auto insertedKey = seenKeys.insert(key).second;
-                    tassert(7155020,
-                            "PartialSchemaRequirements has two predicates on the same non-multikey "
-                            "path in a conjunction",
-                            insertedKey);
-                }
-            });
+                            if (!checkPathContainsTraverse(key._path)) {
+                                auto insertedKey = seenKeys.insert(key).second;
+                                tassert(7155020,
+                                        "PartialSchemaRequirements has two predicates on the same "
+                                        "non-multikey "
+                                        "path in a conjunction",
+                                        insertedKey);
+                            }
+                        });
+                });
         });
-    });
 }
 
 bool SargableNode::operator==(const SargableNode& other) const {

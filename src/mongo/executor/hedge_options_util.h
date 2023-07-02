@@ -28,9 +28,15 @@
  */
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/client/read_preference.h"
+#include "mongo/platform/basic.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 /** Failpoint used to test hedged reads. */

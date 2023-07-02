@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_inc.js
  *
@@ -14,7 +12,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     let data = {
         getUpdateArgument: function(fieldName) {
             return {$inc: {[fieldName]: 1}};

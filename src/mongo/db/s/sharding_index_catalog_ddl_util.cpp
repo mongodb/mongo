@@ -29,13 +29,12 @@
 
 #include "mongo/db/s/sharding_index_catalog_ddl_util.h"
 
-#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
 
-#include <boost/optional/optional.hpp>
+#include <absl/container/node_hash_map.h>
 
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
@@ -82,15 +81,6 @@ void deleteShardingIndexCatalogEntries(OperationContext* opCtx,
         opCtx, collection, BSON(IndexCatalogType::kCollectionUUIDFieldName << uuid), false);
 }
 
-
-ScopedCollectionAcquisition& getAcquisitionForNss(
-    std::vector<ScopedCollectionAcquisition>& acquisitions, const NamespaceString& nss) {
-    auto it = std::find_if(acquisitions.begin(), acquisitions.end(), [&nss](auto& acquisition) {
-        return acquisition.nss() == nss;
-    });
-    invariant(it != acquisitions.end());
-    return *it;
-}
 }  // namespace
 
 void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
@@ -120,10 +110,9 @@ void renameCollectionShardingIndexCatalog(OperationContext* opCtx,
                      AcquisitionPrerequisites::kWrite)},
                 MODE_IX);
 
-            const auto& collsColl = getAcquisitionForNss(
-                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
-            const auto& idxColl =
-                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+            const auto& collsColl =
+                acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
 
             {
                 // First get the document to check the index version if the document already exists
@@ -221,10 +210,8 @@ void addShardingIndexCatalogEntryToCollection(OperationContext* opCtx,
                      AcquisitionPrerequisites::kWrite)},
                 MODE_IX);
 
-            auto& collsColl = getAcquisitionForNss(
-                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
-            const auto& idxColl =
-                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+            auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
 
             {
                 // First get the document to check the index version if the document already exists
@@ -307,10 +294,8 @@ void removeShardingIndexCatalogEntryFromCollection(OperationContext* opCtx,
                      AcquisitionPrerequisites::kWrite)},
                 MODE_IX);
 
-            auto& collsColl = getAcquisitionForNss(
-                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
-            const auto& idxColl =
-                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+            auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
 
             {
                 // First get the document to check the index version if the document already exists
@@ -394,10 +379,8 @@ void replaceCollectionShardingIndexCatalog(OperationContext* opCtx,
                      AcquisitionPrerequisites::kWrite)},
                 MODE_IX);
 
-            auto& collsColl = getAcquisitionForNss(
-                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
-            const auto& idxColl =
-                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+            auto& collsColl = acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
 
             {
                 const auto query =
@@ -489,10 +472,9 @@ void dropCollectionShardingIndexCatalog(OperationContext* opCtx, const Namespace
                      AcquisitionPrerequisites::kWrite)},
                 MODE_IX);
 
-            const auto& collsColl = getAcquisitionForNss(
-                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
-            const auto& idxColl =
-                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+            const auto& collsColl =
+                acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
 
             {
                 const auto query = BSON(ShardAuthoritativeCollectionType::kNssFieldName
@@ -552,10 +534,10 @@ void clearCollectionShardingIndexCatalog(OperationContext* opCtx,
                      AcquisitionPrerequisites::kWrite)},
                 MODE_IX);
 
-            const auto& collsColl = getAcquisitionForNss(
-                acquisitions, NamespaceString::kShardCollectionCatalogNamespace);
-            const auto& idxColl =
-                getAcquisitionForNss(acquisitions, NamespaceString::kShardIndexCatalogNamespace);
+            const auto& collsColl =
+                acquisitions.at(NamespaceString::kShardCollectionCatalogNamespace);
+            const auto& idxColl = acquisitions.at(NamespaceString::kShardIndexCatalogNamespace);
+
             {
                 // First unset the index version.
                 const auto query =

@@ -5,11 +5,9 @@
  *      FCV is upgrading or downgrading     (6744301)
  *      FCV upgrade or downgrade success    (6744302).
  *
- * TODO SERVER-75391: Enable with config shards when config shards can downgrade FCV.
  * @tags: [
  *   multiversion_incompatible,
  *   does_not_support_stepdowns,
- *   config_shard_incompatible,
  * ]
  */
 
@@ -201,8 +199,10 @@ function runShardingTest() {
     checkFCV(shardPrimaryAdminDB, latestFCV);
 
     jsTest.log("Checking for correct FCV logging on a sharded cluster.");
+    // One of the shards is the config server in config shard mode.
+    const numShardServers = TestData.configShard ? 1 : 2;
     assertLogsWithFailpoints(
-        st.configRS.getPrimary(), mongosAdminDB, "shardedCluster", 2 /*numShardServers*/);
+        st.configRS.getPrimary(), mongosAdminDB, "shardedCluster", numShardServers);
 
     st.stop();
 }

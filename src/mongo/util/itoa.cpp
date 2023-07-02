@@ -27,16 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/itoa.h"
-
 #include <cstdint>
+#include <cstring>
+#include <iterator>
 #include <type_traits>
 
 #include "mongo/base/string_data.h"
-#include "mongo/platform/bits.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/util/itoa.h"
 
 namespace mongo {
 namespace {

@@ -131,10 +131,10 @@ public:
      * 'keyString' are ignored.
      */
     static RowType deserializeFromKeyString(
-        const KeyString::Value& keyString,
+        const key_string::Value& keyString,
         BufBuilder* valueBufferBuilder,
         boost::optional<size_t> numPrefixValsToRead = boost::none);
-    void serializeIntoKeyString(KeyString::Builder& builder) const;
+    void serializeIntoKeyString(key_string::Builder& builder) const;
 
 protected:
     void release() {

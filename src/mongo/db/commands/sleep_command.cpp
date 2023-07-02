@@ -110,8 +110,9 @@ public:
             return;
         }
         auto nss = NamespaceString(ns);
-        uassert(
-            50961, "lockTarget is not a valid namespace", NamespaceString::validDBName(nss.db()));
+        uassert(50961,
+                "lockTarget is not a valid namespace",
+                NamespaceString::validDBName(nss.dbName()));
 
         auto dbMode = mode;
         if (!nsIsDbOnly(ns)) {

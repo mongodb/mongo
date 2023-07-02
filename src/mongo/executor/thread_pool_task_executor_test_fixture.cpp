@@ -27,13 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
-
 #include <memory>
+#include <utility>
 
 #include "mongo/executor/thread_pool_mock.h"
+#include "mongo/executor/thread_pool_task_executor_test_fixture.h"
 
 namespace mongo {
 namespace executor {

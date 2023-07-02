@@ -29,15 +29,15 @@
 
 #pragma once
 
-#include "mongo/config.h"
-
 #include <cstring>
+#include <iosfwd>
 #include <type_traits>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/static_assert.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 
 namespace mongo {
 
@@ -166,4 +166,5 @@ struct DataType {
 // Force the visibility of the DataType::Handler specializations.
 #define MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_
 #include "mongo/base/data_type_string_data.h"
+
 #undef MONGO_BASE_DATA_TYPE_H_INCLUDE_HANDSHAKE_

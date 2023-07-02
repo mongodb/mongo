@@ -27,10 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <cstdint>
+#include <limits>
+#include <string>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/decimal_counter.h"
 #include "mongo/util/itoa.h"
 

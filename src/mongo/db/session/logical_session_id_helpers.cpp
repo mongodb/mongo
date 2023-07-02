@@ -173,7 +173,8 @@ LogicalSessionId makeLogicalSessionId(const LogicalSessionFromClient& fromClient
                                 return authSession->isAuthorizedForPrivilege(priv);
                             }) ||
                     authSession->isAuthorizedForPrivilege(Privilege(
-                        ResourcePattern::forClusterResource(), ActionType::impersonate)) ||
+                        ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+                        ActionType::impersonate)) ||
                     getLogicalSessionUserDigestForLoggedInUser(opCtx) == fromClient.getUid());
 
         lsid.setUid(*fromClient.getUid());

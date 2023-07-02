@@ -229,16 +229,15 @@ verifyProfiler(queryComment, framework.find.sbe);
 
 MongoRunner.stopMongod(conn);
 
-conn = MongoRunner.runMongod({
-    restart: conn,
-    setParameter:
-        {featureFlagCommonQueryFramework: true, internalQueryFrameworkControl: "tryBonsai"}
-});
+conn =
+    MongoRunner.runMongod({restart: conn, setParameter: {featureFlagCommonQueryFramework: true}});
 assert.neq(null, conn, "mongod was unable to start up");
 
 db = conn.getDB(jsTestName());
 
 coll = initializeTestCollection();
+assert.commandWorked(
+    db.adminCommand({setParameter: 1, internalQueryFrameworkControl: "tryBonsai"}));
 
 // Run find using CQF
 expectedCounters = generateExpectedCounters(framework.find.cqf);

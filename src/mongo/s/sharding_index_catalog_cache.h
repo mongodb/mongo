@@ -29,10 +29,24 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <string>
+#include <utility>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/idl/idl_parser.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/s/catalog/type_index_catalog.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
 #include "mongo/s/index_version.h"
 #include "mongo/util/read_through_cache.h"
+#include "mongo/util/string_map.h"
 
 namespace mongo {
 

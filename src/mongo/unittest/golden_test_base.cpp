@@ -27,21 +27,38 @@
  *    it in the license file.
  */
 
-#include <boost/filesystem.hpp>
+#include <boost/core/addressof.hpp>
 #include <boost/filesystem/fstream.hpp>
-#include <boost/iostreams/device/file_descriptor.hpp>
-#include <boost/iostreams/stream.hpp>
-#include <boost/iostreams/stream_buffer.hpp>
-#include <boost/program_options.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+#include <boost/filesystem/path_traits.hpp>
+#include <boost/function/function_base.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/program_options/errors.hpp>
+#include <boost/program_options/options_description.hpp>
+#include <boost/program_options/parsers.hpp>
+#include <boost/program_options/value_semantic.hpp>
+#include <boost/program_options/variables_map.hpp>
+#include <boost/type_index/type_index_facade.hpp>
+#include <cstddef>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <yaml-cpp/yaml.h>
+#include <fstream>  // IWYU pragma: keep
+#include <yaml-cpp/node/impl.h>
+#include <yaml-cpp/node/node.h>
+#include <yaml-cpp/node/parse.h>
+#include <yaml-cpp/yaml.h>  // IWYU pragma: keep
 
-#include "mongo/base/init.h"
-#include "mongo/base/status.h"
-#include "mongo/logv2/log.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/unittest/golden_test_base.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

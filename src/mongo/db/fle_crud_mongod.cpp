@@ -248,7 +248,7 @@ private:
         // Check for interruption so we can be killed
         _opCtx->checkForInterrupt();
 
-        KeyString::Builder builder(KeyString::Version::kLatestVersion);
+        key_string::Builder builder(key_string::Version::kLatestVersion);
         builder.appendBinData(BSONBinData(block.data(), block.size(), BinDataType::BinDataGeneral));
         auto recordId = RecordId(builder.getBuffer(), builder.getSize());
 
@@ -316,11 +316,12 @@ private:
         // Check for interruption so we can be killed
         _opCtx->checkForInterrupt();
 
-        KeyString::Builder kb(
-            _sdi->getKeyStringVersion(), _sdi->getOrdering(), KeyString::Discriminator::kInclusive);
+        key_string::Builder kb(_sdi->getKeyStringVersion(),
+                               _sdi->getOrdering(),
+                               key_string::Discriminator::kInclusive);
 
         kb.appendBinData(BSONBinData(block.data(), block.size(), BinDataGeneral));
-        KeyString::Value id(kb.getValueCopy());
+        key_string::Value id(kb.getValueCopy());
 
         incrementRead();
 
@@ -331,13 +332,13 @@ private:
 
         // Seek will almost always give us a document, it just may not be a document we were
         // looking for. We need to check if seeked to the document we want
-        auto sizeWithoutRecordId = KeyString::sizeWithoutRecordIdLongAtEnd(
+        auto sizeWithoutRecordId = key_string::sizeWithoutRecordIdLongAtEnd(
             ksEntry->keyString.getBuffer(), ksEntry->keyString.getSize());
 
-        if (KeyString::compare(ksEntry->keyString.getBuffer(),
-                               id.getBuffer(),
-                               sizeWithoutRecordId,
-                               id.getSize()) == 0) {
+        if (key_string::compare(ksEntry->keyString.getBuffer(),
+                                id.getBuffer(),
+                                sizeWithoutRecordId,
+                                id.getSize()) == 0) {
 
             // Get the document from the base collection
             return _cursor->seekExact(ksEntry->loc);

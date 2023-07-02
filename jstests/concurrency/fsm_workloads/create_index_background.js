@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_index_background.js
  *
@@ -15,7 +13,7 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         nDocumentsToSeed: 1000,
         nDocumentsToCreate: 200,

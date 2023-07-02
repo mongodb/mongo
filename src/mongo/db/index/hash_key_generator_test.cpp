@@ -71,7 +71,7 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
     for (auto& keyString : keyStrings) {
-        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ss << key.toString() << " ";
     }
     ss << "]";
@@ -99,15 +99,15 @@ bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& ac
     return true;
 }
 
-KeyString::Value makeHashKey(BSONElement elt) {
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion,
-                                     BSON("" << BSONElementHasher::hash64(elt, kHashSeed)),
-                                     Ordering::make(BSONObj()));
+key_string::Value makeHashKey(BSONElement elt) {
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      BSON("" << BSONElementHasher::hash64(elt, kHashSeed)),
+                                      Ordering::make(BSONObj()));
     return keyString.release();
 }
 
 struct HashKeyGeneratorTest : public unittest::Test {
-    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+    SharedBufferFragmentBuilder allocator{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
 };
 
 TEST_F(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
@@ -123,7 +123,7 @@ TEST_F(HashKeyGeneratorTest, CollationAppliedBeforeHashing) {
                                        false,
                                        &collator,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
@@ -148,7 +148,7 @@ TEST_F(HashKeyGeneratorTest, CollationDoesNotAffectNonStringFields) {
                                        false,
                                        &collator,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
@@ -173,7 +173,7 @@ TEST_F(HashKeyGeneratorTest, CollatorAppliedBeforeHashingNestedObject) {
                                        false,
                                        &collator,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
@@ -198,12 +198,13 @@ TEST_F(HashKeyGeneratorTest, CollationAppliedforAllIndexFields) {
                                        true,
                                        &collator,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
     KeyStringSet expectedKeys;
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      Ordering::make(BSONObj()));
     keyString.appendBSONElement(backwardsObj["a"]["c"]);
     keyString.appendNumberLong(BSONElementHasher::hash64(backwardsObj["a"], kHashSeed));
     expectedKeys.insert(keyString.release());
@@ -222,7 +223,7 @@ TEST_F(HashKeyGeneratorTest, NoCollation) {
                                        false,
                                        nullptr,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
@@ -244,13 +245,14 @@ TEST_F(HashKeyGeneratorTest, CompoundIndexEmptyObject) {
                                        false,
                                        nullptr,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
     // Verify that we inserted null indexes for empty input object.
     KeyStringSet expectedKeys;
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      Ordering::make(BSONObj()));
     auto nullBSON = BSON("" << BSONNULL);
     auto nullElement = nullBSON.firstElement();
     keyString.appendNumberLong(BSONElementHasher::hash64(nullElement, kHashSeed));
@@ -272,7 +274,7 @@ TEST_F(HashKeyGeneratorTest, SparseIndex) {
                                        true,  // isSparse
                                        nullptr,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
     // Verify that no index entries were added to the sparse index.
@@ -291,13 +293,14 @@ TEST_F(HashKeyGeneratorTest, SparseIndexWithAFieldPresent) {
                                        true,  // isSparse
                                        nullptr,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        false);
 
     // Verify that we inserted null entries for the misssing fields.
     KeyStringSet expectedKeys;
-    KeyString::HeapBuilder keyString(KeyString::Version::kLatestVersion, Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(key_string::Version::kLatestVersion,
+                                      Ordering::make(BSONObj()));
     auto nullBSON = BSON("" << BSONNULL);
     auto nullElement = nullBSON.firstElement();
     keyString.appendNumberLong(BSONElementHasher::hash64(obj["a"], kHashSeed));
@@ -319,7 +322,7 @@ TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathFails) {
                                                           false,
                                                           nullptr,
                                                           &actualKeys,
-                                                          KeyString::Version::kLatestVersion,
+                                                          key_string::Version::kLatestVersion,
                                                           Ordering::make(BSONObj()),
                                                           false),
                        DBException,
@@ -338,7 +341,7 @@ TEST_F(HashKeyGeneratorTest, ArrayAlongIndexFieldPathDoesNotFailWhenIgnoreFlagIs
                                        false,
                                        nullptr,
                                        &actualKeys,
-                                       KeyString::Version::kLatestVersion,
+                                       key_string::Version::kLatestVersion,
                                        Ordering::make(BSONObj()),
                                        true  // ignoreArraysAlongPath
     );
@@ -360,7 +363,7 @@ TEST_F(HashKeyGeneratorTest, ArrayAtTerminalPathAlwaysFails) {
                                                           true,  // isSparse
                                                           nullptr,
                                                           &actualKeys,
-                                                          KeyString::Version::kLatestVersion,
+                                                          key_string::Version::kLatestVersion,
                                                           Ordering::make(BSONObj()),
                                                           true,  // ignoreArraysAlongPath
                                                           boost::none),

@@ -27,14 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/hierarchical_acquisition.h"
-
 #include <fmt/format.h>
+#include <string>
 
 #include "mongo/platform/source_location.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/hierarchical_acquisition.h"
 
 namespace mongo {
 namespace {

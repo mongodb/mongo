@@ -30,11 +30,10 @@
 #pragma once
 
 #include "mongo/db/operation_context.h"
-#include "mongo/db/session/logical_session_id.h"      // for TxnNumberAndRetryCounter
-#include "mongo/db/session/logical_session_id_gen.h"  // for OperationSessionInfo
-#include "mongo/db/session/session_catalog.h"  // for ObservableSession and ScanSessionsCallbackFn
-#include "mongo/db/session/session_txn_record_gen.h"       // for SessionTxnRecord
-#include "mongo/db/transaction/transaction_participant.h"  // for SessionToKill
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/session_catalog.h"
+#include "mongo/db/session/session_txn_record_gen.h"
+#include "mongo/db/transaction/transaction_participant.h"
 
 namespace mongo {
 

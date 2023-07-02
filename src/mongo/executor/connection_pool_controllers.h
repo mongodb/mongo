@@ -29,8 +29,11 @@
 
 #pragma once
 
+#include <cstddef>
 #include <functional>
 #include <string>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/executor/connection_pool.h"

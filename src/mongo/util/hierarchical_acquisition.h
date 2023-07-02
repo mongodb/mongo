@@ -31,7 +31,9 @@
 
 #include <climits>
 #include <cstdint>
+#include <iosfwd>
 
+#include "mongo/base/string_data.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {

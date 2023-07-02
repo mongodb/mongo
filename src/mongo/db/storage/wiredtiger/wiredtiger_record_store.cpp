@@ -27,7 +27,6 @@
  *    it in the license file.
  */
 
-
 #define LOGV2_FOR_RECOVERY(ID, DLEVEL, MESSAGE, ...) \
     LOGV2_DEBUG_OPTIONS(ID, DLEVEL, {logv2::LogComponent::kStorageRecovery}, MESSAGE, ##__VA_ARGS__)
 
@@ -110,12 +109,9 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kStorage
 
-
 namespace mongo {
 
 using namespace fmt::literals;
-using std::string;
-using std::unique_ptr;
 
 namespace {
 
@@ -642,7 +638,7 @@ WiredTigerRecordStore::WiredTigerRecordStore(WiredTigerKVEngine* kvEngine,
         const std::string wtTableConfig =
             uassertStatusOK(WiredTigerUtil::getMetadataCreate(ctx, _uri));
         const bool wtTableConfigMatchesStringKeyFormat =
-            wtTableConfig.find("key_format=u") != string::npos;
+            wtTableConfig.find("key_format=u") != std::string::npos;
         invariant(wtTableConfigMatchesStringKeyFormat);
     }
 
@@ -855,6 +851,7 @@ bool WiredTigerRecordStore::findRecord(OperationContext* opCtx,
 
 void WiredTigerRecordStore::doDeleteRecord(OperationContext* opCtx, const RecordId& id) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork() || opCtx->lockState()->isNoop());
+
     // SERVER-48453: Initialize the next record id counter before deleting. This ensures we won't
     // reuse record ids, which can be problematic for the _mdb_catalog.
     if (_keyFormat == KeyFormat::Long) {
@@ -1193,7 +1190,6 @@ StatusWith<Timestamp> WiredTigerRecordStore::getLatestOplogTimestamp(
     OperationContext* opCtx) const {
     invariant(_isOplog);
     invariant(_keyFormat == KeyFormat::Long);
-    dassert(opCtx->lockState()->isReadLocked());
 
     // Using this function inside a UOW is not supported because the main reason to call it is to
     // synchronize to the last op before waiting for write concern, so it makes little sense to do

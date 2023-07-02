@@ -16,7 +16,7 @@
 //   # errors.
 //   tenant_migration_incompatible,
 //   # TODO SERVER-67639: Verify $indexStats works for queries that are eligible for CQF.
-//   cqf_incompatible,
+//   cqf_experimental_incompatible,
 //   # Uses mapReduce command.
 //   requires_scripting,
 //   references_foreign_collection,

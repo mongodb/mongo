@@ -30,10 +30,22 @@
 #pragma once
 
 #include <absl/container/flat_hash_set.h>
+#include <cstddef>
+#include <memory>
+#include <utility>
 #include <vector>
 
+#include <absl/hash/hash.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/ns_targeter.h"
 #include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

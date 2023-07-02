@@ -364,7 +364,7 @@ TEST_F(CollectionCatalogTest, LookupCollectionByUUID) {
 
 TEST_F(CollectionCatalogTest, LookupNSSByUUID) {
     // Ensure the string value of the obtained NamespaceString is equal to nss.ns_forTest().
-    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns(), nss.ns_forTest());
+    ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), colUUID)->ns_forTest(), nss.ns_forTest());
     // Ensure namespace lookups of unknown UUIDs result in empty NamespaceStrings.
     ASSERT_EQUALS(catalog.lookupNSSByUUID(opCtx.get(), UUID::gen()), boost::none);
 }

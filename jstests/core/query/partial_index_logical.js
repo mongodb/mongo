@@ -3,8 +3,6 @@
  * containing logical expressions ($and, $or).
  *
  * @tags: [
- *  # TODO SERVER-67607: Test plan cache with CQF enabled.
- *  cqf_incompatible,
  *  # Since the plan cache is per-node state, this test assumes that all operations are happening
  *  # against the same mongod.
  *  assumes_read_preference_unchanged,

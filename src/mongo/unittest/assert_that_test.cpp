@@ -27,25 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <array>
-#include <functional>
+#include <fmt/format.h>
 #include <list>
 #include <map>
-#include <set>
+#include <ostream>
 #include <string>
+#include <tuple>
 #include <unordered_map>
-#include <unordered_set>
+#include <utility>
 #include <vector>
 
+#include <absl/container/node_hash_map.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
-#include "mongo/logv2/log.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/stdx/unordered_map.h"
-#include "mongo/stdx/unordered_set.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/stringify.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

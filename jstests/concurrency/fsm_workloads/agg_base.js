@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * agg_base.js
  *
  * Base workload for aggregation. Inserts a bunch of documents in its setup,
  * then each thread does an aggregation with an empty $match.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {
         numDocs: 1000,
         // Use 12KB documents by default. This number is useful because 12,000 documents each of

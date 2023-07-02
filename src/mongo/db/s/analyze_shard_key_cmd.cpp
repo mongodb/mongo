@@ -27,24 +27,21 @@
  *    it in the license file.
  */
 
-#include <memory>
-#include <string>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
+#include <memory>
+#include <string>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/resource_pattern.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/analyze_shard_key_cmd_util.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
@@ -83,14 +80,14 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     "analyzeShardKey command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    "analyzeShardKey command is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
 
             uassert(ErrorCodes::InvalidOptions,
                     "Cannot skip analyzing all metrics",
                     request().getAnalyzeKeyCharacteristics() ||
                         request().getAnalyzeReadWriteDistribution());
+            uassert(ErrorCodes::InvalidOptions,
+                    "Cannot specify both 'sampleRate' and 'sampleSize'",
+                    !request().getSampleRate() || !request().getSampleSize());
 
             const auto& nss = ns();
             const auto& key = request().getKey();
@@ -115,7 +112,13 @@ public:
             // Calculate metrics about the characteristics of the shard key.
             if (request().getAnalyzeKeyCharacteristics()) {
                 auto keyCharacteristics = analyze_shard_key::calculateKeyCharacteristicsMetrics(
-                    opCtx, analyzeShardKeyId, nss, collUuid, key);
+                    opCtx,
+                    analyzeShardKeyId,
+                    nss,
+                    collUuid,
+                    key,
+                    request().getSampleRate(),
+                    request().getSampleSize());
                 if (!keyCharacteristics) {
                     // No calculation was performed. By design this must be because the shard key
                     // does not have a supporting index. If the command is not requesting the

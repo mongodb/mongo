@@ -29,13 +29,29 @@
 
 #include "mongo/dbtests/mock/mock_replica_set.h"
 
+#include <algorithm>
+#include <ctime>
+#include <memory>
 #include <sstream>
+#include <utility>
 
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
+#include "mongo/client/mongo_uri.h"
+#include "mongo/client/sdam/server_description.h"
 #include "mongo/client/sdam/topology_description_builder.h"
+#include "mongo/db/repl/member_config.h"
 #include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/repl_set_tag.h"
 #include "mongo/dbtests/mock/mock_conn_registry.h"
-#include "mongo/dbtests/mock/mock_dbclient_connection.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 
 using namespace mongo::repl;
 

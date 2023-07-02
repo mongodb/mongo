@@ -29,13 +29,29 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/client/remote_command_targeter_factory_mock.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_test_fixture.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/network_test_env.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/chunk_manager.h"
 #include "mongo/s/grid.h"
 #include "mongo/transport/session.h"
 #include "mongo/unittest/temp_dir.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

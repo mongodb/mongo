@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * - Shard several collections with different (random) configured maxChunkSize
  * - Perform continuous inserts of random amounts of data into the collections
@@ -31,7 +29,7 @@ function getRandomCollName(tid) {
     return collNames[Random.randInt(tid * tid) % collNames.length];
 }
 
-var $config = (function() {
+export const $config = (function() {
     let states = {
         /*
          * Insert into a test collection a random amount of documents (up to 10MB per iteration)

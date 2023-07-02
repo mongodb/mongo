@@ -12,7 +12,7 @@
  * @tags: [requires_collstats, requires_capped]
  */
 
-var $config = (function() {
+export const $config = (function() {
     load("jstests/libs/feature_flag_util.js");
 
     // TODO: This workload may fail if an iteration multiplier is specified.

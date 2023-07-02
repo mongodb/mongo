@@ -34,11 +34,11 @@
 #include <boost/none.hpp>
 
 #include "mongo/bson/oid.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/repl/member_state.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/db/stats/operation_resource_consumption_gen.h"
 #include "mongo/db/stats/resource_consumption_metrics.h"
 #include "mongo/db/tenant_id.h"
@@ -55,9 +55,10 @@ namespace {
 ServerParameter* getServerParameter(const std::string& name) {
     return ServerParameterSet::getNodeParameterSet()->get(name);
 }
+
 }  // namespace
 
-class ResourceConsumptionMetricsTest : public LockerNoopServiceContextTest {
+class ResourceConsumptionMetricsTest : public ServiceContextTest {
 public:
     void setUp() {
         _opCtx = makeOperationContext();

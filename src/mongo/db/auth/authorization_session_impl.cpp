@@ -180,8 +180,6 @@ void validateSecurityTokenUserPrivileges(const User::ResourcePrivilegeMap& privs
 
 MONGO_FAIL_POINT_DEFINE(allowMultipleUsersWithApiStrict);
 
-const Privilege kBypassWriteBlockingModeOnClusterPrivilege(ResourcePattern::forClusterResource(),
-                                                           ActionType::bypassWriteBlockingMode);
 }  // namespace
 
 AuthorizationSessionImpl::AuthorizationSessionImpl(
@@ -499,6 +497,10 @@ PrivilegeVector AuthorizationSessionImpl::_getDefaultPrivileges() {
     return defaultPrivileges;
 }
 
+boost::optional<TenantId> AuthorizationSessionImpl::getUserTenantId() const {
+    return _authenticatedUser ? _authenticatedUser.value()->getName().getTenant() : boost::none;
+}
+
 bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONElement& element) {
     const bool isUUID = element.type() == BinData && element.binDataType() == BinDataType::newUUID;
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
@@ -508,8 +510,8 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(const BSONEle
             element.type() == String || isUUID);
 
     if (isUUID) {
-        return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                ActionType::useUUID);
+        return isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(getUserTenantId()), ActionType::useUUID);
     }
 
     return true;
@@ -520,8 +522,8 @@ bool AuthorizationSessionImpl::isAuthorizedToParseNamespaceElement(
     _contract.addAccessCheck(AccessCheckEnum::kIsAuthorizedToParseNamespaceElement);
 
     if (nss.isUUID()) {
-        return isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                ActionType::useUUID);
+        return isAuthorizedForActionsOnResource(
+            ResourcePattern::forClusterResource(getUserTenantId()), ActionType::useUUID);
     }
     return true;
 }
@@ -944,7 +946,8 @@ auto AuthorizationSessionImpl::checkCursorSessionPrivilege(
 
     auto authHasImpersonatePrivilege = [authSession = this] {
         return authSession->isAuthorizedForPrivilege(
-            Privilege(ResourcePattern::forClusterResource(), ActionType::impersonate));
+            Privilege(ResourcePattern::forClusterResource(authSession->getUserTenantId()),
+                      ActionType::impersonate));
     };
 
     auto authIsOn = [authSession = this] {
@@ -1017,15 +1020,16 @@ void AuthorizationSessionImpl::verifyContract(const AuthorizationContract* contr
 
     // "internal" comes from readRequestMetadata and sharded clusters
     // "advanceClusterTime" is an implicit check in clusters in metadata handling
-    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(),
+    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
                                         {ActionType::advanceClusterTime, ActionType::internal}));
 
     // Implicitly checked often to keep mayBypassWriteBlockingMode() fast
-    tempContract.addPrivilege(kBypassWriteBlockingModeOnClusterPrivilege);
+    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
+                                        ActionType::bypassWriteBlockingMode));
 
     // Needed for internal sessions started by the server.
-    tempContract.addPrivilege(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::issueDirectShardOperations));
+    tempContract.addPrivilege(Privilege(ResourcePattern::forClusterResource(boost::none),
+                                        ActionType::issueDirectShardOperations));
 
     uassert(5452401,
             "Authorization Session contains more authorization checks then permitted by contract.",
@@ -1047,7 +1051,9 @@ void AuthorizationSessionImpl::_updateInternalAuthorizationState() {
 
     // Update cached _mayBypassWriteBlockingMode to reflect current state.
     _mayBypassWriteBlockingMode = getAuthorizationManager().isAuthEnabled()
-        ? _isAuthorizedForPrivilege(kBypassWriteBlockingModeOnClusterPrivilege)
+        ? _isAuthorizedForPrivilege(
+              Privilege(ResourcePattern::forClusterResource(getUserTenantId()),
+                        ActionType::bypassWriteBlockingMode))
         : true;
 }
 

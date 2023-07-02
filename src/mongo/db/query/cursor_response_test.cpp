@@ -330,19 +330,16 @@ TEST(CursorResponseTest,
     RAIIServerParameterControllerForTest multitenancyController("multitenancySupport", true);
 
     for (bool flagStatus : {false, true}) {
-        RAIIServerParameterControllerForTest featureFlagController("featureFlagRequireTenantID",
-                                                                   flagStatus);
-
         rpc::OpMsgReplyBuilder builder;
         BSONObj okStatus = BSON("ok" << 1);
         BSONObj testDoc = BSON("_id" << 1);
+        auto scReply = SerializationContext::stateCommandReply();
+        scReply.setTenantIdSource(flagStatus /*nonPrefixedTenantId*/);
+
         BSONObj expectedBody =
             BSON("cursor" << BSON("firstBatch" << BSON_ARRAY(testDoc) << "partialResultsReturned"
                                                << true << "id" << CursorId(123) << "ns"
-                                               << NamespaceStringUtil::serialize(nss)));
-
-        auto scReply = SerializationContext::stateCommandReply();
-        scReply.setTenantIdSource(true /*nonPrefixedTenantId*/);
+                                               << NamespaceStringUtil::serialize(nss, scReply)));
 
         // Use CursorResponseBuilder to serialize the cursor response to OpMsgReplyBuilder.
         CursorResponseBuilder crb(&builder, options);
@@ -365,15 +362,13 @@ TEST(CursorResponseTest,
         CursorResponse response = std::move(swCursorResponse.getValue());
         ASSERT_EQ(response.getCursorId(), CursorId(123));
 
-        // TODO SERVER-74284 Using flagStatus, add cases for both scReplyConfig.setTenantIdSource()
-        // values and check the response here.
         ASSERT_EQ(response.getNSS(), nss);
         ASSERT_EQ(response.getBatch().size(), 1U);
         ASSERT_BSONOBJ_EQ(response.getBatch()[0], testDoc);
         ASSERT_EQ(response.getPartialResultsReturned(), true);
 
         // Re-serialize a BSONObj response from the CursorResponse.
-        auto cursorResBSON = response.toBSONAsInitialResponse();
+        auto cursorResBSON = response.toBSONAsInitialResponse(scReply);
 
         // Confirm that the BSON serialized by the CursorResponse is the same as that serialized by
         // the CursorResponseBuilder. Field ordering differs between the two, so compare

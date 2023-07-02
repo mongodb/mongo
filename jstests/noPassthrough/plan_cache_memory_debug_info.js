@@ -3,7 +3,7 @@
  * cumulative size of the system's plan caches exceeds a pre-configured threshold.
  * @tags: [
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs a series of placement-changing commands (DDLs and chunk migrations) while
  * resetPlacementHistory may be run in parallel. After tearing down the test, the
@@ -22,7 +20,7 @@ load("jstests/libs/uuid_util.js");
 load('jstests/libs/feature_flag_util.js');
 load('jstests/concurrency/fsm_workload_helpers/chunks.js');
 
-var $config = (function() {
+export const $config = (function() {
     const testCollectionsState = 'testCollectionsState';
     const resetPlacementHistoryState = 'resetPlacementHistoryState';
     const resetPlacementHistoryStateId = 'x';

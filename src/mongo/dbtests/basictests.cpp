@@ -27,17 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
 #include <iostream>
+#include <memory>
 #include <string>
+#include <vector>
 
-#include "mongo/db/client.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/base64.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/queue.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/timer.h"
 
 namespace BasicTests {

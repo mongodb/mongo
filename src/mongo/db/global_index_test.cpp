@@ -29,17 +29,42 @@
 
 #include "mongo/db/global_index.h"
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/db_raii.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/internal_plans.h"
+#include "mongo/db/query/plan_executor.h"
+#include "mongo/db/query/plan_yield_policy.h"
+#include "mongo/db/repl/member_state.h"
+#include "mongo/db/repl/oplog.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/replication_coordinator_mock.h"
+#include "mongo/db/repl/storage_interface.h"
 #include "mongo/db/repl/storage_interface_impl.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_context_d_test_fixture.h"
 #include "mongo/db/storage/key_string.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/bufreader.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kIndex
 
@@ -106,7 +131,7 @@ void verifyStoredKeyMatchesIndexKey(const BSONObj& key,
         indexEntry.hasElement(global_index::kContainerIndexKeyTypeBitsFieldName);
     ASSERT_EQ(expectTypeBits, hasTypeBits);
 
-    auto tb = KeyString::TypeBits(KeyString::Version::V1);
+    auto tb = key_string::TypeBits(key_string::Version::V1);
     if (hasTypeBits) {
         auto entryTypeBitsSize =
             indexEntry[global_index::kContainerIndexKeyTypeBitsFieldName].size();
@@ -114,12 +139,12 @@ void verifyStoredKeyMatchesIndexKey(const BSONObj& key,
             indexEntry[global_index::kContainerIndexKeyTypeBitsFieldName].binData(
                 entryTypeBitsSize);
         auto entryTypeBitsReader = BufReader(entryTypeBitsBinData, entryTypeBitsSize);
-        tb = KeyString::TypeBits::fromBuffer(KeyString::Version::V1, &entryTypeBitsReader);
+        tb = key_string::TypeBits::fromBuffer(key_string::Version::V1, &entryTypeBitsReader);
         ASSERT(!tb.isAllZeros());
     }
 
     const auto rehydratedKey =
-        KeyString::toBson(entryIndexKeyBinData, entryIndexKeySize, KeyString::ALL_ASCENDING, tb);
+        key_string::toBson(entryIndexKeyBinData, entryIndexKeySize, key_string::ALL_ASCENDING, tb);
 
     ASSERT_BSONOBJ_EQ(rehydratedKey, key);
     LOGV2(6789401,

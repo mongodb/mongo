@@ -29,8 +29,29 @@
 
 #pragma once
 
+#include <boost/preprocessor/control/iif.hpp>
+#include <memory>
+#include <tuple>
+#include <vector>
+
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/client/remote_command_targeter_mock.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/task_executor.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
+#include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_shard.h"
+#include "mongo/s/client/shard_registry.h"
 #include "mongo/s/sharding_test_fixture_common.h"
+#include "mongo/transport/session.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

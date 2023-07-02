@@ -57,7 +57,6 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/s/resharding/resharding_feature_flag_gen.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo {
@@ -168,12 +167,10 @@ public:
     void reportDataTransformMetrics(OperationContext* opCtx, BSONObjBuilder* bob) const {
         auto sCtx = opCtx->getServiceContext();
         using Metrics = ShardingDataTransformCumulativeMetrics;
+        Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
 
         // The serverStatus command is run before the FCV is initialized so we ignore it when
-        // checking whether the resharding and global index features are enabled here.
-        if (resharding::gFeatureFlagResharding.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
-            Metrics::getForResharding(sCtx)->reportForServerStatus(bob);
-        }
+        // checking whether the global index feature is enabled here.
         if (gFeatureFlagGlobalIndexes.isEnabledAndIgnoreFCVUnsafeAtStartup()) {
             Metrics::getForGlobalIndexes(sCtx)->reportForServerStatus(bob);
         }

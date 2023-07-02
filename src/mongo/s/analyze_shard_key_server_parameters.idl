@@ -85,6 +85,16 @@ server_parameters:
             expr: 5 * 60
         validator:
             gt: 0
+    analyzeShardKeyCharacteristicsDefaultSampleSize:
+        description: The default number of documents to sample when calculating the metrics about
+                     the characteristics of the shard key if both 'sampleRate' and 'sampleSize'
+                     are not specified.
+        set_at: [startup, runtime]
+        cpp_vartype: AtomicWord<int>
+        cpp_varname: gKeyCharacteristicsDefaultSampleSize
+        default: 10000000 # 10 million
+        validator:
+            gt: 0
 
     queryAnalysisQueryStatsSmoothingFactor:
         description: The smoothing factor for the exponential moving average of the number

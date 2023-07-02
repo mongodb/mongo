@@ -699,7 +699,9 @@ if wiredtiger:
         ],
         LIBDEPS=[
             '$BUILD_DIR/mongo/db/auth/authmocks',
+            '$BUILD_DIR/mongo/db/commands/create_command',
             '$BUILD_DIR/mongo/db/commands/test_commands_enabled',
+            '$BUILD_DIR/mongo/db/concurrency/exception_util',
             '$BUILD_DIR/mongo/db/index/index_access_method',
             '$BUILD_DIR/mongo/db/index_builds_coordinator_mongod',
             '$BUILD_DIR/mongo/db/multitenancy',
@@ -718,6 +720,7 @@ if wiredtiger:
             '$BUILD_DIR/mongo/db/service_context_d_test_fixture',
             '$BUILD_DIR/mongo/db/shard_role',
             '$BUILD_DIR/mongo/db/storage/wiredtiger/storage_wiredtiger',
+            '$BUILD_DIR/mongo/db/timeseries/timeseries_collmod',
             '$BUILD_DIR/mongo/db/timeseries/timeseries_options',
             '$BUILD_DIR/mongo/unittest/unittest',
             '$BUILD_DIR/mongo/util/clock_source_mock',

@@ -7,7 +7,7 @@
  * @tags: [catches_command_failures, antithesis_incompatible]
  */
 
-var $config = (function() {
+export const $config = (function() {
     const prefix = "create_collection_and_view";
 
     // We'll use a single unique collection for all operations executed by this test. The

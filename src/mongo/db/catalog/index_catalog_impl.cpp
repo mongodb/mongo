@@ -1756,7 +1756,7 @@ Status IndexCatalogImpl::_indexFilteredRecords(OperationContext* opCtx,
                                                const IndexCatalogEntry* index,
                                                const std::vector<BsonRecord>& bsonRecords,
                                                int64_t* keysInsertedOut) const {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
@@ -1795,7 +1795,7 @@ Status IndexCatalogImpl::_updateRecord(OperationContext* const opCtx,
                                        const RecordId& recordId,
                                        int64_t* const keysInsertedOut,
                                        int64_t* const keysDeletedOut) const {
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, coll->ns(), index->descriptor(), &options);
@@ -1841,7 +1841,7 @@ void IndexCatalogImpl::_unindexRecord(OperationContext* opCtx,
         }
     }
 
-    SharedBufferFragmentBuilder pooledBuilder(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder pooledBuilder(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     InsertDeleteOptions options;
     prepareInsertDeleteOptions(opCtx, collection->ns(), entry->descriptor(), &options);

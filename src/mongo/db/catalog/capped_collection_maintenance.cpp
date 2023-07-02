@@ -129,8 +129,7 @@ void cappedDeleteUntilBelowConfiguredMaximum(OperationContext* opCtx,
         // 'cappedFirstRecord' until the outermost WriteUnitOfWork commits or aborts. Locking the
         // metadata resource exclusively on the collection gives us that guarantee as it uses
         // two-phase locking semantics.
-        invariant(opCtx->lockState()->getLockMode(ResourceId(RESOURCE_METADATA, nss.ns())) ==
-                  MODE_X);
+        invariant(opCtx->lockState()->getLockMode(ResourceId(RESOURCE_METADATA, nss)) == MODE_X);
     } else {
         // Capped deletes not performed under the capped lock need the 'cappedFirstRecordMutex'
         // mutex.

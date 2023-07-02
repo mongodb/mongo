@@ -27,6 +27,8 @@
  *    it in the license file.
  */
 
+#include <string>
+
 #include "mongo/scripting/engine.h"
 
 namespace mongo {

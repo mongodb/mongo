@@ -400,16 +400,17 @@ var runner = (function() {
             config.data, 'threadCount', {enumerable: true, value: config.threadCount});
     }
 
-    function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {
-        workloads.forEach(function(workload) {
-            load(workload);  // for $config
+    async function loadWorkloadContext(workloads, context, executionOptions, applyMultipliers) {
+        for (const workload of workloads) {
+            const {$config} = await import(workload);
             assert.neq('undefined', typeof $config, '$config was not defined by ' + workload);
+            print(tojson($config));
             context[workload] = {config: parseConfig($config)};
             if (applyMultipliers) {
                 context[workload].config.iterations *= executionOptions.iterationMultiplier;
                 context[workload].config.threadCount *= executionOptions.threadMultiplier;
             }
-        });
+        }
     }
 
     function printWorkloadSchedule(schedule) {
@@ -591,7 +592,7 @@ var runner = (function() {
                                             'after workload-group teardown and data clean-up');
     }
 
-    function runWorkloads(
+    async function runWorkloads(
         workloads, clusterOptions, executionMode, executionOptions, cleanupOptions) {
         assert.gt(workloads.length, 0, 'need at least one workload to run');
 
@@ -625,7 +626,8 @@ var runner = (function() {
         globalAssertLevel = assertLevel;
 
         var context = {};
-        loadWorkloadContext(workloads, context, executionOptions, true /* applyMultipliers */);
+        await loadWorkloadContext(
+            workloads, context, executionOptions, true /* applyMultipliers */);
         var threadMgr = new ThreadManager(clusterOptions, executionMode);
 
         var cluster = new Cluster(clusterOptions);
@@ -694,32 +696,34 @@ var runner = (function() {
     }
 
     return {
-        serial: function serial(workloads, clusterOptions, executionOptions, cleanupOptions) {
+        serial: async function serial(workloads, clusterOptions, executionOptions, cleanupOptions) {
             clusterOptions = clusterOptions || {};
             executionOptions = executionOptions || {};
             cleanupOptions = cleanupOptions || {};
 
-            runWorkloads(
+            await runWorkloads(
                 workloads, clusterOptions, {serial: true}, executionOptions, cleanupOptions);
         },
 
-        parallel: function parallel(workloads, clusterOptions, executionOptions, cleanupOptions) {
-            clusterOptions = clusterOptions || {};
-            executionOptions = executionOptions || {};
-            cleanupOptions = cleanupOptions || {};
+        parallel:
+            async function parallel(workloads, clusterOptions, executionOptions, cleanupOptions) {
+                clusterOptions = clusterOptions || {};
+                executionOptions = executionOptions || {};
+                cleanupOptions = cleanupOptions || {};
 
-            runWorkloads(
-                workloads, clusterOptions, {parallel: true}, executionOptions, cleanupOptions);
-        },
+                await runWorkloads(
+                    workloads, clusterOptions, {parallel: true}, executionOptions, cleanupOptions);
+            },
 
-        composed: function composed(workloads, clusterOptions, executionOptions, cleanupOptions) {
-            clusterOptions = clusterOptions || {};
-            executionOptions = executionOptions || {};
-            cleanupOptions = cleanupOptions || {};
+        composed:
+            async function composed(workloads, clusterOptions, executionOptions, cleanupOptions) {
+                clusterOptions = clusterOptions || {};
+                executionOptions = executionOptions || {};
+                cleanupOptions = cleanupOptions || {};
 
-            runWorkloads(
-                workloads, clusterOptions, {composed: true}, executionOptions, cleanupOptions);
-        },
+                await runWorkloads(
+                    workloads, clusterOptions, {composed: true}, executionOptions, cleanupOptions);
+            },
 
         internals: {
             validateExecutionOptions,

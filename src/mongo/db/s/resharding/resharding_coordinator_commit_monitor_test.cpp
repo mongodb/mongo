@@ -35,7 +35,6 @@
 #include <fmt/format.h>
 // IWYU pragma: no_include "cxxabi.h"
 #include <algorithm>
-#include <future>
 #include <memory>
 #include <ratio>
 #include <string>

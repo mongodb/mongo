@@ -9,7 +9,7 @@
  *   assumes_balancer_off,
  *   does_not_support_stepdowns,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 

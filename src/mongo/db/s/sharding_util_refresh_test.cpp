@@ -29,11 +29,9 @@
 
 #include <boost/move/utility_core.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <future>
 #include <memory>
 #include <string>
 #include <system_error>
-#include <utility>
 #include <vector>
 
 #include "mongo/base/error_codes.h"

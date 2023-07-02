@@ -37,7 +37,6 @@
 #include <memory>
 #include <mutex>
 #include <string>
-#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -58,7 +57,6 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/repl/topology_version_observer.h"
-#include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_parameter.h"
 #include "mongo/db/tenant_id.h"
 #include "mongo/executor/connection_pool.h"

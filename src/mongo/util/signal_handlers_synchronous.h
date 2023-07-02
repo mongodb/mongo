@@ -31,6 +31,7 @@
 
 #include <functional>
 #include <iosfwd>
+#include <typeinfo>
 #include <vector>
 
 #include "mongo/platform/compiler.h"

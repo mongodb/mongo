@@ -104,9 +104,9 @@ public:
                                       const SortedDataIndexAccessMethod* iam,
                                       DataThrottle* dataThrottle);
 
-    boost::optional<IndexKeyEntry> seek(OperationContext* opCtx, const KeyString::Value& key);
+    boost::optional<IndexKeyEntry> seek(OperationContext* opCtx, const key_string::Value& key);
     boost::optional<KeyStringEntry> seekForKeyString(OperationContext* opCtx,
-                                                     const KeyString::Value& key);
+                                                     const key_string::Value& key);
 
     boost::optional<IndexKeyEntry> next(OperationContext* opCtx);
     boost::optional<KeyStringEntry> nextKeyString(OperationContext* opCtx);

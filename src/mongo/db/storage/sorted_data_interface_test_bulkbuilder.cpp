@@ -27,12 +27,13 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include <boost/move/utility_core.hpp>
+#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/record_id_helpers.h"
 #include "mongo/db/service_context.h"
@@ -70,6 +71,7 @@ TEST(SortedDataInterface, BuilderAddKey) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -82,7 +84,8 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    key_string::Builder keyString1(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -101,6 +104,7 @@ TEST(SortedDataInterface, BuilderAddKeyString) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -131,6 +135,7 @@ TEST(SortedDataInterface, BuilderAddKeyWithReservedRecordIdLong) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -158,6 +163,7 @@ TEST(SortedDataInterface, BuilderAddCompoundKey) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -189,6 +195,7 @@ TEST(SortedDataInterface, BuilderAddSameKey) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -202,9 +209,9 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/true, /*partial=*/false));
 
-    KeyString::Builder keyStringLoc1(
+    key_string::Builder keyStringLoc1(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyStringLoc2(
+    key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
     {
@@ -225,6 +232,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyString) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(1, sorted->numEntries(opCtx.get()));
     }
 }
@@ -254,6 +262,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyWithDupsAllowed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
@@ -267,9 +276,9 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    KeyString::Builder keyStringLoc1(
+    key_string::Builder keyStringLoc1(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyStringLoc2(
+    key_string::Builder keyStringLoc2(
         sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc2);
 
     {
@@ -290,6 +299,7 @@ TEST(SortedDataInterface, BuilderAddSameKeyStringWithDupsAllowed) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(2, sorted->numEntries(opCtx.get()));
     }
 }
@@ -319,6 +329,7 @@ TEST(SortedDataInterface, BuilderAddMultipleKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
     }
 }
@@ -331,9 +342,12 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
     const std::unique_ptr<SortedDataInterface> sorted(
         harnessHelper->newSortedDataInterface(/*unique=*/false, /*partial=*/false));
 
-    KeyString::Builder keyString1(sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
-    KeyString::Builder keyString2(sorted->getKeyStringVersion(), key2, sorted->getOrdering(), loc2);
-    KeyString::Builder keyString3(sorted->getKeyStringVersion(), key3, sorted->getOrdering(), loc3);
+    key_string::Builder keyString1(
+        sorted->getKeyStringVersion(), key1, sorted->getOrdering(), loc1);
+    key_string::Builder keyString2(
+        sorted->getKeyStringVersion(), key2, sorted->getOrdering(), loc2);
+    key_string::Builder keyString3(
+        sorted->getKeyStringVersion(), key3, sorted->getOrdering(), loc3);
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
@@ -354,6 +368,7 @@ TEST(SortedDataInterface, BuilderAddMultipleKeyStrings) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(3, sorted->numEntries(opCtx.get()));
     }
 }
@@ -385,6 +400,7 @@ TEST(SortedDataInterface, BuilderAddMultipleCompoundKeys) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(5, sorted->numEntries(opCtx.get()));
     }
 }

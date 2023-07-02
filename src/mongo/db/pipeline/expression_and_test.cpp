@@ -27,10 +27,9 @@
  *    it in the license file.
  */
 
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <string>
 #include <vector>
-
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -45,7 +44,7 @@
 #include "mongo/db/pipeline/expression_context_for_test.h"
 #include "mongo/db/pipeline/variables.h"
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo {

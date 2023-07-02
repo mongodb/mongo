@@ -29,12 +29,14 @@
 
 #pragma once
 
+#include <boost/numeric/conversion/cast.hpp>
+#include <boost/numeric/conversion/converter_policies.hpp>
+#include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <type_traits>
-
-#include <boost/numeric/conversion/cast.hpp>
-#include <boost/optional.hpp>
 
 #include "mongo/base/static_assert.h"
 #include "mongo/platform/decimal128.h"

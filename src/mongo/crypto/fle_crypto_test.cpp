@@ -29,9 +29,11 @@
 
 #include <algorithm>
 #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/multiprecision/number.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <climits>
 #include <cstdint>
@@ -44,12 +46,10 @@
 #include <tuple>
 #include <vector>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/data_range.h"
 #include "mongo/base/error_codes.h"
 #include "mongo/base/secure_allocator.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bson_depth.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"

@@ -29,10 +29,23 @@
 
 #include "mongo/transport/proxy_protocol_header_parser.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstring>
+#include <fmt/format.h>
+#include <string>
+#include <utility>
+
+#ifndef _WIN32
+#include <sys/un.h>
+#endif
+
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/assert_that.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/unittest/matcher.h"
+#include "mongo/unittest/matcher_core.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/shared_buffer.h"
 
 namespace mongo::transport {
 namespace {

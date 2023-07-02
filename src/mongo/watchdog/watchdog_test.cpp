@@ -27,28 +27,28 @@
  *    it in the license file.
  */
 
+#include <boost/filesystem/path.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <mutex>
+#include <utility>
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/watchdog/watchdog.h"
-
-#include <memory>
-
-#include "mongo/db/client.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/clock_source.h"
-#include "mongo/util/clock_source_mock.h"
-#include "mongo/util/tick_source_mock.h"
+#include "mongo/util/assert_util_core.h"
+#include "mongo/util/time_support.h"
+#include "mongo/watchdog/watchdog.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
-
 namespace mongo {
+namespace {
 
 class TestPeriodicThread : public WatchdogPeriodicThread {
 public:
@@ -95,7 +95,7 @@ private:
     std::uint32_t _wait{0};
 };
 
-class PeriodicThreadTest : public LockerNoopServiceContextTest {};
+class PeriodicThreadTest : public ServiceContextTest {};
 
 // Tests:
 // 1. Make sure it runs at least N times
@@ -246,7 +246,7 @@ private:
     std::uint32_t _wait{0};
 };
 
-class WatchdogCheckThreadTest : public LockerNoopServiceContextTest {};
+class WatchdogCheckThreadTest : public ServiceContextTest {};
 
 // Positive: Make sure check thread runs at least N times and stops correctly
 TEST_F(WatchdogCheckThreadTest, Basic) {
@@ -301,7 +301,7 @@ private:
 };
 
 
-class WatchdogMonitorThreadTest : public LockerNoopServiceContextTest {};
+class WatchdogMonitorThreadTest : public ServiceContextTest {};
 
 // Positive: Make sure monitor thread signals death if the check thread never starts
 TEST_F(WatchdogMonitorThreadTest, Basic) {
@@ -376,7 +376,7 @@ TEST_F(WatchdogMonitorThreadTest, SleepyHungCheck) {
     checkThread.shutdown();
 }
 
-class WatchdogMonitorTest : public LockerNoopServiceContextTest {};
+class WatchdogMonitorTest : public ServiceContextTest {};
 
 // Positive: Make sure watchdog monitor signals death if a check is unresponsive
 TEST_F(WatchdogMonitorTest, SleepyHungCheck) {
@@ -471,7 +471,7 @@ TEST_F(WatchdogMonitorTest, PauseAndResume) {
     ASSERT_EQ(lastCounter, counterCheckPtr->getCounter());
 }
 
-class DirectoryCheckTest : public LockerNoopServiceContextTest {};
+class DirectoryCheckTest : public ServiceContextTest {};
 
 // Positive: Do a sanity check that directory check passes
 TEST_F(DirectoryCheckTest, Basic) {
@@ -483,4 +483,5 @@ TEST_F(DirectoryCheckTest, Basic) {
     check.run(opCtx.get());
 }
 
+}  // namespace
 }  // namespace mongo

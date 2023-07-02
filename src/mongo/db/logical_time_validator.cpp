@@ -28,19 +28,16 @@
  */
 
 
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <mutex>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <boost/optional/optional.hpp>
-#include <boost/preprocessor/control/iif.hpp>
-
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep
-#include "mongo/base/initializer.h"
 #include "mongo/base/status_with.h"
-#include "mongo/db/auth/action_set.h"
 #include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/auth/privilege.h"
@@ -76,14 +73,6 @@ const auto getLogicalTimeValidator =
     ServiceContext::declareDecoration<std::shared_ptr<LogicalTimeValidator>>();
 
 Mutex validatorMutex;  // protects access to decoration instance of LogicalTimeValidator.
-
-std::vector<Privilege> advanceClusterTimePrivilege;
-
-MONGO_INITIALIZER(InitializeAdvanceClusterTimePrivilegeVector)(InitializerContext* const) {
-    ActionSet actions;
-    actions.addAction(ActionType::advanceClusterTime);
-    advanceClusterTimePrivilege.emplace_back(ResourcePattern::forClusterResource(), actions);
-}
 
 Milliseconds kRefreshIntervalIfErrored(200);
 
@@ -234,11 +223,12 @@ bool LogicalTimeValidator::isAuthorizedToAdvanceClock(OperationContext* opCtx) {
         return isInternalClient;
     }
 
-    auto client = opCtx->getClient();
+    auto as = AuthorizationSession::get(opCtx->getClient());
     // Note: returns true if auth is off, courtesy of
     // AuthzSessionExternalStateServerCommon::shouldIgnoreAuthChecks.
-    return AuthorizationSession::get(client)->isAuthorizedForPrivileges(
-        advanceClusterTimePrivilege);
+    return as->isAuthorizedForPrivilege(
+        Privilege(ResourcePattern::forClusterResource(as->getUserTenantId()),
+                  ActionType::advanceClusterTime));
 }
 
 bool LogicalTimeValidator::shouldGossipLogicalTime() {

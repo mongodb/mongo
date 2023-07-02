@@ -31,8 +31,15 @@
 
 #include <algorithm>
 #include <array>
+#include <cstdint>
 #include <iterator>
+#include <type_traits>
+#include <utility>
 
+#include <fmt/format.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 
 namespace mongo::str {

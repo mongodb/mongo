@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * map_reduce_with_chunk_migrations.js
  *
@@ -17,10 +15,12 @@
  *  does_not_support_causal_consistency
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                     // for extendWorkload
-load('jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/sharded_moveChunk_partitioned.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // The base setup will insert 'partitionSize' number of documents per thread, evenly
     // distributing across the chunks. Documents will only have the "_id" field.
     $config.data.partitionSize = 50;

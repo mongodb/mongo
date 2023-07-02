@@ -25,26 +25,26 @@ const numDocs = 10 * analyzeShardKeyNumRanges;
 // Given the number of documents defined above, the error code 4952606 is only expected because of
 // the deletes that will occur as part of renaming, dropping, recreating and emptying the
 // collection.
+const expectedAnalyzeShardKeyErrCodes = [
+    ErrorCodes.NamespaceNotFound,
+    ErrorCodes.QueryPlanKilled,
+    ErrorCodes.IllegalOperation,
+    // The shard key does not have enough cardinality for generating split points because
+    // documents are being deleted.
+    4952606,
+    // The collection becomes empty during the $collStats step.
+    7826501,
+    // The collection becomes empty during the step for calculating the monotonicity metrics.
+    7826505,
+    // The collection becomes empty during the step for calculating the cardinality and frequency
+    // metrics.
+    7826506
+];
 const analyzeShardKeyTestCases = [
-    {
-        operationType: "rename",
-        expectedErrCodes: [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled, 4952606]
-    },
-    {
-        operationType: "drop",
-        expectedErrCodes: [ErrorCodes.NamespaceNotFound, ErrorCodes.QueryPlanKilled, 4952606]
-    },
-    {
-        operationType: "recreate",
-        expectedErrCodes: [
-            ErrorCodes.NamespaceNotFound,
-            ErrorCodes.CollectionUUIDMismatch,
-            ErrorCodes.QueryPlanKilled,
-            ErrorCodes.IllegalOperation,
-            4952606
-        ]
-    },
-    {operationType: "makeEmpty", expectedErrCodes: [ErrorCodes.IllegalOperation, 4952606]}
+    {operationType: "rename", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
+    {operationType: "drop", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
+    {operationType: "recreate", expectedErrCodes: expectedAnalyzeShardKeyErrCodes},
+    {operationType: "makeEmpty", expectedErrCodes: expectedAnalyzeShardKeyErrCodes}
 ];
 // Test DDL operations after each step below.
 const analyzeShardKeyFpNames = [

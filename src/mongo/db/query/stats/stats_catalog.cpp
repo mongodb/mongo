@@ -29,16 +29,13 @@
 
 #include "mongo/db/query/stats/stats_catalog.h"
 
-#include <boost/smart_ptr.hpp>
-#include <list>
-#include <map>
-#include <tuple>
-#include <type_traits>
-#include <utility>
-
 #include <absl/container/node_hash_map.h>
 #include <boost/move/utility_core.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <list>
+#include <type_traits>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/query/stats/array_histogram.h"

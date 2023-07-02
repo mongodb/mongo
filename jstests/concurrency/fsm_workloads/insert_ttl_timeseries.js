@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Creates a time-series collection with a short expireAfterSeconds value. Each thread does an
  * insert on each iteration with a time, a metadata field, 'tid', and random measurement, 'data'. At
@@ -15,7 +13,7 @@
 
 load('jstests/concurrency/fsm_workload_helpers/balancer.js');
 
-var $config = (function() {
+export const $config = (function() {
     const initData = {
         getCollectionName: function(collName) {
             return "insert_ttl_timeseries_" + collName;

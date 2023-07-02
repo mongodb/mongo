@@ -1,16 +1,14 @@
-'use strict';
-
 /**
  * explain_find.js
  *
  * Runs explain() and find() on a collection.
  *
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js');     // for $config
-load('jstests/libs/analyze_plan.js');                     // for planHasStage and isIxscan
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
+load('jstests/libs/analyze_plan.js');  // for planHasStage and isIxscan
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states = Object.extend({
         explainLimit: function explainLimit(db, collName) {
             var res = db[collName].find().limit(3).explain();

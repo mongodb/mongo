@@ -35,6 +35,7 @@
 #include <utility>
 
 #include "mongo/base/status.h"
+#include "mongo/crypto/hash_block.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/service_liaison.h"

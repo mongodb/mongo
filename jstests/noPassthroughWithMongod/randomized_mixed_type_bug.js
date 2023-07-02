@@ -5,9 +5,16 @@
 (function() {
 "use strict";
 
+load("jstests/libs/optimizer_utils.js");             // For checkCascadesOptimizerEnabled.
 load('jstests/third_party/fast_check/fc-3.1.0.js');  // For fast-check (fc).
 
-const scalars = [fc.string(), fc.double(), fc.boolean(), fc.date(), fc.constant(null)];
+// TODO SERVER-67506: Re-enable this test when a decision is made about how Bonsai will handle
+// comparison to null. Other semantic difference tickets are also relevant here.
+let scalars = [fc.string(), fc.double(), fc.boolean(), fc.date()];
+if (!checkCascadesOptimizerEnabled(db)) {
+    scalars.push(fc.constant(null));
+}
+
 const pathComponents = fc.constant("a", "b");
 // Define our grammar for documents.
 let documentModel = fc.letrec(

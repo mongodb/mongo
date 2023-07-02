@@ -405,7 +405,7 @@ generateGenericMultiIntervalIndexScan(StageBuilderState& state,
                                       const std::string& indexName,
                                       const IndexScanNode* ixn,
                                       const BSONObj& keyPattern,
-                                      KeyString::Version version,
+                                      key_string::Version version,
                                       Ordering ordering,
                                       sbe::IndexKeysInclusionSet indexKeysToInclude,
                                       sbe::value::SlotVector indexKeySlots,
@@ -537,8 +537,8 @@ generateSingleIntervalIndexScan(StageBuilderState& state,
                                 const std::string& indexName,
                                 const BSONObj& keyPattern,
                                 bool forward,
-                                std::unique_ptr<KeyString::Value> lowKey,
-                                std::unique_ptr<KeyString::Value> highKey,
+                                std::unique_ptr<key_string::Value> lowKey,
+                                std::unique_ptr<key_string::Value> highKey,
                                 sbe::IndexKeysInclusionSet indexKeysToInclude,
                                 sbe::value::SlotVector indexKeySlots,
                                 const PlanStageReqs& reqs,
@@ -762,7 +762,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> generateIndexScan(
 
 IndexIntervals makeIntervalsFromIndexBounds(const IndexBounds& bounds,
                                             bool forward,
-                                            KeyString::Version version,
+                                            key_string::Version version,
                                             Ordering ordering) {
     auto lowKeyInclusive{IndexBounds::isStartIncludedInBound(bounds.boundInclusion)};
     auto highKeyInclusive{IndexBounds::isEndIncludedInBound(bounds.boundInclusion)};
@@ -810,10 +810,10 @@ std::pair<sbe::value::TypeTags, sbe::value::Value> packIndexIntervalsInSbeArray(
         obj->reserve(2);
         obj->push_back("l"_sd,
                        sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<KeyString::Value*>(lowKey.release()));
+                       sbe::value::bitcastFrom<key_string::Value*>(lowKey.release()));
         obj->push_back("h"_sd,
                        sbe::value::TypeTags::ksValue,
-                       sbe::value::bitcastFrom<KeyString::Value*>(highKey.release()));
+                       sbe::value::bitcastFrom<key_string::Value*>(highKey.release()));
         guard.reset();
         arr->push_back(tag, val);
     }

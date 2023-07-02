@@ -30,13 +30,17 @@
 #pragma once
 
 #include <algorithm>
+#include <array>
 #include <boost/optional.hpp>
+#include <cstddef>
 #include <fmt/format.h>
+#include <iterator>
 #include <memory>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <typeinfo>
 #include <utility>
 

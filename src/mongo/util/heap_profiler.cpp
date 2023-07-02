@@ -27,23 +27,44 @@
  *    it in the license file.
  */
 
-#include <algorithm>
 #include <gperftools/malloc_hook.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <algorithm>
+#include <array>
+#include <atomic>
+#include <cstdint>
+#include <cstdlib>
 #include <memory>
+#include <mutex>
+#include <ostream>
+#include <queue>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include "mongo/base/data_range.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/static_assert.h"
-#include "mongo/config.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/util/murmur3.h"
 #include "mongo/util/stacktrace.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
-#if defined(_POSIX_VERSION) && defined(MONGO_CONFIG_HAVE_EXECINFO_BACKTRACE)
-#include <dlfcn.h>
-#include <execinfo.h>
+#if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
+#include <unistd.h>
 #endif
+
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * remove_multiple_documents.js
  *
@@ -12,7 +10,7 @@
  *
  * @tags: [assumes_balancer_off]
  */
-var $config = (function() {
+export const $config = (function() {
     var states = {
         init: function init(db, collName) {
             this.numDocs = 200;

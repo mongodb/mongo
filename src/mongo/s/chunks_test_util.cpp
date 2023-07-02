@@ -30,11 +30,24 @@
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 
 #include "mongo/s/chunks_test_util.h"
-#include "mongo/db/namespace_string.h"
+
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "ext/alloc_traits.h"
+#include <algorithm>
+#include <cstdlib>
+#include <iterator>
+#include <utility>
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/simple_bsonobj_comparator.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/random.h"
-#include "mongo/s/shard_key_pattern.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo::chunks_test_util {
 namespace {

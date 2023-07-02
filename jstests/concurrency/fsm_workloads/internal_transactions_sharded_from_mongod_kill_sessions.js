@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs insert, update, delete and findAndModify commands against a sharded collection inside
  * single-shard and cross-shard internal transactions started on a shard using all the available
@@ -14,11 +12,13 @@
  * ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/internal_transactions_sharded_from_mongod.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/internal_transactions_sharded_from_mongod.js";
 load('jstests/libs/override_methods/retry_on_killed_session.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.retryOnKilledSession = true;
 
     // Insert initial documents during setup instead of the init state, otherwise the insert could

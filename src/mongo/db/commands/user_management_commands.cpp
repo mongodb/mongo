@@ -1341,7 +1341,7 @@ DropAllUsersFromDatabaseReply CmdUMCTyped<DropAllUsersFromDatabaseCommand>::Invo
     auto* authzManager = AuthorizationManager::get(serviceContext);
     auto lk = uassertStatusOK(requireWritableAuthSchema28SCRAM(opCtx, authzManager));
 
-    audit::logDropAllUsersFromDatabase(client, dbname.db());
+    audit::logDropAllUsersFromDatabase(client, dbname);
 
     auto swNumRemoved = removePrivilegeDocuments(
         opCtx,
@@ -2113,7 +2113,7 @@ DropAllRolesFromDatabaseReply CmdUMCTyped<DropAllRolesFromDatabaseCommand>::Invo
 
     auto status = retryTransactionOps(
         opCtx, dbname.tenantId(), DropAllRolesFromDatabaseCommand::kCommandName, dropRoleOps, [&] {
-            audit::logDropAllRolesFromDatabase(opCtx->getClient(), dbname.db());
+            audit::logDropAllRolesFromDatabase(opCtx->getClient(), dbname);
         });
     if (!status.isOK()) {
         uassertStatusOK(

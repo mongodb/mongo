@@ -27,12 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <type_traits>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/request_types/add_shard_request_type.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/server_options.h"
+#include "mongo/db/write_concern_options.h"
+#include "mongo/s/request_types/add_shard_request_type.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 
 namespace mongo {
@@ -40,9 +53,6 @@ namespace mongo {
 using std::string;
 using str::stream;
 
-class BSONObj;
-template <typename T>
-class StatusWith;
 
 const BSONField<std::string> AddShardRequest::mongosAddShard("addShard");
 const BSONField<std::string> AddShardRequest::mongosAddShardDeprecated("addshard");

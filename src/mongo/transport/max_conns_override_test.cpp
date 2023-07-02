@@ -27,11 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
+#include <string>
+#include <variant>
+#include <vector>
 
+#include "mongo/base/string_data.h"
 #include "mongo/transport/mock_session.h"
 #include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/transport/session.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/net/cidr.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/util/net/sockaddr.h"
 
 namespace mongo {
 namespace {

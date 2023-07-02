@@ -109,8 +109,6 @@ extern "C" {
 #include "mongo/stdx/variant.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/debug_util.h"
-#include "mongo/util/namespace_string_util.h"
-#include "mongo/util/serialization_context.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 
@@ -4059,10 +4057,7 @@ BSONObj EncryptionInformationHelpers::encryptionInformationSerialize(
     ei.setType(kEncryptionInformationSchemaVersion);
 
     // Do not include tenant id in nss in the schema as the command request has "$tenant".
-    SerializationContext serializationCtx = SerializationContext::stateCommandRequest();
-    serializationCtx.setPrefixState(false);
-    ei.setSchema(
-        BSON(NamespaceStringUtil::serializeForCommands(nss, serializationCtx) << encryptedFields));
+    ei.setSchema(BSON(nss.serializeWithoutTenantPrefix_UNSAFE() << encryptedFields));
 
     return ei.toBSON();
 }
@@ -4072,10 +4067,7 @@ EncryptedFieldConfig EncryptionInformationHelpers::getAndValidateSchema(
     BSONObj schema = ei.getSchema();
 
     // Do not include tenant id in nss in the schema as the command request has "$tenant".
-    SerializationContext serializationCtx = SerializationContext::stateCommandRequest();
-    serializationCtx.setPrefixState(false);
-    auto element =
-        schema.getField(NamespaceStringUtil::serializeForCommands(nss, serializationCtx));
+    auto element = schema.getField(nss.serializeWithoutTenantPrefix_UNSAFE());
 
     uassert(6371205,
             "Expected an object for schema in EncryptionInformation",

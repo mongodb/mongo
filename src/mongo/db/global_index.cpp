@@ -92,8 +92,8 @@ BSONObj buildIndexEntry(const BSONObj& key, const BSONObj& docKey) {
     // - We assume unique: true, and there's no support for other index options.
     // - No support for multikey indexes.
 
-    KeyString::Builder ks(KeyString::Version::V1);
-    ks.resetToKey(BSONObj::stripFieldNames(key), KeyString::ALL_ASCENDING);
+    key_string::Builder ks(key_string::Version::V1);
+    ks.resetToKey(BSONObj::stripFieldNames(key), key_string::ALL_ASCENDING);
     const auto& indexTB = ks.getTypeBits();
 
     // Build the index entry, consisting of:
@@ -116,7 +116,7 @@ BSONObj buildIndexEntry(const BSONObj& key, const BSONObj& docKey) {
 
 RecordIdBound docKeyToRecordIdBound(const BSONObj& docKey) {
     // Build RecordIdBound corresponding to docKey.
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendObject(docKey);
     return RecordIdBound(RecordId(keyBuilder.getBuffer(), keyBuilder.getSize()));
 }

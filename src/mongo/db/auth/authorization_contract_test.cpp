@@ -75,7 +75,7 @@ TEST(AuthContractTest, Basic) {
     ASSERT_FALSE(ac.hasPrivileges(
         Privilege(ResourcePattern::forAnyNormalResource(boost::none), ActionType::shutdown)));
     ASSERT_FALSE(ac.hasPrivileges(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::enableSharding)));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::enableSharding)));
 
 
     ASSERT_TRUE(ac.hasPrivileges(
@@ -130,7 +130,8 @@ TEST(AuthContractTest, DifferentResoucePattern) {
         Privilege(ResourcePattern::forAnyNormalResource(boost::none), ActionType::enableSharding));
 
     AuthorizationContract ac2;
-    ac2.addPrivilege(Privilege(ResourcePattern::forClusterResource(), ActionType::enableSharding));
+    ac2.addPrivilege(
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::enableSharding));
 
     ASSERT_FALSE(ac1.contains(ac2));
     ASSERT_FALSE(ac2.contains(ac1));

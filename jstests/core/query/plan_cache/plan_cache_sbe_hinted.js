@@ -12,7 +12,7 @@
  *   # Multiple servers can mess up the plan cache list.
  *   assumes_standalone_mongod,
  *   # TODO SERVER-67607: Test plan cache with CQF enabled.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

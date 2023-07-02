@@ -36,7 +36,7 @@
 #include "mongo/db/query/stats/scalar_histogram.h"
 #include "mongo/db/query/stats/stats_gen.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/framework.h"
 
 namespace mongo::stats {

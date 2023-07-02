@@ -27,14 +27,15 @@
  *    it in the license file.
  */
 
-#include <memory>
-
 #include <boost/move/utility_core.hpp>
+#include <memory>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/concurrency/d_concurrency.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/record_id.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/sorted_data_interface.h"
@@ -61,6 +62,7 @@ TEST(SortedDataInterface, FullValidate) {
     int nToInsert = 10;
     for (int i = 0; i < nToInsert; i++) {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_X);
         {
             WriteUnitOfWork uow(opCtx.get());
             BSONObj key = BSON("" << i);
@@ -72,6 +74,7 @@ TEST(SortedDataInterface, FullValidate) {
 
     {
         const ServiceContext::UniqueOperationContext opCtx(harnessHelper->newOperationContext());
+        Lock::GlobalLock globalLock(opCtx.get(), MODE_S);
         ASSERT_EQUALS(nToInsert, sorted->numEntries(opCtx.get()));
     }
 }

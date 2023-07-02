@@ -278,6 +278,16 @@ public:
         return false;
     }
 
+    bool timeseriesBucketingParametersMayHaveChanged() const final {
+        unimplementedTasserted();
+        return false;
+    }
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) final {
+        unimplementedTasserted();
+    }
+
     bool getRequiresTimeseriesExtendedRangeSupport() const final {
         // A virtual collection is never a time-series collection, so it never requires
         // extended-range support.

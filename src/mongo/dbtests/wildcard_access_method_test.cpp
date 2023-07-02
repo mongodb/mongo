@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
+#include <vector>
 
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/json.h"
-#include "mongo/db/index/wildcard_access_method.h"
+#include "mongo/db/field_ref.h"
+#include "mongo/db/query/index_bounds.h"
+#include "mongo/db/query/interval.h"
 #include "mongo/db/query/query_planner_test_lib.h"
 #include "mongo/db/query/wildcard_multikey_paths.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

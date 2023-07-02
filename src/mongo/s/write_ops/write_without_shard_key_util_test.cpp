@@ -27,15 +27,37 @@
  *    it in the license file.
  */
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <memory>
+#include <vector>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/json.h"
 #include "mongo/db/concurrency/locker_impl_client_observer.h"
+#include "mongo/db/cursor_id.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/db/query/collation/collator_interface.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
+#include "mongo/executor/network_test_env.h"
+#include "mongo/executor/remote_command_request.h"
 #include "mongo/idl/server_parameter_test_util.h"
-#include "mongo/logv2/log.h"
+#include "mongo/s/catalog/type_collection.h"
+#include "mongo/s/catalog_cache.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/shard_key_pattern.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/write_without_shard_key_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/bson_test_util.h"
+#include "mongo/unittest/framework.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

@@ -493,12 +493,12 @@ void GeoHash::appendHashMin(BSONObjBuilder* builder, const char* fieldName) cons
     appendHashToBuilder(_hash, builder, fieldName);
 }
 
-void GeoHash::appendHashMin(KeyString::Builder* ks) const {
+void GeoHash::appendHashMin(key_string::Builder* ks) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToKeyString(_hash, ks);
 }
 
-void GeoHash::appendHashMin(KeyString::PooledBuilder* ks) const {
+void GeoHash::appendHashMin(key_string::PooledBuilder* ks) const {
     // The min bound of a GeoHash region has all the unused suffix bits set to 0
     appendHashToKeyString(_hash, ks);
 }

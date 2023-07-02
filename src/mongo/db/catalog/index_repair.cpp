@@ -154,7 +154,7 @@ StatusWith<int> moveRecordToLostAndFound(OperationContext* opCtx,
 
 int repairMissingIndexEntry(OperationContext* opCtx,
                             const IndexCatalogEntry* index,
-                            const KeyString::Value& ks,
+                            const key_string::Value& ks,
                             const KeyFormat& keyFormat,
                             const NamespaceString& nss,
                             const CollectionPtr& coll,
@@ -196,10 +196,10 @@ int repairMissingIndexEntry(OperationContext* opCtx,
 
         RecordId rid;
         if (keyFormat == KeyFormat::Long) {
-            rid = KeyString::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
+            rid = key_string::decodeRecordIdLongAtEnd(ks.getBuffer(), ks.getSize());
         } else {
             invariant(keyFormat == KeyFormat::String);
-            rid = KeyString::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
+            rid = key_string::decodeRecordIdStrAtEnd(ks.getBuffer(), ks.getSize());
         }
 
         auto dupKeyInfo = insertStatus.extraInfo<DuplicateKeyErrorInfo>();

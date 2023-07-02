@@ -1,15 +1,13 @@
-'use strict';
-
 /**
  * explain_aggregate.js
  *
  * Runs explain() and aggregate() on a collection.
  *
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/explain.js');     // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/explain.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     function assertCursorStages(num, obj) {
         assertAlways(obj.stages, tojson(obj));
         assertAlways.eq(num, obj.stages.length, tojson(obj.stages));

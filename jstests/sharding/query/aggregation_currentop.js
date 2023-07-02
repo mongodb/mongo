@@ -13,7 +13,9 @@
  * applicable.
  *
  * This test requires replica set configuration and user credentials to persist across a restart.
- * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction, requires_fcv_70]
+ * TODO SERVER-78101: Investigate the test failure and re-enable the test with CQF enabled.
+ * @tags: [requires_persistence, uses_transactions, uses_prepare_transaction, requires_fcv_70,
+ * cqf_incompatible]
  */
 
 // Restarts cause issues with authentication for awaiting replication.

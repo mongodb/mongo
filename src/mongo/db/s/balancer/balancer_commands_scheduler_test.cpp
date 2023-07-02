@@ -32,7 +32,6 @@
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
 #include <cstddef>
-#include <future>
 #include <memory>
 #include <string>
 #include <system_error>

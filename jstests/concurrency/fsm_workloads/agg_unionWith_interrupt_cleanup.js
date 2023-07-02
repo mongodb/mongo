@@ -6,11 +6,12 @@
  *   uses_curop_agg_stage
  * ]
  */
-'use strict';
-load('jstests/concurrency/fsm_libs/extend_workload.js');                 // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/agg_out_interrupt_cleanup.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.commentStr = "agg_unionWith_interrupt_cleanup";
 
     $config.states.aggregate = function aggregate(db, collName) {

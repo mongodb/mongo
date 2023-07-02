@@ -828,7 +828,7 @@ TEST_F(AuthorizationSessionTest, CannotAggregateCurrentOpAllUsersTrueWithoutInpr
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoD) {
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::inprog));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::inprog));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
     auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
@@ -842,7 +842,7 @@ TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActi
 
 TEST_F(AuthorizationSessionTest, CanAggregateCurrentOpAllUsersTrueWithInprogActionOnMongoS) {
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::inprog));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::inprog));
 
     BSONArray pipeline = BSON_ARRAY(BSON("$currentOp" << BSON("allUsers" << true)));
     auto aggReq = uassertStatusOK(aggregation_request_helper::parseFromBSONForTests(
@@ -1291,7 +1291,7 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
 
     // The useUUID privilege allows UUIDs to be parsed
     authzSession->assumePrivilegesForDB(
-        Privilege(ResourcePattern::forClusterResource(), ActionType::useUUID));
+        Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID));
 
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(stringObj.firstElement()));
     ASSERT_TRUE(authzSession->isAuthorizedToParseNamespaceElement(uuidObj.firstElement()));
@@ -1304,7 +1304,7 @@ TEST_F(AuthorizationSessionTest, CanUseUUIDNamespacesWithPrivilege) {
         std::initializer_list<AccessCheckEnum>{
             AccessCheckEnum::kIsAuthorizedToParseNamespaceElement},
         std::initializer_list<Privilege>{
-            Privilege(ResourcePattern::forClusterResource(), ActionType::useUUID)});
+            Privilege(ResourcePattern::forClusterResource(boost::none), ActionType::useUUID)});
 
     authzSession->verifyContract(&ac);
 }

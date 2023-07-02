@@ -734,7 +734,7 @@ std::pair<std::unique_ptr<sbe::PlanStage>, PlanStageSlots> SlotBasedStageBuilder
     auto indexAccessMethod =
         collection->getIndexCatalog()->getEntry(indexDescriptor)->accessMethod()->asSortedData();
 
-    std::unique_ptr<KeyString::Value> lowKey, highKey;
+    std::unique_ptr<key_string::Value> lowKey, highKey;
     if (csn->iets.empty()) {
         std::tie(lowKey, highKey) =
             makeKeyStringPair(csn->startKey,

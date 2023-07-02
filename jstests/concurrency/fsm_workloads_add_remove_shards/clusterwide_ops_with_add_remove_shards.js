@@ -8,7 +8,7 @@
 
 "use strict";
 
-var $config = (function() {
+export const $config = (function() {
     // The 'setup' function is run once by the parent thread after the cluster has been initialized,
     // before the worker threads have been spawned. The 'this' argument is bound as '$config.data'.
     function setup(db, collName, cluster) {

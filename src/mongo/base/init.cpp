@@ -27,10 +27,11 @@
  *    it in the license file.
  */
 
-#include "mongo/base/init.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
 
 #include <cstdlib>
 #include <iostream>
+#include <utility>
 
 #include "mongo/base/initializer.h"
 #include "mongo/util/assert_util.h"

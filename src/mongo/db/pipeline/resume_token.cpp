@@ -175,7 +175,7 @@ ResumeToken::ResumeToken(const ResumeTokenData& data) {
     }
 
     auto keyObj = builder.obj();
-    KeyString::Builder encodedToken(KeyString::Version::V1, keyObj, Ordering::make(BSONObj()));
+    key_string::Builder encodedToken(key_string::Version::V1, keyObj, Ordering::make(BSONObj()));
     _hexKeyString = hexblob::encode(encodedToken.getBuffer(), encodedToken.getSize());
     const auto& typeBits = encodedToken.getTypeBits();
     if (!typeBits.isAllZeros())
@@ -195,7 +195,7 @@ bool ResumeToken::operator==(const ResumeToken& other) const {
 }
 
 ResumeTokenData ResumeToken::getData() const {
-    KeyString::TypeBits typeBits(KeyString::Version::V1);
+    key_string::TypeBits typeBits(key_string::Version::V1);
     if (!_typeBits.missing()) {
         BSONBinData typeBitsBinData = _typeBits.getBinData();
         BufReader typeBitsReader(typeBitsBinData.data, typeBitsBinData.length);
@@ -210,10 +210,10 @@ ResumeTokenData ResumeToken::getData() const {
     hexblob::decode(_hexKeyString, &hexDecodeBuf);
     BSONBinData keyStringBinData =
         BSONBinData(hexDecodeBuf.buf(), hexDecodeBuf.len(), BinDataType::BinDataGeneral);
-    auto internalBson = KeyString::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
-                                              keyStringBinData.length,
-                                              Ordering::make(BSONObj()),
-                                              typeBits);
+    auto internalBson = key_string::toBsonSafe(static_cast<const char*>(keyStringBinData.data),
+                                               keyStringBinData.length,
+                                               Ordering::make(BSONObj()),
+                                               typeBits);
 
     BSONObjIterator i(internalBson);
     ResumeTokenData result;

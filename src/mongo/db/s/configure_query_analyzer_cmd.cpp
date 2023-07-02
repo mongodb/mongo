@@ -157,9 +157,6 @@ public:
                     "configureQueryAnalyzer command is not supported on a multitenant replica set",
                     !gMultitenancySupport);
             uassert(ErrorCodes::IllegalOperation,
-                    "configureQueryAnalyzer command is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
-            uassert(ErrorCodes::IllegalOperation,
                     "Cannot run configureQueryAnalyzer command directly against a shardsvr mongod",
                     serverGlobalParams.clusterRole.has(ClusterRole::None) ||
                         isInternalClient(opCtx) || TestingProctor::instance().isEnabled());

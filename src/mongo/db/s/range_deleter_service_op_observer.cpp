@@ -29,12 +29,11 @@
 
 #include "mongo/db/s/range_deleter_service_op_observer.h"
 
-#include <string>
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <string>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -44,7 +43,9 @@
 #include "mongo/db/catalog_raii.h"
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/cursor_manager.h"
+#include "mongo/db/database_name.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/collection_sharding_runtime.h"
 #include "mongo/db/s/range_deleter_service.h"
 #include "mongo/db/s/range_deletion_task_gen.h"

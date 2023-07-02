@@ -29,10 +29,22 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <cstddef>
+#include <functional>
+#include <memory>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/logical_time.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/read_write_concern_defaults_cache_lookup_mock.h"
+#include "mongo/executor/remote_command_request.h"
+#include "mongo/platform/basic.h"
 #include "mongo/s/catalog_cache_test_fixture.h"
+#include "mongo/util/fail_point.h"
 
 namespace mongo {
 

@@ -28,9 +28,12 @@
  */
 
 
+#include <absl/container/node_hash_map.h>
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <iterator>
 #include <list>
@@ -38,12 +41,8 @@
 #include <mutex>
 #include <set>
 #include <string>
-#include <tuple>
+#include <utility>
 #include <vector>
-
-#include <absl/container/node_hash_map.h>
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/init.h"  // IWYU pragma: keep

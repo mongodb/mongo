@@ -30,13 +30,16 @@
 
 #include "mongo/embedded/embedded_options.h"
 
+#include <boost/filesystem.hpp>  // IWYU pragma: keep
+#include <string>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/db/server_options_base.h"
 #include "mongo/db/server_options_helpers.h"
 #include "mongo/db/storage/storage_options.h"
 #include "mongo/embedded/embedded_options_gen.h"
-
-#include <boost/filesystem.hpp>
-#include <string>
+#include "mongo/util/options_parser/value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl
 

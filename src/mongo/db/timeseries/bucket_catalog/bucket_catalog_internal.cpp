@@ -37,6 +37,7 @@
 #include <boost/cstdint.hpp>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/preprocessor/iteration/iterate.hpp>
 #include <boost/utility/in_place_factory.hpp>  // IWYU pragma: keep
@@ -48,8 +49,6 @@
 #include <string>
 #include <tuple>
 #include <type_traits>
-
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"

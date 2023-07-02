@@ -116,29 +116,29 @@ $config = (function() {
         function getRand() {
             return Random.randInt(10);
         }
-  
+
         function init(db, collName) {
             this.start = getRand() * this.tid;
         }
- 
+
         function scanGT(db, collName) {
             db[collName].find({ _id: { $gt: this.start } }).itcount();
         }
- 
+
         function scanLTE(db, collName) {
             db[collName].find({ _id: { $lte: this.start } }).itcount();
         }
- 
- 
+
+
         return {
             init: init,
             scanGT: scanGT,
             scanLTE: scanLTE
         };
     })();
-     
+
     /* ... */
-  
+
     return {
         /* ... */
         states: states,
@@ -204,7 +204,7 @@ $config = (function() {
             printjson(db.serverCmdLineOpts());
         });
     }
-  
+
     function teardown(db, collName, cluster) {
         cluster.executeOnMongodNodes(function(db) {
             db.adminCommand({ setParameter: 1, internalQueryExecYieldIterations: 128 });
@@ -288,7 +288,7 @@ engine, and work as you would expect. One thing to note is that before calling
 either isMMAPv1 or isWiredTiger, first verify isMongod. When special casing
 functionality for sharded environments or storage engines, try to special case a
 test for the exceptionality while still leaving in place assertions for either
-case. 
+case.
 
 #### indexed_noindex.js
 
@@ -300,12 +300,11 @@ workload you are extending has a function in its data object called
 "getIndexSpec" that returns the spec for the index to be removed.
 
 ```javascript
-
-load('jstests/concurrency/fsm_libs/extend_workload.js'); // for extendWorkload
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 load('jstests/concurrency/fsm_workload_modifiers/indexed_noindex.js'); // for indexedNoindex
-load('jstests/concurrency/fsm_workloads/workload_with_index.js'); //for $config
-  
-$config = extendWorkload($config, indexedNoIndex);
+import {$config as $baseConfig} from 'jstests/concurrency/fsm_workloads/workload_with_index.js';
+
+export const $config = extendWorkload($baseConfig, indexedNoIndex);
 ```
 
 #### drop_utils.js
@@ -336,7 +335,7 @@ will always correspond to the mongod the mongo shell initially connected to.
 Serial is the simplest of all three modes and basically works as explained
 above. Setup is run single threaded, data is copied into multiple threads where
 the states are executed, and once all the threads have finished a teardown
-function is run and the runner moves onto the next workload. 
+function is run and the runner moves onto the next workload.
 
 ![fsm_serial_example.png](../images/testing/fsm_serial_example.png)
 
@@ -393,7 +392,7 @@ runWorkloads functions, the third argument, can contain the following options
 Runs all workloads serially. For each workload, `$config.threadCount` threads
 are spawned and each thread runs for exactly `$config.iterations` steps starting
 at `$config.startState` and transitioning to other states based on the
-transition probabilities defined in $config.transitions. 
+transition probabilities defined in $config.transitions.
 
 #### fsm_all_composed.js
 
@@ -408,7 +407,7 @@ composition of workloads. By default, each workload in each subset is run
 between 2 and 3 times. The number of threads used during composition equals the
 sum of the `$config.threadCount` values for each workload in each subset.
 
-#### fsm_all_simultaneous.js 
+#### fsm_all_simultaneous.js
 
 options: numSubsets, subsetSize
 

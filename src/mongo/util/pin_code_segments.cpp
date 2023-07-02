@@ -27,14 +27,21 @@
  *    it in the license file.
  */
 
+#include <cstddef>
+#include <cstdint>
 #include <elf.h>
+#include <fmt/format.h>
 #include <link.h>
+#include <string>
 #include <sys/mman.h>
 #include <vector>
 
-#include "mongo/db/initialize_server_global_state.h"
-#include "mongo/db/initialize_server_global_state_gen.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/pin_code_segments_params_gen.h"
 

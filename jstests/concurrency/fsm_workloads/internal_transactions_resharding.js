@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs insert, update, delete and findAndModify commands against a sharded collection inside
  * single-shard and cross-shard internal transactions using all client session configurations, and
@@ -12,12 +10,14 @@
  *  antithesis_incompatible,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/internal_transactions_sharded.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/internal_transactions_sharded.js";
 load('jstests/libs/fail_point_util.js');
 load("jstests/libs/feature_flag_util.js");
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // reshardingMinimumOperationDurationMillis is set to 30 seconds when there are stepdowns.
     // So in order to limit the overall time for the test, we limit the number of resharding
     // operations to maxReshardingExecutions.

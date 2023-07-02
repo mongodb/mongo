@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/s/request_types/remove_shard_from_zone_request_type.h"
+#include <boost/move/utility_core.hpp>
 
-#include "mongo/bson/bson_field.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/write_concern_options.h"
+#include "mongo/s/request_types/remove_shard_from_zone_request_type.h"
 
 namespace mongo {
 

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * auth_create_user.js
  *
@@ -10,7 +8,7 @@ load('jstests/concurrency/fsm_workload_helpers/drop_utils.js');  // for dropUser
 // UMC commands are not supported in transactions.
 TestData.runInsideTransaction = false;
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // Use the workload name as a prefix for the username,
         // since the workload name is assumed to be unique.

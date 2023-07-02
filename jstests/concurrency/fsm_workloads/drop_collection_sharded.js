@@ -7,8 +7,6 @@
  *   requires_sharding,
  * ]
  */
-'use strict';
-
 const dbPrefix = jsTestName() + '_DB_';
 const dbCount = 2;
 const collPrefix = 'sharded_coll_';
@@ -22,7 +20,7 @@ function getRandomCollection(db) {
     return getRandomDb(db)[collPrefix + Random.randInt(collCount)];
 }
 
-var $config = (function() {
+export const $config = (function() {
     var setup = function(db, collName, cluster) {
         // Initialize databases
         for (var i = 0; i < dbCount; i++) {

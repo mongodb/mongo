@@ -84,7 +84,7 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexDescriptor* idx,
-    boost::optional<KeyString::Value> firstKeyString = {});
+    boost::optional<key_string::Value> firstKeyString = {});
 
 /**
  * Builds a BSONArray of the violations with duplicate index keys and returns the formatted error

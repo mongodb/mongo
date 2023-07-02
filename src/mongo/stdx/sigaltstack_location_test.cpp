@@ -28,21 +28,23 @@
  */
 
 
-#include <condition_variable>
+// IWYU pragma: no_include "bits/types/siginfo_t.h"
+// IWYU pragma: no_include "bits/types/stack_t.h"
 #include <csetjmp>
-#include <exception>
+#include <csignal>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
 #include <functional>
 #include <iostream>
-#include <mutex>
-#include <stdexcept>
+#include <limits>
 
 #ifndef _WIN32
-#include <sys/types.h>
 #include <sys/wait.h>
 #endif
 
 #include "mongo/config.h"  // IWYU pragma: keep
-#include "mongo/platform/compiler.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/exit_code.h"
 
@@ -50,6 +52,9 @@
 #include <unistd.h>
 #endif
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
 
 #if !MONGO_HAS_SIGALTSTACK
 

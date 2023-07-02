@@ -36,7 +36,6 @@
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstddef>
 #include <fmt/format.h>
-#include <future>
 #include <memory>
 #include <string>
 #include <system_error>

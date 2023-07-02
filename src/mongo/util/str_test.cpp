@@ -29,9 +29,13 @@
 
 #include <bitset>
 #include <fmt/format.h>
+#include <limits>
+#include <memory>
 
-#include "mongo/unittest/unittest.h"
+#include <boost/optional/optional.hpp>
 
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/str.h"

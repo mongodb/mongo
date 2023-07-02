@@ -322,7 +322,7 @@ PlanState IndexScanStageBase::getNext() {
     if (_indexKeySlot) {
         _recordAccessor.reset(false,
                               value::TypeTags::ksValue,
-                              value::bitcastFrom<KeyString::Value*>(&_nextRecord->keyString));
+                              value::bitcastFrom<key_string::Value*>(&_nextRecord->keyString));
     }
 
     if (_recordIdSlot) {
@@ -572,22 +572,22 @@ void SimpleIndexScanStage::open(bool reOpen) {
         _seekKeyLowHolder.reset(ownedLow, tagLow, valLow);
     } else {
         auto sdi = _entry->accessMethod()->asSortedData()->getSortedDataInterface();
-        KeyString::Builder kb(sdi->getKeyStringVersion(),
-                              sdi->getOrdering(),
-                              KeyString::Discriminator::kExclusiveBefore);
-        kb.appendDiscriminator(KeyString::Discriminator::kExclusiveBefore);
+        key_string::Builder kb(sdi->getKeyStringVersion(),
+                               sdi->getOrdering(),
+                               key_string::Discriminator::kExclusiveBefore);
+        kb.appendDiscriminator(key_string::Discriminator::kExclusiveBefore);
 
         auto [copyTag, copyVal] = value::makeCopyKeyString(kb.getValueCopy());
         _seekKeyLowHolder.reset(true, copyTag, copyVal);
     }
 }
 
-const KeyString::Value& SimpleIndexScanStage::getSeekKeyLow() const {
+const key_string::Value& SimpleIndexScanStage::getSeekKeyLow() const {
     auto [tag, value] = _seekKeyLowHolder.getViewOfValue();
     return *value::getKeyStringView(value);
 }
 
-const KeyString::Value* SimpleIndexScanStage::getSeekKeyHigh() const {
+const key_string::Value* SimpleIndexScanStage::getSeekKeyHigh() const {
     if (!_seekKeyHigh) {
         return nullptr;
     }
@@ -775,11 +775,11 @@ bool GenericIndexScanStage::validateKey(const boost::optional<KeyStringEntry>& k
 
         _keyBuffer.reset();
         BSONObjBuilder keyBuilder(_keyBuffer);
-        KeyString::toBsonSafe(key->keyString.getBuffer(),
-                              key->keyString.getSize(),
-                              _params.ord,
-                              key->keyString.getTypeBits(),
-                              keyBuilder);
+        key_string::toBsonSafe(key->keyString.getBuffer(),
+                               key->keyString.getSize(),
+                               _params.ord,
+                               key->keyString.getTypeBits(),
+                               keyBuilder);
         auto bsonKey = keyBuilder.done();
 
         switch (_checker->checkKey(bsonKey, &_seekPoint)) {

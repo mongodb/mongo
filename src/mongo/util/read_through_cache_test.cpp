@@ -27,12 +27,29 @@
  *    it in the license file.
  */
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <fmt/format.h>
+#include <list>
 #include <string>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context_test_fixture.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/read_through_cache.h"
 #include "mongo/util/scopeguard.h"
 

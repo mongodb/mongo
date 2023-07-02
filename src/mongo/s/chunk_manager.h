@@ -29,13 +29,30 @@
 
 #pragma once
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/query/collation/collation_spec.h"
 #include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/shard_id.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/s/catalog/type_chunk.h"
 #include "mongo/s/chunk.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/database_version.h"
 #include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_key_pattern.h"
@@ -43,6 +60,7 @@
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/read_through_cache.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

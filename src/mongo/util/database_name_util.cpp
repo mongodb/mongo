@@ -28,13 +28,25 @@
  */
 
 #include "mongo/util/database_name_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/oid.h"
 #include "mongo/db/database_name.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include <ostream>
-
-#include "mongo/logv2/log_debug.h"
 
 namespace mongo {
 
@@ -43,10 +55,9 @@ std::string DatabaseNameUtil::serialize(const DatabaseName& dbName,
     if (!gMultitenancySupport)
         dbName.toString();
 
-    // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
-    // if (context.getSource() == SerializationContext::Source::Command &&
-    //     context.getCallerType() == SerializationContext::CallerType::Reply)
-    //     return serializeForCommands(dbName, context);
+    if (context.getSource() == SerializationContext::Source::Command &&
+        context.getCallerType() == SerializationContext::CallerType::Reply)
+        return serializeForCommands(dbName, context);
 
     // if we're not serializing a Command Reply, use the default serializing rules
     return serializeForStorage(dbName, context);
@@ -67,7 +78,7 @@ std::string DatabaseNameUtil::serializeForCatalog(const DatabaseName& dbName,
 
 std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
                                                    const SerializationContext& context) {
-    // tenantId came from either a $tenant field or security token
+    // tenantId came from either a $tenant field or security token.
     if (context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
@@ -81,6 +92,7 @@ std::string DatabaseNameUtil::serializeForCommands(const DatabaseName& dbName,
         }
     }
 
+    // tenantId came from the prefix.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return dbName.toString();
@@ -132,10 +144,9 @@ DatabaseName DatabaseNameUtil::deserialize(boost::optional<TenantId> tenantId,
         return DatabaseName(boost::none, db);
     }
 
-    // TODO SERVER-74284: uncomment to redirect command-sepcific deserialization requests
-    // if (context.getSource() == SerializationContext::Source::Command &&
-    //     context.getCallerType() == SerializationContext::CallerType::Request)
-    //     return deserializeForCommands(std::move(tenantId), db, context);
+    if (context.getSource() == SerializationContext::Source::Command &&
+        context.getCallerType() == SerializationContext::CallerType::Request)
+        return deserializeForCommands(std::move(tenantId), db, context);
 
     // if we're not deserializing a Command Request, use the default deserializing rules
     return deserializeForStorage(std::move(tenantId), db, context);
@@ -170,6 +181,8 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
                                                       const SerializationContext& context) {
     // we only get here if we are processing a Command Request.  We disregard the feature flag in
     // this case, essentially letting the request dictate the state of the feature.
+
+    // We received a tenantId from $tenant or the security token.
     if (tenantId != boost::none) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
@@ -196,10 +209,12 @@ DatabaseName DatabaseNameUtil::deserializeForCommands(boost::optional<TenantId> 
         }
     }
 
+    // We received the tenantId from the prefix.
     auto dbName = parseFromStringExpectTenantIdInMultitenancyMode(db);
-    if ((dbName != DatabaseName::kAdmin) && (dbName != DatabaseName::kLocal) &&
-        (dbName != DatabaseName::kConfig))
-        massert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
+    // TODO SERVER-73113 Uncomment out this conditional to check that we always have a tenantId.
+    // if ((dbName != DatabaseName::kAdmin) && (dbName != DatabaseName::kLocal) &&
+    //     (dbName != DatabaseName::kConfig))
+    //     massert(8423388, "TenantId must be set", dbName.tenantId() != boost::none);
 
     return dbName;
 }

@@ -29,15 +29,14 @@
 
 #pragma once
 
-#include <memory>
-#include <set>
-#include <string>
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -85,9 +84,6 @@ public:
             uassert(ErrorCodes::IllegalOperation,
                     str::stream() << kStageName << " is not supported on a multitenant replica set",
                     !gMultitenancySupport);
-            uassert(ErrorCodes::IllegalOperation,
-                    str::stream() << kStageName << " is not supported on a configsvr mongod",
-                    !serverGlobalParams.clusterRole.exclusivelyHasConfigRole());
             uassert(6875700,
                     str::stream() << kStageName
                                   << " must take a nested object but found: " << specElem,

@@ -6,7 +6,7 @@
  * Includes documentation of each property on $config.
  * Serves as a template for new workloads.
  */
-var $config = (function() {
+export const $config = (function() {
     // 'data' is passed (copied) to each of the worker threads.
     var data = {};
 

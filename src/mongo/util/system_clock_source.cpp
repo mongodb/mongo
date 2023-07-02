@@ -27,12 +27,9 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/system_clock_source.h"
-
 #include <memory>
 
+#include "mongo/util/system_clock_source.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

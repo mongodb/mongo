@@ -28,17 +28,20 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <exception>
 
-#include "mongo/unittest/temp_dir.h"
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 
-#include <boost/filesystem.hpp>
-
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/options_parser/startup_option_init.h"
-#include "mongo/util/options_parser/startup_options.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/temp_dir.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest

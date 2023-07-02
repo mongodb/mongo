@@ -27,43 +27,61 @@
  *    it in the license file.
  */
 
-
-#include "mongo/platform/basic.h"
-
-#include <array>
-#include <deque>
+#include <boost/move/utility_core.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <fmt/format.h>
 #include <fmt/ostream.h>
-#include <initializer_list>
+// IWYU pragma: no_include "cxxabi.h"
+#include <array>
+#include <cstddef>
+#include <cstdint>
+#include <deque>
+#include <functional>
+#include <iosfwd>
+#include <iterator>
 #include <memory>
+#include <string>
+#include <tuple>
 #include <type_traits>
 #include <utility>
-#include <vector>
 
 #include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/baton.h"
 #include "mongo/db/client.h"
 #include "mongo/db/client_strand.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/compiler.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/transport/mock_session.h"
+#include "mongo/stdx/condition_variable.h"
 #include "mongo/transport/service_entry_point.h"
-#include "mongo/transport/service_entry_point_impl.h"
 #include "mongo/transport/service_executor.h"
-#include "mongo/transport/service_executor_utils.h"
 #include "mongo/transport/session_workflow.h"
 #include "mongo/transport/session_workflow_test_util.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/concurrency/notification.h"
 #include "mongo/util/concurrency/thread_pool.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/functional.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/synchronized_value.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
@@ -205,13 +223,13 @@ private:
     std::unique_ptr<BasicExpectation> _cb;
 };
 
-/** Fixture that mocks interactions with a `SessionWorkflow`. */
-class SessionWorkflowTest : public LockerNoopServiceContextTest {
-    using Base = LockerNoopServiceContextTest;
-
+/**
+ * Fixture that mocks interactions with a `SessionWorkflow`.
+ */
+class SessionWorkflowTest : public ServiceContextTest {
 public:
     void setUp() override {
-        Base::setUp();
+        ServiceContextTest::setUp();
         auto sc = getServiceContext();
         sc->setServiceEntryPoint(_makeServiceEntryPoint(sc));
         initializeNewSession();
@@ -221,7 +239,7 @@ public:
 
     void tearDown() override {
         ScopeGuard guard = [&] {
-            Base::tearDown();
+            ServiceContextTest::tearDown();
         };
         // Normal shutdown is a noop outside of ASAN.
         invariant(sep()->shutdownAndWait(Seconds{10}));

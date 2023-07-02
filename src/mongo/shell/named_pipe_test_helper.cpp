@@ -29,24 +29,36 @@
 
 #include "mongo/shell/named_pipe_test_helper.h"
 
-#include <boost/optional.hpp>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <exception>
+#include <new>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/bson/bsonelement.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog/virtual_collection_options.h"
 #include "mongo/db/pipeline/external_data_source_option_gen.h"
+#include "mongo/db/storage/input_stream.h"
 #include "mongo/db/storage/multi_bson_stream_cursor.h"
 #include "mongo/db/storage/named_pipe.h"
+#include "mongo/db/storage/record_data.h"
 #include "mongo/db/storage/record_store.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/random.h"
-#include "mongo/stdx/chrono.h"
 #include "mongo/stdx/thread.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
 

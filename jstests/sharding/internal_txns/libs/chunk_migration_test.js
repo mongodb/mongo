@@ -17,21 +17,15 @@ load('jstests/libs/chunk_manipulation_util.js');
 load('jstests/sharding/internal_txns/libs/fixture_helpers.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-function InternalTransactionChunkMigrationTest(storeFindAndModifyImagesInSideCollection = true) {
-    jsTest.log(`Running chunk migration test with options ${
-        tojson({storeFindAndModifyImagesInSideCollection})}`);
+function InternalTransactionChunkMigrationTest() {
+    jsTest.log(`Running chunk migration test`);
 
     let st = new ShardingTest({
         mongos: 1,
         shards: 3,
         rs: {nodes: 2},
-        rsOptions: {
-            oplogSize: 256,
-            setParameter: {
-                storeFindAndModifyImagesInSideCollection: storeFindAndModifyImagesInSideCollection,
-                maxNumberOfTransactionOperationsInSingleOplogEntry: 1
-            }
-        }
+        rsOptions:
+            {oplogSize: 256, setParameter: {maxNumberOfTransactionOperationsInSingleOplogEntry: 1}}
     });
     let staticMongod = MongoRunner.runMongod({});
 

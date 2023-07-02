@@ -62,7 +62,6 @@ class ResourcePattern {
 
 public:
     // TODO (SERVER-76195) Remove legacy non-tenant aware APIs from ResourcePattern
-    // forClusterResource() - Remove boost::none default.
     // databaseToMatch() - Remove in favor of dbNameToMatch.
 
     /**
@@ -83,8 +82,7 @@ public:
     /**
      * Returns a pattern that matches the "cluster" resource.
      */
-    static ResourcePattern forClusterResource(
-        const boost::optional<TenantId>& tenantId = boost::none) {
+    static ResourcePattern forClusterResource(const boost::optional<TenantId>& tenantId) {
         return ResourcePattern(MatchTypeEnum::kMatchClusterResource, tenantId);
     }
 

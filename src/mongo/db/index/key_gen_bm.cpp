@@ -61,7 +61,7 @@ void BM_KeyGenBasic(benchmark::State& state, bool skipMultikey) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,
@@ -91,7 +91,7 @@ void BM_KeyGenArray(benchmark::State& state, int32_t elements) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,
@@ -119,7 +119,7 @@ void BM_KeyGenArrayZero(benchmark::State& state, int32_t elements) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,
@@ -152,7 +152,7 @@ void BM_KeyGenArrayOfArray(benchmark::State& state, int32_t elements) {
     BtreeKeyGenerator generator({kFieldName},
                                 {BSONElement{}},
                                 false,
-                                KeyString::Version::kLatestVersion,
+                                key_string::Version::kLatestVersion,
                                 makeOrdering(kFieldName));
 
     SharedBufferFragmentBuilder allocator(kMemBlockSize,

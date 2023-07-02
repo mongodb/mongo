@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
+#if defined(_WIN32)
 
 #include "mongo/stdx/exception.h"
 
 #include <atomic>
 #include <utility>
-
-#if defined(_WIN32)
 
 namespace mongo {
 namespace stdx {

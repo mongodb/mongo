@@ -53,9 +53,7 @@
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 
-
 namespace mongo {
-
 namespace shutdown_detail {
 
 MONGO_FAIL_POINT_DEFINE(crashOnShutdown);
@@ -110,5 +108,4 @@ void finishShutdown(OperationContext* opCtx,
 }
 
 }  // namespace shutdown_detail
-
 }  // namespace mongo

@@ -27,32 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/db/exec/scoped_timer_factory.h"
+#pragma once
 
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <vector>
 
-#include <boost/optional/optional.hpp>
-
-#include "mongo/util/assert_util_core.h"
+#include "mongo/base/status.h"
+#include "mongo/db/query/query_stats_transform_algorithm_gen.h"
 
 namespace mongo {
-namespace scoped_timer_factory {
+/**
+ * Validate properties of the algorithm field of $queryStats.transformIdentifiers
+ */
+Status validateAlgo(TransformAlgorithmEnum algorithm);
 
-boost::optional<ScopedTimer> make(ServiceContext* context,
-                                  QueryExecTimerPrecision precision,
-                                  Nanoseconds* counter) {
-    invariant(context);
-    if (precision == QueryExecTimerPrecision::kMillis) {
-        return {{counter, context->getFastClockSource()}};
-    }
-    if (precision == QueryExecTimerPrecision::kNanos) {
-        return {{counter, context->getTickSource()}};
-    }
-
-    return boost::none;
-}
-
-}  // namespace scoped_timer_factory
+/**
+ * Validate properties of the hmac key field of $queryStats.transformIdentifiers
+ */
+Status validateHmac(std::vector<uint8_t> hmacKey);
 }  // namespace mongo

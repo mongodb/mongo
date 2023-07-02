@@ -185,6 +185,10 @@ structs:
                 type: safeBool
                 optional: true
                 stability: unstable
+            originalSpec:
+                type: object_owned
+                optional: true
+                stability: unstable
             clustered:
                 type: safeBool
                 optional: true

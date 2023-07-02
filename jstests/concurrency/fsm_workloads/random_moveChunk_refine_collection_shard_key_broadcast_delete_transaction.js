@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs these actions in parallel:
  * 1. Refine a collection's shard key.
@@ -19,18 +17,24 @@
  *   uses_transactions,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js";
 load('jstests/concurrency/fsm_workload_helpers/delete_in_transaction_states.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.iterations = 10;
 
     $config.states.exactIdDelete = function(db, collName, connCache) {
         exactIdDelete(db, this.getCurrentOrPreviousLatchCollName(collName), this.session);
     };
     $config.states.multiDelete = function(db, collName, connCache) {
-        multiDelete(db, this.getCurrentOrPreviousLatchCollName(collName), this.session, this.tid);
+        multiDelete(db,
+                    this.getCurrentOrPreviousLatchCollName(collName),
+                    this.session,
+                    this.tid,
+                    this.partitionSize);
     };
     $config.states.verifyDocuments = function(db, collName, connCache) {
         verifyDocuments(db, this.getCurrentOrPreviousLatchCollName(collName), this.tid);
@@ -48,7 +52,7 @@ var $config = extendWorkload($config, function($config, $super) {
 
         for (let i = this.latchCount; i >= 0; --i) {
             const latchCollName = collName + '_' + i;
-            initDeleteInTransactionStates(db, latchCollName, this.tid);
+            initDeleteInTransactionStates(db, latchCollName, this.tid, this.partitionSize);
         }
     };
 

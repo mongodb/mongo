@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs concurrent majority writes alongside transactions to verify both will eventually
  * complete as expected.
@@ -8,11 +6,13 @@
  * @tags: [uses_transactions, assumes_snapshot_transactions]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js');  // for $config
-load('jstests/concurrency/fsm_workload_helpers/server_types.js');                 // for isMongos
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_simple.js";
+load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.majorityWriteCollName = 'majority_writes';
     $config.data.counter = 0;
 

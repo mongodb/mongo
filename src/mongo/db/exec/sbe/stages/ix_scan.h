@@ -256,8 +256,8 @@ protected:
     bool validateKey(const boost::optional<KeyStringEntry>& key) override;
 
 private:
-    const KeyString::Value& getSeekKeyLow() const;
-    const KeyString::Value* getSeekKeyHigh() const;
+    const key_string::Value& getSeekKeyLow() const;
+    const key_string::Value* getSeekKeyHigh() const;
 
     std::unique_ptr<EExpression> _seekKeyLow;
     std::unique_ptr<EExpression> _seekKeyHigh;
@@ -289,7 +289,7 @@ struct GenericIndexScanStageParams {
     std::unique_ptr<EExpression> indexBounds;
     const BSONObj keyPattern;
     const int direction;
-    const KeyString::Version version;
+    const key_string::Version version;
     const Ordering ord;
 };
 class GenericIndexScanStage final : public IndexScanStageBase {

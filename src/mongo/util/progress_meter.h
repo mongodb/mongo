@@ -29,10 +29,12 @@
 
 #pragma once
 
+#include <mutex>
 #include <string>
 #include <utility>
 
 #include "mongo/base/string_data.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/stdx/mutex.h"
 #include "mongo/util/concurrency/with_lock.h"

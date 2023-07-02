@@ -72,7 +72,7 @@ public:
     WildcardKeyGenerator(BSONObj keyPattern,
                          BSONObj pathProjection,
                          const CollatorInterface* collator,
-                         KeyString::Version keyStringVersion,
+                         key_string::Version keyStringVersion,
                          Ordering ordering,
                          boost::optional<KeyFormat> rsKeyFormat = boost::none);
 
@@ -101,7 +101,7 @@ private:
     WildcardProjection _proj;
     const CollatorInterface* _collator;
     const BSONObj _keyPattern;
-    const KeyString::Version _keyStringVersion;
+    const key_string::Version _keyStringVersion;
     const Ordering _ordering;
     const boost::optional<KeyFormat> _rsKeyFormat;
     boost::optional<BtreeKeyGenerator> _preBtreeGenerator = boost::none;

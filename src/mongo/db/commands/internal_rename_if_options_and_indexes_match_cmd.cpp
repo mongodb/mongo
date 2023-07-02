@@ -93,8 +93,7 @@ public:
                 std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
             const auto& collectionOptions = thisRequest.getCollectionOptions();
 
-            if (serverGlobalParams.clusterRole.has(ClusterRole::None) ||
-                serverGlobalParams.clusterRole.exclusivelyHasConfigRole()) {
+            if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
                 // No need to acquire additional locks in a non-sharded environment
                 _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
                 return;

@@ -28,11 +28,26 @@
  */
 
 #include "mongo/util/namespace_string_util.h"
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <utility>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/oid.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/multitenancy_gen.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/server_feature_flags_gen.h"
+#include "mongo/db/server_options.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
-#include <ostream>
 
 namespace mongo {
 
@@ -41,10 +56,10 @@ std::string NamespaceStringUtil::serialize(const NamespaceString& ns,
     if (!gMultitenancySupport)
         return ns.toString();
 
-    // TODO SERVER-74284: uncomment to redirect command-sepcific serialization requests
-    // if (context.getSource() == SerializationContext::Source::Command &&
-    //     context.getCallerType() == SerializationContext::CallerType::Reply)
-    //     return serializeForCommands(ns, context);
+    if (context.getSource() == SerializationContext::Source::Command &&
+        context.getCallerType() == SerializationContext::CallerType::Reply) {
+        return serializeForCommands(ns, context);
+    }
 
     // if we're not serializing a Command Reply, use the default serializing rules
     return serializeForStorage(ns, context);
@@ -70,7 +85,7 @@ std::string NamespaceStringUtil::serializeForStorage(const NamespaceString& ns,
 
 std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
                                                       const SerializationContext& context) {
-    // tenantId came from either a $tenant field or security token
+    // tenantId came from either a $tenant field or security token.
     if (context.receivedNonPrefixedTenantId()) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
@@ -84,6 +99,7 @@ std::string NamespaceStringUtil::serializeForCommands(const NamespaceString& ns,
         }
     }
 
+    // tenantId came from the prefix.
     switch (context.getPrefix()) {
         case SerializationContext::Prefix::ExcludePrefix:
             return ns.toString();
@@ -115,10 +131,9 @@ NamespaceString NamespaceStringUtil::deserialize(boost::optional<TenantId> tenan
         return NamespaceString(boost::none, ns);
     }
 
-    // TODO SERVER-74284: uncomment to redirect command-sepcific deserialization requests
-    // if (context.getSource() == SerializationContext::Source::Command &&
-    //     context.getCallerType() == SerializationContext::CallerType::Request)
-    //     return deserializeForCommands(std::move(tenantId), ns, context);
+    if (context.getSource() == SerializationContext::Source::Command &&
+        context.getCallerType() == SerializationContext::CallerType::Request)
+        return deserializeForCommands(std::move(tenantId), ns, context);
 
     // if we're not deserializing a Command Request, use the default deserializing rules
     return deserializeForStorage(std::move(tenantId), ns, context);
@@ -160,6 +175,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
     // we only get here if we are processing a Command Request.  We disregard the feature flag in
     // this case, essentially letting the request dictate the state of the feature.
 
+    // We received a tenantId from $tenant or the security token.
     if (tenantId != boost::none) {
         switch (context.getPrefix()) {
             case SerializationContext::Prefix::ExcludePrefix:
@@ -186,6 +202,7 @@ NamespaceString NamespaceStringUtil::deserializeForCommands(boost::optional<Tena
         }
     }
 
+    // We received the tenantId from the prefix.
     auto nss = parseFromStringExpectTenantIdInMultitenancyMode(ns);
     if ((nss.dbName() != DatabaseName::kAdmin) && (nss.dbName() != DatabaseName::kLocal) &&
         (nss.dbName() != DatabaseName::kConfig)) {

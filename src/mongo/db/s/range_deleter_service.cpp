@@ -132,7 +132,7 @@ RangeDeleterService* RangeDeleterService::get(OperationContext* opCtx) {
 
 RangeDeleterService::ReadyRangeDeletionsProcessor::ReadyRangeDeletionsProcessor(
     OperationContext* opCtx)
-    : _thread([this] { _runRangeDeletions(); }) {}
+    : _service(opCtx->getServiceContext()), _thread([this] { _runRangeDeletions(); }) {}
 
 RangeDeleterService::ReadyRangeDeletionsProcessor::~ReadyRangeDeletionsProcessor() {
     shutdown();
@@ -175,7 +175,8 @@ void RangeDeleterService::ReadyRangeDeletionsProcessor::_completedRangeDeletion(
 }
 
 void RangeDeleterService::ReadyRangeDeletionsProcessor::_runRangeDeletions() {
-    Client::initThread(kRangeDeletionThreadName);
+    ThreadClient threadClient(kRangeDeletionThreadName, _service);
+
     {
         stdx::lock_guard<Latch> lock(_mutex);
         if (_state != kRunning) {
@@ -362,7 +363,6 @@ void RangeDeleterService::onStepUpComplete(OperationContext* opCtx, long long te
 }
 
 void RangeDeleterService::_recoverRangeDeletionsOnStepUp(OperationContext* opCtx) {
-
     _stepUpCompletedFuture =
         ExecutorFuture<void>(_executor)
             .then([serviceContext = opCtx->getServiceContext(), this] {

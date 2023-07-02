@@ -28,14 +28,26 @@
  */
 
 #include <algorithm>
+#include <iostream>
+#include <iterator>
 #include <string>
+#include <tuple>
 #include <utility>
+#include <vector>
 
 #include "stitch_support/stitch_support.h"
 
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/json.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/scopeguard.h"

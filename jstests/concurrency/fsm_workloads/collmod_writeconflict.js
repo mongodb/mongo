@@ -1,14 +1,12 @@
-'use strict';
-
 /**
  * collmod_writeconflict.js
  *
  * Ensures collMod successfully handles WriteConflictExceptions.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/collmod.js');     // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/collmod.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'collmod_writeconflict';
     $config.setup = function setup(db, collName, cluster) {
         $super.setup.apply(this, arguments);

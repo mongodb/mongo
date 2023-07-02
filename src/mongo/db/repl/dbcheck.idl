@@ -65,6 +65,22 @@ enums:
       Collection: "collection"
       Start: "start"
       Stop: "stop"
+  DbCheckValidationMode:
+      description: "The type of consistency check that dbCheck will run."
+      type: string
+      # dataConsistency: Runs the existing data consistency checks between nodes of a replica set. 
+      # This is intended for cases where running secondary index checks is too expensive, and we 
+      # want to just test data consistency between nodes in a replica set.
+      #
+      # dataConsistencyAndMissingIndexKeysCheck: Runs the existing data consistency checks between 
+      # nodes of a replica set and verifies that there are no missing index keys in all index tables.
+      #
+      # extraIndexKeysCheck: Verifies that there are no extra index keys in the index table.
+      values:
+          dataConsistency: "dataConsistency"
+          dataConsistencyAndMissingIndexKeysCheck: "dataConsistencyAndMissingIndexKeysCheck"
+          extraIndexKeysCheck: "extraIndexKeysCheck"
+
 
 structs:
   DbCheckSingleInvocation:
@@ -113,6 +129,10 @@ structs:
         description: Wait for this writeConcern at the end of every batch. Default is w:1 with no timeout.
         type: WriteConcern
         default: WriteConcernOptions()
+      validateMode:
+        description: The type of consistency checks that dbCheck will run.
+        type: DbCheckValidationMode
+        optional: true
 
   DbCheckAllInvocation:
     description: "Command object for database-wide form of dbCheck invocation"

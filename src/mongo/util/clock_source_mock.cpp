@@ -27,13 +27,15 @@
  *    it in the license file.
  */
 
+#include <mutex>
+#include <new>
 #include <queue>
 #include <utility>
 #include <vector>
 
-#include "mongo/platform/basic.h"
+#include <boost/preprocessor/control/iif.hpp>
 
-#include "mongo/stdx/mutex.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/clock_source_mock.h"
 #include "mongo/util/static_immortal.h"
 

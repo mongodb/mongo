@@ -29,6 +29,8 @@
 
 #pragma once
 
+#include <memory>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/db/resource_yielder.h"
 

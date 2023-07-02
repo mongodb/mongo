@@ -15,8 +15,6 @@
  *    tenant_migration_incompatible,
  *    does_not_support_repeated_reads,
  *    requires_fcv_62,
- *    # TODO SERVER-67640: Verify 'top' and $collStats work correctly for queries in CQF.
- *    cqf_incompatible,
  * ]
  */
 

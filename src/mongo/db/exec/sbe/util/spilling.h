@@ -52,11 +52,11 @@ namespace sbe {
 void assertIgnorePrepareConflictsBehavior(OperationContext* opCtx);
 
 // Encode key as a RecordId and TypeBits.
-std::pair<RecordId, KeyString::TypeBits> encodeKeyString(KeyString::Builder&,
-                                                         const value::MaterializedRow& value);
+std::pair<RecordId, key_string::TypeBits> encodeKeyString(key_string::Builder&,
+                                                          const value::MaterializedRow& value);
 
 // Reconstructs the KeyString carried in RecordId using 'typeBits'.
-KeyString::Value decodeKeyString(const RecordId& rid, KeyString::TypeBits typeBits);
+key_string::Value decodeKeyString(const RecordId& rid, key_string::TypeBits typeBits);
 
 // Reads a materialized row from the record store.
 boost::optional<value::MaterializedRow> readFromRecordStore(OperationContext* opCtx,
@@ -74,13 +74,13 @@ int upsertToRecordStore(OperationContext* opCtx,
                         RecordStore* rs,
                         const RecordId& key,
                         const value::MaterializedRow& val,
-                        const KeyString::TypeBits& typeBits,
+                        const key_string::TypeBits& typeBits,
                         bool update);
 int upsertToRecordStore(OperationContext* opCtx,
                         RecordStore* rs,
                         const RecordId& key,
                         BufBuilder& buf,
-                        const KeyString::TypeBits& typeBits,  // recover type of value.
+                        const key_string::TypeBits& typeBits,  // recover type of value.
                         bool update);
 }  // namespace sbe
 }  // namespace mongo

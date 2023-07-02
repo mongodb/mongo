@@ -27,13 +27,17 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+// IWYU pragma: no_include "cxxabi.h"
+#include <future>
+#include <memory>
+#include <mutex>
+#include <system_error>
 
-#include "mongo/unittest/unittest.h"
-
+#include "mongo/base/string_data.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/future.h"
-#include "mongo/stdx/mutex.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/lockable_adapter.h"
 
 namespace mongo {

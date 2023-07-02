@@ -27,6 +27,9 @@
  *    it in the license file.
  */
 
+#include <functional>
+#include <memory>
+
 #include "mongo/util/assert_util.h"
 #include "mongo/util/boost_assert_shim.h"
 

@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <cerrno>
 #include <cstdlib>
+#include <string>
 #include <system_error>
 #include <utility>
 

@@ -10,8 +10,6 @@
  *   # This test contains assertions for the hostname that operations run on.
  *   tenant_migration_incompatible,
  *   docker_incompatible,
- *   # TODO SERVER-70142: Populate planSummary field which is shown in output of $currentOp.
- *   cqf_incompatible,
  * ]
  */
 

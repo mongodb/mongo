@@ -77,7 +77,7 @@ StatusWith<RecordId> keyForOptime(const Timestamp& opTime, const KeyFormat keyFo
             return {std::move(out)};
         }
         case KeyFormat::String: {
-            KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+            key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
             keyBuilder.appendTimestamp(opTime);
             return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
         }
@@ -134,7 +134,7 @@ RecordId keyForElem(const BSONElement& elem) {
     // Intentionally discard the TypeBits since the type information will be stored in the cluster
     // key of the original document. The consequence of this behavior is that cluster key values
     // that compare similarly, but are of different types may not be used concurrently.
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendBSONElement(elem);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
@@ -144,13 +144,13 @@ RecordId keyForObj(const BSONObj& obj) {
 }
 
 RecordId keyForOID(OID oid) {
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendOID(oid);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
 
 RecordId keyForDate(Date_t date) {
-    KeyString::Builder keyBuilder(KeyString::Version::kLatestVersion);
+    key_string::Builder keyBuilder(key_string::Version::kLatestVersion);
     keyBuilder.appendDate(date);
     return RecordId(keyBuilder.getBuffer(), keyBuilder.getSize());
 }
@@ -159,7 +159,7 @@ void appendToBSONAs(const RecordId& rid, BSONObjBuilder* builder, StringData fie
     rid.withFormat([&](RecordId::Null) { builder->appendNull(fieldName); },
                    [&](int64_t val) { builder->append(fieldName, val); },
                    [&](const char* str, int len) {
-                       KeyString::appendSingleFieldToBSONAs(str, len, fieldName, builder);
+                       key_string::appendSingleFieldToBSONAs(str, len, fieldName, builder);
                    });
 }
 

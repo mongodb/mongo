@@ -29,6 +29,11 @@
 
 #include "mongo/executor/hedging_metrics.h"
 
+#include <utility>
+
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/decorable.h"
+
 namespace mongo {
 
 namespace {

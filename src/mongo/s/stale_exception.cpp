@@ -29,9 +29,17 @@
 
 #include "mongo/s/stale_exception.h"
 
-#include "mongo/base/init.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/bson/bsonelement.h"
 #include "mongo/s/shard_version.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/namespace_string_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace {

@@ -57,7 +57,7 @@ namespace mongo::sbe::value {
  * The 'valueBufferBuilder' is _not_ owned by the ValueBuilder class, so that the caller can reuse
  * it without freeing and then reallocating its memory.
  *
- * NB: The ValueBuilder is specifically intended to adapt KeyString::Value conversion, which
+ * NB: The ValueBuilder is specifically intended to adapt key_string::Value conversion, which
  * operates by appending results to a BSONObjBuilder, to instead convert to SBE values. It is not
  * intended as a general-purpose tool for populating SBE accessors, and no new code should construct
  * or use a ValueBuilder.
@@ -354,9 +354,9 @@ private:
                 }
                 case TypeTags::ksValue: {
                     // Read the KeyString size after the 'sbeTag' byte. This gets written to the
-                    // buffer in 'KeyString::Value::serialize'.
+                    // buffer in 'key_string::Value::serialize'.
                     auto ks =
-                        KeyString::Value::deserialize(buf, KeyString::Version::kLatestVersion);
+                        key_string::Value::deserialize(buf, key_string::Version::kLatestVersion);
                     auto [ksTag, ksVal] = makeCopyKeyString(ks);
                     return {true, ksTag, ksVal};
                 }

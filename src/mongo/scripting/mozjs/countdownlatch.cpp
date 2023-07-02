@@ -27,18 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/countdownlatch.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/preprocessor/control/iif.hpp>
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TypeDecls.h>
+#include <jsapi.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <climits>
 #include <cmath>
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
 #include "mongo/platform/mutex.h"
-#include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/countdownlatch.h"
 #include "mongo/scripting/mozjs/objectwrapper.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/unordered_map.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace mozjs {

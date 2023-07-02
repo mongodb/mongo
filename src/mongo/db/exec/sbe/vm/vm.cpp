@@ -2262,8 +2262,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
         return {false, value::TypeTags::Nothing, 0};
     }
 
-    auto ksVersion = static_cast<KeyString::Version>(version);
-    auto ksDiscriminator = static_cast<KeyString::Discriminator>(discriminator);
+    auto ksVersion = static_cast<key_string::Version>(version);
+    auto ksDiscriminator = static_cast<key_string::Discriminator>(discriminator);
 
     uint32_t orderingBits = value::numericCast<int32_t>(tagOrdering, valOrdering);
     BSONObjBuilder bb;
@@ -2271,7 +2271,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
         bb.append(""_sd, (orderingBits & 1) ? -1 : 1);
     }
 
-    KeyString::HeapBuilder kb{ksVersion, Ordering::make(bb.done())};
+    key_string::HeapBuilder kb{ksVersion, Ordering::make(bb.done())};
 
     const auto stringTransformFn = [&](StringData stringData) {
         return collator->getComparisonString(stringData);
@@ -2432,7 +2432,7 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::genericNewKeyString(
 
     return {true,
             value::TypeTags::ksValue,
-            value::bitcastFrom<KeyString::Value*>(new KeyString::Value(kb.release()))};
+            value::bitcastFrom<key_string::Value*>(new key_string::Value(kb.release()))};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinNewKeyString(ArityType arity) {
@@ -5326,8 +5326,8 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinGenerateSortKey(
 
     return {true,
             value::TypeTags::ksValue,
-            value::bitcastFrom<KeyString::Value*>(
-                new KeyString::Value(sortSpec->generateSortKey(bsonObj, collator)))};
+            value::bitcastFrom<key_string::Value*>(
+                new key_string::Value(sortSpec->generateSortKey(bsonObj, collator)))};
 }
 
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinSortKeyComponentVectorGetElement(

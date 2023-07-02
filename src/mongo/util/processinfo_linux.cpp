@@ -28,21 +28,38 @@
  */
 
 
-#include "processinfo.h"
-
-#include <boost/filesystem.hpp>
+#include <boost/filesystem/exception.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
 #include <boost/none.hpp>
-#include <boost/optional.hpp>
-#include <cstdio>
+#include <boost/optional/optional.hpp>
 #include <fmt/format.h>
-#include <fstream>
-#include <iostream>
+// IWYU pragma: no_include "bits/types/struct_rusage.h"
+#include <algorithm>
+#include <climits>
+#include <compare>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
+#include <fstream>  // IWYU pragma: keep
+#include <functional>
+#include <initializer_list>
+#include <memory>
+#include <new>
+#include <set>
+#include <stdexcept>
 #include <string>
+#include <system_error>
+#include <tuple>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
+#include "processinfo.h"
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #ifndef _WIN32
-#include <malloc.h>
 #include <sched.h>
-#include <sys/mman.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/utsname.h>
@@ -57,11 +74,22 @@
 #endif
 
 #include "mongo/base/parse_number.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/errno_util.h"
 #include "mongo/util/file.h"
 #include "mongo/util/pcre.h"
+#include "mongo/util/static_immortal.h"
+#include "mongo/util/str.h"
 
 #if defined(MONGO_CONFIG_HAVE_HEADER_UNISTD_H)
 #include <unistd.h>

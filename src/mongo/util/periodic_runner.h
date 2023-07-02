@@ -29,13 +29,14 @@
 
 #pragma once
 
+#include <boost/optional.hpp>
 #include <functional>
 #include <memory>
 #include <string>
-
-#include <boost/optional.hpp>
+#include <utility>
 
 #include "mongo/platform/mutex.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {
@@ -119,7 +120,7 @@ public:
         /**
          * Returns the current period for the job
          */
-        virtual Milliseconds getPeriod() = 0;
+        virtual Milliseconds getPeriod() const = 0;
 
         /**
          * Updates the period of the job.  This takes effect immediately by altering the current
@@ -173,7 +174,7 @@ public:
     void resume();
     void stop();
     void setPeriod(Milliseconds ms);
-    Milliseconds getPeriod();
+    Milliseconds getPeriod() const;
 
     /**
      * Abandon responsibility for scheduling the execution of this job

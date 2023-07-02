@@ -69,7 +69,7 @@ template <class T>
 class BulkBuilderCommon : public IndexAccessMethod::BulkBuilder {
 
 public:
-    using KeyHandlerFn = std::function<Status(const KeyString::Value&)>;
+    using KeyHandlerFn = std::function<Status(const key_string::Value&)>;
     using RecordIdHandlerFn = std::function<Status(const RecordId&)>;
     BulkBuilderCommon(int64_t numKeys, std::string message, std::string indexName)
         : _keysInserted(numKeys), _progressMessage(message), _indexName(indexName){};

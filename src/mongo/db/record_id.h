@@ -29,17 +29,33 @@
 
 #pragma once
 
+#include <array>
+#include <boost/container_hash/extensions.hpp>
 #include <boost/functional/hash.hpp>
 #include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <fmt/format.h>
+#include <limits>
+#include <new>
 #include <ostream>
+#include <string>
+#include <string_view>
 #include <type_traits>
+#include <utility>
 
+#include "mongo/base/data_type_endian.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/bufreader.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/shared_buffer.h"

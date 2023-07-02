@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * secondary_reads.js
  *
@@ -20,7 +18,7 @@
  * @tags: [requires_replication, uses_write_concern]
  */
 
-var $config = (function() {
+export const $config = (function() {
     // Use the workload name as the collection name.
     var uniqueCollectionName = 'secondary_reads';
 

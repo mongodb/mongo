@@ -31,10 +31,17 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <iterator>
+#include <string>
 #include <utility>
 #include <vector>
 
+#include <fmt/format.h>
+
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/util/assert_util.h"
 

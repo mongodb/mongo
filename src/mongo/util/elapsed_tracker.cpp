@@ -27,10 +27,7 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/util/elapsed_tracker.h"
-
 #include "mongo/util/clock_source.h"
 
 namespace mongo {

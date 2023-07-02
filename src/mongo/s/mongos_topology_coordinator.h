@@ -29,13 +29,21 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <utility>
+
 #include "mongo/db/operation_context.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/rpc/topology_version_gen.h"
 #include "mongo/s/mongos_hello_response.h"
 #include "mongo/transport/hello_metrics.h"
 #include "mongo/util/concurrency/with_lock.h"
-#include <memory>
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

@@ -130,7 +130,7 @@ let testCases = {
         // checkResults: function(res) {
         //     // The command should work and return correct results.
         //     assert.commandWorked(res);
-        //     assert.eq(res.numDocs, 1000, res);
+        //     assert.eq(res.keyCharacteristics.numDocsTotal, 1000, res);
         // },
         // behavior: "versioned"
     },
@@ -143,7 +143,7 @@ let testCases = {
     balancerStatus: {skip: "primary only"},
     balancerStop: {skip: "primary only"},
     buildInfo: {skip: "does not return user data"},
-    bulkWrite: {skip: "not yet implemented"},
+    bulkWrite: {skip: "primary only"},
     captrunc: {skip: "primary only"},
     checkMetadataConsistency: {skip: "primary only"},
     checkShardingIndex: {skip: "primary only"},

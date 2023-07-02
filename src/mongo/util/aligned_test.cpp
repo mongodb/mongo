@@ -29,10 +29,14 @@
 
 #include "mongo/util/aligned.h"
 
+#include <cstdint>
 #include <utility>
+#include <variant>
 
 #include "mongo/base/static_assert.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

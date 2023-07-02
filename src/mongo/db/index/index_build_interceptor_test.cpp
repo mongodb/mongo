@@ -131,9 +131,9 @@ TEST_F(IndexBuilderInterceptorTest, SingleInsertIsSavedToSideWritesTable) {
     auto interceptor = createIndexBuildInterceptor(fromjson("{v: 2, name: 'a_1', key: {a: 1}}"));
     const IndexDescriptor* desc = getIndexDescriptor("a_1");
 
-    KeyString::HeapBuilder ksBuilder(KeyString::Version::kLatestVersion);
+    key_string::HeapBuilder ksBuilder(key_string::Version::kLatestVersion);
     ksBuilder.appendNumberLong(10);
-    KeyString::Value keyString(ksBuilder.release());
+    key_string::Value keyString(ksBuilder.release());
 
     WriteUnitOfWork wuow(operationContext());
     int64_t numKeys = 0;

@@ -5,7 +5,7 @@
  *
  * Runs multiple aggregations with $_externalDataSources option concurrently.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = (() => {
         Random.setRandomSeed();
 

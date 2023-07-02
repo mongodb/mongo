@@ -26,19 +26,37 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
+#include <boost/smart_ptr.hpp>
+#include <string>
+#include <tuple>
+#include <utility>
 
-#include "mongo/s/commands/document_shard_key_update_util.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 
-#include "mongo/base/status_with.h"
+#include "mongo/base/status.h"
+#include "mongo/crypto/fle_field_schema_gen.h"
+#include "mongo/db/commands/txn_cmds_gen.h"
 #include "mongo/db/namespace_string.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/session/logical_session_id.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_write.h"
+#include "mongo/s/commands/document_shard_key_update_util.h"
+#include "mongo/s/transaction_router.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/s/write_ops/batch_write_exec.h"
 #include "mongo/s/write_ops/batched_command_request.h"
 #include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/fail_point.h"
-#include "mongo/util/str.h"
+#include "mongo/util/future_impl.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding
 

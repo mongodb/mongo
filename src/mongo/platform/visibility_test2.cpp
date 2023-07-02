@@ -27,12 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
 #include "mongo/platform/visibility_test_lib2.h"
 #include "mongo/util/exit_code.h"
-
-#include <cstdlib>
 
 int main(int argc, char* argv[]) {
     mongo::visibility_test_lib2::Derived d("hello", argc);

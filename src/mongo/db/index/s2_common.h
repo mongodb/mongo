@@ -90,9 +90,9 @@ struct S2IndexingParams {
 BSONObj S2CellIdToIndexKey(const S2CellId& cellId, S2IndexVersion indexVersion);
 void S2CellIdToIndexKeyStringAppend(const S2CellId& cellId,
                                     S2IndexVersion indexVersion,
-                                    const std::vector<KeyString::HeapBuilder>& keysToAdd,
-                                    std::vector<KeyString::HeapBuilder>* out,
-                                    KeyString::Version keyStringVersion,
+                                    const std::vector<key_string::HeapBuilder>& keysToAdd,
+                                    std::vector<key_string::HeapBuilder>* out,
+                                    key_string::Version keyStringVersion,
                                     Ordering ordering);
 
 }  // namespace mongo

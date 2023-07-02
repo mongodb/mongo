@@ -29,8 +29,10 @@
 
 #pragma once
 
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_interface.h"
 

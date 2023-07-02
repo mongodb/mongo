@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs deletes in transactions without the shard key while chunks are being moved. This
  * includes multi=true deletes and multi=false deletes with exact _id queries.
@@ -11,11 +9,11 @@
  *  uses_transactions,
  * ];
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_base.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/random_moveChunk_base.js";
 load('jstests/concurrency/fsm_workload_helpers/delete_in_transaction_states.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -37,7 +35,7 @@ var $config = extendWorkload($config, function($config, $super) {
         exactIdDelete(db, collName, this.session);
     };
     $config.states.multiDelete = function(db, collName, connCache) {
-        multiDelete(db, collName, this.session, this.tid);
+        multiDelete(db, collName, this.session, this.tid, this.partitionSize);
     };
     $config.states.verifyDocuments = function(db, collName, connCache) {
         verifyDocuments(db, collName, this.tid);
@@ -50,7 +48,7 @@ var $config = extendWorkload($config, function($config, $super) {
     $config.states.init = function init(db, collName, connCache) {
         $super.states.init.apply(this, arguments);
         this.session = db.getMongo().startSession({causalConsistency: false});
-        initDeleteInTransactionStates(db, collName, this.tid);
+        initDeleteInTransactionStates(db, collName, this.tid, this.partitionSize);
     };
 
     $config.transitions = {

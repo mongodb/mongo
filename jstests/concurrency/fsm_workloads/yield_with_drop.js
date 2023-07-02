@@ -4,7 +4,7 @@
  * Executes query operations that can yield while the source collection is dropped and recreated.
  */
 
-var $config = (function() {
+export const $config = (function() {
     const data = {
         kAllowedErrors: [
             ErrorCodes.ConflictingOperationInProgress,

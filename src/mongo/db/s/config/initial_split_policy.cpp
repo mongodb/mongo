@@ -33,7 +33,9 @@
 #include <absl/container/node_hash_map.h>
 #include <absl/container/node_hash_set.h>
 #include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <limits>
@@ -43,11 +45,7 @@
 #include <string>
 #include <type_traits>
 
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonmisc.h"

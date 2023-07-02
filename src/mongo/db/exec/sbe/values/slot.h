@@ -407,7 +407,7 @@ typedef SingleRowAccessor<MaterializedRow> MaterializedSingleRowAccessor;
  * might reference it.
  */
 void readKeyStringValueIntoAccessors(
-    const KeyString::Value& keyString,
+    const key_string::Value& keyString,
     const Ordering& ordering,
     BufBuilder* valueBufferBuilder,
     std::vector<OwnedValueAccessor>* accessors,

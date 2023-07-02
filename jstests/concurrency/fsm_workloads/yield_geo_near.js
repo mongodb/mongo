@@ -1,13 +1,11 @@
-'use strict';
-
 /*
  * Intersperses $geoNear aggregations with updates and deletes of documents they may match.
  * @tags: [requires_non_retryable_writes]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.query = function geoNear(db, collName) {
         // This distance gets about 80 docs around the origin. There is one doc inserted
         // every 1m^2 and the area scanned by a 5m radius is PI*(5m)^2 ~ 79.

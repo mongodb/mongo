@@ -30,13 +30,15 @@
 #include "mongo/stdx/unordered_map.h"
 
 #include <algorithm>
-#include <iterator>
+#include <fmt/format.h>
 #include <stdexcept>
 #include <string>
 
-#include <fmt/format.h>
+#include <absl/container/node_hash_map.h>
 
-#include "mongo/unittest/unittest.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace {
 

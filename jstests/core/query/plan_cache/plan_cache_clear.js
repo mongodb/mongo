@@ -18,7 +18,7 @@
 //   # The SBE plan cache was first enabled in 6.3.
 //   requires_fcv_63,
 //   # TODO SERVER-67607: Test plan cache with CQF enabled.
-//   cqf_incompatible,
+//   cqf_experimental_incompatible,
 //   references_foreign_collection,
 // ]
 

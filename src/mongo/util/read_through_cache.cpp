@@ -29,7 +29,11 @@
 
 #include "mongo/util/read_through_cache.h"
 
-#include "mongo/stdx/condition_variable.h"
+#include <utility>
+
+#include "mongo/db/client.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/scopeguard.h"
 
 namespace mongo {
 

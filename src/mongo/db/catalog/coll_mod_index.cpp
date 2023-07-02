@@ -352,7 +352,7 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     OperationContext* opCtx,
     const CollectionPtr& collection,
     const IndexDescriptor* idx,
-    boost::optional<KeyString::Value> firstKeyString) {
+    boost::optional<key_string::Value> firstKeyString) {
     auto entry = idx->getEntry();
     auto accessMethod = entry->accessMethod()->asSortedData();
     // Only scans for the duplicates on one key if 'firstKeyString' is provided.
@@ -361,10 +361,10 @@ std::list<std::set<RecordId>> scanIndexForDuplicates(
     // Starting point of index traversal.
     if (!firstKeyString) {
         auto keyStringVersion = accessMethod->getSortedDataInterface()->getKeyStringVersion();
-        KeyString::Builder firstKeyStringBuilder(keyStringVersion,
-                                                 BSONObj(),
-                                                 entry->ordering(),
-                                                 KeyString::Discriminator::kExclusiveBefore);
+        key_string::Builder firstKeyStringBuilder(keyStringVersion,
+                                                  BSONObj(),
+                                                  entry->ordering(),
+                                                  key_string::Discriminator::kExclusiveBefore);
         firstKeyString = firstKeyStringBuilder.getValueCopy();
     }
 

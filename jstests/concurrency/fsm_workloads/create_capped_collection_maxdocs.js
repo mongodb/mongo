@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * create_capped_collection_maxdocs.js
  *
@@ -14,10 +12,12 @@
  *
  * @tags: [does_not_support_stepdowns, requires_capped]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');                // for extendWorkload
-load('jstests/concurrency/fsm_workloads/create_capped_collection.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/create_capped_collection.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Use the workload name as a prefix for the collection name,
     // since the workload name is assumed to be unique.
     $config.data.prefix = 'create_capped_collection_maxdocs';

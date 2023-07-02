@@ -27,8 +27,15 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <string>
+
 #include "mongo/base/shim.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/s/transaction_coordinator_worker_curop_repository.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 
 namespace mongo {
 namespace {

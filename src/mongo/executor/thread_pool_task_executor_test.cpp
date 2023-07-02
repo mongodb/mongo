@@ -27,23 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <fmt/format.h>
 #include <memory>
+#include <utility>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/init.h"
+#include <boost/move/utility_core.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
-#include "mongo/executor/network_interface.h"
+#include "mongo/base/string_data.h"
 #include "mongo/executor/network_interface_mock.h"
 #include "mongo/executor/task_executor_test_common.h"
-#include "mongo/executor/task_executor_test_fixture.h"
-#include "mongo/executor/thread_pool_mock.h"
 #include "mongo/executor/thread_pool_task_executor.h"
 #include "mongo/executor/thread_pool_task_executor_test_fixture.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/fail_point.h"
+#include "mongo/util/functional.h"
 
 namespace mongo {
 namespace executor {

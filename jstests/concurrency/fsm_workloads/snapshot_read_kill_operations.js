@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Test a snapshot read spanning a find and getmore that runs concurrently with killSessions,
  * killOp, killCursors, and txnNumber change.
@@ -9,7 +7,7 @@
 
 load('jstests/concurrency/fsm_workload_helpers/snapshot_read_utils.js');
 
-var $config = (function() {
+export const $config = (function() {
     const data = {numIds: 100, batchSize: 50};
 
     const states = {

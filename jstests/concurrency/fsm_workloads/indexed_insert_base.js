@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_base.js
  *
@@ -7,7 +5,7 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * value is the thread's id.
  */
-var $config = (function() {
+export const $config = (function() {
     function makeSortSpecFromIndexSpec(ixSpec) {
         var sort = {};
 

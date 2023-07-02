@@ -25,18 +25,13 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-
 global:
-    cpp_namespace: "mongo"
+  cpp_namespace: "mongo"
 
-imports:
-    - "mongo/db/basic_types.idl"
-    - "mongo/db/s/move_primary/move_primary_common_metadata.idl"
-
-structs:
-    MovePrimaryOplogApplierProgress:
-        description: "Used for storing the progress made by the movePrimary oplog applier at recipient."
-        strict: false
-        inline_chained_structs: true
-        chained_structs:
-            MovePrimaryCommonMetadata: metadata
+enums:
+  TransformAlgorithm:
+    description: "The type of algorithm to be used for the transformIdentifiers field of $queryStats."
+    type: string
+    values:
+      kHmacSha256: "hmac-sha-256"
+      kNone: "none"

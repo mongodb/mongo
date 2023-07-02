@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * explain.js
  *
@@ -9,7 +7,7 @@
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
 load('jstests/libs/analyze_plan.js');
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         collNotExist: 'donotexist__',
         nInserted: 0,

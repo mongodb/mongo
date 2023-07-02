@@ -85,7 +85,7 @@ public:
     void resume() override {}
     void stop() override {}
 
-    Milliseconds getPeriod() override {
+    Milliseconds getPeriod() const override {
         return _job.interval;
     }
 

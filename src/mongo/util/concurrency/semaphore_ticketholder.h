@@ -32,10 +32,15 @@
 #include <semaphore.h>
 #endif
 
+#include <algorithm>
+#include <boost/optional/optional.hpp>
+#include <cstdint>
 #include <queue>
 
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/admission_context.h"

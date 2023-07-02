@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Performs these actions in parallel:
  * 1. Refine a collection's shard key.
@@ -19,11 +17,13 @@
  *   uses_transactions,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/random_moveChunk_refine_collection_shard_key.js";
 load('jstests/concurrency/fsm_workload_helpers/update_in_transaction_states.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 10;
 

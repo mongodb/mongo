@@ -30,9 +30,7 @@
 #include <boost/move/utility_core.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <future>
 #include <system_error>
-#include <utility>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"

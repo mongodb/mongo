@@ -1,6 +1,8 @@
 /**
  * Tests that cursors opened before a chunk is moved will not see the effects of the chunk
  * migration.
+ * TODO SERVER-71169: Re-enable this test once shard filtering is implemented for CQF.
+ * @tags: [cqf_incompatible]
  */
 (function() {
 "use strict";

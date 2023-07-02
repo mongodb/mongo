@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Extends sharded_mergeChunks_partitioned.js.
  *
@@ -9,12 +7,14 @@
  * @tags: [requires_sharding, assumes_balancer_off, does_not_support_stepdowns]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');                       // for extendWorkload
-load('jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/sharded_mergeChunks_partitioned.js";
 load("jstests/sharding/libs/find_chunks_util.js");
 load("jstests/concurrency/fsm_workload_helpers/state_transition_utils.js");
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.iterations = 6;
     $config.threadCount = 5;
 

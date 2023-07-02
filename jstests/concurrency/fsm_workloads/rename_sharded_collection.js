@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform continuous renames on 3 collections per database, with the objective to verify that:
  * - Upon successful renames, no data are lost
@@ -97,7 +95,7 @@ function checkExceptionHasBeenThrown(db, exceptionCode) {
     assert.gte(count, 1, 'No exception with error code ' + exceptionCode + ' has been thrown');
 }
 
-var $config = (function() {
+export const $config = (function() {
     let states = {
         rename: function(db, collName, connCache) {
             const dbName = getRandomDbName(this.threadCount);

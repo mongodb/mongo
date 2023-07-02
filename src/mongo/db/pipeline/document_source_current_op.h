@@ -29,16 +29,15 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonelement.h"
@@ -58,6 +57,7 @@
 #include "mongo/db/query/serialization_options.h"
 #include "mongo/db/read_concern_support_result.h"
 #include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/stdx/unordered_set.h"
 
 namespace mongo {
@@ -87,10 +87,15 @@ public:
         static std::unique_ptr<LiteParsed> parse(const NamespaceString& nss,
                                                  const BSONElement& spec);
 
-        LiteParsed(std::string parseTimeName, UserMode allUsers, LocalOpsMode localOps)
+        LiteParsed(std::string parseTimeName,
+                   const boost::optional<TenantId>& tenantId,
+                   UserMode allUsers,
+                   LocalOpsMode localOps)
             : LiteParsedDocumentSource(std::move(parseTimeName)),
               _allUsers(allUsers),
-              _localOps(localOps) {}
+              _localOps(localOps),
+              _privileges(
+                  {Privilege(ResourcePattern::forClusterResource(tenantId), ActionType::inprog)}) {}
 
         stdx::unordered_set<NamespaceString> getInvolvedNamespaces() const final {
             return stdx::unordered_set<NamespaceString>();
@@ -98,17 +103,15 @@ public:
 
         PrivilegeVector requiredPrivileges(bool isMongos,
                                            bool bypassDocumentValidation) const final {
-            PrivilegeVector privileges;
-
             // In a sharded cluster, we always need the inprog privilege to run $currentOp on the
             // shards. If we are only looking up local mongoS operations, we do not need inprog to
             // view our own ops but *do* require it to view other users' ops.
             if (_allUsers == UserMode::kIncludeAll ||
                 (isMongos && _localOps == LocalOpsMode::kRemoteShardOps)) {
-                privileges.push_back({ResourcePattern::forClusterResource(), ActionType::inprog});
+                return _privileges;
             }
 
-            return privileges;
+            return PrivilegeVector();
         }
 
         bool allowedToPassthroughFromMongos() const final {
@@ -131,6 +134,7 @@ public:
     private:
         const UserMode _allUsers;
         const LocalOpsMode _localOps;
+        const PrivilegeVector _privileges;
     };
 
     static boost::intrusive_ptr<DocumentSourceCurrentOp> create(

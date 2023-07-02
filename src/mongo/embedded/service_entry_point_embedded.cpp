@@ -28,16 +28,32 @@
  */
 
 
-#include "mongo/platform/basic.h"
+#include <string>
+#include <utility>
 
-#include "mongo/embedded/service_entry_point_embedded.h"
-
+#include "mongo/base/checked_cast.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/db/client.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_concern.h"
+#include "mongo/db/repl/optime.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/speculative_majority_read_info.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/service_entry_point_common.h"
+#include "mongo/db/storage/recovery_unit.h"
+#include "mongo/db/write_concern.h"
 #include "mongo/embedded/not_implemented.h"
 #include "mongo/embedded/periodic_runner_embedded.h"
+#include "mongo/embedded/service_entry_point_embedded.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/transport/service_executor.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/polymorphic_scoped.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

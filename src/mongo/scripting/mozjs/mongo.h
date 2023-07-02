@@ -29,7 +29,18 @@
 
 #pragma once
 
+#include <memory>
+
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/PropertySpec.h>
+#include <js/RootingAPI.h>
+#include <js/TracingAPI.h>
+#include <js/TypeDecls.h>
+
 #include "mongo/client/dbclient_base.h"
+#include "mongo/scripting/mozjs/base.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {

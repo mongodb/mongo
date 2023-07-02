@@ -30,10 +30,14 @@
 #pragma once
 
 #include <boost/log/sinks/text_ostream_backend.hpp>
+#include <functional>
 #include <memory>
 #include <string>
 
+#include <boost/log/core/record_view.hpp>
+
 #include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
 #include "mongo/logv2/log_format.h"
 
 namespace mongo::logv2 {

@@ -27,13 +27,27 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/death_test.h"
-
-#include <climits>
+#include <algorithm>
+#include <cerrno>
 #include <cstdio>
 #include <cstdlib>
 #include <fmt/format.h>
+#include <iterator>
 #include <sstream>
+#include <stdexcept>
+#include <utility>
+#include <vector>
+
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/death_test.h"
+#include "mongo/unittest/test_info.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/scopeguard.h"
 
 #ifndef _WIN32
 #include <sys/resource.h>

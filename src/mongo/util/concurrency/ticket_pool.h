@@ -29,9 +29,16 @@
 
 #pragma once
 
+#include <cstdint>
+#include <memory>
 #include <queue>
+#include <utility>
+
+#include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/platform/atomic_word.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/concurrency/admission_context.h"
 #include "mongo/util/time_support.h"
 

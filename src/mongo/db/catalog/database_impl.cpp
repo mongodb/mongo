@@ -45,6 +45,7 @@
 // IWYU pragma: no_include "boost/system/detail/error_code.hpp"
 
 #include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonmisc.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/audit.h"
@@ -100,6 +101,7 @@
 #include "mongo/platform/compiler.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
+#include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/fail_point.h"
 #include "mongo/util/intrusive_counter.h"
@@ -165,7 +167,8 @@ static const BSONObj kColumnStoreSpec = BSON("name"
                                              << "v" << 2);
 }  // namespace
 
-Status DatabaseImpl::validateDBName(StringData dbname) {
+Status DatabaseImpl::validateDBName(const DatabaseName& dbName) {
+    const auto dbname = DatabaseNameUtil::serializeForCatalog(dbName);
     if (dbname.size() <= 0)
         return Status(ErrorCodes::BadValue, "db name is empty");
 
@@ -189,7 +192,7 @@ DatabaseImpl::DatabaseImpl(const DatabaseName& dbName)
     : _name(dbName), _viewsName(NamespaceString::makeSystemDotViewsNamespace(_name)) {}
 
 void DatabaseImpl::init(OperationContext* const opCtx) {
-    Status status = validateDBName(_name.db());
+    Status status = validateDBName(_name);
 
     if (!status.isOK()) {
         LOGV2_WARNING(

@@ -27,18 +27,29 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/oid.h"
-
+#include <js/ComparisonOperators.h>
 #include <js/Object.h>
-#include <memory>
+#include <js/PropertyDescriptor.h>
+#include <js/RootingAPI.h>
+#include <jsapi.h>
+#include <string>
 
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/scripting/engine.h"
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/scripting/mozjs/oid.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

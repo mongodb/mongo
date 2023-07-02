@@ -8,7 +8,7 @@
  *   does_not_support_stepdowns,
  * ]
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {prefix: "create_timeseries_collection"};
 
     var states = (function() {

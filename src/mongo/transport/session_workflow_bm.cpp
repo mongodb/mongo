@@ -27,30 +27,51 @@
  *    it in the license file.
  */
 
-#include <chrono>
-#include <memory>
-
+#include <array>
 #include <benchmark/benchmark.h>
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <initializer_list>
+#include <memory>
+#include <utility>
+#include <vector>
 
-#include "mongo/bson/bsonelement.h"
-#include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/logv2/log_component_settings.h"
 #include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/platform/mutex.h"
+#include "mongo/rpc/message.h"
 #include "mongo/rpc/op_msg.h"
-#include "mongo/transport/mock_service_executor.h"
-#include "mongo/transport/service_entry_point_impl.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/service_executor_synchronous.h"
 #include "mongo/transport/session.h"
 #include "mongo/transport/session_workflow_test_util.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/transport/transport_layer_mock.h"
-#include "mongo/util/assert_util_core.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future.h"
+#include "mongo/util/future_impl.h"
 #include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/processinfo.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kExecutor
 
@@ -271,9 +292,6 @@ public:
 
         setGlobalServiceContext(ServiceContext::make());
         auto sc = getGlobalServiceContext();
-        invariant(sc);
-        sc->registerClientObserver(std::make_unique<LockerNoopClientObserver>());
-
         _coordinator = std::make_unique<MockCoordinator>(sc, exhaustRounds + 1);
         sc->setServiceEntryPoint(_coordinator->makeServiceEntryPoint());
         sc->setTransportLayer(std::make_unique<TransportLayerMockWithReactor>());

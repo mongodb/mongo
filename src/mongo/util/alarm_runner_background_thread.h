@@ -28,6 +28,11 @@
  */
 #pragma once
 
+#include <memory>
+#include <utility>
+#include <vector>
+
+#include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
 #include "mongo/util/alarm.h"

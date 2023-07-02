@@ -29,34 +29,41 @@
 
 #include "mongo/dbtests/framework.h"
 
+#include <cstdlib>
+#include <ctime>
+#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/checked_cast.h"
-#include "mongo/base/status.h"
-#include "mongo/db/catalog/collection_catalog.h"
+#include "mongo/client/dbclient_base.h"
+#include "mongo/db/catalog/collection.h"
 #include "mongo/db/catalog/collection_impl.h"
+#include "mongo/db/catalog/database_holder.h"
 #include "mongo/db/catalog/database_holder_impl.h"
 #include "mongo/db/client.h"
 #include "mongo/db/dbdirectclient.h"
+#include "mongo/db/index_builds_coordinator.h"
 #include "mongo/db/index_builds_coordinator_mongod.h"
+#include "mongo/db/op_observer/op_observer.h"
 #include "mongo/db/op_observer/op_observer_registry.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/collection_sharding_state_factory_shard.h"
-#include "mongo/db/s/sharding_state.h"
 #include "mongo/db/service_context.h"
 #include "mongo/db/storage/control/storage_control.h"
 #include "mongo/db/storage/storage_engine_init.h"
-#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/dbtests/framework_options.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/mutex.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/scripting/dbdirectclient_factory.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/util/assert_util.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/exit.h"
 #include "mongo/util/exit_code.h"
+#include "mongo/util/periodic_runner.h"
 #include "mongo/util/periodic_runner_factory.h"
-#include "mongo/util/scopeguard.h"
-#include "mongo/util/version.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

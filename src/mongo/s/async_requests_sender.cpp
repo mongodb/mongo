@@ -28,25 +28,35 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/s/async_requests_sender.h"
-
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr.hpp>
 #include <fmt/format.h>
 #include <memory>
+#include <tuple>
+#include <type_traits>
 
-#include "mongo/client/remote_command_targeter.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/hedge_options_util.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/async_requests_sender.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/transport/baton.h"
-#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/cancellation.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/time_support.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kQuery
 

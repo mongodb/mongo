@@ -52,9 +52,9 @@ protected:
                                 value::Value argVal,
                                 value::TypeTags expectedTag,
                                 value::Value expectedVal) {
-        auto version = static_cast<int64_t>(KeyString::Version::V1);
+        auto version = static_cast<int64_t>(key_string::Version::V1);
         auto ordering = uint32_t{0};
-        auto discriminator = static_cast<int64_t>(KeyString::Discriminator::kInclusive);
+        auto discriminator = static_cast<int64_t>(key_string::Discriminator::kInclusive);
 
         auto versionExpr =
             makeE<EConstant>(value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(version));
@@ -92,7 +92,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
         auto argTag = value::TypeTags::NumberInt32;
         auto argVal = value::bitcastFrom<int32_t>(int32Value);
 
-        KeyString::Builder kb(KeyString::Version::V1, KeyString::ALL_ASCENDING);
+        key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberInt(int32Value);
         auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
@@ -105,7 +105,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
         auto argTag = value::TypeTags::NumberInt64;
         auto argVal = value::bitcastFrom<int64_t>(int64Value);
 
-        KeyString::Builder kb(KeyString::Version::V1, KeyString::ALL_ASCENDING);
+        key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberLong(int64Value);
         auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
@@ -117,7 +117,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
         auto argTag = value::TypeTags::NumberDouble;
         auto argVal = value::bitcastFrom<double>(doubleValue);
 
-        KeyString::Builder kb(KeyString::Version::V1, KeyString::ALL_ASCENDING);
+        key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberDouble(doubleValue);
         auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);
@@ -129,7 +129,7 @@ TEST_F(SBEBuiltinKsTest, NumericTests) {
         auto [argTag, argVal] = value::makeCopyDecimal(dec128Value);
         value::ValueGuard argGuard(argTag, argVal);
 
-        KeyString::Builder kb(KeyString::Version::V1, KeyString::ALL_ASCENDING);
+        key_string::Builder kb(key_string::Version::V1, key_string::ALL_ASCENDING);
         kb.appendNumberDecimal(dec128Value);
         auto [expectedTag, expectedVal] = value::makeCopyKeyString(kb.getValueCopy());
         value::ValueGuard expectedGuard(expectedTag, expectedVal);

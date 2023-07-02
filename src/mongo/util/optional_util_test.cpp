@@ -29,12 +29,19 @@
 
 #include "mongo/util/optional_util.h"
 
-#include <boost/optional.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <cstddef>
 #include <optional>
-#include <sstream>
 #include <string>
+#include <utility>
 
-#include "mongo/unittest/unittest.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/static_assert.h"
+#include "mongo/base/string_data.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

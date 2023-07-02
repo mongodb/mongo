@@ -29,27 +29,62 @@
 
 #include "mongo/s/catalog_cache.h"
 
+#include <boost/none.hpp>
+#include <boost/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <fmt/format.h>
+#include <list>
+#include <memory>
+#include <set>
+#include <vector>
 
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/catalog_shard_feature_flag_gen.h"
+#include "mongo/db/cluster_role.h"
+#include "mongo/db/concurrency/locker.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/keypattern.h"
+#include "mongo/db/logical_time.h"
 #include "mongo/db/query/collation/collator_factory_interface.h"
-#include "mongo/db/repl/optime_with.h"
+#include "mongo/db/query/collation/collator_interface.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/repl/read_concern_level.h"
+#include "mongo/db/server_options.h"
 #include "mongo/db/vector_clock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
+#include "mongo/s/catalog/sharding_catalog_client.h"
 #include "mongo/s/catalog/type_collection.h"
 #include "mongo/s/catalog/type_database_gen.h"
+#include "mongo/s/catalog/type_index_catalog_gen.h"
+#include "mongo/s/chunk_version.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
-#include "mongo/s/is_mongos.h"
+#include "mongo/s/index_version.h"
 #include "mongo/s/mongod_and_mongos_server_parameters_gen.h"
+#include "mongo/s/resharding/type_collection_fields_gen.h"
 #include "mongo/s/shard_cannot_refresh_due_to_locks_held_exception.h"
 #include "mongo/s/shard_version_factory.h"
 #include "mongo/s/sharding_feature_flags_gen.h"
-#include "mongo/s/stale_exception.h"
-#include "mongo/util/concurrency/with_lock.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/s/type_collection_common_types_gen.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/fail_point.h"
+#include "mongo/util/future.h"
+#include "mongo/util/invalidating_lru_cache.h"
+#include "mongo/util/str.h"
 #include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kSharding

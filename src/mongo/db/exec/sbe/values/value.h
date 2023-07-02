@@ -188,7 +188,7 @@ enum class TypeTags : uint8_t {
     // Local lambda value
     LocalLambda,
 
-    // KeyString::Value
+    // key_string::Value
     ksValue,
 
     // Pointer to a compiled PCRE regular expression object.
@@ -1292,8 +1292,8 @@ inline std::pair<TypeTags, Value> makeCopyDecimal(const Decimal128& inD) {
     return {TypeTags::NumberDecimal, reinterpret_cast<Value>(valueBuffer)};
 }
 
-inline KeyString::Value* getKeyStringView(Value val) noexcept {
-    return reinterpret_cast<KeyString::Value*>(val);
+inline key_string::Value* getKeyStringView(Value val) noexcept {
+    return reinterpret_cast<key_string::Value*>(val);
 }
 
 std::pair<TypeTags, Value> makeNewPcreRegex(StringData pattern, StringData options);
@@ -1458,7 +1458,7 @@ inline std::pair<TypeTags, Value> makeCopyBsonCodeWScope(const BsonCodeWScope& c
     return makeNewBsonCodeWScope(cws.code, cws.scope);
 }
 
-std::pair<TypeTags, Value> makeCopyKeyString(const KeyString::Value& inKey);
+std::pair<TypeTags, Value> makeCopyKeyString(const key_string::Value& inKey);
 
 std::pair<TypeTags, Value> makeCopyJsFunction(const JsFunction&);
 

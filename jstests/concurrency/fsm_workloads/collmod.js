@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * collmod.js
  *
@@ -10,7 +8,7 @@
  *
  * All threads update the same TTL index on the same collection.
  */
-var $config = (function() {
+export const $config = (function() {
     var data = {
         numDocs: 1000,
         maxTTL: 5000  // max time to live

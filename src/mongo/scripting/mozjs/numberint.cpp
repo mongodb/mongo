@@ -27,17 +27,22 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/numberint.h"
-
+#include <cstdint>
 #include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <string>
 
+#include <js/CallArgs.h>
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/scripting/mozjs/implscope.h"
-#include "mongo/scripting/mozjs/objectwrapper.h"
+#include "mongo/scripting/mozjs/numberint.h"
 #include "mongo/scripting/mozjs/valuereader.h"
 #include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"
+#include "mongo/scripting/mozjs/wrapconstrainedmethod.h"  // IWYU pragma: keep
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

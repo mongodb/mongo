@@ -29,13 +29,16 @@
 
 #pragma once
 
+#include <boost/move/utility_core.hpp>
 #include <cstdint>
+#include <mutex>
 #include <vector>
 
 #include "mongo/platform/mutex.h"
 #include "mongo/stdx/condition_variable.h"
 #include "mongo/util/concurrency/thread_pool_interface.h"
 #include "mongo/util/hierarchical_acquisition.h"
+#include "mongo/util/out_of_line_executor.h"
 
 namespace mongo {
 namespace executor {

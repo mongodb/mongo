@@ -29,6 +29,14 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
+#include <functional>
+#include <map>
+#include <string>
+
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/s/sharding_task_executor_pool_controller.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/duration.h"

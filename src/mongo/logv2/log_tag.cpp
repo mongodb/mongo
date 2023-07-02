@@ -29,6 +29,7 @@
 
 #include "mongo/logv2/log_tag.h"
 
+#include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobjbuilder.h"
 
 namespace mongo::logv2 {

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Run serverStatus() while running a large number of queries which are expected to reach maxTimeMS
  * and time out.
@@ -12,7 +10,7 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongos
 
-var $config = (function() {
+export const $config = (function() {
     const states = {
         /**
          * This is a no-op, used only as a transition state.

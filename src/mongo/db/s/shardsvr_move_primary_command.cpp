@@ -83,7 +83,7 @@ public:
 
             uassert(ErrorCodes::InvalidNamespace,
                     "invalid database {}"_format(dbNss.toStringForErrorMsg()),
-                    NamespaceString::validDBName(dbNss.db(),
+                    NamespaceString::validDBName(dbNss.dbName(),
                                                  NamespaceString::DollarInDbNameBehavior::Allow));
 
             uassert(

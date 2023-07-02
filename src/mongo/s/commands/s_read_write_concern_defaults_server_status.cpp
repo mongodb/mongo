@@ -27,10 +27,13 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <memory>
 
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/commands/rwc_defaults_commands_gen.h"
 #include "mongo/db/commands/server_status.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/read_write_concern_defaults.h"
 
 namespace mongo {

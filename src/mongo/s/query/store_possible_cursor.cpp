@@ -27,22 +27,39 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
+#include <algorithm>
+#include <boost/move/utility_core.hpp>
+#include <utility>
+#include <vector>
 
-#include "mongo/s/query/store_possible_cursor.h"
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/query/cursor_response.h"
+#include "mongo/db/query/query_stats_key_generator.h"
+#include "mongo/db/repl/read_concern_args.h"
+#include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/shard_id.h"
 #include "mongo/executor/task_executor_pool.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/async_results_merger_params_gen.h"
+#include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
 #include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/store_possible_cursor.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 

@@ -92,7 +92,7 @@ void DuplicateKeyTracker::keepTemporaryTable() {
 
 Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                                       const IndexCatalogEntry* indexCatalogEntry,
-                                      const KeyString::Value& key) {
+                                      const key_string::Value& key) {
     invariant(opCtx->lockState()->inAWriteUnitOfWork());
 
     LOGV2_DEBUG(20676,
@@ -100,7 +100,7 @@ Status DuplicateKeyTracker::recordKey(OperationContext* opCtx,
                 "Index build: recording duplicate key conflict on unique index",
                 "index"_attr = indexCatalogEntry->descriptor()->indexName());
 
-    // The KeyString::Value will be serialized in the format [KeyString][TypeBits]. We need to
+    // The key_string::Value will be serialized in the format [KeyString][TypeBits]. We need to
     // store the TypeBits for error reporting later on. The RecordId does not need to be stored, so
     // we exclude it from the serialization.
     BufBuilder builder;
@@ -157,7 +157,7 @@ Status DuplicateKeyTracker::checkConstraints(OperationContext* opCtx,
         resolved++;
 
         BufReader reader(record->data.data(), record->data.size());
-        auto key = KeyString::Value::deserialize(reader, index->getKeyStringVersion());
+        auto key = key_string::Value::deserialize(reader, index->getKeyStringVersion());
 
         auto status = index->dupKeyCheck(opCtx, key);
         if (!status.isOK())

@@ -1214,12 +1214,12 @@ inline std::vector<T> appendVectorUnique(std::vector<T> lhs, std::vector<T> rhs)
     return lhs;
 }
 
-inline std::pair<std::unique_ptr<KeyString::Value>, std::unique_ptr<KeyString::Value>>
+inline std::pair<std::unique_ptr<key_string::Value>, std::unique_ptr<key_string::Value>>
 makeKeyStringPair(const BSONObj& lowKey,
                   bool lowKeyInclusive,
                   const BSONObj& highKey,
                   bool highKeyInclusive,
-                  KeyString::Version version,
+                  key_string::Version version,
                   Ordering ordering,
                   bool forward) {
     // Note that 'makeKeyFromBSONKeyForSeek()' is intended to compute the "start" key for an
@@ -1227,14 +1227,14 @@ makeKeyStringPair(const BSONObj& lowKey,
     // is why we use 'makeKeyStringFromBSONKey()' to manually specify the discriminator for the
     // end key.
     return {
-        std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
+        std::make_unique<key_string::Value>(IndexEntryComparison::makeKeyStringFromBSONKeyForSeek(
             lowKey, version, ordering, forward, lowKeyInclusive)),
-        std::make_unique<KeyString::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
+        std::make_unique<key_string::Value>(IndexEntryComparison::makeKeyStringFromBSONKey(
             highKey,
             version,
             ordering,
-            forward != highKeyInclusive ? KeyString::Discriminator::kExclusiveBefore
-                                        : KeyString::Discriminator::kExclusiveAfter))};
+            forward != highKeyInclusive ? key_string::Discriminator::kExclusiveBefore
+                                        : key_string::Discriminator::kExclusiveAfter))};
 }
 
 }  // namespace mongo::stage_builder

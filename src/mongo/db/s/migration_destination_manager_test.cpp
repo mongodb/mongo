@@ -31,9 +31,7 @@
 #include <boost/none.hpp>
 #include <boost/optional/optional.hpp>
 // IWYU pragma: no_include "cxxabi.h"
-#include <future>
 #include <system_error>
-#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/bson/bsonelement.h"

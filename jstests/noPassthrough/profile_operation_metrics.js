@@ -8,7 +8,7 @@
  *   requires_wiredtiger,
  *   # TODO SERVER-71170: docBytesRead for read operations using cqf are reported are higher than
  *   # tests expect.
- *   cqf_incompatible,
+ *   cqf_experimental_incompatible,
  * ]
  */
 (function() {

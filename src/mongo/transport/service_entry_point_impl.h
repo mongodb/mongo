@@ -29,13 +29,18 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 #include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/db/client.h"
+#include "mongo/db/service_context.h"
+#include "mongo/logv2/log_severity.h"
 #include "mongo/logv2/log_severity_suppressor.h"
 #include "mongo/stdx/variant.h"
 #include "mongo/transport/service_entry_point.h"

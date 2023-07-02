@@ -29,9 +29,19 @@
 
 #pragma once
 
+#include <compare>
+#include <cstdint>
+#include <iosfwd>
+#include <string>
+#include <tuple>
+
 #include "mongo/base/data_view.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/bson/util/builder.h"
+#include "mongo/bson/util/builder_fwd.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/time_support.h"
 
 namespace mongo {

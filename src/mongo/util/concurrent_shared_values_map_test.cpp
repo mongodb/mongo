@@ -29,8 +29,13 @@
 
 #include <string>
 
-#include "mongo/unittest/barrier.h"
-#include "mongo/unittest/unittest.h"
+#include <absl/container/flat_hash_map.h>
+
+#include "mongo/base/string_data.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/stdx/unordered_set.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/util/concurrent_shared_values_map.h"
 
 namespace mongo {

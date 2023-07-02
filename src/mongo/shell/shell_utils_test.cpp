@@ -28,8 +28,9 @@
  */
 
 #include "mongo/shell/shell_utils.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/assert_util.h"
+
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 namespace {

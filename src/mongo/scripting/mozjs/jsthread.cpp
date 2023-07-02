@@ -28,27 +28,44 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/jsthread.h"
-
-#include <cstdio>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <js/Array.h>
+#include <js/CallArgs.h>
 #include <js/Object.h>
+#include <js/RootingAPI.h>
+#include <js/ValueArray.h>
+#include <jsapi.h>
 #include <jsfriendapi.h>
 #include <memory>
-#include <vm/PosixNSPR.h>
+#include <mutex>
+#include <string>
+#include <utility>
 
+#include <js/PropertySpec.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/client.h"
-#include "mongo/db/jsobj.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
 #include "mongo/platform/mutex.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/scripting/mozjs/engine.h"
+#include "mongo/scripting/mozjs/exception.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/internedstring.h"
+#include "mongo/scripting/mozjs/jsthread.h"
+#include "mongo/scripting/mozjs/objectwrapper.h"
 #include "mongo/scripting/mozjs/valuereader.h"
-#include "mongo/scripting/mozjs/valuewriter.h"
-#include "mongo/stdx/condition_variable.h"
 #include "mongo/stdx/thread.h"
-#include "mongo/util/stacktrace.h"
+#include "mongo/util/assert_util.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault
 

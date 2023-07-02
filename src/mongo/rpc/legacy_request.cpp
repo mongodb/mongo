@@ -27,15 +27,14 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include <utility>
-
+#include "mongo/rpc/legacy_request.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/namespace_string.h"
-#include "mongo/rpc/legacy_request.h"
 #include "mongo/rpc/metadata.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/str.h"
 
 namespace mongo {
 namespace rpc {

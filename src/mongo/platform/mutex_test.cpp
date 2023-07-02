@@ -27,10 +27,10 @@
  *    it in the license file.
  */
 
-#include "mongo/unittest/unittest.h"
-
-#include "mongo/config.h"
+#include "mongo/config.h"  // IWYU pragma: keep
 #include "mongo/platform/mutex.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
 
 namespace mongo {
 TEST(MutexTest, BasicSingleThread) {

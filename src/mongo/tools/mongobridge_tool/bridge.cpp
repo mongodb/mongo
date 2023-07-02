@@ -28,42 +28,66 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <boost/optional.hpp>
 #include <cstdint>
 #include <memory>
+#include <mutex>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include "mongo/base/init.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/logv2/log.h"
-#include "mongo/platform/atomic_word.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/platform/mutex.h"
 #include "mongo/platform/random.h"
 #include "mongo/rpc/factory.h"
 #include "mongo/rpc/message.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/protocol.h"
 #include "mongo/rpc/reply_builder_interface.h"
-#include "mongo/stdx/thread.h"
 #include "mongo/tools/mongobridge_tool/bridge_commands.h"
 #include "mongo/tools/mongobridge_tool/mongobridge_options.h"
 #include "mongo/transport/asio/asio_transport_layer.h"
 #include "mongo/transport/message_compressor_manager.h"
+#include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/service_entry_point_impl.h"
-#include "mongo/transport/service_executor_synchronous.h"
+#include "mongo/transport/session.h"
+#include "mongo/transport/transport_layer.h"
 #include "mongo/util/assert_util.h"
+#include "mongo/util/clock_source.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
 #include "mongo/util/exit.h"
+#include "mongo/util/exit_code.h"
 #include "mongo/util/future.h"
+#include "mongo/util/net/hostandport.h"
 #include "mongo/util/quick_exit.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/static_immortal.h"
 #include "mongo/util/str.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/time_support.h"
-#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kBridge
 
@@ -162,7 +186,6 @@ BridgeContext* BridgeContext::get() {
     return &_get(getGlobalServiceContext());
 }
 
-class ServiceEntryPointBridge;
 class ProxiedConnection {
 public:
     ProxiedConnection() : _dest(nullptr), _prng(BridgeContext::get()->makeSeededPRNG()) {}

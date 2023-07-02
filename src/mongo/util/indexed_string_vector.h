@@ -29,11 +29,18 @@
 
 #pragma once
 
+#include <array>
 #include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <limits>
+#include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
+#include "mongo/base/string_data.h"
+#include "mongo/platform/compiler.h"
 #include "mongo/util/string_map.h"
 
 namespace mongo {

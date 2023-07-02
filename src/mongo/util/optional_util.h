@@ -28,7 +28,9 @@
  */
 #pragma once
 
+#include <boost/none_t.hpp>
 #include <boost/optional.hpp>
+#include <boost/optional/optional.hpp>
 #include <optional>
 #include <ostream>
 #include <string>

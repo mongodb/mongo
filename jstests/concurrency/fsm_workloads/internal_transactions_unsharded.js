@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Runs insert, update, delete and findAndModify commands in internal transactions using all the
  * available client session settings. This workload works on both standalone replica sets and
@@ -14,29 +12,14 @@
  *  assumes_unsharded_collection,
  * ]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
 load('jstests/concurrency/fsm_workload_helpers/auto_retry_transaction.js');
 load("jstests/libs/override_methods/retry_writes_at_least_once.js");
 
 // This workload involves running commands outside a session.
 TestData.disableImplicitSessions = true;
 
-if ($config === undefined) {
-    // There is no workload to extend. Define a noop base workload to make the 'extendWorkload' call
-    // below still work.
-    $config = {
-        threadCount: 1,
-        iterations: 1,
-        startState: "init",
-        data: {},
-        states: {init: function(db, collName) {}},
-        transitions: {init: {init: 1}},
-        setup: function(db, collName) {},
-        teardown: function(db, collName) {},
-    };
-}
-
-var $config = extendWorkload($config, function($config, $super) {
+export function extendWithInternalTransactionsUnsharded($config, $super) {
     $config.threadCount = 5;
     $config.iterations = 50;
 
@@ -749,4 +732,17 @@ var $config = extendWorkload($config, function($config, $super) {
     };
 
     return $config;
-});
+}
+
+const kBaseConfig = {
+    threadCount: 1,
+    iterations: 1,
+    startState: "init",
+    data: {},
+    states: {init: function(db, collName) {}},
+    transitions: {init: {init: 1}},
+    setup: function(db, collName) {},
+    teardown: function(db, collName) {},
+};
+
+export const $config = extendWorkload(kBaseConfig, extendWithInternalTransactionsUnsharded);

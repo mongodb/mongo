@@ -56,6 +56,7 @@
 #include "mongo/db/query/explain_verbosity_gen.h"
 #include "mongo/db/read_write_concern_provenance_base_gen.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
 
@@ -174,6 +175,9 @@ public:
 
     // Get the authenticated user's object handle, if any.
     virtual boost::optional<UserHandle> getAuthenticatedUser() = 0;
+
+    // Get the authenticated user's tenant ID, if any.
+    virtual boost::optional<TenantId> getUserTenantId() const = 0;
 
     // Is auth disabled? Returns true if auth is disabled.
     virtual bool shouldIgnoreAuthChecks() = 0;

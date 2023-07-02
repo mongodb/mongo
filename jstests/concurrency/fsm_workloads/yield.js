@@ -1,12 +1,10 @@
-'use strict';
-
 /**
  * yield.js
  *
  * Designed to execute queries and make them yield as much as possible while also updating and
  * removing documents that they operate on.
  */
-var $config = (function() {
+export const $config = (function() {
     // The explain used to build the assertion message in advanceCursor() is the only command not
     // allowed in a transaction used in the query state function. With shard stepdowns, getMores
     // aren't allowed outside a transaction, so if the explain runs when the suite is configured to

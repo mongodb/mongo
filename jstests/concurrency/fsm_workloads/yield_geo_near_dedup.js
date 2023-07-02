@@ -1,13 +1,11 @@
-'use strict';
-
 /*
  * Intersperses $geoNear aggregations with updates of non-geo fields to test deduplication.
  * @tags: [requires_non_retryable_writes]
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');      // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield_geo_near.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield_geo_near.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.remove = function remove(db, collName) {
         var id = Random.randInt(this.nDocs);
         var doc = db[collName].findOne({_id: id});

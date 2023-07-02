@@ -209,7 +209,7 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
             }
 
             auto keys = executionCtx.keys();
-            SharedBufferFragmentBuilder pool(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+            SharedBufferFragmentBuilder pool(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
             // There's no need to compute the prefixes of the indexed fields that cause the
             // index to be multikey when ensuring the keyData is still valid.
             KeyStringSet* multikeyMetadataKeys = nullptr;
@@ -231,10 +231,10 @@ bool WorkingSetCommon::fetch(OperationContext* opCtx,
                          multikeyMetadataKeys,
                          multikeyPaths,
                          member->recordId);
-            KeyString::HeapBuilder keyString(iam->getSortedDataInterface()->getKeyStringVersion(),
-                                             memberKey.keyData,
-                                             iam->getSortedDataInterface()->getOrdering(),
-                                             member->recordId);
+            key_string::HeapBuilder keyString(iam->getSortedDataInterface()->getKeyStringVersion(),
+                                              memberKey.keyData,
+                                              iam->getSortedDataInterface()->getOrdering(),
+                                              member->recordId);
             if (!keys->count(keyString.release())) {
                 // document would no longer be at this position in the index.
                 return false;

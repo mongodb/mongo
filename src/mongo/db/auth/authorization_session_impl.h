@@ -55,6 +55,7 @@
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/concurrency/with_lock.h"
 #include "mongo/util/time_support.h"
 
@@ -103,6 +104,8 @@ public:
     bool isAuthenticated() override;
 
     boost::optional<UserHandle> getAuthenticatedUser() override;
+
+    boost::optional<TenantId> getUserTenantId() const override;
 
     boost::optional<UserName> getAuthenticatedUserName() override;
 
@@ -214,7 +217,6 @@ private:
     std::tuple<boost::optional<UserName>*, std::vector<RoleName>*> _getImpersonations() override {
         return std::make_tuple(&_impersonatedUserName, &_impersonatedRoleNames);
     }
-
 
     // Generates a vector of default privileges that are granted to any user,
     // regardless of which roles that user does or does not possess.

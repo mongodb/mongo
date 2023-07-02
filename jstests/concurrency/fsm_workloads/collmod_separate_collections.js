@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * collmod_separate_collections.js
  *
@@ -9,10 +7,10 @@
  *
  * Each thread updates a TTL index on a separate collection.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/collmod.js');     // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/collmod.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.prefix = 'collmod_separate_collections';
     $config.data.shardKey = {createdAt: 1};
 

@@ -27,13 +27,12 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+// IWYU pragma: no_include "cxxabi.h"
+#include <condition_variable>
+#include <mutex>
 
 #include "mongo/stdx/condition_variable.h"
-#include "mongo/stdx/mutex.h"
-#include "mongo/stdx/thread.h"
 
 namespace mongo {
 

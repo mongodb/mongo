@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include "mongo/base/status.h"
 #include "mongo/transport/service_executor.h"
 #include "mongo/transport/session.h"
 #include "mongo/util/functional.h"

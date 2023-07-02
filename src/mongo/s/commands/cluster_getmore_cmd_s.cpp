@@ -27,7 +27,18 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <set>
+#include <string>
+
+#include "mongo/base/string_data.h"
+#include "mongo/db/auth/authorization_checks.h"
+#include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/s/commands/cluster_getmore_cmd.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 namespace {

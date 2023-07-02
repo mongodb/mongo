@@ -20,7 +20,7 @@ env.Library(
 utEnv = env.Clone()
 utEnv.InjectThirdParty(libraries=['yaml'])
 utEnv.Library(
-    target="unittest",
+    target='unittest',
     source=[
         'barrier.cpp',
         'bson_test_util.cpp',
@@ -46,7 +46,7 @@ utEnv.Library(
 )
 
 env.Library(
-    target="unittest_main",
+    target='unittest_main',
     source=[
         'unittest_main.cpp',
         'unittest_options.idl',

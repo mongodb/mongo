@@ -112,6 +112,7 @@
 #include "mongo/db/repl/tenant_migration_access_blocker_util.h"
 #include "mongo/db/repl/tenant_migration_conflict_info.h"
 #include "mongo/db/repl/tenant_migration_decoration.h"
+#include "mongo/db/resource_yielder.h"
 #include "mongo/db/s/collection_sharding_state.h"
 #include "mongo/db/s/operation_sharding_state.h"
 #include "mongo/db/s/query_analysis_writer.h"
@@ -146,6 +147,7 @@
 #include "mongo/db/update/document_diff_applier.h"
 #include "mongo/db/update/path_support.h"
 #include "mongo/db/update/update_oplog_entry_serialization.h"
+#include "mongo/executor/inline_executor.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -159,6 +161,8 @@
 #include "mongo/s/query_analysis_sampler_util.h"
 #include "mongo/s/type_collection_common_types_gen.h"
 #include "mongo/s/would_change_owning_shard_exception.h"
+#include "mongo/s/write_ops/batched_command_response.h"
+#include "mongo/s/write_ops/batched_upsert_detail.h"
 #include "mongo/stdx/unordered_map.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -166,6 +170,7 @@
 #include "mongo/util/future.h"
 #include "mongo/util/log_and_backoff.h"
 #include "mongo/util/namespace_string_util.h"
+#include "mongo/util/out_of_line_executor.h"
 #include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/timer.h"
@@ -456,9 +461,10 @@ SingleWriteResult makeWriteResultForInsertOrDeleteRetry() {
 // perform. First item in the tuple determines whether to bypass document validation altogether,
 // second item determines if _safeContent_ array can be modified in an encrypted collection.
 std::tuple<bool, bool> getDocumentValidationFlags(OperationContext* opCtx,
-                                                  const write_ops::WriteCommandRequestBase& req) {
+                                                  const write_ops::WriteCommandRequestBase& req,
+                                                  const boost::optional<TenantId>& tenantId) {
     auto& encryptionInfo = req.getEncryptionInformation();
-    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo);
+    const bool fleCrudProcessed = getFleCrudProcessed(opCtx, encryptionInfo, tenantId);
     return std::make_tuple(req.getBypassDocumentValidation(), fleCrudProcessed);
 }
 }  // namespace
@@ -558,13 +564,14 @@ bool handleError(OperationContext* opCtx,
 }
 
 bool getFleCrudProcessed(OperationContext* opCtx,
-                         const boost::optional<EncryptionInformation>& encryptionInfo) {
+                         const boost::optional<EncryptionInformation>& encryptionInfo,
+                         const boost::optional<TenantId>& tenantId) {
     if (encryptionInfo && encryptionInfo->getCrudProcessed().value_or(false)) {
         uassert(6666201,
                 "External users cannot have crudProcessed enabled",
                 AuthorizationSession::get(opCtx->getClient())
-                    ->isAuthorizedForActionsOnResource(ResourcePattern::forClusterResource(),
-                                                       ActionType::internal));
+                    ->isAuthorizedForActionsOnResource(
+                        ResourcePattern::forClusterResource(tenantId), ActionType::internal));
 
         return true;
     }
@@ -1042,8 +1049,8 @@ WriteResult performInserts(OperationContext* opCtx,
         uassertStatusOK(userAllowedWriteNS(opCtx, wholeOp.getNamespace()));
     }
 
-    const auto [disableDocumentValidation, fleCrudProcessed] =
-        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+    const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
+        opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);
@@ -1476,8 +1483,8 @@ WriteResult performUpdates(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    const auto [disableDocumentValidation, fleCrudProcessed] =
-        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+    const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
+        opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);
@@ -1749,8 +1756,8 @@ WriteResult performDeletes(OperationContext* opCtx,
               (txnParticipant && opCtx->inMultiDocumentTransaction()));
     uassertStatusOK(userAllowedWriteNS(opCtx, ns));
 
-    const auto [disableDocumentValidation, fleCrudProcessed] =
-        getDocumentValidationFlags(opCtx, wholeOp.getWriteCommandRequestBase());
+    const auto [disableDocumentValidation, fleCrudProcessed] = getDocumentValidationFlags(
+        opCtx, wholeOp.getWriteCommandRequestBase(), wholeOp.getDbName().tenantId());
 
     DisableDocumentSchemaValidationIfTrue docSchemaValidationDisabler(opCtx,
                                                                       disableDocumentValidation);

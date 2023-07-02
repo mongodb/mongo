@@ -29,6 +29,12 @@
 
 #pragma once
 
+#include <js/CallArgs.h>
+#include <js/Class.h>
+#include <js/TypeDecls.h>
+
+#include "mongo/bson/bsonobj.h"
+#include "mongo/scripting/mozjs/base.h"
 #include "mongo/scripting/mozjs/wraptype.h"
 
 namespace mongo {

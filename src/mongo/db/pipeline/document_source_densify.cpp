@@ -29,17 +29,17 @@
 
 #include "mongo/db/pipeline/document_source_densify.h"
 
-#include <algorithm>
-#include <iterator>
-#include <memory>
-
 #include <absl/container/node_hash_map.h>
 #include <absl/meta/type_traits.h>
+#include <algorithm>
 #include <boost/move/utility_core.hpp>
 #include <boost/none.hpp>
+#include <boost/optional.hpp>
 #include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr/intrusive_ptr.hpp>
+#include <iterator>
+#include <memory>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/db/basic_types.h"
@@ -354,10 +354,19 @@ DocumentSource::GetNextResult DocumentSourceInternalDensify::densifyExplicitRang
                            RangeStatement(_range.getStep(),
                                           ExplicitBounds(bounds.first, bounds.second),
                                           _range.getUnit()));
+    } else if (_current < bounds.first) {
+        // All the documents we saw were below the explicit range, so _current is below the range.
+        // Densification starts at the first bounds, so _current is no longer relevant.
+        createDocGenerator(bounds.first,
+                           RangeStatement(_range.getStep(),
+                                          ExplicitBounds(bounds.first, bounds.second),
+                                          _range.getUnit()));
+
     } else if (_current->increment(_range) >= bounds.second) {
         _densifyState = DensifyState::kDensifyDone;
         return DocumentSource::GetNextResult::makeEOF();
     } else {
+        // _current is somewhere in the middle of the range.
         auto lowerBound = _current->increment(_range);
         createDocGenerator(lowerBound,
                            RangeStatement(_range.getStep(),

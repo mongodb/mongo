@@ -116,6 +116,7 @@ public:
 #undef DBNAME_CONSTANT
 
     static constexpr size_t kMaxDatabaseNameLength = 63;
+    static constexpr size_t kMaxTenantDatabaseNameLength = 38;
 
     /**
      * Constructs an empty DatabaseName.
@@ -290,7 +291,7 @@ private:
 
     /**
      * Constructs a DatabaseName from the given tenantId and database name.
-     * "dbName" is expected only consist of a db name. It is the caller's responsibility to ensure
+     * "dbString" is expected only consist of a db name. It is the caller's responsibility to ensure
      * the dbName is a valid db name.
      */
     DatabaseName(boost::optional<TenantId> tenantId, StringData dbString) {
@@ -300,11 +301,12 @@ private:
         uassert(ErrorCodes::InvalidNamespace,
                 "database names cannot have embedded null characters",
                 dbString.find('\0') == std::string::npos);
+
+        size_t maxLen = tenantId ? kMaxTenantDatabaseNameLength : kMaxDatabaseNameLength;
         uassert(ErrorCodes::InvalidNamespace,
-                fmt::format("db name must be at most {} characters, found: {}",
-                            kMaxDatabaseNameLength,
-                            dbString.size()),
-                dbString.size() <= kMaxDatabaseNameLength);
+                fmt::format(
+                    "db name must be at most {} characters, found: {}", maxLen, dbString.size()),
+                dbString.size() <= maxLen);
 
         uint8_t details = dbString.size() & kDatabaseNameOffsetEndMask;
         size_t dbStartIndex = kDataOffset;

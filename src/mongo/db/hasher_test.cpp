@@ -29,14 +29,22 @@
 
 /** Unit tests for BSONElementHasher. */
 
-#include "mongo/platform/basic.h"
+#include <limits>
+#include <memory>
 
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonmisc.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/bson/bsontypes.h"
+#include "mongo/bson/bsontypes_util.h"
+#include "mongo/bson/json.h"
+#include "mongo/bson/oid.h"
+#include "mongo/bson/timestamp.h"
 #include "mongo/db/hasher.h"
-#include "mongo/db/jsobj.h"
-#include "mongo/db/json.h"
-
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 namespace {

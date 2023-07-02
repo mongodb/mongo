@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * remove_where.js
  *
@@ -13,10 +11,10 @@
  * @tags: [assumes_balancer_off]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');            // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_where.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_where.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.data.randomBound = 10;
     $config.data.generateDocumentToInsert = function generateDocumentToInsert() {
         return {tid: this.tid, x: Random.randInt(this.randomBound)};

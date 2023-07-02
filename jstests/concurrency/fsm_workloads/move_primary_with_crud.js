@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Randomly performs a series of CRUD and movePrimary operations on unsharded collections, checking
  * for data consistency as a consequence of these operations.
@@ -12,7 +10,7 @@
 
 load('jstests/libs/feature_flag_util.js');
 
-const $config = (function() {
+export const $config = (function() {
     const kCollNamePrefix = 'unsharded_coll_';
     const kInitialCollSize = 100;
     const kBatchSizeForDocsLookup = kInitialCollSize * 2;
@@ -167,9 +165,7 @@ const $config = (function() {
                     // Due to a stepdown of the donor during the cloning phase, the movePrimary
                     // operation failed. It is not automatically recovered, but any orphaned data on
                     // the recipient has been deleted.
-                    7120202,
-                    // Same as the above, but due to a stepdown of the recipient.
-                    ErrorCodes.MovePrimaryAborted
+                    7120202
                 ]);
         },
         checkDatabaseMetadataConsistency: function(db, collName, connCache) {

@@ -28,32 +28,54 @@
  */
 
 
+#include <boost/smart_ptr.hpp>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <string>
+#include <type_traits>
+#include <utility>
 
-#include "mongo/platform/basic.h"
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <fmt/format.h>
 
-#include "mongo/s/service_entry_point_mongos.h"
-
-#include "mongo/client/server_discovery_monitor.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/commands.h"
+#include "mongo/db/catalog/collection_catalog.h"
 #include "mongo/db/curop.h"
+#include "mongo/db/cursor_id.h"
 #include "mongo/db/dbmessage.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/request_execution_context.h"
-#include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/db/session/session.h"
 #include "mongo/db/session/session_catalog.h"
-#include "mongo/db/stats/counters.h"
 #include "mongo/db/stats/top.h"
 #include "mongo/logv2/log.h"
-#include "mongo/rpc/check_allowed_op_query_cmd.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/logv2/redaction.h"
 #include "mongo/rpc/message.h"
 #include "mongo/s/commands/strategy.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/load_balancer_support.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/service_entry_point_mongos.h"
 #include "mongo/s/transaction_router.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
+#include "mongo/util/duration.h"
+#include "mongo/util/future_impl.h"
+#include "mongo/util/uuid.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kNetwork
 

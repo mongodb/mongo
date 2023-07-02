@@ -28,15 +28,18 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include <cmath>
 #include <csignal>
-#include <cstdlib>
+#include <exception>
+#include <string>
 
+#include "mongo/base/string_data.h"
+#include "mongo/stdx/type_traits.h"
+#include "mongo/unittest/assert.h"
 #include "mongo/unittest/death_test.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/signal_handlers_synchronous.h"
+#include "mongo/util/str.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

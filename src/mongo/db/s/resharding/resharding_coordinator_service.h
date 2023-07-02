@@ -110,12 +110,10 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
     ReshardingMetrics* metrics,
     const ReshardingCoordinatorDocument& coordinatorDoc);
 
-boost::optional<ReshardingCoordinatorDocument>
-removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-    OperationContext* opCtx,
-    ReshardingMetrics* metrics,
-    const ReshardingCoordinatorDocument& coordinatorDoc,
-    boost::optional<Status> abortReason = boost::none);
+void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
+                                             ReshardingMetrics* metrics,
+                                             const ReshardingCoordinatorDocument& coordinatorDoc,
+                                             boost::optional<Status> abortReason = boost::none);
 }  // namespace resharding
 
 class ReshardingCoordinatorExternalState {
@@ -161,8 +159,7 @@ public:
         : _stepdownToken(stepdownToken),
           _abortSource(CancellationSource(stepdownToken)),
           _abortToken(_abortSource.token()),
-          _commitMonitorCancellationSource(CancellationSource(_abortToken)),
-          _quiesceCancellationSource(CancellationSource(_stepdownToken)) {}
+          _commitMonitorCancellationSource(CancellationSource(_abortToken)) {}
 
     /**
      * Returns whether the any token has been canceled.
@@ -199,10 +196,6 @@ public:
         _commitMonitorCancellationSource.cancel();
     }
 
-    void cancelQuiescePeriod() {
-        _quiesceCancellationSource.cancel();
-    }
-
     const CancellationToken& getStepdownToken() {
         return _stepdownToken;
     }
@@ -213,10 +206,6 @@ public:
 
     CancellationToken getCommitMonitorToken() {
         return _commitMonitorCancellationSource.token();
-    }
-
-    CancellationToken getCancelQuiesceToken() {
-        return _quiesceCancellationSource.token();
     }
 
 private:
@@ -234,10 +223,6 @@ private:
     // The source created by inheriting from the abort token.
     // Provides the means to cancel the commit monitor (e.g., due to receiving the commit command).
     CancellationSource _commitMonitorCancellationSource;
-
-    // A source created by inheriting from the stepdown token.
-    // Provides the means to cancel the quiesce period.
-    CancellationSource _quiesceCancellationSource;
 };
 
 class ReshardingCoordinator;
@@ -280,8 +265,6 @@ public:
      * between operations interrupted due to stepdown or abort. Callers who wish to confirm that
      * the abort successfully went through should follow up with an inspection on the resharding
      * coordinator docs to ensure that they are empty.
-     *
-     * This call skips quiesce periods for all aborted coordinators.
      */
     void abortAllReshardCollection(OperationContext* opCtx);
 
@@ -309,9 +292,8 @@ public:
 
     /**
      * Attempts to cancel the underlying resharding operation using the abort token.
-     * If 'skipQuiescePeriod' is set, will also skip the quiesce period used to allow retries.
      */
-    void abort(bool skipQuiescePeriod = false);
+    void abort();
 
     /**
      * Replace in-memory representation of the CoordinatorDoc
@@ -337,14 +319,6 @@ public:
      */
     SharedSemiFuture<void> getCoordinatorDocWrittenFuture() const {
         return _coordinatorDocWrittenPromise.getFuture();
-    }
-
-    /**
-     * Returns a Future that will be resolved when the service has finished its quiesce period
-     * and deleted the coordinator document.
-     */
-    SharedSemiFuture<void> getQuiescePeriodFinishedFuture() const {
-        return _quiescePeriodFinishedPromise.getFuture();
     }
 
     boost::optional<BSONObj> reportForCurrentOp(
@@ -430,12 +404,6 @@ private:
      */
     ExecutorFuture<void> _runReshardingOp(
         const std::shared_ptr<executor::ScopedTaskExecutor>& executor);
-
-    /**
-     * Keep the instance in a quiesced state in order to handle retries.
-     */
-    ExecutorFuture<void> _quiesce(const std::shared_ptr<executor::ScopedTaskExecutor>& executor,
-                                  Status status);
 
     /**
      * Does the following writes:
@@ -525,14 +493,6 @@ private:
         boost::optional<Timestamp> cloneTimestamp = boost::none,
         boost::optional<ReshardingApproxCopySize> approxCopySize = boost::none,
         boost::optional<Status> abortReason = boost::none);
-
-    /**
-     * Updates the entry for this resharding operation in config.reshardingOperations to the
-     * quiesced state, or removes it if quiesce isn't being done.  Removes the resharding fields
-     * from the catalog entries.
-     */
-    void _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
-        OperationContext* opCtx, boost::optional<Status> abortReason = boost::none);
 
     /**
      * Sends the command to the specified participants asynchronously.
@@ -662,9 +622,6 @@ private:
     // Promise that is fulfilled when the chain of work kicked off by run() has completed.
     SharedPromise<void> _completionPromise;
 
-    // Promise that is fulfilled when the quiesce period is finished
-    SharedPromise<void> _quiescePeriodFinishedPromise;
-
     // Callback handle for scheduled work to handle critical section timeout.
     boost::optional<executor::TaskExecutor::CallbackHandle> _criticalSectionTimeoutCbHandle;
 
@@ -675,15 +632,7 @@ private:
 
     // Used to catch the case when an abort() is called but the cancellation source (_ctHolder) has
     // not been initialized.
-    enum AbortType {
-        kNoAbort = 0,
-        kAbortWithQuiesce,
-        kAbortSkipQuiesce
-    } _abortCalled{AbortType::kNoAbort};
-
-    // If we recovered a completed resharding coordinator (quiesced) on failover, the
-    // resharding status when it actually ran.
-    boost::optional<Status> _originalReshardingStatus;
+    bool _abortCalled{false};
 };
 
 }  // namespace mongo

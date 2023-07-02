@@ -46,7 +46,7 @@
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/quick_exit.h"
 #include "mongo/util/signal_handlers.h"
-#include "mongo/util/text.h"
+#include "mongo/util/text.h"  // IWYU pragma: keep
 #include "mongo/util/winutil.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kControl

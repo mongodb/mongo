@@ -53,18 +53,18 @@ using namespace mongo;
 void assertKeyStringCollatorOutput(const CollatorInterfaceMock& collator,
                                    const BSONObj& dataObj,
                                    const BSONObj& expected) {
-    KeyString::Builder ks(KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING);
+    key_string::Builder ks(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
     ks.appendBSONElement(dataObj.firstElement(), [&](StringData stringData) {
         return collator.getComparisonString(stringData);
     });
 
-    ASSERT_EQ(
-        ks.getValueCopy(),
-        KeyString::Builder(KeyString::Version::kLatestVersion, expected, KeyString::ALL_ASCENDING));
+    ASSERT_EQ(ks.getValueCopy(),
+              key_string::Builder(
+                  key_string::Version::kLatestVersion, expected, key_string::ALL_ASCENDING));
 }
 
 void assertKeyStringCollatorThrows(const CollatorInterfaceMock& collator, const BSONObj& dataObj) {
-    KeyString::Builder ks(KeyString::Version::kLatestVersion, KeyString::ALL_ASCENDING);
+    key_string::Builder ks(key_string::Version::kLatestVersion, key_string::ALL_ASCENDING);
     ASSERT_THROWS_CODE(ks.appendBSONElement(dataObj.firstElement(),
                                             [&](StringData stringData) {
                                                 return collator.getComparisonString(stringData);

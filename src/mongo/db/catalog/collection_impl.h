@@ -237,8 +237,14 @@ public:
     bool isTemporary() const final;
 
     boost::optional<bool> getTimeseriesBucketsMayHaveMixedSchemaData() const final;
+
     void setTimeseriesBucketsMayHaveMixedSchemaData(OperationContext* opCtx,
                                                     boost::optional<bool> setting) final;
+
+    bool timeseriesBucketingParametersMayHaveChanged() const final;
+
+    void setTimeseriesBucketingParametersChanged(OperationContext* opCtx,
+                                                 boost::optional<bool> value) final;
 
     bool doesTimeseriesBucketsDocContainMixedSchemaData(const BSONObj& bucketsDoc) const final;
 

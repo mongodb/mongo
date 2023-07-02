@@ -163,7 +163,6 @@
 #include "mongo/dbtests/dbtests.h"  // IWYU pragma: keep
 #include "mongo/executor/task_executor.h"
 #include "mongo/idl/idl_parser.h"
-#include "mongo/idl/server_parameter_test_util.h"
 #include "mongo/logv2/log.h"
 #include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_component.h"
@@ -3319,8 +3318,6 @@ protected:
 };
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
     const auto criteria = BSON("_id" << 0);
@@ -3366,8 +3363,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdate) {
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
     namespace mmb = mongo::mutablebson;
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);
     // Create a new document representing BSONObj with the above contents.
     mmb::Document doc(bsonObj, mmb::Document::kInPlaceEnabled);
@@ -3426,8 +3421,6 @@ TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyUpdateWithDamages) {
 }
 
 TEST_F(RetryableFindAndModifyTest, RetryableFindAndModifyDelete) {
-    RAIIServerParameterControllerForTest storeImageInSideCollection(
-        "storeFindAndModifyImagesInSideCollection", true);
     AutoGetCollection autoColl(_opCtx, nss, LockMode::MODE_X);
     CollectionWriter collection(_opCtx, autoColl);
     const auto bsonObj = BSON("_id" << 0 << "a" << 1);

@@ -27,19 +27,23 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/uuid.h"
-
 #include <algorithm>
+#include <boost/move/utility_core.hpp>
 #include <fmt/format.h>
+#include <new>
+#include <utility>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
 #include "mongo/platform/random.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/ctype.h"
 #include "mongo/util/hex.h"
 #include "mongo/util/static_immortal.h"
 #include "mongo/util/synchronized_value.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 

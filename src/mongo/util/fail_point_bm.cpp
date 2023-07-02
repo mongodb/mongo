@@ -28,9 +28,8 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
 #include <benchmark/benchmark.h>
+#include <string>
 
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/compiler.h"

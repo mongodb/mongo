@@ -66,7 +66,7 @@ std::string dumpKeyset(const KeyStringSet& keyStrings) {
     std::stringstream ss;
     ss << "[ ";
     for (auto& keyString : keyStrings) {
-        auto key = KeyString::toBson(keyString, Ordering::make(BSONObj()));
+        auto key = key_string::toBson(keyString, Ordering::make(BSONObj()));
         ss << key.toString() << " ";
     }
     ss << "]";
@@ -94,21 +94,21 @@ bool assertKeysetsEqual(const KeyStringSet& expectedKeys, const KeyStringSet& ac
     return true;
 }
 
-KeyString::Value make2DKey(const TwoDIndexingParams& params,
-                           int x,
-                           int y,
-                           BSONElement trailingFields) {
+key_string::Value make2DKey(const TwoDIndexingParams& params,
+                            int x,
+                            int y,
+                            BSONElement trailingFields) {
     BSONObjBuilder bob;
     BSONObj locObj = BSON_ARRAY(x << y);
     params.geoHashConverter->hash(locObj, nullptr).appendHashMin(&bob, "");
     bob.append(trailingFields);
-    KeyString::HeapBuilder keyString(
-        KeyString::Version::kLatestVersion, bob.obj(), Ordering::make(BSONObj()));
+    key_string::HeapBuilder keyString(
+        key_string::Version::kLatestVersion, bob.obj(), Ordering::make(BSONObj()));
     return keyString.release();
 }
 
 struct TwoDKeyGeneratorTest : public unittest::Test {
-    SharedBufferFragmentBuilder allocator{KeyString::HeapBuilder::kHeapAllocatorDefaultBytes};
+    SharedBufferFragmentBuilder allocator{key_string::HeapBuilder::kHeapAllocatorDefaultBytes};
 };
 
 TEST_F(TwoDKeyGeneratorTest, TrailingField) {
@@ -121,7 +121,7 @@ TEST_F(TwoDKeyGeneratorTest, TrailingField) {
                                      obj,
                                      params,
                                      &actualKeys,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
@@ -141,7 +141,7 @@ TEST_F(TwoDKeyGeneratorTest, ArrayTrailingField) {
                                      obj,
                                      params,
                                      &actualKeys,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;
@@ -161,7 +161,7 @@ TEST_F(TwoDKeyGeneratorTest, ArrayOfObjectsTrailingField) {
                                      obj,
                                      params,
                                      &actualKeys,
-                                     KeyString::Version::kLatestVersion,
+                                     key_string::Version::kLatestVersion,
                                      Ordering::make(BSONObj()));
 
     KeyStringSet expectedKeys;

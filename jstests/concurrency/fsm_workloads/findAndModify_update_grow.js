@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_update_grow.js
  *
@@ -10,7 +8,7 @@
  */
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');  // for isMongod
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         shardKey: {tid: 1},
     };

@@ -29,11 +29,16 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
-
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/db/keypattern.h"
 #include "mongo/db/namespace_string.h"
 #include "mongo/db/operation_context.h"
+#include "mongo/platform/basic.h"
 #include "mongo/s/shard_key_pattern.h"
+#include "mongo/util/uuid.h"
 
 namespace mongo {
 namespace analyze_shard_key {

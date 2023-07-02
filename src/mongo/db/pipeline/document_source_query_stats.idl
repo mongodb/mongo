@@ -25,27 +25,36 @@
 # exception statement from all source files in the program, then also delete
 # it in the license file.
 #
-
 global:
-    cpp_namespace: "mongo"
-
+  cpp_namespace: "mongo"
+  cpp_includes:
+    - "mongo/db/pipeline/document_source_query_stats_validators.h"
 imports:
-    - "mongo/db/basic_types.idl"
+  - "mongo/db/basic_types.idl"
+  - "mongo/db/query/query_stats_transform_algorithm.idl"
 
 structs:
-    MovePrimaryCommonMetadata:
-        description: "Common metadata for movePrimary operations"
-        strict: false
+    TransformIdentifiersSpec:
+      description: "Specification for the transformIdentifiers field of $queryStats."
+      strict: true
+      fields:
+        algorithm:
+              description: "The algorithm to use to transform the identifiers."
+              type: TransformAlgorithm
+              optional: false
+              validator:
+                    {callback: "validateAlgo"}
+        hmacKey:
+            description: "The hmac key to be used to transform the identifiers."
+            type: bindata_generic
+            optional: true
+            validator:
+                  {callback: "validateHmac"}
+    DocumentSourceQueryStatsSpec:
+        description: "Specification for a $queryStats stage."
+        strict: true
         fields:
-            migrationId:
-                description: "Unique identifier for the movePrimary operation."
-                type: uuid
-            databaseName:
-                description: "The name of the database being moved as part of movePrimary."
-                type: namespacestring
-            fromShardName:
-                description: "The name of the shard the database is being moved from."
-                type: string
-            toShardName:
-                description: "The name of the shard the database is being moved to."
-                type: string
+          transformIdentifiers:
+            description: "The algorithm and hmac key to use when transforming identifiers."
+            type: TransformIdentifiersSpec
+            optional: true

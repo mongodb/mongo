@@ -570,7 +570,6 @@ void DBClientConnection::_checkConnection() {
                 "Trying to reconnect to {connString}",
                 "Trying to reconnect",
                 "connString"_attr = toString());
-    string errmsg;
 
     auto connectStatus = connect(_serverAddress, _applicationName, _transientSSLParams);
     if (!connectStatus.isOK()) {
@@ -580,7 +579,7 @@ void DBClientConnection::_checkConnection() {
                     "Reconnect attempt to {connString} failed: {reason}",
                     "Reconnect attempt failed",
                     "connString"_attr = toString(),
-                    "error"_attr = errmsg);
+                    "error"_attr = connectStatus);
         if (connectStatus == ErrorCodes::IncompatibleCatalogManager) {
             uassertStatusOK(connectStatus);  // Will always throw
         } else {

@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * indexed_insert_long_fieldname.js
  *
@@ -7,10 +5,10 @@
  * documents appear in both a collection scan and an index scan. The indexed
  * field name is a long string.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // The indexedField must be limited such that the namespace and indexedField does not
     // exceed 128 characters. The namespace defaults to // "test<i>_fsmdb<j>.fsmcoll<k>",
     // where i, j & k are increasing integers for each test, workload and thread.

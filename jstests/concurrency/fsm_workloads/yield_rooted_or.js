@@ -1,5 +1,3 @@
-'use strict';
-
 /*
  * yield_rooted_or.js (extends yield.js)
  *
@@ -7,10 +5,10 @@
  * match.
  * Other workloads that need an index on c and d can inherit from this.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/yield.js');       // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/yield.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     /*
      * Issue a query with an or stage as the root.
      */

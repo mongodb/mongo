@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * update_inc.js
  *
@@ -12,7 +10,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // uses the workload name as _id on the document.
         // assumes this name will be unique.

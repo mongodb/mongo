@@ -1,16 +1,16 @@
-'use strict';
-
 /**
  * Tests periodically killing sessions that are running transactions.
  *
  * @tags: [uses_transactions, assumes_snapshot_transactions, kills_random_sessions]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // for extendWorkload
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js";
 load('jstests/concurrency/fsm_workload_helpers/kill_session.js');  // for killSession
-load('jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js');
 
-var $config = extendWorkload($config, ($config, $super) => {
+export const $config = extendWorkload($baseConfig, ($config, $super) => {
     $config.data.retryOnKilledSession = true;
 
     $config.states.killSession = killSession;

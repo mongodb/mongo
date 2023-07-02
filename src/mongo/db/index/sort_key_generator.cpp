@@ -94,7 +94,7 @@ SortKeyGenerator::SortKeyGenerator(SortPattern sortPattern, const CollatorInterf
 
     constexpr bool isSparse = false;
     _indexKeyGen = std::make_unique<BtreeKeyGenerator>(
-        fieldNames, fixed, isSparse, KeyString::Version::kLatestVersion, _ordering);
+        fieldNames, fixed, isSparse, key_string::Version::kLatestVersion, _ordering);
 
     if (!_sortHasMeta) {
         size_t i = 0;
@@ -113,10 +113,10 @@ Value SortKeyGenerator::computeSortKey(const WorkingSetMember& wsm) const {
     return computeSortKeyFromIndexKey(wsm);
 }
 
-KeyString::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) {
+key_string::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) {
     const bool fastPathSucceeded = fastFillOutSortKeyParts(obj, &_localEltStorage);
     if (fastPathSucceeded) {
-        KeyString::HeapBuilder builder(KeyString::Version::kLatestVersion, _ordering);
+        key_string::HeapBuilder builder(key_string::Version::kLatestVersion, _ordering);
         for (auto elt : _localEltStorage) {
             if (_collator) {
                 builder.appendBSONElement(elt, [&](StringData stringData) {
@@ -131,7 +131,7 @@ KeyString::Value SortKeyGenerator::computeSortKeyString(const BSONObj& obj) {
     }
 
     KeyStringSet keySet;
-    SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder allocator(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
     const bool skipMultikey = false;
     MultikeyPaths* multikeyPaths = nullptr;
     _indexKeyGen->getKeys(allocator, obj, skipMultikey, &keySet, multikeyPaths, _collator);
@@ -218,7 +218,7 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocumentWithoutMetadata(
     // corresponding collation keys. Therefore, we use the simple string comparator when comparing
     // the keys themselves.
     KeyStringSet keys;
-    SharedBufferFragmentBuilder allocator(KeyString::HeapBuilder::kHeapAllocatorDefaultBytes);
+    SharedBufferFragmentBuilder allocator(key_string::HeapBuilder::kHeapAllocatorDefaultBytes);
 
     try {
         // There's no need to compute the prefixes of the indexed fields that cause the index to be
@@ -241,7 +241,7 @@ StatusWith<BSONObj> SortKeyGenerator::computeSortKeyFromDocumentWithoutMetadata(
     invariant(!keys.empty());
 
     // The sort key is the first index key, ordered according to the pattern '_sortSpecWithoutMeta'.
-    return KeyString::toBson(*keys.begin(), Ordering::make(_sortSpecWithoutMeta));
+    return key_string::toBson(*keys.begin(), Ordering::make(_sortSpecWithoutMeta));
 }
 
 Value SortKeyGenerator::getCollationComparisonKey(const Value& val) const {

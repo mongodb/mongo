@@ -27,29 +27,55 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
+#include <cstdint>
+#include <limits>
+#include <memory>
+#include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include "mongo/db/auth/action_set.h"
-#include "mongo/db/auth/action_type.h"
+#include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/api_parameters.h"
 #include "mongo/db/auth/authorization_session.h"
-#include "mongo/db/catalog/collection_operation_source.h"
+#include "mongo/db/auth/privilege.h"
+#include "mongo/db/basic_types_gen.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/bulk_write_common.h"
 #include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/commands/bulk_write_parser.h"
+#include "mongo/db/curop.h"
+#include "mongo/db/feature_flag.h"
+#include "mongo/db/namespace_string.h"
 #include "mongo/db/not_primary_error_tracker.h"
+#include "mongo/db/operation_context.h"
 #include "mongo/db/query/find_common.h"
-#include "mongo/db/query/query_knobs_gen.h"
+#include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/server_feature_flags_gen.h"
 #include "mongo/db/server_options.h"
 #include "mongo/db/service_context.h"
+#include "mongo/db/session/logical_session_id_gen.h"
+#include "mongo/rpc/op_msg.h"
 #include "mongo/s/cluster_write.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/query/cluster_client_cursor.h"
+#include "mongo/s/query/cluster_client_cursor_guard.h"
 #include "mongo/s/query/cluster_client_cursor_impl.h"
+#include "mongo/s/query/cluster_client_cursor_params.h"
 #include "mongo/s/query/cluster_cursor_manager.h"
+#include "mongo/s/query/cluster_query_result.h"
+#include "mongo/s/query/router_exec_stage.h"
 #include "mongo/s/query/router_stage_queued_data.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 
 namespace mongo {
 namespace {

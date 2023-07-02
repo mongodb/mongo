@@ -1269,7 +1269,7 @@ See [createIndexForApplyOps](https://github.com/mongodb/mongo/blob/6ea7d1923619b
 # KeyString
 
 The `KeyString` format is an alternative serialization format for `BSON`. In the text below,
-`KeyString` may refer to values in this format, the C++ namespace of that name or the format itself.
+`KeyString` may refer to values in this format or the format itself, while `key_string` refers to the C++ namespace.
 Indexes sort keys based on their BSON sorting order. In this order all numerical values compare
 according to their mathematical value. Given a BSON document `{ x: 42.0, y : "hello"}`
 and an index with the compound key `{ x : 1, y : 1}`, the document is sorted as the BSON document
@@ -1329,18 +1329,18 @@ validation to check if there are keys in the old format in unique secondary inde
 ## Building KeyString values and passing them around
 
 There are three kinds of builders for constructing `KeyString` values:
-* `KeyString::Builder`: starts building using a small allocation on the stack, and
+* `key_string::Builder`: starts building using a small allocation on the stack, and
   dynamically switches to allocating memory from the heap. This is generally preferable if the value
   is only needed in the scope where it was created.
-* `KeyString::HeapBuilder`: always builds using dynamic memory allocation. This has advantage that
+* `key_string::HeapBuilder`: always builds using dynamic memory allocation. This has advantage that
    calling the `release` method can transfer ownership of the memory without copying.
-*  `KeyString::PooledBuilder`: This class allow building many `KeyString` values tightly packed into
+*  `key_string::PooledBuilder`: This class allow building many `KeyString` values tightly packed into
    larger blocks. The advantage is fewer, larger memory allocations and no wasted space due to
    internal fragmentation. This is a good approach when a large number of values is needed, such as
    for index building. However, memory for a block is only released after _no_ references to that
    block remain.
 
-The `KeyString::Value` class holds a reference to a `SharedBufferFragment` with the `KeyString` and
+The `key_string::Value` class holds a reference to a `SharedBufferFragment` with the `KeyString` and
 its `TypeBits` if any and can be used for passing around values.
 
 # The External Sorter

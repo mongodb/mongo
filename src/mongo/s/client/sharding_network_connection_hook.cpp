@@ -29,17 +29,23 @@
 
 #include "mongo/s/client/sharding_network_connection_hook.h"
 
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <memory>
+
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/bson/util/bson_extract.h"
-#include "mongo/db/catalog_shard_feature_flag_gen.h"
-#include "mongo/db/server_options.h"
-#include "mongo/db/wire_version.h"
+#include "mongo/db/service_context.h"
 #include "mongo/executor/remote_command_request.h"
 #include "mongo/executor/remote_command_response.h"
-#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/grid.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/net/hostandport.h"
 #include "mongo/util/str.h"
 

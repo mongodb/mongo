@@ -20,7 +20,7 @@ var workerThread = (function() {
     // args.errorLatch = CountDownLatch instance that threads count down when they error
     // args.sessionOptions = the options to start a session with
     // run = callback that takes a map of workloads to their associated $config
-    function main(workloads, args, run) {
+    async function main(workloads, args, run) {
         var myDB;
         var configs = {};
         var connectionString = 'mongodb://' + args.host + '/?appName=tid:' + args.tid;
@@ -172,8 +172,8 @@ var workerThread = (function() {
                 load('jstests/libs/override_methods/set_read_and_write_concerns.js');
             }
 
-            workloads.forEach(function(workload) {
-                load(workload);                     // for $config
+            for (const workload of workloads) {
+                const {$config} = await import(workload);
                 var config = parseConfig($config);  // to normalize
 
                 // Copy any modifications that were made to $config.data
@@ -213,7 +213,7 @@ var workerThread = (function() {
                     tid: args.tid,
                     transitions: config.transitions
                 };
-            });
+            }
 
             args.latch.countDown();
 

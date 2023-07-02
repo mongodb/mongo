@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * plan_cache_drop_database.js
  *
@@ -8,7 +6,7 @@
  * events triggers the concurrent destruction of a Collection object and
  * the updating of said object's PlanCache (SERVER-17117).
  */
-var $config = (function() {
+export const $config = (function() {
     function populateData(db, collName) {
         var coll = db[collName];
 

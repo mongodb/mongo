@@ -264,7 +264,25 @@ let testCases = {
     balancerStatus: {skip: "does not accept read or write concern"},
     balancerStop: {skip: "does not accept read or write concern"},
     buildInfo: {skip: "does not accept read or write concern"},
-    bulkWrite: {skip: "not yet implemented"},
+    bulkWrite: {
+        // TODO SERVER-52419: Run this test and remove the skip.
+        // setUp: function(conn) {
+        //     assert.commandWorked(conn.getDB(db).runCommand({create: coll, writeConcern: {w:
+        //     1}}));
+        // },
+        // db: "admin",
+        // command: {
+        //     bulkWrite: 1,
+        //     ops: [{insert: 0, document: {_id: ObjectId()}}],
+        //     nsInfo: [{ns: db + "." + coll}]
+        // },
+        // checkReadConcern: false,
+        // checkWriteConcern: true,
+        // // TODO SERVER-78258: Depending on what profiling behavior we implement we may be able to
+        // // use profiler output here instead rather than logs.
+        // useLogs: true,
+        skip: "requires feature flag"
+    },
     captrunc: {skip: "test command"},
     checkMetadataConsistency: {skip: "does not accept read or write concern"},
     checkShardingIndex: {skip: "does not accept read or write concern"},

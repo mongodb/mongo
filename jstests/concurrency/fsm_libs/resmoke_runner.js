@@ -1,4 +1,3 @@
-(function() {
 'use strict';
 
 load('jstests/concurrency/fsm_libs/runner.js');  // for runner.internals
@@ -28,8 +27,8 @@ function cleanupWorkload(workload, context, cluster, errors, header) {
     return true;
 }
 
-function runWorkloads(workloads,
-                      {cluster: clusterOptions = {}, execution: executionOptions = {}} = {}) {
+async function runWorkloads(workloads,
+                            {cluster: clusterOptions = {}, execution: executionOptions = {}} = {}) {
     assert.gt(workloads.length, 0, 'need at least one workload to run');
 
     const executionMode = {serial: true};
@@ -53,7 +52,7 @@ function runWorkloads(workloads,
 
     const context = {};
     const applyMultipliers = true;
-    loadWorkloadContext(workloads, context, executionOptions, applyMultipliers);
+    await loadWorkloadContext(workloads, context, executionOptions, applyMultipliers);
 
     // Constructing a Cluster instance calls its internal validateClusterOptions() function,
     // which fills in any properties that aren't explicitly present in 'clusterOptions'. We do
@@ -287,5 +286,4 @@ if (Object.keys(sessionOptions).length > 0 || TestData.runningWithSessions) {
     executionOptions.sessionOptions = sessionOptions;
 }
 
-runWorkloads(workloads, {cluster: clusterOptions, execution: executionOptions});
-})();
+await runWorkloads(workloads, {cluster: clusterOptions, execution: executionOptions});

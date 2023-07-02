@@ -28,13 +28,11 @@
  */
 
 
+#include <boost/preprocessor/control/iif.hpp>
 #include <ratio>
 #include <string>
 
-#include <boost/preprocessor/control/iif.hpp>
-
 #include "mongo/base/error_codes.h"
-#include "mongo/base/string_data.h"
 #include "mongo/db/client.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/operation_context.h"

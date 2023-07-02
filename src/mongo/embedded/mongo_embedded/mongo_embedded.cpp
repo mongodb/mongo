@@ -26,32 +26,47 @@
  *    exception statement from all source files in the program, then also delete
  *    it in the license file.
  */
-#include "mongo/platform/basic.h"
-
-#include "mongo_embedded/mongo_embedded.h"
-
-#include <boost/log/core.hpp>
+#include <boost/smart_ptr.hpp>
 #include <cstring>
 #include <exception>
-#include <thread>
-#include <unordered_map>
+#include <iosfwd>
+#include <memory>
+#include <new>
+#include <string>
+#include <tuple>
+#include <utility>
 #include <vector>
 
 #include "api_common.h"
+#include "mongo_embedded/mongo_embedded.h"
+#include <boost/exception/exception.hpp>
+#include <boost/log/core/core.hpp>
+// IWYU pragma: no_include "boost/log/detail/attachable_sstream_buf.hpp"
+#include <boost/log/sinks/sync_frontend.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <boost/smart_ptr/make_shared_object.hpp>
+#include <boost/smart_ptr/shared_ptr.hpp>
+#include <boost/thread/exceptions.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/client.h"
+#include "mongo/db/dbmessage.h"
 #include "mongo/db/service_context.h"
 #include "mongo/embedded/embedded.h"
 #include "mongo/embedded/embedded_log_backend.h"
 #include "mongo/logv2/component_settings_filter.h"
+#include "mongo/logv2/log_attr.h"
 #include "mongo/logv2/log_domain_global.h"
 #include "mongo/logv2/log_manager.h"
 #include "mongo/logv2/plain_formatter.h"
+#include "mongo/platform/atomic_word.h"
 #include "mongo/rpc/message.h"
-#include "mongo/stdx/unordered_map.h"
+#include "mongo/stdx/type_traits.h"
 #include "mongo/transport/service_entry_point.h"
 #include "mongo/transport/transport_layer_mock.h"
 #include "mongo/util/assert_util.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/future.h"
 #include "mongo/util/shared_buffer.h"
 
 #if defined(_WIN32)

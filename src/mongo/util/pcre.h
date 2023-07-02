@@ -29,10 +29,13 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <string>
 #include <system_error>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "mongo/base/string_data.h"

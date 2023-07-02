@@ -27,13 +27,20 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <fmt/format.h>
 #include <iostream>
+#include <memory>
 
+#include <boost/preprocessor/control/iif.hpp>
 
+#include "mongo/base/string_data.h"
 #include "mongo/platform/atomic_word.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/assert_util_core.h"
 
 namespace mongo {
 namespace {

@@ -27,24 +27,72 @@
  *    it in the license file.
  */
 
+#include <memory>
+#include <set>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/client/read_preference.h"
+#include "mongo/db/auth/action_type.h"
 #include "mongo/db/auth/authorization_session.h"
+#include "mongo/db/auth/resource_pattern.h"
 #include "mongo/db/commands.h"
+#include "mongo/db/database_name.h"
+#include "mongo/db/exec/document_value/document_metadata_fields.h"
 #include "mongo/db/explain_gen.h"
+#include "mongo/db/feature_flag.h"
 #include "mongo/db/internal_transactions_feature_flag_gen.h"
-#include "mongo/db/query/collation/collator_factory_interface.h"
+#include "mongo/db/matcher/expression_parser.h"
+#include "mongo/db/matcher/extensions_callback_noop.h"
+#include "mongo/db/namespace_string.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/ops/parsed_update.h"
+#include "mongo/db/ops/update_request.h"
+#include "mongo/db/ops/write_ops_gen.h"
+#include "mongo/db/pipeline/expression_context.h"
+#include "mongo/db/query/explain_options.h"
+#include "mongo/db/query/find_command.h"
+#include "mongo/db/query/projection.h"
 #include "mongo/db/query/projection_parser.h"
+#include "mongo/db/query/projection_policies.h"
+#include "mongo/db/service_context.h"
 #include "mongo/db/shard_id.h"
+#include "mongo/db/update/update_driver.h"
 #include "mongo/db/update/update_util.h"
+#include "mongo/executor/remote_command_response.h"
+#include "mongo/executor/task_executor_pool.h"
+#include "mongo/idl/idl_parser.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/rpc/get_status_from_command_result.h"
+#include "mongo/rpc/op_msg.h"
+#include "mongo/rpc/reply_builder_interface.h"
+#include "mongo/s/async_requests_sender.h"
+#include "mongo/s/catalog_cache.h"
+#include "mongo/s/chunk_manager.h"
+#include "mongo/s/client/shard.h"
 #include "mongo/s/cluster_commands_helpers.h"
 #include "mongo/s/commands/cluster_explain.h"
-#include "mongo/s/commands/cluster_find_and_modify_cmd.h"
-#include "mongo/s/commands/cluster_write_cmd.h"
 #include "mongo/s/grid.h"
 #include "mongo/s/is_mongos.h"
 #include "mongo/s/multi_statement_transaction_requests_sender.h"
 #include "mongo/s/request_types/cluster_commands_without_shard_key_gen.h"
-#include "mongo/s/write_ops/batch_write_op.h"
+#include "mongo/s/write_ops/batched_command_request.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/intrusive_counter.h"
+#include "mongo/util/timer.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kCommand
 

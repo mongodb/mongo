@@ -34,8 +34,12 @@
 #include <absl/meta/type_traits.h>
 #include <algorithm>
 #include <boost/cstdint.hpp>
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/optional/optional.hpp>
 #include <boost/preprocessor/control/iif.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/smart_ptr/intrusive_ptr.hpp>
 #include <cstdint>
 #include <functional>
 #include <iterator>
@@ -44,11 +48,6 @@
 #include <ratio>
 #include <set>
 #include <string>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/none.hpp>
-#include <boost/optional/optional.hpp>
-#include <boost/smart_ptr/intrusive_ptr.hpp>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/string_data.h"
@@ -61,7 +60,6 @@
 #include "mongo/client/read_preference.h"
 #include "mongo/crypto/sha256_block.h"
 #include "mongo/db/basic_types_gen.h"
-#include "mongo/db/cluster_role.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/curop.h"
 #include "mongo/db/exec/document_value/document_metadata_fields.h"
@@ -94,7 +92,6 @@
 #include "mongo/db/query/cursor_response_gen.h"
 #include "mongo/db/query/query_request_helper.h"
 #include "mongo/db/repl/read_concern_args.h"
-#include "mongo/db/server_options.h"
 #include "mongo/db/session/logical_session_id.h"
 #include "mongo/db/session/logical_session_id_gen.h"
 #include "mongo/db/vector_clock.h"
@@ -1680,21 +1677,11 @@ std::unique_ptr<Pipeline, PipelineDeleter> attachCursorToPipeline(
             const auto& cm = cri.cm;
             auto pipelineToTarget = pipeline->clone();
 
-            if (!cm.isSharded() &&
-                // TODO SERVER-75391: Remove this condition.
-                (serverGlobalParams.clusterRole.has(ClusterRole::ConfigServer) ||
-                 expCtx->ns != NamespaceString::kConfigsvrCollectionsNamespace)) {
+            if (!cm.isSharded()) {
                 // If the collection is unsharded and we are on the primary, we should be able to
                 // do a local read. The primary may be moved right after the primary shard check,
                 // but the local read path will do a db version check before it establishes a cursor
                 // to catch this case and ensure we fail to read locally.
-                //
-                // There is the case where we are in config.collections (collection unsharded) and
-                // we want to broadcast to all shards for the $shardedDataDistribution pipeline. In
-                // this case we don't want to do a local read and we must target the config servers.
-                // In 7.0, only the config server will be targeted for this collection, but in a
-                // mixed version cluster, an older binary mongos may still target a shard, so if the
-                // current node is not the config server, we force remote targeting.
                 try {
                     auto expectUnshardedCollection(
                         expCtx->mongoProcessInterface->expectUnshardedCollectionInScope(

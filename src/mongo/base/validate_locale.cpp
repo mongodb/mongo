@@ -27,13 +27,16 @@
  *    it in the license file.
  */
 
-#include <stdexcept>
-
 #include <boost/filesystem/path.hpp>
-#include <codecvt>
-#include <locale>
+#include <codecvt>  // IWYU pragma: keep
+#include <locale>   // IWYU pragma: keep
+#include <stdexcept>
+#include <string>
 
-#include "mongo/base/init.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/initializer.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/str.h"
 
 namespace mongo {

@@ -27,25 +27,29 @@
  *    it in the license file.
  */
 
+#include <algorithm>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include "mongo/base/init.h"
+#include <boost/preprocessor/control/iif.hpp>
+
+#include "mongo/base/init.h"  // IWYU pragma: keep
 #include "mongo/base/initializer.h"
 #include "mongo/base/status.h"
 #include "mongo/db/commands/test_commands_enabled.h"
 #include "mongo/db/wire_version.h"
-#include "mongo/logv2/log_domain_global.h"
-#include "mongo/logv2/log_manager.h"
+#include "mongo/logv2/log_severity.h"
+#include "mongo/unittest/framework.h"
 #include "mongo/unittest/log_test.h"
 #include "mongo/unittest/temp_dir.h"
-#include "mongo/unittest/unittest.h"
 #include "mongo/unittest/unittest_options_gen.h"
+#include "mongo/util/assert_util_core.h"
 #include "mongo/util/exit_code.h"
 #include "mongo/util/options_parser/environment.h"
 #include "mongo/util/options_parser/option_section.h"
 #include "mongo/util/options_parser/options_parser.h"
+#include "mongo/util/options_parser/value.h"
 #include "mongo/util/signal_handlers_synchronous.h"
 #include "mongo/util/testing_proctor.h"
 

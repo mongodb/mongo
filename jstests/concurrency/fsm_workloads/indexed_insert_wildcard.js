@@ -1,15 +1,13 @@
-'use strict';
-
 /**
  * indexed_insert_wildcard.js
  *
  * Inserts documents into an indexed collection and asserts that the documents appear in both a
  * collection scan and an index scan. The collection is indexed with a wildcard index.
  */
-load('jstests/concurrency/fsm_libs/extend_workload.js');           // For extendWorkload().
-load('jstests/concurrency/fsm_workloads/indexed_insert_base.js');  // For $config().
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/indexed_insert_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.setup = function init(db, collName) {
         $super.setup.apply(this, arguments);
     };

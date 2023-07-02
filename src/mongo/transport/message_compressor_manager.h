@@ -29,17 +29,24 @@
 
 #pragma once
 
+#include <boost/optional/optional.hpp>
+#include <memory>
+#include <vector>
+
 #include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/rpc/message.h"
 #include "mongo/transport/message_compressor_base.h"
 #include "mongo/transport/session.h"
-
-#include <vector>
 
 namespace mongo {
 
 class BSONObj;
 class BSONObjBuilder;
 class Message;
+
 class MessageCompressorRegistry;
 
 class MessageCompressorManager {

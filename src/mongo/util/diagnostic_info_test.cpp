@@ -30,12 +30,12 @@
 
 #include "mongo/util/diagnostic_info.h"
 
-#include <string>
-
-#include "mongo/platform/atomic_word.h"
-#include "mongo/platform/compiler.h"
-#include "mongo/unittest/unittest.h"
+#include "mongo/db/service_context.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/clock_source.h"
 #include "mongo/util/clock_source_mock.h"
+#include "mongo/util/duration.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

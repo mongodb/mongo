@@ -35,12 +35,6 @@ imports:
     - "mongo/db/basic_types.idl"
 
 feature_flags:
-    featureFlagResharding:
-        description: When enabled, allows users to reshard their sharded collections.
-        cpp_varname: gFeatureFlagResharding
-        default: true
-        version: 5.0
-        shouldBeFCVGated: true
     featureFlagReshardingImprovements:
         description: "Feature flag for applying improvements on resharding to make it faster and 
         support same-key resharding."

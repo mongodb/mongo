@@ -29,6 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
+
+#include "mongo/base/string_data.h"
 #include "mongo/base/string_data_comparator_interface.h"
 
 namespace mongo {

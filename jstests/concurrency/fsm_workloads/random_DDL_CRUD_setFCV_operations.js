@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Concurrently performs CRUD operations, DDL commands and FCV changes and verifies guarantees are
  * not broken.
@@ -19,10 +17,12 @@
  *  ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');
-load('jstests/concurrency/fsm_workloads/random_DDL_CRUD_operations.js');
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/random_DDL_CRUD_operations.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.setFCV = function(db, collName, connCache) {
         const fcvValues = [lastLTSFCV, lastContinuousFCV, latestFCV];
         const targetFCV = fcvValues[Random.randInt(3)];

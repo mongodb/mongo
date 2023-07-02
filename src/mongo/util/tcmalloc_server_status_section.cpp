@@ -32,15 +32,23 @@
 #define NVALGRIND
 #endif
 
-#include "mongo/platform/basic.h"
-
+#include <cstddef>
 #include <gperftools/malloc_extension.h>
-#include <valgrind/valgrind.h>
+#include <memory>
+#include <utility>
 
-#include "mongo/base/init.h"
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
+#include "mongo/base/init.h"  // IWYU pragma: keep
+#include "mongo/base/status.h"
+#include "mongo/base/string_data.h"
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/db/commands/server_status.h"
-#include "mongo/db/service_context.h"
-#include "mongo/transport/service_entry_point.h"
+#include "mongo/db/operation_context.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/util/tcmalloc_parameters_gen.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kDefault

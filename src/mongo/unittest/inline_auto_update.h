@@ -29,7 +29,9 @@
 
 #pragma once
 
+#include <cstddef>
 #include <ostream>
+#include <string>
 #include <vector>
 
 #include "mongo/unittest/assert.h"

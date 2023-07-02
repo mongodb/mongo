@@ -43,7 +43,6 @@
 #include <boost/preprocessor/control/iif.hpp>
 
 #include "mongo/base/string_data.h"
-#include "mongo/db/concurrency/locker_noop_service_context_test_fixture.h"
 #include "mongo/db/query/cost_model/cost_model_gen.h"
 #include "mongo/db/query/optimizer/algebra/operator.h"
 #include "mongo/db/query/optimizer/algebra/polyvalue.h"
@@ -66,6 +65,7 @@
 #include "mongo/db/query/optimizer/utils/unit_test_pipeline_utils.h"
 #include "mongo/db/query/optimizer/utils/unit_test_utils.h"
 #include "mongo/db/query/optimizer/utils/utils.h"
+#include "mongo/db/service_context_test_fixture.h"
 #include "mongo/platform/atomic_word.h"
 #include "mongo/platform/random.h"
 #include "mongo/stdx/thread.h"
@@ -102,7 +102,7 @@ ABT optimizedQueryPlan(const std::string& query,
     return optimized;
 }
 
-class IntervalIntersection : public LockerNoopServiceContextTest {};
+class IntervalIntersection : public ServiceContextTest {};
 
 TEST_F(IntervalIntersection, SingleFieldIntersection) {
     opt::unordered_map<std::string, IndexDefinition> testIndex = {

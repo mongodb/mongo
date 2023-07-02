@@ -28,21 +28,33 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/rpc/metadata/client_metadata.h"
-
+#include <boost/move/utility_core.hpp>
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+#include <cstdint>
+#include <mutex>
 #include <string>
 
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
 #include "mongo/base/status_with.h"
 #include "mongo/base/string_data.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/bson/bsontypes.h"
+#include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/platform/compiler.h"
+#include "mongo/platform/process_id.h"
+#include "mongo/rpc/metadata/client_metadata.h"
 #include "mongo/s/is_mongos.h"
-#include "mongo/util/debug_util.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/decorable.h"
 #include "mongo/util/net/socket_utils.h"
 #include "mongo/util/processinfo.h"
 #include "mongo/util/str.h"

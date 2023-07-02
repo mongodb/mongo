@@ -27,10 +27,8 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
 #include "mongo/s/is_mongos.h"
-
+#include "mongo/db/cluster_role.h"
 #include "mongo/db/server_options.h"
 
 namespace mongo {

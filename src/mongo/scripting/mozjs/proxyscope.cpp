@@ -27,20 +27,25 @@
  *    it in the license file.
  */
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/scripting/mozjs/proxyscope.h"
+#include <boost/none.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+#include <memory>
+#include <mutex>
+#include <thread>
+#include <utility>
 
 #include "mongo/db/client.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/service_context.h"
 #include "mongo/platform/decimal128.h"
 #include "mongo/scripting/mozjs/implscope.h"
+#include "mongo/scripting/mozjs/proxyscope.h"
+#include "mongo/util/assert_util.h"
 #include "mongo/util/concurrency/idle_thread_block.h"
 #include "mongo/util/destructor_guard.h"
 #include "mongo/util/functional.h"
-#include "mongo/util/quick_exit.h"
-#include "mongo/util/scopeguard.h"
+#include "mongo/util/interruptible.h"
 
 namespace mongo {
 namespace mozjs {

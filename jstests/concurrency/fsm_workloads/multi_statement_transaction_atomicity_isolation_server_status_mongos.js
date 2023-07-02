@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Verifies the transactions server status metrics on mongos while running transactions.
  * Temporarily disabled for BF-24311.
@@ -8,11 +6,13 @@
  * uses_transactions]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {
+    $config as $baseConfig
+} from "jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js";
 load('jstests/concurrency/fsm_workload_helpers/check_transaction_server_status_invariants.js');
-load('jstests/concurrency/fsm_workloads/multi_statement_transaction_atomicity_isolation.js');
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.teardown = function(db, collName, cluster) {
         // Check the server-wide invariants one last time with only a single sample, since all user
         // operations should have finished.

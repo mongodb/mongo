@@ -161,7 +161,7 @@ TEST(ValueSerializeForSorter, Serialize) {
                          value::bitcastFrom<const char*>(bson["binDataDeprecated"].value()));
     testData->push_back(bsonBinDataDeprecatedTag, bsonBinDataDeprecatedVal);
 
-    KeyString::Builder keyStringBuilder(KeyString::Version::V1);
+    key_string::Builder keyStringBuilder(key_string::Version::V1);
     keyStringBuilder.appendNumberLong(1);
     keyStringBuilder.appendNumberLong(2);
     keyStringBuilder.appendNumberLong(3);
@@ -228,7 +228,7 @@ protected:
             sourceRow.reset(idx++, false, tag, val);
         }
 
-        KeyString::Builder kb{KeyString::Version::kLatestVersion};
+        key_string::Builder kb{key_string::Version::kLatestVersion};
         sourceRow.serializeIntoKeyString(kb);
 
         auto ks = kb.getValueCopy();
@@ -407,7 +407,7 @@ TEST_F(ValueSerializeForKeyString, BsonBinData) {
 }
 
 TEST_F(ValueSerializeForKeyString, KeyString) {
-    KeyString::Builder keyStringBuilder(KeyString::Version::V1);
+    key_string::Builder keyStringBuilder(key_string::Version::V1);
     keyStringBuilder.appendNumberLong(1);
     keyStringBuilder.appendNumberLong(2);
     keyStringBuilder.appendNumberLong(3);

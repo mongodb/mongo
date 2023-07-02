@@ -68,7 +68,6 @@ std::string _testLoggingSettings(std::string extraStrings) {
 
 WiredTigerHarnessHelper::WiredTigerHarnessHelper(Options options, StringData extraStrings)
     : _dbpath("wt_test"),
-      _lockerNoopClientObserverRegisterer(getServiceContext()),
       _engine(Client::getCurrent()->makeOperationContext().get(),
               kWiredTigerEngineName,
               _dbpath.path(),

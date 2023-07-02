@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Perform CRUD operations in parallel on a clustered collection. Disallows dropping the collection
  * to prevent implicit creation of a non-clustered collection.
@@ -9,10 +7,10 @@
  *  ]
  */
 
-load('jstests/concurrency/fsm_libs/extend_workload.js');         // for extendWorkload
-load('jstests/concurrency/fsm_workloads/CRUD_and_commands.js');  // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/CRUD_and_commands.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     // Exclude dropCollection to prevent implicit collection creation of a non-clustered
     // collection.
     const newStates = $super.states;

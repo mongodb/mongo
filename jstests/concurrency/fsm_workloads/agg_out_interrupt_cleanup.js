@@ -10,11 +10,10 @@
  *
  * @tags: [uses_curop_agg_stage]
  */
-'use strict';
-load('jstests/concurrency/fsm_libs/extend_workload.js');  // for extendWorkload
-load('jstests/concurrency/fsm_workloads/agg_base.js');    // for $config
+import {extendWorkload} from "jstests/concurrency/fsm_libs/extend_workload.js";
+import {$config as $baseConfig} from "jstests/concurrency/fsm_workloads/agg_base.js";
 
-var $config = extendWorkload($config, function($config, $super) {
+export const $config = extendWorkload($baseConfig, function($config, $super) {
     $config.states.aggregate = function aggregate(db, collName) {
         // $out to the same collection so that concurrent aggregate commands would cause congestion.
         db[collName].runCommand(

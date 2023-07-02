@@ -89,6 +89,7 @@ public:
         : MatchExpression(MatchExpression::INTERNAL_BUCKET_GEO_WITHIN, std::move(annotation)),
           _geoContainer(container),
           _indexField("data." + field),
+          _fieldRef(_indexField),
           _field(std::move(field)) {}
 
     void debugString(StringBuilder& debug, int indentationLevel) const final;
@@ -146,8 +147,7 @@ public:
     }
 
     const FieldRef* fieldRef() const final {
-        MONGO_UNREACHABLE_TASSERT(5837104);
-        return nullptr;
+        return &_fieldRef;
     }
 
     void acceptVisitor(MatchExpressionMutableVisitor* visitor) final {
@@ -172,6 +172,7 @@ private:
 
     std::shared_ptr<GeometryContainer> _geoContainer;
     std::string _indexField;
+    FieldRef _fieldRef;
     std::string _field;
 };
 

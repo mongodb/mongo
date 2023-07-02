@@ -28,14 +28,19 @@
  */
 
 
-#include "mongo/db/commands/bulk_write_gen.h"
-#include "mongo/db/ops/write_ops_parsers.h"
-#include "mongo/platform/basic.h"
+#include <utility>
 
-#include "mongo/db/pipeline/variables.h"
-#include "mongo/s/write_ops/bulk_write_command_modifier.h"
+#include <absl/container/node_hash_map.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
+#include "mongo/db/commands/bulk_write_gen.h"
+#include "mongo/db/ops/write_ops.h"
+#include "mongo/db/ops/write_ops_parsers.h"
+#include "mongo/s/write_ops/bulk_write_command_modifier.h"
+#include "mongo/util/assert_util.h"
 
 namespace mongo {
 

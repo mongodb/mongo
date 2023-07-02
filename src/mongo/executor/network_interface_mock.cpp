@@ -28,17 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/executor/network_interface_mock.h"
-
+#include <absl/container/node_hash_map.h>
+#include <absl/meta/type_traits.h>
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+#include <boost/preprocessor/control/iif.hpp>
+// IWYU pragma: no_include "cxxabi.h"
+// IWYU pragma: no_include "ext/alloc_traits.h"
 #include <algorithm>
 #include <functional>
 #include <iterator>
+#include <type_traits>
 
-#include "mongo/executor/connection_pool_stats.h"
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status_with.h"
+#include "mongo/base/string_data.h"
 #include "mongo/executor/network_connection_hook.h"
+#include "mongo/executor/network_interface_mock.h"
 #include "mongo/logv2/log.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/util/scopeguard.h"
 #include "mongo/util/str.h"
 #include "mongo/util/time_support.h"
 

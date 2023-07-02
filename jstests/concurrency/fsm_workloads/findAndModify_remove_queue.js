@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * findAndModify_remove_queue.js
  *
@@ -14,7 +12,7 @@
 // For isMongod.
 load('jstests/concurrency/fsm_workload_helpers/server_types.js');
 
-var $config = (function() {
+export const $config = (function() {
     var data = {
         // Use the workload name as the database name, since the workload name is assumed to be
         // unique.

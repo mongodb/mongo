@@ -29,7 +29,17 @@
 
 #include "mongo/util/concurrency/ticketholder_test_fixture.h"
 
+#include <array>
+
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
+
+#include "mongo/base/error_codes.h"
 #include "mongo/db/concurrency/locker_noop_client_observer.h"
+#include "mongo/stdx/thread.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/util/assert_util.h"
+#include "mongo/util/time_support.h"
 
 namespace mongo {
 

@@ -35,7 +35,6 @@
 #include "mongo/db/exec/sbe/values/slot.h"
 #include "mongo/db/exec/sbe/values/value.h"
 #include "mongo/db/exec/scoped_timer.h"
-#include "mongo/db/exec/scoped_timer_factory.h"
 #include "mongo/db/exec/trial_run_tracker.h"
 #include "mongo/db/operation_context.h"
 #include "mongo/db/query/plan_yield_policy.h"
@@ -455,9 +454,19 @@ protected:
      */
     boost::optional<ScopedTimer> getOptTimer(OperationContext* opCtx) {
         if (opCtx && _commonStats.executionTime.precision != QueryExecTimerPrecision::kNoTiming) {
-            return scoped_timer_factory::make(opCtx->getServiceContext(),
-                                              _commonStats.executionTime.precision,
-                                              &_commonStats.executionTime.executionTimeEstimate);
+
+            if (MONGO_likely(_commonStats.executionTime.precision ==
+                             QueryExecTimerPrecision::kMillis)) {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    opCtx->getServiceContext()->getFastClockSource());
+            } else {
+                return boost::optional<ScopedTimer>(
+                    boost::in_place_init,
+                    &_commonStats.executionTime.executionTimeEstimate,
+                    opCtx->getServiceContext()->getTickSource());
+            }
         }
 
         return boost::none;

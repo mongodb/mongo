@@ -28,19 +28,27 @@
  */
 
 
-#include "mongo/platform/basic.h"
-
-#include "mongo/util/procparser.h"
-
-#include <boost/filesystem.hpp>
+#include <array>
+#include <cerrno>
 #include <fcntl.h>
 #include <map>
+#include <system_error>
+#include <unistd.h>
 
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/path.hpp>
+// IWYU pragma: no_include "boost/system/detail/error_code.hpp"
+
+#include "mongo/bson/bsonelement.h"
 #include "mongo/bson/bsonobj.h"
 #include "mongo/bson/bsonobjbuilder.h"
 #include "mongo/logv2/log.h"
-#include "mongo/unittest/unittest.h"
-#include "mongo/util/processinfo.h"
+#include "mongo/logv2/log_attr.h"
+#include "mongo/logv2/log_component.h"
+#include "mongo/unittest/assert.h"
+#include "mongo/unittest/framework.h"
+#include "mongo/util/errno_util.h"
+#include "mongo/util/procparser.h"
 
 #define MONGO_LOGV2_DEFAULT_COMPONENT ::mongo::logv2::LogComponent::kTest
 

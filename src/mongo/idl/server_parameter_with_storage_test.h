@@ -29,10 +29,17 @@
 
 #pragma once
 
-#include "mongo/platform/basic.h"
+#include <boost/optional/optional.hpp>
+#include <cstddef>
+#include <cstdint>
 
+#include "mongo/base/error_codes.h"
+#include "mongo/base/status.h"
 #include "mongo/db/server_parameter.h"
+#include "mongo/db/tenant_id.h"
 #include "mongo/idl/server_parameter_with_storage_test_structs_gen.h"
+#include "mongo/platform/atomic_word.h"
+#include "mongo/platform/basic.h"
 
 namespace mongo {
 namespace test {

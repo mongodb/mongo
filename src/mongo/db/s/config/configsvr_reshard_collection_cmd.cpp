@@ -28,13 +28,12 @@
  */
 
 
+#include <boost/move/utility_core.hpp>
+#include <boost/optional/optional.hpp>
 #include <memory>
 #include <string>
 #include <utility>
 #include <vector>
-
-#include <boost/move/utility_core.hpp>
-#include <boost/optional/optional.hpp>
 
 #include "mongo/base/checked_cast.h"
 #include "mongo/base/error_codes.h"
@@ -48,6 +47,7 @@
 #include "mongo/db/commands.h"
 #include "mongo/db/commands/feature_compatibility_version.h"
 #include "mongo/db/commands/test_commands_enabled.h"
+#include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/replication_state_transition_lock_guard.h"
 #include "mongo/db/database_name.h"
 #include "mongo/db/feature_flag.h"
@@ -58,6 +58,7 @@
 #include "mongo/db/repl/read_concern_args.h"
 #include "mongo/db/repl/read_concern_level.h"
 #include "mongo/db/repl/repl_client_info.h"
+#include "mongo/db/repl/replication_coordinator.h"
 #include "mongo/db/s/config/sharding_catalog_manager.h"
 #include "mongo/db/s/resharding/coordinator_document_gen.h"
 #include "mongo/db/s/resharding/resharding_coordinator_service.h"
@@ -180,9 +181,6 @@ public:
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject forceRedistribution parameter",
                     !request().getForceRedistribution().has_value());
-                uassert(ErrorCodes::InvalidOptions,
-                        "Resharding improvements is not enabled, reject reshardingUUID parameter",
-                        !request().getReshardingUUID().has_value());
             }
 
             if (const auto& shardDistribution = request().getShardDistribution()) {
@@ -194,11 +192,6 @@ public:
             auto instance =
                 ([&]() -> boost::optional<std::shared_ptr<const ReshardingCoordinator>> {
                     FixedFCVRegion fixedFcv(opCtx);
-
-                    uassert(ErrorCodes::CommandNotSupported,
-                            "reshardCollection command not enabled",
-                            resharding::gFeatureFlagResharding.isEnabled(
-                                serverGlobalParams.featureCompatibility));
 
                     // (Generic FCV reference): To run this command and ensure the consistency of
                     // the metadata we need to make sure we are on a stable state.
@@ -236,9 +229,6 @@ public:
                                                                    request().getKey());
                     commonMetadata.setStartTime(
                         opCtx->getServiceContext()->getFastClockSource()->now());
-                    if (request().getReshardingUUID()) {
-                        commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
-                    }
 
                     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
                     coordinatorDoc.setZones(request().getZones());

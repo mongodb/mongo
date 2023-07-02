@@ -28,10 +28,9 @@
  */
 
 
-#include <utility>
-
 #include <boost/move/utility_core.hpp>
 #include <boost/preprocessor/control/iif.hpp>
+#include <utility>
 
 #include "mongo/base/error_codes.h"
 #include "mongo/base/status.h"
@@ -44,7 +43,6 @@
 #include "mongo/db/concurrency/lock_manager_defs.h"
 #include "mongo/db/concurrency/locker.h"
 #include "mongo/db/dbdirectclient.h"
-#include "mongo/db/ops/write_ops.h"
 #include "mongo/db/ops/write_ops_gen.h"
 #include "mongo/db/persistent_task_store.h"
 #include "mongo/db/query/find_command.h"
