@@ -74,6 +74,8 @@
     ",log=(recover=on,remove=false),statistics=(all),statistics_log=(json,on_close,wait=1)"
 #define TESTUTIL_ENV_CONFIG_COMPAT ",compatibility=(release=\"2.9\")"
 
+#define TESTUTIL_SEED_FORMAT "-PSD%" PRIu64 ",E%" PRIu64
+
 /* Generic option parsing structure shared by all test cases. */
 typedef struct {
     char *home;
@@ -104,8 +106,6 @@ typedef struct {
     uint64_t force_delay;     /* Force a simulated network delay every N operations */
     uint64_t force_error;     /* Force a simulated network error every N operations */
     uint32_t local_retention; /* Local retention for tiered storage */
-
-#define TESTUTIL_SEED_FORMAT "-PSD%" PRIu64 ",E%" PRIu64
 
     bool absolute_bucket_dir;  /* Use an absolute bucket path when it is a directory */
     bool compat;               /* Compatibility */

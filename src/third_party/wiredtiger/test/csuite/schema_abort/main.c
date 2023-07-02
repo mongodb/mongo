@@ -75,7 +75,7 @@ static const char *const uri_collection = "table:collection";
 
 static const char *const ready_file = "child_ready";
 
-static bool use_columns, use_lazyfs, use_ts, use_txn;
+static bool aggressive_sweep, use_columns, use_lazyfs, use_ts, use_txn;
 static volatile bool stable_set;
 
 static uint32_t nth;                       /* Number of threads. */
@@ -101,13 +101,12 @@ static TEST_OPTS *opts, _opts;
     "log=(enabled,file_max=10M,remove=false),statistics=(all),statistics_log=(json,on_close,wait=" \
     "1)"
 
-#define ENV_CONFIG_TXNSYNC \
-    ENV_CONFIG_DEF         \
-    ",transaction_sync=(enabled,method=none)"
+#define ENV_CONFIG_SWEEP \
+    ",file_manager=(close_handle_minimum=0,close_idle_time=1,close_scan_interval=1)"
 
-#define ENV_CONFIG_TXNSYNC_FSYNC \
-    ENV_CONFIG_DEF               \
-    ",transaction_sync=(enabled,method=fsync)"
+#define ENV_CONFIG_TXNSYNC ",transaction_sync=(enabled,method=none)"
+
+#define ENV_CONFIG_TXNSYNC_FSYNC ",transaction_sync=(enabled,method=fsync)"
 
 /*
  * A minimum width of 10, along with zero filling, means that all the keys sort according to their
@@ -148,13 +147,28 @@ static void usage(void) WT_GCC_FUNC_DECL_ATTRIBUTE((noreturn));
 
 /*
  * usage --
- *     TODO: Add a comment describing this function.
+ *     Display usage statement and exit failure.
  */
 static void
 usage(void)
 {
-    fprintf(stderr, "usage: %s [-h dir] [-s stop_timestamp] [-T threads] [-t time] [-BClmvxz]\n",
+    fprintf(stderr, "usage: %s [-h dir] [-s stop_timestamp] [-T threads] [-t time] [-ClmSvxz]\n",
       progname);
+    fprintf(stderr, "%s",
+      "\t-C compatibility\n"
+      "\t-c use variable-length columns\n"
+      "\t-h home directory\n"
+      "\t-l use LazyFS\n"
+      "\t-m in-memory\n"
+      "\t-P tiered storage options\n"
+      "\t-p preserve directory contents\n"
+      "\t-S set sweep server to be aggressive\n"
+      "\t-s set a stop timestamp to stop the threads to run\n"
+      "\t-T set number of threads\n"
+      "\t-t set timeout in seconds\n"
+      "\t-v verify only\n"
+      "\t-x use transactions\n"
+      "\t-z don't use timestamps\n");
     exit(EXIT_FAILURE);
 }
 
@@ -920,12 +934,13 @@ run_workload(void)
     stable_set = false;
     if (chdir(home) != 0)
         testutil_die(errno, "Child chdir: %s", home);
-    if (opts->inmem)
-        strcpy(envconf, ENV_CONFIG_DEF);
-    else if (use_lazyfs)
-        strcpy(envconf, ENV_CONFIG_TXNSYNC_FSYNC);
+    strcpy(envconf, ENV_CONFIG_DEF);
+    if (use_lazyfs)
+        strcat(envconf, ENV_CONFIG_TXNSYNC_FSYNC);
     else
-        strcpy(envconf, ENV_CONFIG_TXNSYNC);
+        strcat(envconf, ENV_CONFIG_TXNSYNC);
+    if (aggressive_sweep)
+        strcat(envconf, ENV_CONFIG_SWEEP);
 
     /* Open WiredTiger without recovery. */
     testutil_wiredtiger_open(opts, WT_HOME_DIR, envconf, &event_handler, &conn, false, false);
@@ -1066,22 +1081,22 @@ main(int argc, char *argv[])
     opts = &_opts;
     memset(opts, 0, sizeof(*opts));
 
-    use_lazyfs = lazyfs_is_implicitly_enabled();
-    use_ts = true;
     /*
      * Setting this to false forces us to use internal library code. Allow an override but default
      * to using that code.
      */
-    use_txn = false;
+    aggressive_sweep = use_columns = use_lazyfs = use_txn = false;
     nth = MIN_TH;
-    rand_th = rand_time = true;
+    rand_th = rand_time = use_ts = true;
     stop_timestamp = 0;
     timeout = MIN_TIME;
     verify_only = false;
 
-    testutil_parse_begin_opt(argc, argv, "b:Ch:mP:pT:v", opts);
+    use_lazyfs = lazyfs_is_implicitly_enabled();
 
-    while ((ch = __wt_getopt(progname, argc, argv, "Cch:lmpP:s:T:t:vxz")) != EOF)
+    testutil_parse_begin_opt(argc, argv, "Ch:mP:pT:v", opts);
+
+    while ((ch = __wt_getopt(progname, argc, argv, "Cch:lmpP:Ss:T:t:vxz")) != EOF)
         switch (ch) {
         case 'c':
             /* Variable-length columns only; fixed would require considerable changes */
@@ -1089,6 +1104,9 @@ main(int argc, char *argv[])
             break;
         case 'l':
             use_lazyfs = true;
+            break;
+        case 'S':
+            aggressive_sweep = true;
             break;
         case 's':
             stop_arg = __wt_optarg;
@@ -1120,9 +1138,8 @@ main(int argc, char *argv[])
             break;
         default:
             /* The option is either one that we're asking testutil to support, or illegal. */
-            if (testutil_parse_single_opt(opts, ch) != 0) {
+            if (testutil_parse_single_opt(opts, ch) != 0)
                 usage();
-            }
         }
     argc -= __wt_optind;
     if (argc != 0)
@@ -1132,9 +1149,7 @@ main(int argc, char *argv[])
         usage();
     }
 
-    /*
-     * Among other things, this initializes the random number generators in the option structure.
-     */
+    /* Among other things, this initializes the random number generators in the option structure. */
     testutil_parse_end_opt(opts);
 
     testutil_work_dir_from_path(home, sizeof(home), opts->home);
@@ -1199,11 +1214,11 @@ main(int argc, char *argv[])
           opts->compat ? "true" : "false", opts->inmem ? "true" : "false",
           use_ts ? "true" : "false", opts->tiered_storage ? "true" : "false");
         printf("Parent: Create %" PRIu32 " threads; sleep %" PRIu32 " seconds\n", nth, timeout);
-        printf("CONFIG: %s%s%s%s%s%s -h %s -s %" PRIu64 " -T %" PRIu32 " -t %" PRIu32
+        printf("CONFIG: %s%s%s%s%s%s%s -h %s -s %" PRIu64 " -T %" PRIu32 " -t %" PRIu32
                " " TESTUTIL_SEED_FORMAT "\n",
           progname, opts->compat ? " -C" : "", use_lazyfs ? " -l" : "", opts->inmem ? " -m" : "",
-          opts->tiered_storage ? " -PT" : "", !use_ts ? " -z" : "", opts->home, stop_timestamp, nth,
-          timeout, opts->data_seed, opts->extra_seed);
+          opts->tiered_storage ? " -PT" : "", aggressive_sweep ? " -S" : "", !use_ts ? " -z" : "",
+          opts->home, stop_timestamp, nth, timeout, opts->data_seed, opts->extra_seed);
         /*
          * Fork a child to insert as many items. We will then randomly kill the child, run recovery
          * and make sure all items we wrote exist after recovery runs.
