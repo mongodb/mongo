@@ -1026,21 +1026,15 @@ std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
 
-bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,
-                                         const ShardId& shardName) const {
-    // Return true if the shard version is the same in the two chunk managers
-    // TODO: This doesn't need to be so strong, just major vs
-    return other.getVersion(shardName) == getVersion(shardName);
-}
-
-ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
-                                              bool throwOnStaleShard) const {
+ShardVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& shardName,
+                                                           bool throwOnStaleShard) const {
     auto it = _shardVersions.find(shardName);
     if (it == _shardVersions.end()) {
         // Shards without explicitly tracked shard versions (meaning they have no chunks) always
         // have a version of (0, 0, epoch, timestamp)
         const auto collVersion = _chunkMap.getVersion();
-        return ChunkVersion(0, 0, collVersion.epoch(), collVersion.getTimestamp());
+        return ShardVersionTargetingInfo(
+            ChunkVersion(0, 0, collVersion.epoch(), collVersion.getTimestamp()), Timestamp(0, 0));
     }
 
     if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
@@ -1049,15 +1043,9 @@ ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
                 !it->second.isStale.load());
     }
 
-    return it->second.shardVersion;
-}
-
-ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
-    return _getVersion(shardName, true);
-}
-
-ChunkVersion RoutingTableHistory::getVersionForLogging(const ShardId& shardName) const {
-    return _getVersion(shardName, false);
+    const auto& shardVersionTargetingInfo = it->second;
+    return ShardVersionTargetingInfo(shardVersionTargetingInfo.shardVersion,
+                                     shardVersionTargetingInfo.validAfter);
 }
 
 std::string RoutingTableHistory::toString() const {
@@ -1068,7 +1056,8 @@ std::string RoutingTableHistory::toString() const {
 
     sb << "Shard versions:\n";
     for (const auto& entry : _shardVersions) {
-        sb << "\t" << entry.first << ": " << entry.second.shardVersion.toString() << '\n';
+        sb << "\t" << entry.first << ": " << entry.second.shardVersion.toString() << " @ "
+           << entry.second.validAfter.toString() << '\n';
     }
 
     return sb.str();
