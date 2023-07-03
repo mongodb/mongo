@@ -2,7 +2,6 @@
  * Tests that unbounded collections scans access the storage engine with low priority.
  *
  * @tags: [
- *   cqf_incompatible, # TODO (SERVER-77792): remove tag
  *   requires_wiredtiger,
  * ]
  */
@@ -24,8 +23,8 @@ assert.commandWorked(db.adminCommand({setParameter: 1, internalQueryExecYieldIte
 
 const runTest = function(options, deprioritize) {
     assert.commandWorked(db.createCollection(coll.getName(), options));
-    assert.commandWorked(coll.insert({_id: 0}));
-    assert.commandWorked(coll.insert({_id: 1}));
+    assert.commandWorked(coll.insert({_id: 0, class: 0}));
+    assert.commandWorked(coll.insert({_id: 1, class: 0}));
 
     const numLowPriority = function() {
         return db.serverStatus()
@@ -64,6 +63,35 @@ const runTest = function(options, deprioritize) {
     testScanLimitNotDeprioritized(1);
     testScanLimitNotDeprioritized(-1);
 
+    const testAggregationInducedScanDeprioritized = function() {
+        assert.commandWorked(coll.insert({_id: 3, class: 1}));
+        assert.commandWorked(coll.insert({_id: 4, class: 1}));
+        let numLowPriorityBefore = numLowPriority();
+        coll.aggregate(
+            [{
+                $group: {_id: "$class", idSum: {$count: {}}},
+            }],
+        );
+        if (deprioritize) {
+            assert.gt(numLowPriority(), numLowPriorityBefore);
+        } else {
+            assert.eq(numLowPriority(), numLowPriorityBefore);
+        }
+
+        numLowPriorityBefore = numLowPriority();
+        coll.aggregate(
+            [{
+                $match: {class: 0},
+
+            }],
+        );
+        if (deprioritize) {
+            assert.gt(numLowPriority(), numLowPriorityBefore);
+        } else {
+            assert.eq(numLowPriority(), numLowPriorityBefore);
+        }
+    };
+    testAggregationInducedScanDeprioritized();
     assert(coll.drop());
 };
 
