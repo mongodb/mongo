@@ -64,7 +64,7 @@ class DDLLockManager {
                           const ResourceId& resId,
                           StringData reason,
                           LockMode mode,
-                          Milliseconds timeout,
+                          Date_t deadline,
                           bool waitForRecovery);
 
     public:
@@ -73,7 +73,7 @@ class DDLLockManager {
                           const NamespaceString& ns,
                           StringData reason,
                           LockMode mode,
-                          Milliseconds timeout,
+                          Date_t deadline,
                           bool waitForRecovery);
 
         ScopedBaseDDLLock(OperationContext* opCtx,
@@ -81,7 +81,7 @@ class DDLLockManager {
                           const DatabaseName& db,
                           StringData reason,
                           LockMode mode,
-                          Milliseconds timeout,
+                          Date_t deadline,
                           bool waitForRecovery);
 
         virtual ~ScopedBaseDDLLock();
@@ -128,13 +128,12 @@ public:
          * Throws:
          *     ErrorCodes::LockBusy in case the timeout is reached.
          *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout
-         *         is reached
+         *         is reached.
          *     ErrorCategory::Interruption in case the operation context is interrupted.
-         *     ErrorCodes::IllegalOperation in case of not being on the db primary shard
+         *     ErrorCodes::IllegalOperation in case of not being on the db primary shard.
          *
-         * Note that object can only be instantiated from the replica set primary node of the
-         * db primary shard. It's caller's responsability to release the acquired locks on
-         * step-downs
+         * It's caller's responsibility to ensure this lock is acquired only on primary node of
+         * replica set and released on step-down.
          */
         ScopedDatabaseDDLLock(OperationContext* opCtx,
                               const DatabaseName& db,
@@ -143,8 +142,9 @@ public:
                               Milliseconds timeout = kDefaultLockTimeout);
     };
 
-    // RAII-style class to acquire a DDL lock on the given collection
-    class ScopedCollectionDDLLock : public ScopedBaseDDLLock {
+    // RAII-style class to acquire a DDL lock on the given collection. The database DDL lock will
+    // also be implicitly acquired in the corresponding intent mode.
+    class ScopedCollectionDDLLock {
     public:
         /**
          * Constructs a ScopedCollectionDDLLock object
@@ -158,19 +158,24 @@ public:
          * Throws:
          *     ErrorCodes::LockBusy in case the timeout is reached.
          *     ErrorCodes::LockTimeout when not being on kPrimaryAndRecovered state and timeout
-         *         is reached
+         *         is reached.
          *     ErrorCategory::Interruption in case the operation context is interrupted.
-         *     ErrorCodes::IllegalOperation in case of not being on the db primary shard
+         *     ErrorCodes::IllegalOperation in case of not being on the db primary shard.
          *
-         * Note that object can only be instantiated from the replica set primary node of the
-         * db primary shard. It's caller's responsability to release the acquired locks on
-         * step-downs
+         * It's caller's responsibility to ensure this lock is acquired only on primary node of
+         * replica set and released on step-down.
          */
         ScopedCollectionDDLLock(OperationContext* opCtx,
                                 const NamespaceString& ns,
                                 StringData reason,
                                 LockMode mode,
                                 Milliseconds timeout = kDefaultLockTimeout);
+
+    private:
+        // Make sure _dbLock is instantiated before _collLock to don't break the hierarchy locking
+        // acquisition order
+        boost::optional<ScopedBaseDDLLock> _dbLock;
+        boost::optional<ScopedBaseDDLLock> _collLock;
     };
 
     DDLLockManager() = default;
@@ -221,10 +226,11 @@ protected:
                const ResourceId& resId,
                StringData reason,
                LockMode mode,
-               Milliseconds timeout,
+               Date_t deadline,
                bool waitForRecovery);
 
-    void _unlock(Locker* locker, StringData ns, const ResourceId& resId, StringData reason);
+    void _unlock(
+        Locker* locker, StringData ns, const ResourceId& resId, StringData reason, LockMode mode);
 
     friend class ShardingDDLCoordinatorService;
     friend class ShardingDDLCoordinator;

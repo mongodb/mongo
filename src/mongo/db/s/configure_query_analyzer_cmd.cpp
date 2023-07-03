@@ -77,6 +77,7 @@
 #include "mongo/s/client/shard_registry.h"
 #include "mongo/s/configure_query_analyzer_cmd_gen.h"
 #include "mongo/s/grid.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/cancellation.h"
 #include "mongo/util/clock_source.h"
@@ -112,11 +113,18 @@ public:
 
     ScopedDDLLock(OperationContext* opCtx, const NamespaceString& nss) {
         if (serverGlobalParams.clusterRole.has(ClusterRole::ShardServer)) {
-            // TODO SERVER-77546 remove db lock once it's automatically acquired by the
-            // ScopedCollectionDDLLock
-            const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                opCtx, nss.dbName(), lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
 
+            // TODO SERVER-77546 remove db ddl lock acquisition on feature flag removal since it
+            // will be implicitly taken in IX mode under the collection ddl lock acquisition
+            boost::optional<DDLLockManager::ScopedDatabaseDDLLock> dbDDLLock;
+            if (!feature_flags::gMultipleGranularityDDLLocking.isEnabled(
+                    serverGlobalParams.featureCompatibility)) {
+                dbDDLLock.emplace(
+                    opCtx, nss.dbName(), lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout);
+            }
+
+            // Acquire the DDL lock to serialize with other DDL operations. It also makes sure that
+            // we are targeting the primary shard for this database.
             _collDDLLock.emplace(
                 opCtx, nss, lockReason, MODE_X, DDLLockManager::kDefaultLockTimeout);
         } else {

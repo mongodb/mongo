@@ -126,7 +126,7 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireLockAsync(
                                                                       resource,
                                                                       coorName,
                                                                       lockMode,
-                                                                      lockTimeOut,
+                                                                      Date_t::now() + lockTimeOut,
                                                                       false /* waitForRecovery */});
            })
         .until([this, resource, lockMode](Status status) {
@@ -282,19 +282,28 @@ ExecutorFuture<void> ShardingDDLCoordinator::_acquireAllLocksAsync(
     auto futureChain = ExecutorFuture<void>(**executor);
     boost::optional<DatabaseName> lastDb;
     for (const auto& lockNss : locksToAcquire) {
+        const bool isDbOnly = lockNss.coll().empty();
+
+        // Acquiring the database DDL lock
         if (lastDb != lockNss.dbName()) {
-            // Acquiring the database DDL lock
+            const auto lockMode = [&] {
+                if (!feature_flags::gMultipleGranularityDDLLocking.isEnabled(
+                        serverGlobalParams.featureCompatibility)) {
+                    return MODE_X;
+                }
+                return (isDbOnly ? MODE_X : MODE_IX);
+            }();
             const auto& dbName = lockNss.dbName();
             futureChain =
                 std::move(futureChain)
-                    .then([this, executor, token, dbName, anchor = shared_from_this()] {
-                        return _acquireLockAsync<DatabaseName>(executor, token, dbName, MODE_X);
+                    .then([this, executor, token, dbName, lockMode, anchor = shared_from_this()] {
+                        return _acquireLockAsync<DatabaseName>(executor, token, dbName, lockMode);
                     });
             lastDb = dbName;
         }
 
-        if (!lockNss.coll().empty()) {
-            // Acquiring the collection DDL lock
+        // Acquiring the collection DDL lock
+        if (!isDbOnly) {
             futureChain =
                 std::move(futureChain)
                     .then([this, executor, token, nss = lockNss, anchor = shared_from_this()] {

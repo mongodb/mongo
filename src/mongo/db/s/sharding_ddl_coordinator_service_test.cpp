@@ -142,11 +142,13 @@ protected:
         LockMode mode,
         Milliseconds timeout,
         bool waitForRecovery = true) {
+
+        const Date_t deadline = Date_t::now() + timeout;
         return std::make_pair(
             ScopedBaseDDLLock{
-                opCtx, opCtx->lockState(), ns.dbName(), reason, mode, timeout, waitForRecovery},
+                opCtx, opCtx->lockState(), ns.dbName(), reason, mode, deadline, waitForRecovery},
             ScopedBaseDDLLock{
-                opCtx, opCtx->lockState(), ns, reason, mode, timeout, waitForRecovery});
+                opCtx, opCtx->lockState(), ns, reason, mode, deadline, waitForRecovery});
     }
 
     /**

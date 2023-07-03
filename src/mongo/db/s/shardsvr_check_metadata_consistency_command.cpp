@@ -95,6 +95,7 @@
 #include "mongo/s/query/establish_cursors.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
 #include "mongo/s/shard_version.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
 #include "mongo/util/duration.h"
@@ -273,8 +274,12 @@ public:
 
             // Take a DDL lock on the database
             static constexpr StringData kLockReason{"checkMetadataConsistency"_sd};
+            const LockMode mode = (feature_flags::gMultipleGranularityDDLLocking.isEnabled(
+                                       serverGlobalParams.featureCompatibility)
+                                       ? MODE_S
+                                       : MODE_X);
             const DDLLockManager::ScopedDatabaseDDLLock dbDDLLock{
-                opCtx, nss.dbName(), kLockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
+                opCtx, nss.dbName(), kLockReason, mode, DDLLockManager::kDefaultLockTimeout};
 
             return establishCursors(opCtx,
                                     Grid::get(opCtx)->getExecutorPool()->getFixedExecutor(),

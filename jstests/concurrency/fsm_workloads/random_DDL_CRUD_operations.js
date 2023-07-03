@@ -194,6 +194,7 @@ export const $config = (function() {
             } catch (e) {
                 const exceptionCode = e.code;
                 if (exceptionCode == ErrorCodes.ConflictingOperationInProgress ||
+                    exceptionCode == ErrorCodes.ReshardCollectionInProgress ||
                     exceptionCode == ErrorCodes.NamespaceNotSharded) {
                     // It is fine for a resharding operation to throw ConflictingOperationInProgress
                     // if a concurrent resharding with the same collection is ongoing.

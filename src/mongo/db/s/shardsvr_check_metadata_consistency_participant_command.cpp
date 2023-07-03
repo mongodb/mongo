@@ -89,6 +89,7 @@
 #include "mongo/s/query/cluster_cursor_manager.h"
 #include "mongo/s/query/cluster_query_result.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/stale_shard_version_helpers.h"
 #include "mongo/util/assert_util.h"
 #include "mongo/util/decorable.h"
@@ -179,9 +180,15 @@ std::vector<MetadataInconsistencyItem> checkIndexesInconsistencies(
     for (const auto& coll : collections) {
         const auto& nss = coll.getNss();
 
-        // Serialize with concurrent DDL operations that modify indexes
-        const DDLLockManager::ScopedCollectionDDLLock collectionDDLLock{
-            opCtx, nss, kLockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
+        // TODO SERVER-77546 Remove the collection DDL lock acquisition on feature flag removal
+        // since the already taken DB DDL lock in S mode will be enough to serialize with other
+        // indexes operations
+        if (!feature_flags::gMultipleGranularityDDLLocking.isEnabled(
+                serverGlobalParams.featureCompatibility)) {
+            // Serialize with concurrent DDL operations that modify indexes
+            const DDLLockManager::ScopedCollectionDDLLock collectionDDLLock{
+                opCtx, nss, kLockReason, MODE_X, DDLLockManager::kDefaultLockTimeout};
+        }
 
         AggregateCommandRequest aggRequest{nss, rawPipelineStages};
 

@@ -207,7 +207,7 @@ DatabaseType ShardingCatalogManager::createDatabase(
                        DatabaseNameUtil::deserialize(boost::none, str::toLower(dbName)),
                        "createDatabase" /* reason */,
                        MODE_X,
-                       DDLLockManager::kDefaultLockTimeout,
+                       Date_t::now() + DDLLockManager::kDefaultLockTimeout,
                        true /*waitForRecovery*/);
     }
 

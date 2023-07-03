@@ -98,6 +98,7 @@
 #include "mongo/s/grid.h"
 #include "mongo/s/request_types/flush_database_cache_updates_gen.h"
 #include "mongo/s/request_types/sharded_ddl_commands_gen.h"
+#include "mongo/s/sharding_feature_flags_gen.h"
 #include "mongo/s/write_ops/batched_command_response.h"
 #include "mongo/util/database_name_util.h"
 #include "mongo/util/decorable.h"
@@ -254,11 +255,17 @@ void DropDatabaseCoordinator::_dropShardedCollection(
     const CancellationToken& token) {
     const auto& nss = coll.getNss();
 
-    // Acquire the collection DDL lock in order to synchronize with other DDL operations that
-    // didn't take the DB DDL lock
-    const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
-    const DDLLockManager::ScopedCollectionDDLLock collDDLLock{
-        opCtx, nss, coorName, MODE_X, DDLLockManager::kDefaultLockTimeout};
+    // TODO SERVER-77546 Remove the collection DDL lock acquisition on feature flag removal since it
+    // will be mandatory to acquire a db DDL lock in IX/IS mode before acquiring any collection DDL
+    // lock
+    boost::optional<DDLLockManager::ScopedCollectionDDLLock> collDDLLock;
+    if (!feature_flags::gMultipleGranularityDDLLocking.isEnabled(
+            serverGlobalParams.featureCompatibility)) {
+        // Acquire the collection DDL lock in order to synchronize with other DDL operations that
+        // didn't take the DB DDL lock
+        const auto coorName = DDLCoordinatorType_serializer(_coordId.getOperationType());
+        collDDLLock.emplace(opCtx, nss, coorName, MODE_X, DDLLockManager::kDefaultLockTimeout);
+    }
 
     if (!_isPre70Compatible()) {
         ShardsvrParticipantBlock blockCRUDOperationsRequest(nss);

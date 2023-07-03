@@ -14,18 +14,19 @@
 (function() {
 "use strict";
 
+load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/libs/fail_point_util.js");  // for configureFailPoint.
 
-const st = new ShardingTest({shards: 2});
 const dbName = "test";
-const testDB = st.s.getDB(dbName);
-const targetCollName = "out_time";
-const sourceCollName = "in";
 const timeFieldName = 'time';
 const metaFieldName = 'tag';
 const numDocs = 40;
 
-function setUpCollection(collName) {
+/* Create new sharded collection on testDB */
+let _collCounter = 0;
+function setUpCollection(testDB) {
+    const collName = 'coll_' + _collCounter++;
+
     // Create a time-series collection to be the source for $out.
     testDB.createCollection(collName,
                             {timeseries: {timeField: timeFieldName, metaField: metaFieldName}});
@@ -37,46 +38,50 @@ function setUpCollection(collName) {
         });
     }
     assert.commandWorked(testDB[collName].insertMany(docs));
+    return testDB[collName];
 }
 
-function runOutQuery() {
-    assert.doesNotThrow(() => testDB[sourceCollName].aggregate([
-        {$set: {"time": new Date()}},
-        {
+function runOut(dbName, sourceCollName, targetCollName, expectCommandWorked) {
+    const testDB = db.getSiblingDB(dbName);
+    const cmdRes = testDB.runCommand({
+        aggregate: sourceCollName,
+        pipeline: [{
             $out: {
                 db: testDB.getName(),
                 coll: targetCollName,
-                timeseries: {timeField: timeFieldName, metaField: metaFieldName}
+                timeseries: {timeField: "time", metaField: "tag"}
             }
-        }
-    ]));
+        }],
+        cursor: {}
+    });
+    if (expectCommandWorked) {
+        assert.commandWorked(cmdRes);
+    } else {
+        assert.commandFailed(cmdRes);
+    }
 }
 
-function checkMetadata() {
+function checkMetadata(testDB) {
     const checkOptions = {'checkIndexes': 1};
     let inconsistencies = testDB.checkMetadataConsistency(checkOptions).toArray();
     assert.eq(0, inconsistencies, inconsistencies);
 }
 
-function runParallelShellTest() {
+function runOutAndShardCollectionConcurrently_shardCollectionMustFail(st, testDB, primaryShard) {
+    // The target collection should exist to produce the metadata inconsistency scenario.
+    const sourceColl = setUpCollection(testDB);
+    const targetColl = setUpCollection(testDB);
+
     // Set a failpoint in the internalRenameCollection command after the sharding check.
-    const fp = configureFailPoint(st.shard0, 'blockBeforeInternalRenameIfOptionsAndIndexesMatch');
+    const fp = configureFailPoint(primaryShard, 'blockBeforeInternalRenameAndAfterTakingDDLLocks');
 
     // Run an $out aggregation pipeline in a parallel shell.
-    let parallelFunction =
-        `let cmdRes = db.runCommand({
-        aggregate: "in",
-        pipeline: [
-            {
-                $out: {
-                    db: db.getName(),
-                    coll: "out_time",
-                    timeseries: {timeField: "time", metaField: "tag"}
-                }
-            }
-        ], cursor: {}})
-        assert(cmdRes.ok);`;
-    let outShell = startParallelShell(parallelFunction, st.s.port);
+    let outShell = startParallelShell(funWithArgs(runOut,
+                                                  testDB.getName(),
+                                                  sourceColl.getName(),
+                                                  targetColl.getName(),
+                                                  true /*expectCommandWorked*/),
+                                      st.s.port);
 
     // Wait for the aggregation pipeline to hit the failpoint.
     fp.wait();
@@ -89,8 +94,7 @@ function runParallelShellTest() {
     // view namespace.
     jsTestLog("attempting to shard the target collection.");
     assert.commandFailedWithCode(
-        testDB.adminCommand(
-            {shardCollection: testDB[targetCollName].getFullName(), key: {[metaFieldName]: 1}}),
+        testDB.adminCommand({shardCollection: targetColl.getFullName(), key: {[metaFieldName]: 1}}),
         ErrorCodes.LockBusy);
 
     // Turn off the failpoint and resume the $out aggregation pipeline.
@@ -98,25 +102,77 @@ function runParallelShellTest() {
     fp.off();
     outShell();
     // Assert the metadata is consistent.
-    checkMetadata();
+    checkMetadata(testDB);
 
     // Assert sharding the target collection succeeds, since there is no lock on the view
     // namespace.
     assert.commandWorked(testDB.adminCommand(
-        {shardCollection: testDB[targetCollName].getFullName(), key: {[metaFieldName]: 1}}));
+        {shardCollection: targetColl.getFullName(), key: {[metaFieldName]: 1}}));
 
     // Assert the metadata is consistent.
-    checkMetadata();
+    checkMetadata(testDB);
+
+    sourceColl.drop();
+    targetColl.drop();
 }
 
-assert.commandWorked(st.s.adminCommand({enableSharding: dbName}));
-st.ensurePrimaryShard(dbName, st.shard0.shardName);
+function runOutAndShardCollectionConcurrently_OutMustFail(st, testDB, primaryShard) {
+    // The target collection should exist to produce the metadata inconsistency scenario.
+    const sourceColl = setUpCollection(testDB);
+    const targetColl = setUpCollection(testDB);
 
-// The target collection should exist to produce the metadata inconsistency scenario.
-setUpCollection(sourceCollName);
-setUpCollection(targetCollName);
+    // Set a failpoint in the internalRenameCollection command after the sharding check.
+    const fp = configureFailPoint(primaryShard, 'blockBeforeInternalRenameAndBeforeTakingDDLLocks');
 
-runParallelShellTest();
+    // Run an $out aggregation pipeline in a parallel shell.
+    let outShell = startParallelShell(funWithArgs(runOut,
+                                                  testDB.getName(),
+                                                  sourceColl.getName(),
+                                                  targetColl.getName(),
+                                                  false /*expectCommandWorked*/),
+                                      st.s.port);
+
+    // Wait for the aggregation pipeline to hit the failpoint.
+    fp.wait();
+
+    // Validate the temporary collection exists, meaning we are in the middle of the $out stage.
+    const collNames = testDB.getCollectionNames();
+    assert.eq(collNames.filter(col => col.includes('tmp.agg_out')).length, 1, collNames);
+
+    // Assert sharding the target collection fails, since the rename command has a lock on the
+    // view namespace.
+    jsTestLog("attempting to shard the target collection.");
+    assert.commandWorked(testDB.adminCommand(
+        {shardCollection: targetColl.getFullName(), key: {[metaFieldName]: 1}}));
+
+    // Turn off the failpoint and resume the $out aggregation pipeline.
+    jsTestLog("turning the failpoint off.");
+    fp.off();
+    outShell();
+
+    // Assert the metadata is consistent.
+    checkMetadata(testDB);
+
+    sourceColl.drop();
+    targetColl.drop();
+}
+
+const st = new ShardingTest({shards: 2});
+const testDB = st.s.getDB(dbName);
+const primaryShard = st.shard0;
+
+// Reduce DDL lock timeout to half a second to speedup testing command that are expected to fail
+// with LockBusy error
+const fp = configureFailPoint(primaryShard, "overrideDDLLockTimeout", {'timeoutMillisecs': 500});
+
+assert.commandWorked(
+    st.s.adminCommand({enableSharding: dbName, primaryShard: primaryShard.shardName}));
+
+// Running tests
+runOutAndShardCollectionConcurrently_shardCollectionMustFail(st, testDB, primaryShard);
+runOutAndShardCollectionConcurrently_OutMustFail(st, testDB, primaryShard);
+
+fp.off();
 
 st.stop();
 }());

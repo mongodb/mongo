@@ -62,7 +62,8 @@
 namespace mongo {
 namespace {
 
-MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameIfOptionsAndIndexesMatch);
+MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameAndBeforeTakingDDLLocks);
+MONGO_FAIL_POINT_DEFINE(blockBeforeInternalRenameAndAfterTakingDDLLocks);
 
 bool isCollectionSharded(OperationContext* opCtx, const NamespaceString& nss) {
     AutoGetCollectionForRead lock(opCtx, nss);
@@ -93,20 +94,22 @@ public:
                 std::list<BSONObj>(originalIndexes.begin(), originalIndexes.end());
             const auto& collectionOptions = thisRequest.getCollectionOptions();
 
+            if (MONGO_unlikely(blockBeforeInternalRenameAndBeforeTakingDDLLocks.shouldFail())) {
+                blockBeforeInternalRenameAndBeforeTakingDDLLocks.pauseWhileSet();
+            }
+
             if (serverGlobalParams.clusterRole.has(ClusterRole::None)) {
                 // No need to acquire additional locks in a non-sharded environment
                 _internalRun(opCtx, fromNss, toNss, indexList, collectionOptions);
                 return;
             }
 
-            // Check if the receiving shard is still the primary for the database
-            DatabaseShardingState::assertIsPrimaryShardForDb(opCtx, fromNss.dbName());
-
             /**
              * Acquiring the local part of the distributed locks for involved namespaces allows:
              * - Serialize with sharded DDLs, ensuring no concurrent modifications of the
              * collections.
              * - Check safely if the target collection is sharded or not.
+             * - Check if the current shard is still the primary for the database.
              */
             static constexpr StringData lockReason{"internalRenameCollection"_sd};
             const DDLLockManager::ScopedCollectionDDLLock fromCollDDLLock{
@@ -137,10 +140,9 @@ public:
                                  const NamespaceString& toNss,
                                  const std::list<BSONObj>& indexList,
                                  const BSONObj& collectionOptions) {
-            if (MONGO_unlikely(blockBeforeInternalRenameIfOptionsAndIndexesMatch.shouldFail())) {
-                blockBeforeInternalRenameIfOptionsAndIndexesMatch.pauseWhileSet();
+            if (MONGO_unlikely(blockBeforeInternalRenameAndAfterTakingDDLLocks.shouldFail())) {
+                blockBeforeInternalRenameAndAfterTakingDDLLocks.pauseWhileSet();
             }
-
             RenameCollectionOptions options;
             options.dropTarget = true;
             options.stayTemp = false;

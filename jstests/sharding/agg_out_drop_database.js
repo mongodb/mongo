@@ -2,7 +2,7 @@
  *  Test that aggregation's $out stage serializes behind a drop database and fails.
  *
  *  @tags: [
- *      requires_fcv_51,
+ *      requires_fcv_71,
  *      does_not_support_stepdowns, # DropDatabaseCoordinator drops the input collection on step-up
  *  ]
  */
@@ -26,7 +26,7 @@ assert.commandWorked(inputColl.insert({_id: 0}));
 const outputCollName = "output_coll";
 
 let failpoint =
-    configureFailPoint(st.rs0.getPrimary(), 'blockBeforeInternalRenameIfOptionsAndIndexesMatch');
+    configureFailPoint(st.rs0.getPrimary(), 'blockBeforeInternalRenameAndBeforeTakingDDLLocks');
 
 function aggOut(inputCollName, outputCollName) {
     // Make sure the aggregation fails because the database has been dropped
