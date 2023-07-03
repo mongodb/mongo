@@ -1019,6 +1019,11 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
             writeToImageCollection(opCtx, *opCtx->getLogicalSessionId(), imageToWrite);
         }
 
+        SessionTxnRecord sessionTxnRecord;
+        sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
+        sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
+        onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord);
+
         // Write a pre-image to the change streams pre-images collection when following conditions
         // are met:
         // 1. The collection has 'changeStreamPreAndPostImages' enabled.
@@ -1043,11 +1048,6 @@ void OpObserverImpl::onUpdate(OperationContext* opCtx,
 
             writeChangeStreamPreImageEntry(opCtx, args.coll->ns().tenantId(), preImage);
         }
-
-        SessionTxnRecord sessionTxnRecord;
-        sessionTxnRecord.setLastWriteOpTime(opTime.writeOpTime);
-        sessionTxnRecord.setLastWriteDate(opTime.wallClockTime);
-        onWriteOpCompleted(opCtx, args.updateArgs->stmtIds, sessionTxnRecord);
     }
 
     if (opAccumulator) {
