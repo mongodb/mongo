@@ -125,9 +125,11 @@ void removeExpiredDocuments(Client* client) {
         auto& changeCollectionManager = ChangeStreamChangeCollectionManager::get(opCtx.get());
 
         for (const auto& tenantId : getConfigDbTenants(opCtx.get())) {
-            auto expiredAfterSeconds =
-                change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);
-
+            // Change stream collections can multiply the amount of user data inserted and deleted
+            // on each node. It is imperative that removal is prioritized so it can keep up with
+            // inserts and prevent users from running out of disk space.
+            ScopedAdmissionPriorityForLock skipAdmissionControl(
+                opCtx->lockState(), AdmissionContext::Priority::kImmediate);
             // Acquire intent-exclusive lock on the change collection.
             const auto changeCollection =
                 acquireCollection(opCtx.get(),
@@ -149,6 +151,9 @@ void removeExpiredDocuments(Client* client) {
                      ->canAcceptWritesForDatabase(opCtx.get(), DatabaseName::kConfig)) {
                 continue;
             }
+
+            auto expiredAfterSeconds =
+                change_stream_serverless_helpers::getExpireAfterSeconds(tenantId);
 
             if (useUnreplicatedTruncates) {
                 removedCount += ChangeStreamChangeCollectionManager::
