@@ -199,8 +199,6 @@
         # TODO SERVER-46040: Enable when SERVER-46040 is backported
         - jstests/sharding/drop_indexes_with_stale_config_error.js
         - jstests/sharding/query/merge_write_concern.js
-        # TODO: Re-enable multiversion testing for PM-1858.
-        - jstests/sharding/analyze_shard_key/**/*.js
 
 - name: sharding_multiversion_testdata_last_lts
   value:
