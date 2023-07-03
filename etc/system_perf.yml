@@ -474,7 +474,7 @@ functions:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks}
+        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks} --build-variant ${build_variant_override|*build_variant}
     - command: generate.tasks
       params:
         files:
@@ -1947,6 +1947,29 @@ buildvariants:
     tasks:
       - name: renew_ssl_cert
 
+  - name: linux-standalone-schedule.2022-11
+    display_name: Linux Standalone Schedule 2022-11
+    # TODO SERVER-74399 Reduce frequency back to baseline.
+    # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
+    cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+    run_on:
+      - "rhel70-perf-single"
+    tasks: 
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
   - name: linux-standalone.2022-11
     display_name: Linux Standalone 2022-11
     # TODO SERVER-74399 Reduce frequency back to baseline.
@@ -1968,8 +1991,6 @@ buildvariants:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
     tasks: &standalonetasks
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
       - name: dsi_integ_test_run_command_simple
       - name: smoke_test
       - name: industry_benchmarks
@@ -1995,6 +2016,27 @@ buildvariants:
       - name: tpch_10_normalized
       - name: tpch_10_denormalized
 
+  - name: linux-standalone-all-feature-flags-schedule.2022-11
+    display_name: Linux Standalone (all feature flags) Schedule 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: standalone-all-feature-flags
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      build_variant_override: linux-standalone-all-feature-flags.2022-11
+    run_on:
+      - "rhel70-perf-single"
+    tasks:
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
+
   - name: linux-standalone-all-feature-flags.2022-11
     display_name: Linux Standalone (all feature flags) 2022-11
     cron: "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
@@ -2014,8 +2056,6 @@ buildvariants:
       - "rhel70-perf-single"
     depends_on: *_compile_amazon_linux2_arm64
     tasks:
-      - name: schedule_patch_auto_tasks
-      - name: schedule_variant_auto_tasks
       - name: industry_benchmarks
       - name: ycsb_60GB
       - name: ycsb_60GB.long
@@ -2354,6 +2394,27 @@ buildvariants:
       - name: schedule_variant_auto_tasks
       - name: linkbench
       - name: linkbench2
+
+  - name: linux-1-node-replSet-schedule.2022-11
+    display_name: Linux 1-Node ReplSet Schedule 2022-11
+    modules: *modules
+    expansions:
+      mongodb_setup_release: 2022-11
+      mongodb_setup: single-replica
+      infrastructure_provisioning_release: 2022-11
+      infrastructure_provisioning: single
+      workload_setup: 2022-11
+      platform: linux
+      project_dir: *project_dir
+      authentication: enabled
+      storageEngine: wiredTiger
+      compile_variant: "-arm64"
+      build_variant_override: linux-1-node-replSet.2022-11
+    run_on:
+      - "rhel70-perf-single"
+    tasks: 
+      - name: schedule_patch_auto_tasks
+      - name: schedule_variant_auto_tasks
 
   - name: linux-1-node-replSet.2022-11
     display_name: Linux 1-Node ReplSet 2022-11
