@@ -2164,7 +2164,6 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     const boost::optional<UUID>& collectionUUID,
     bool allowMigrations,
     const std::string& cmdName) {
-    std::set<ShardId> cmShardIds;
     {
         // Mark opCtx as interruptible to ensure that all reads and writes to the metadata
         // collections under the exclusive _kChunkOpLock happen on the same term.
@@ -2185,8 +2184,6 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
                               << " in the request does not match the current uuid " << cm.getUUID()
                               << " for ns " << nss.toStringForErrorMsg(),
                 !collectionUUID || collectionUUID == cm.getUUID());
-
-        cm.getAllShardIds(&cmShardIds);
 
         auto updateCollectionAndChunkFn = [allowMigrations, &nss, &collectionUUID](
                                               const txn_api::TransactionClient& txnClient,
@@ -2293,19 +2290,9 @@ void ShardingCatalogManager::setAllowMigrationsAndBumpOneChunk(
     // shard and this flush is not sent to that donor, stopMigrations will not wait for the critical
     // section to finish on that shard (SERVER-73984).
     const auto executor = Grid::get(opCtx)->getExecutorPool()->getFixedExecutor();
-    // TODO (SERVER-74477): Remove catch of invalid view definition once 7.0 becomes LastLTS
-    try {
-        const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
-        sharding_util::tellShardsToRefreshCollection(opCtx, allShardIds, nss, executor);
-    } catch (const ExceptionFor<ErrorCodes::InvalidViewDefinition>&) {
-        // In multiversion scenarios, some nodes may hit the bug in SERVER-74313. We should retry
-        // the command only on the shards that own chunks.
-        sharding_util::tellShardsToRefreshCollection(opCtx,
-                                                     {std::make_move_iterator(cmShardIds.begin()),
-                                                      std::make_move_iterator(cmShardIds.end())},
-                                                     nss,
-                                                     executor);
-    }
+    const auto allShardIds = Grid::get(opCtx)->shardRegistry()->getAllShardIds(opCtx);
+    sharding_util::tellShardsToRefreshCollection(opCtx, allShardIds, nss, executor);
+
     resourceYielder->unyield(opCtx);
 }
 
