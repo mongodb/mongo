@@ -6745,6 +6745,87 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggRankFinalize(
     return {true, value::TypeTags::NumberInt64, value::bitcastFrom<int64_t>(lastRank)};
 }
 
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggExpMovingAvg(ArityType arity) {
+    auto [stateTag, stateVal] = moveOwnedFromStack(0);
+    value::ValueGuard stateGuard{stateTag, stateVal};
+
+    auto [fieldOwned, fieldTag, fieldVal] = getFromStack(1);
+    if (!value::isNumber(fieldTag)) {
+        stateGuard.reset();
+        return {true, stateTag, stateVal};
+    }
+
+    uassert(7821200, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+    uassert(7821201,
+            "Unexpected state array size",
+            state->size() == static_cast<size_t>(AggExpMovingAvgElems::kSizeOfArray));
+
+    auto [alphaTag, alphaVal] = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kAlpha));
+    uassert(7821202, "alpha is not of decimal type", alphaTag == value::TypeTags::NumberDecimal);
+    auto alpha = value::bitcastTo<Decimal128>(alphaVal);
+
+    value::TypeTags currentResultTag;
+    value::Value currentResultVal;
+    std::tie(currentResultTag, currentResultVal) =
+        state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
+
+    auto decimalVal = value::numericCast<Decimal128>(fieldTag, fieldVal);
+    auto result = [&]() {
+        if (currentResultTag == value::TypeTags::Null) {
+            // Accumulator result has not been yet initialised. We will now
+            // set it to decimalVal
+            return decimalVal;
+        } else {
+            uassert(7821203,
+                    "currentResultTag is not of decimal type",
+                    currentResultTag == value::TypeTags::NumberDecimal);
+            auto currentResult = value::bitcastTo<Decimal128>(currentResultVal);
+            currentResult = decimalVal.multiply(alpha).add(
+                currentResult.multiply(Decimal128(1).subtract(alpha)));
+            return currentResult;
+        }
+    }();
+
+    auto [resultTag, resultVal] = value::makeCopyDecimal(result);
+
+    state->setAt(static_cast<size_t>(AggExpMovingAvgElems::kResult), resultTag, resultVal);
+    if (fieldTag == value::TypeTags::NumberDecimal) {
+        state->setAt(static_cast<size_t>(AggExpMovingAvgElems::kIsDecimal),
+                     value::TypeTags::Boolean,
+                     value::bitcastFrom<bool>(true));
+    }
+
+    stateGuard.reset();
+    return {true, stateTag, stateVal};
+}
+
+FastTuple<bool, value::TypeTags, value::Value> ByteCode::builtinAggExpMovingAvgFinalize(
+    ArityType arity) {
+    auto [stateOwned, stateTag, stateVal] = getFromStack(0);
+
+    uassert(7821204, "State should be of array type", stateTag == value::TypeTags::Array);
+    auto state = value::getArrayView(stateVal);
+
+    auto [resultTag, resultVal] = state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kResult));
+    if (resultTag == value::TypeTags::Null) {
+        return {false, value::TypeTags::Null, 0};
+    }
+    uassert(7821205, "Unexpected result type", resultTag == value::TypeTags::NumberDecimal);
+
+    auto [isDecimalTag, isDecimalVal] =
+        state->getAt(static_cast<size_t>(AggExpMovingAvgElems::kIsDecimal));
+    uassert(7821206, "Unexpected isDecimal type", isDecimalTag == value::TypeTags::Boolean);
+
+    if (value::bitcastTo<bool>(isDecimalVal)) {
+        std::tie(resultTag, resultVal) = value::copyValue(resultTag, resultVal);
+        return {true, resultTag, resultVal};
+    } else {
+        auto result = value::bitcastTo<Decimal128>(resultVal).toDouble();
+        return {false, value::TypeTags::NumberDouble, value::bitcastFrom<double>(result)};
+    }
+}
+
 FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin f,
                                                                          ArityType arity) {
     switch (f) {
@@ -7061,6 +7142,10 @@ FastTuple<bool, value::TypeTags, value::Value> ByteCode::dispatchBuiltin(Builtin
             return builtinAggDenseRankColl(arity);
         case Builtin::aggRankFinalize:
             return builtinAggRankFinalize(arity);
+        case Builtin::aggExpMovingAvg:
+            return builtinAggExpMovingAvg(arity);
+        case Builtin::aggExpMovingAvgFinalize:
+            return builtinAggExpMovingAvgFinalize(arity);
     }
 
     MONGO_UNREACHABLE;
@@ -7383,6 +7468,10 @@ std::string builtinToString(Builtin b) {
             return "aggDenseRankColl";
         case Builtin::aggRankFinalize:
             return "aggRankFinalize";
+        case Builtin::aggExpMovingAvg:
+            return "aggExpMovingAvg";
+        case Builtin::aggExpMovingAvgFinalize:
+            return "aggExpMovingAvgFinalize";
         default:
             MONGO_UNREACHABLE;
     }
