@@ -304,7 +304,7 @@ functions:
               -e 's|gcp_client_x509_cert_url|${gcp_sdk_ext_client_x509_cert_url}|'  ../test/evergreen/gcp_auth.json > $file
           export GOOGLE_APPLICATION_CREDENTIALS="$file"
 
-          virtualenv -p python3 venv
+          PATH=/opt/mongodbtoolchain/v4/bin:$PATH virtualenv -p python3 venv
           source venv/bin/activate
           pip3 install boto3
           pip3 install azure-storage-blob
@@ -596,20 +596,20 @@ functions:
           rm -rf RUNDIR_1 RUNDIR_2 RUNDIR_3
 
           first_run_args="-c $config runs.timer=$runtime"
-          ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1
-          stable_hex=$(../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
+          ${test_env_vars|} ./t -h RUNDIR_1 $first_run_args ${extra_args} || fail RUNDIR_1/CONFIG 2>&1
+          stable_hex=$(${test_env_vars|} ../../../tools/wt_timestamps RUNDIR_1 | sed -e '/stable=/!d' -e 's/.*=//')
           ops=$(echo $((0x$stable_hex)))
 
           # Do the second run up to the stable timestamp, using the same data seed,
           # but with a different extra seed.  Compare it when done.
           common_args="-c RUNDIR_1/CONFIG runs.timer=0 runs.ops=$ops"
-          ./t -h RUNDIR_2 $common_args random.extra_seed=$x2 || fail RUNDIR_2/CONFIG 2>&1
-          ../../../tools/wt_cmp_dir RUNDIR_1 RUNDIR_2 || fail RUNDIR_1/CONFIG RUNDIR_2/CONFIG 2>&1
+          ${test_env_vars|} ./t -h RUNDIR_2 $common_args random.extra_seed=$x2 || fail RUNDIR_2/CONFIG 2>&1
+          ${test_env_vars|} ../../../tools/wt_cmp_dir RUNDIR_1 RUNDIR_2 || fail RUNDIR_1/CONFIG RUNDIR_2/CONFIG 2>&1
 
           # Do the third run up to the stable timestamp, using the same data seed,
           # but with a different extra seed.  Compare it to the second run when done.
-          ./t -h RUNDIR_3 $common_args random.extra_seed=$x3 || fail RUNDIR_3/CONFIG 2>&1
-          ../../../tools/wt_cmp_dir RUNDIR_2 RUNDIR_3 || fail RUNDIR_2/CONFIG RUNDIR_3/CONFIG 2>&1
+          ${test_env_vars|} ./t -h RUNDIR_3 $common_args random.extra_seed=$x3 || fail RUNDIR_3/CONFIG 2>&1
+          ${test_env_vars|} ../../../tools/wt_cmp_dir RUNDIR_2 RUNDIR_3 || fail RUNDIR_2/CONFIG RUNDIR_3/CONFIG 2>&1
         done
   "format test script":
     command: shell.exec
@@ -716,11 +716,11 @@ functions:
 
         rm -rf RUNDIR_0
         # The first run is for calibration only.  We just want to run for the designated
-        # time and get an approriate stop timestamp that can be used in later runs.
+        # time and get an appropriate stop timestamp that can be used in later runs.
         calibration_run_args="-PSD$r,E$x0 -T $nthreads -t $runtime"
         ./test_schema_abort -p -h RUNDIR_0 $first_run_args || exit 1
         echo "Finished calibration run"
-        stable_hex=$($toolsdir/wt_timestamps RUNDIR_0/WT_HOME | sed -e '/stable=/!d' -e 's/.*=//')
+        stable_hex=$(${test_env_vars|} $toolsdir/wt_timestamps RUNDIR_0/WT_HOME | sed -e '/stable=/!d' -e 's/.*=//')
         op_count=$(echo $((0x$stable_hex)))
 
         for i in $(seq ${times}); do
@@ -745,7 +745,7 @@ functions:
           # We are ignoring the table:wt table. This table does not participate in
           # predictable replay, as it may be concurrently created, opened (regular or bulk cursor),
           # verified, upgraded and dropped by multiple threads in test_schema_abort.
-          $toolsdir/wt_cmp_dir -i '^table:wt$' RUNDIR_1/WT_HOME RUNDIR_2/WT_HOME || exit 1
+          ${test_env_vars|} $toolsdir/wt_cmp_dir -i '^table:wt$' RUNDIR_1/WT_HOME RUNDIR_2/WT_HOME || exit 1
         done
   "upload artifact":
     - command: archive.targz_pack
@@ -5175,6 +5175,8 @@ buildvariants:
   run_on:
   - ubuntu2004-test
   expansions:
+    configure_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
       WT_TOPDIR=$(git rev-parse --show-toplevel)
       WT_BUILDDIR=$WT_TOPDIR/cmake_build
@@ -5358,6 +5360,8 @@ buildvariants:
   expansions:
     smp_command: -j $(grep -c ^processor /proc/cpuinfo)
     make_command: ninja
+    configure_env_vars:
+      PATH=/opt/mongodbtoolchain/v4/bin:$PATH
     test_env_vars:
       PATH=/opt/mongodbtoolchain/v4/bin:$PATH
       WT_TOPDIR=$(git rev-parse --show-toplevel)
