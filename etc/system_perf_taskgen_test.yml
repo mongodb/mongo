@@ -436,7 +436,7 @@ functions:
         file: ./expansions.yml
     - command: shell.exec
       params:
-        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks}
+        script: ./src/dsi/run-dsi schedule_tasks --tasks=${tasks} --build-variant ${build_variant_override|*build_variant}
     - command: generate.tasks
       params:
         files:
