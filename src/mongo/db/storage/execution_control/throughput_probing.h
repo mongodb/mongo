@@ -82,7 +82,6 @@ private:
     struct Stats {
         void serialize(BSONObjBuilder& builder) const;
 
-        AtomicWord<int64_t> opsPerSec;
         AtomicWord<int64_t> timesDecreased;
         AtomicWord<int64_t> timesIncreased;
         AtomicWord<int64_t> totalAmountDecreased;

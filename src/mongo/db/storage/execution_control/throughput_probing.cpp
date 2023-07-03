@@ -118,7 +118,6 @@ void ThroughputProbing::_run(Client* client) {
     }
 
     auto throughput = (numFinishedProcessing - _prevNumFinishedProcessing) / elapsed;
-    _stats.opsPerSec.store(throughput * 1'000'000);
 
     switch (_state) {
         case ProbingState::kStable:
@@ -298,7 +297,6 @@ void ThroughputProbing::_decreaseConcurrency() {
 }
 
 void ThroughputProbing::Stats::serialize(BSONObjBuilder& builder) const {
-    builder.append("opsPerSec", opsPerSec.load());
     builder.append("timesDecreased", static_cast<long long>(timesDecreased.load()));
     builder.append("timesIncreased", static_cast<long long>(timesIncreased.load()));
     builder.append("totalAmountDecreased", static_cast<long long>(totalAmountDecreased.load()));
