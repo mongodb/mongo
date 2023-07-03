@@ -4,6 +4,7 @@
  * @tags: [
  *   # We need a timeseries collection.
  *   requires_timeseries,
+ *   requires_fcv_71,
  * ]
  */
 
@@ -17,10 +18,41 @@ coll.drop();
 const timeField = "badInput']}}}}}}";
 assert.commandWorked(db.createCollection(collName, {timeseries: {timeField: timeField}}));
 
-const timeseriesMaxOptions =
-    db.getCollectionInfos({name: "system.buckets." + collName})[0]
-        .options.validator.$jsonSchema.properties.control.properties.max.properties;
-assert.eq(timeseriesMaxOptions, {"badInput']}}}}}}": {bsonType: 'date'}});
+const timeseriesCollInfo = db.getCollectionInfos({name: "system.buckets." + collName})[0];
+jsTestLog("Timeseries system collection info: " + tojson(timeseriesCollInfo));
+const properties = {};
+properties[timeField] = {
+    "bsonType": "date"
+};
+const expectedValidator = {
+    "$jsonSchema": {
+        "bsonType": "object",
+        "required": ["_id", "control", "data"],
+        "properties": {
+            "_id": {"bsonType": "objectId"},
+            "control": {
+                "bsonType": "object",
+                "required": ["version", "min", "max"],
+                "properties": {
+                    "version": {"bsonType": "number"},
+                    "min":
+                        {"bsonType": "object", "required": [timeField], "properties": properties},
+                    "max":
+                        {"bsonType": "object", "required": [timeField], "properties": properties},
+                    "closed": {"bsonType": "bool"},
+                    "count": {"bsonType": "number", "minimum": 1}
+                },
+                "additionalProperties": false
+            },
+            "data": {"bsonType": "object"},
+            "meta": {}
+        },
+        "additionalProperties": false
+    }
+};
+
+assert(timeseriesCollInfo.options);
+assert.eq(timeseriesCollInfo.options.validator, expectedValidator);
 
 const doc = {
     a: 1,
