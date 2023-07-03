@@ -100,6 +100,19 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
     if (maxWorksBeforeReplan > numUpperLimitWorks) {
         maxWorksBeforeReplan = numUpperLimitWorks;
     }
+    
+    // sometimes the _decisionWorks is greater than numUpperLimitWorks, even greater than the collection size.
+    // for example: We deleted a lot of data in the process of querying the data
+    // 
+    // Force adjust the cache entry works, If not adjust, the replan will lose effectiveness
+    if (_decisionWorks > numUpperLimitWorks) {
+        LOGV2_DEBUG(20578,
+            1,
+            "Force adjust the cache entry works",
+            "oldWorks"_attr = _decisionWorks,
+            "newWorks"_attr = numUpperLimitWorks);
+        _decisionWorks = numUpperLimitWorks;
+    }
 
     // The trial period ends without replanning if the cached plan produces this many results.
     size_t numResults = trial_period::getTrialPeriodNumToReturn(*_canonicalQuery);
@@ -181,13 +194,22 @@ Status CachedPlanStage::pickBestPlan(PlanYieldPolicy* yieldPolicy) {
                 "planSummary"_attr = explainer->getPlanSummary());
 
     const bool shouldCache = true;
-    return replan(
-        yieldPolicy,
-        shouldCache,
-        str::stream()
-            << "cached plan was less efficient than expected: expected trial execution to take "
-            << _decisionWorks << " works but it took at least " << maxWorksBeforeReplan
-            << " works");
+    if (_decisionWorks < maxWorksBeforeReplan) {
+        return replan(
+            yieldPolicy,
+            shouldCache,
+            str::stream()
+                << "cached plan was less efficient than expected: expected trial execution to take "
+                << _decisionWorks << " works but it took at least " << maxWorksBeforeReplan
+                << " works");
+    } else {
+        return replan(
+            yieldPolicy,
+            shouldCache,
+            str::stream()
+                << "cached plan may be less efficient than expected: expected decisionWorks is "
+                << _decisionWorks << ", it is same to the maxWorksBeforeReplan");
+    }
 }
 
 Status CachedPlanStage::tryYield(PlanYieldPolicy* yieldPolicy) {
