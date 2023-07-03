@@ -304,13 +304,11 @@ public:
 
         OrderedPathSet computedPaths;
         StringMap<std::string> renamedPaths;
-        StringMap<std::string> complexRenamedPaths;
-        _root->reportComputedPaths(&computedPaths, &renamedPaths, &complexRenamedPaths);
+        _root->reportComputedPaths(&computedPaths, &renamedPaths);
 
         return {DocumentSource::GetModPathsReturn::Type::kAllExcept,
                 std::move(preservedPaths),
-                std::move(renamedPaths),
-                std::move(complexRenamedPaths)};
+                std::move(renamedPaths)};
     }
 
     /**

@@ -642,14 +642,8 @@ public:
             kAllExcept,
         };
 
-        GetModPathsReturn(Type type,
-                          OrderedPathSet&& paths,
-                          StringMap<std::string>&& renames,
-                          StringMap<std::string>&& complexRenames = {})
-            : type(type),
-              paths(std::move(paths)),
-              renames(std::move(renames)),
-              complexRenames(std::move(complexRenames)) {}
+        GetModPathsReturn(Type type, OrderedPathSet&& paths, StringMap<std::string>&& renames)
+            : type(type), paths(std::move(paths)), renames(std::move(renames)) {}
 
         std::set<std::string> getNewNames() {
             std::set<std::string> newNames;
@@ -711,11 +705,6 @@ public:
         // This stage should return kAllExcept, since it modifies all paths other than "a". It can
         // also fill out 'renames' with the mapping "b" => "c".
         StringMap<std::string> renames;
-
-        // Including space for returning renames which include dotted paths.
-        // i.e., "a.b" => c
-        //
-        StringMap<std::string> complexRenames;
     };
 
     /**
