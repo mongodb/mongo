@@ -97,6 +97,11 @@ const JSFunctionSpec MongoBase::methods[] = {
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cleanup, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(close, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(compact, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(setAutoEncryption, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(getAutoEncryptionOptions, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(unsetAutoEncryption, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(toggleAutoEncryption, MongoExternalInfo),
+    MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(isAutoEncryptionEnabled, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(cursorHandleFromId, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(find, MongoExternalInfo),
     MONGO_ATTACH_JS_CONSTRAINED_METHOD_NO_PROTO(generateDataKey, MongoExternalInfo),
@@ -122,6 +127,7 @@ const JSFunctionSpec MongoBase::methods[] = {
 const char* const MongoBase::className = "Mongo";
 
 EncryptedDBClientCallback* encryptedDBClientCallback = nullptr;
+EncryptedDBClientFromExistingCallback* encryptedDBClientFromExistingCallback = nullptr;
 GetNestedConnectionCallback* getNestedConnectionCallback = nullptr;
 
 const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
@@ -133,12 +139,58 @@ const JSFunctionSpec MongoExternalInfo::freeFunctions[4] = {
 
 namespace {
 
+// This class holds a "raw" DBClient connection, along with an optional "encrypted" DBClient
+// that performs automatic encryption of requests before forwarding them to the raw connection.
+// If auto encryption is enabled, this returns the encrypted DBClient in getConnection().
+class DBClientWithAutoEncryption {
+public:
+    DBClientWithAutoEncryption(std::shared_ptr<DBClientBase> rawConn,
+                               std::shared_ptr<DBClientBase> encryptedConn)
+        : _rawConn(std::move(rawConn)),
+          _encryptedConn(std::move(encryptedConn)),
+          _encryptionEnabled(_encryptedConn != nullptr) {
+        invariant(_rawConn);
+    }
+
+    void setEncryptedConnection(std::shared_ptr<DBClientBase> encryptedConn) {
+        _encryptedConn = std::move(encryptedConn);
+    }
+
+    std::shared_ptr<DBClientBase>& getConnection() {
+        return this->isEncryptionEnabled() ? _encryptedConn : _rawConn;
+    }
+
+    std::shared_ptr<DBClientBase>& getRawConnection() {
+        return _rawConn;
+    }
+
+    std::shared_ptr<DBClientBase>& getEncryptedConnection() {
+        return _encryptedConn;
+    }
+
+    bool isEncryptionEnabled() const {
+        return _encryptionEnabled && _encryptedConn != nullptr;
+    }
+
+    void toggleAutoEncryption(bool enable) {
+        uassert(7760001,
+                "Auto encryption is not configured on this connection",
+                _encryptedConn != nullptr);
+        _encryptionEnabled = enable;
+    }
+
+private:
+    std::shared_ptr<DBClientBase> _rawConn;
+    std::shared_ptr<DBClientBase> _encryptedConn;
+    bool _encryptionEnabled;
+};
+
 const std::shared_ptr<DBClientBase>& getConnectionRef(JS::CallArgs& args) {
-    auto ret =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto ret = static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull()));
     uassert(
         ErrorCodes::BadValue, "Trying to get connection for closed Mongo object", *ret != nullptr);
-    return *ret;
+    return (*ret)->getConnection();
 }
 
 DBClientBase* getConnection(JS::CallArgs& args) {
@@ -158,11 +210,10 @@ void setCursor(MozJSImplScope* scope,
                JS::HandleObject target,
                std::unique_ptr<DBClientCursor> cursor,
                JS::CallArgs& args) {
-    auto client =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto client = getConnectionRef(args);
 
     // Copy the client shared pointer to up the refcount
-    JS::SetPrivate(target, scope->trackedNew<CursorInfo::CursorHolder>(std::move(cursor), *client));
+    JS::SetPrivate(target, scope->trackedNew<CursorInfo::CursorHolder>(std::move(cursor), client));
 }
 
 void setCursorHandle(MozJSImplScope* scope,
@@ -170,13 +221,12 @@ void setCursorHandle(MozJSImplScope* scope,
                      NamespaceString ns,
                      long long cursorId,
                      JS::CallArgs& args) {
-    auto client =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto client = getConnectionRef(args);
 
     // Copy the client shared pointer to up the refcount.
     JS::SetPrivate(
         target,
-        scope->trackedNew<CursorHandleInfo::CursorTracker>(std::move(ns), cursorId, *client));
+        scope->trackedNew<CursorHandleInfo::CursorTracker>(std::move(ns), cursorId, client));
 }
 
 void setHiddenMongo(JSContext* cx, JS::HandleValue value, JS::CallArgs& args) {
@@ -192,12 +242,12 @@ void setHiddenMongo(JSContext* cx, JS::CallArgs& args) {
 
 void setHiddenMongo(JSContext* cx,
                     std::shared_ptr<DBClientBase> resPtr,
-                    DBClientBase* origConn,
+                    std::shared_ptr<DBClientWithAutoEncryption> origClient,
                     JS::CallArgs& args) {
     ObjectWrapper o(cx, args.rval());
     // If the connection that ran the command is the same as conn, then we set a hidden "_mongo"
     // property on the returned object that is just "this" Mongo object.
-    if (resPtr.get() == origConn) {
+    if (resPtr.get() == origClient->getConnection().get()) {
         setHiddenMongo(cx, args.thisv(), args);
     } else {
         JS::RootedObject newMongo(cx);
@@ -206,8 +256,16 @@ void setHiddenMongo(JSContext* cx,
         scope->getProto<MongoExternalInfo>().newObject(&newMongo);
 
         auto host = resPtr->getServerAddress();
-        JS::SetPrivate(newMongo,
-                       scope->trackedNew<std::shared_ptr<DBClientBase>>(std::move(resPtr)));
+
+        auto encConn = origClient->getEncryptedConnection();
+        if (encConn && encryptedDBClientFromExistingCallback) {
+            encConn = encryptedDBClientFromExistingCallback(encConn, resPtr, cx);
+        }
+
+        auto newClient = std::make_unique<DBClientWithAutoEncryption>(std::move(resPtr), encConn);
+        JS::SetPrivate(
+            newMongo,
+            scope->trackedNew<std::shared_ptr<DBClientWithAutoEncryption>>(newClient.release()));
 
         ObjectWrapper from(cx, args.thisv());
         ObjectWrapper to(cx, newMongo);
@@ -236,10 +294,20 @@ EncryptionCallbacks* getEncryptionCallbacks(DBClientBase* conn) {
     return callbackPtr;
 }
 
+std::shared_ptr<DBClientBase> runEncryptedDBClientCallback(std::shared_ptr<DBClientBase> conn,
+                                                           JS::HandleValue arg,
+                                                           JS::HandleObject mongoConnection,
+                                                           JSContext* cx) {
+    if (encryptedDBClientCallback != nullptr) {
+        return encryptedDBClientCallback(std::move(conn), arg, mongoConnection, cx);
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
-    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(obj));
+    auto conn = static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(JS::GetPrivate(obj));
 
     if (conn) {
         getScope(fop)->trackedDelete(conn);
@@ -247,11 +315,13 @@ void MongoBase::finalize(JSFreeOp* fop, JSObject* obj) {
 }
 
 void MongoBase::trace(JSTracer* trc, JSObject* obj) {
-    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(obj));
-    if (!conn) {
+    auto client = static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(JS::GetPrivate(obj));
+    if (!client || !(*client)) {
         return;
     }
-    auto callbackPtr = dynamic_cast<EncryptionCallbacks*>(conn->get());
+    auto conn = (*client)->getConnection();
+
+    auto callbackPtr = dynamic_cast<EncryptionCallbacks*>(conn.get());
     if (callbackPtr != nullptr) {
         callbackPtr->trace(trc);
     }
@@ -261,7 +331,7 @@ void MongoBase::Functions::close::call(JSContext* cx, JS::CallArgs args) {
     getConnection(args);
 
     auto thisv = args.thisv().toObjectOrNull();
-    auto conn = static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(thisv));
+    auto conn = static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(JS::GetPrivate(thisv));
 
     conn->reset();
 
@@ -329,7 +399,10 @@ void doRunCommand(JSContext* cx, JS::CallArgs args, MakeRequest makeRequest) {
     }
 
     ValueReader(cx, args.rval()).fromBSON(reply, nullptr, false /* read only */);
-    setHiddenMongo(cx, std::get<1>(res), conn.get(), args);
+
+    auto origClient = static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull()));
+    setHiddenMongo(cx, std::get<1>(res), *origClient, args);
 
     ObjectWrapper o(cx, args.rval());
     if (!o.hasField(InternedString::_commandObj)) {
@@ -431,6 +504,81 @@ void MongoBase::Functions::cleanup::call(JSContext* cx, JS::CallArgs args) {
     auto conn = getConnection(args);
     auto ptr = getEncryptionCallbacks(conn);
     ptr->cleanup(cx, args);
+}
+
+void MongoBase::Functions::setAutoEncryption::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() < 1)
+        uasserted(ErrorCodes::BadValue, "setAutoEncryption needs at least 1 arg");
+
+    std::shared_ptr<DBClientWithAutoEncryption> kvClient;
+    JS::RootedObject keyvaultConn(cx);
+    if (args.length() > 1 && !args.get(1).isUndefined()) {
+        uassert(7760001,
+                str::stream() << "the second parameter to setAutoEncryption() must be an object",
+                args.get(1).isObject());
+        keyvaultConn.set(args.get(1).toObjectOrNull());
+        kvClient = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+            JS::GetPrivate(args.get(1).toObjectOrNull())));
+    } else {
+        keyvaultConn.set(args.thisv().toObjectOrNull());
+        kvClient = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+            JS::GetPrivate(args.thisv().toObjectOrNull())));
+    }
+
+    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull())));
+
+    if (client->getEncryptedConnection() != nullptr) {
+        uasserted(ErrorCodes::BadValue, "Auto encryption is already set on this connection");
+    }
+
+    auto encConn =
+        runEncryptedDBClientCallback(client->getRawConnection(), args.get(0), keyvaultConn, cx);
+    bool retval = encConn != nullptr;
+    if (encConn) {
+        client->setEncryptedConnection(std::move(encConn));
+    }
+    args.rval().setBoolean(retval);
+}
+
+void MongoBase::Functions::getAutoEncryptionOptions::call(JSContext* cx, JS::CallArgs args) {
+    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    auto encConn = client->getEncryptedConnection();
+    if (encConn) {
+        auto ptr = getEncryptionCallbacks(encConn.get());
+        ptr->getEncryptionOptions(cx, args);
+    } else {
+        // no auto-encryption is set, so return undefined
+        args.rval().setUndefined();
+    }
+}
+
+void MongoBase::Functions::unsetAutoEncryption::call(JSContext* cx, JS::CallArgs args) {
+    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    client->toggleAutoEncryption(false);
+    client->setEncryptedConnection(nullptr);
+    args.rval().setBoolean(true);
+}
+
+void MongoBase::Functions::toggleAutoEncryption::call(JSContext* cx, JS::CallArgs args) {
+    if (args.length() != 1)
+        uasserted(ErrorCodes::BadValue, "toggleAutoEncryption needs 1 arg");
+    if (!args.get(0).isBoolean()) {
+        uasserted(ErrorCodes::BadValue, "first argument to toggleAutoEncryption must be a boolean");
+    }
+    auto enable = ValueWriter(cx, args.get(0)).toBoolean();
+    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    client->toggleAutoEncryption(enable);
+    args.rval().setBoolean(true);
+}
+
+void MongoBase::Functions::isAutoEncryptionEnabled::call(JSContext* cx, JS::CallArgs args) {
+    auto client = *(static_cast<std::shared_ptr<DBClientWithAutoEncryption>*>(
+        JS::GetPrivate(args.thisv().toObjectOrNull())));
+    args.rval().setBoolean(client->isEncryptionEnabled());
 }
 
 void MongoBase::Functions::compact::call(JSContext* cx, JS::CallArgs args) {
@@ -536,19 +684,11 @@ void MongoBase::Functions::_markNodeAsFailed::call(JSContext* cx, JS::CallArgs a
     args.rval().setUndefined();
 }
 
-std::unique_ptr<DBClientBase> runEncryptedDBClientCallback(std::unique_ptr<DBClientBase> conn,
-                                                           JS::HandleValue arg,
-                                                           JS::HandleObject mongoConnection,
-                                                           JSContext* cx) {
-    if (encryptedDBClientCallback != nullptr) {
-        return encryptedDBClientCallback(std::move(conn), arg, mongoConnection, cx);
-    }
-    return conn;
-}
-
 void setEncryptedDBClientCallbacks(EncryptedDBClientCallback* encCallback,
+                                   EncryptedDBClientFromExistingCallback* encFromExistingCallback,
                                    GetNestedConnectionCallback* getCallback) {
     encryptedDBClientCallback = encCallback;
+    encryptedDBClientFromExistingCallback = encFromExistingCallback;
     getNestedConnectionCallback = getCallback;
 }
 
@@ -589,7 +729,7 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
 
     boost::optional<std::string> appname = cs.getAppName();
     std::string errmsg;
-    std::unique_ptr<DBClientBase> conn(
+    std::shared_ptr<DBClientBase> conn(
         cs.connect(appname.value_or("MongoDB Shell"), errmsg, boost::none, &apiParameters));
 
     if (!conn.get()) {
@@ -602,9 +742,12 @@ void MongoExternalInfo::construct(JSContext* cx, JS::CallArgs args) {
     scope->getProto<MongoExternalInfo>().newObject(&thisv);
     ObjectWrapper o(cx, thisv);
 
-    conn = runEncryptedDBClientCallback(std::move(conn), args.get(1), thisv, cx);
+    auto encConn = runEncryptedDBClientCallback(conn, args.get(1), thisv, cx);
 
-    JS::SetPrivate(thisv, scope->trackedNew<std::shared_ptr<DBClientBase>>(conn.release()));
+    auto client = std::make_unique<DBClientWithAutoEncryption>(conn, encConn);
+
+    JS::SetPrivate(
+        thisv, scope->trackedNew<std::shared_ptr<DBClientWithAutoEncryption>>(client.release()));
 
     o.setBoolean(InternedString::slaveOk, false);
     o.setString(InternedString::host, cs.connectionString().toString());
@@ -659,14 +802,13 @@ void MongoBase::Functions::getApiParameters::call(JSContext* cx, JS::CallArgs ar
 }
 
 void MongoBase::Functions::_startSession::call(JSContext* cx, JS::CallArgs args) {
-    auto client =
-        static_cast<std::shared_ptr<DBClientBase>*>(JS::GetPrivate(args.thisv().toObjectOrNull()));
+    auto client = getConnectionRef(args);
 
     LogicalSessionIdToClient id;
     id.setId(UUID::gen());
 
     JS::RootedObject obj(cx);
-    SessionInfo::make(cx, &obj, *client, id.toBSON());
+    SessionInfo::make(cx, &obj, client, id.toBSON());
 
     args.rval().setObjectOrNull(obj.get());
 }

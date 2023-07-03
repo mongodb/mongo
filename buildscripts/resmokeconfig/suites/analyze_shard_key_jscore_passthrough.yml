@@ -103,6 +103,9 @@ selector:
   # The following test requires the collection to be unsharded.
   - jstests/core/txns/finished_transaction_error_handling.js
 
+  # The following test fails because configureQueryAnalyzer is not allowed on QE collections
+  - jstests/core/queryable_encryption/**/*.js
+
   exclude_with_any_tags:
   - assumes_against_mongod_not_mongos
   - assumes_standalone_mongod

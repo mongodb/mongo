@@ -7,6 +7,9 @@ selector:
   # Transactions are not supported on MongoDB standalone nodes.
   - jstests/core/txns/**/*.js
 
+  # Queryable encryption is not supported on standalone
+  - jstests/core/queryable_encryption/**/*.js
+
   # These test run commands using legacy queries, which are not supported on sessions.
   - jstests/core/**/comment_field.js
   - jstests/core/**/exhaust.js

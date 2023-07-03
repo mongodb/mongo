@@ -14,6 +14,9 @@ selector:
   # 'core' suite. Instead we run them against a 1-node replica set in the 'core_txns' suite.
   - jstests/core/txns/**/*.js
 
+  # Queryable encryption is not supported on standalone
+  - jstests/core/queryable_encryption/**/*.js
+
   # These tests produce different error codes depending on which parser implementation.
   - jstests/core/**/sort_with_meta_operator.js
 

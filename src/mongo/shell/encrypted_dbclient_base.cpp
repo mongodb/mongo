@@ -131,7 +131,7 @@ static void validateCollection(JSContext* cx, JS::HandleValue value) {
             mozjs::getScope(cx)->getProto<mozjs::DBCollectionInfo>().instanceOf(coll));
 }
 
-EncryptedDBClientBase::EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
+EncryptedDBClientBase::EncryptedDBClientBase(std::shared_ptr<DBClientBase> conn,
                                              ClientSideFLEOptions encryptionOptions,
                                              JS::HandleValue collection,
                                              JSContext* cx)
@@ -658,8 +658,26 @@ void EncryptedDBClientBase::trace(JSTracer* trc) {
     JS::TraceEdge(trc, &_collection, "collection object");
 }
 
+void EncryptedDBClientBase::getEncryptionOptions(JSContext* cx, JS::CallArgs args) {
+    mozjs::ValueReader(cx, args.rval()).fromBSON(_encryptionOptions.toBSON(), nullptr, false);
+}
+
+const ClientSideFLEOptions& EncryptedDBClientBase::getEncryptionOptions() const {
+    return _encryptionOptions;
+}
+
 JS::Value EncryptedDBClientBase::getCollection() const {
     return _collection.get();
+}
+
+JS::Value EncryptedDBClientBase::getKeyVaultMongo() const {
+    JS::RootedValue mongoRooted(_cx);
+    JS::RootedObject collectionRooted(_cx, &_collection.get().toObject());
+    JS_GetProperty(_cx, collectionRooted, "_mongo", &mongoRooted);
+    if (!mongoRooted.isObject()) {
+        uasserted(ErrorCodes::BadValue, "Collection object is incomplete.");
+    }
+    return mongoRooted.get();
 }
 
 std::unique_ptr<DBClientCursor> EncryptedDBClientBase::find(FindCommandRequest findRequest,
@@ -773,6 +791,7 @@ BSONObj EncryptedDBClientBase::getEncryptedKey(const UUID& uuid) {
     findCmd.setFilter(BSON("_id" << uuid));
     findCmd.setReadConcern(
         repl::ReadConcernArgs(repl::ReadConcernLevel::kMajorityReadConcern).toBSONInner());
+
     BSONObj dataKeyObj = _conn->findOne(std::move(findCmd));
     if (dataKeyObj.isEmpty()) {
         uasserted(ErrorCodes::BadValue, "Invalid keyID.");
@@ -889,7 +908,7 @@ void createCollectionObject(JSContext* cx,
 
 // The parameters required to start FLE on the shell. The current connection is passed in as a
 // parameter to create the keyvault collection object if one is not provided.
-std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
+std::shared_ptr<DBClientBase> createEncryptedDBClientBase(std::shared_ptr<DBClientBase> conn,
                                                           JS::HandleValue arg,
                                                           JS::HandleObject mongoConnection,
                                                           JSContext* cx) {
@@ -900,7 +919,7 @@ std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClie
     static constexpr auto keyVaultClientFieldId = "keyVaultClient";
 
     if (!arg.isObject()) {
-        return conn;
+        return nullptr;
     }
 
     ClientSideFLEOptions encryptionOptions;
@@ -938,9 +957,22 @@ std::unique_ptr<DBClientBase> createEncryptedDBClientBase(std::unique_ptr<DBClie
             std::move(conn), encryptionOptions, collection, cx);
     }
 
-    std::unique_ptr<EncryptedDBClientBase> base =
-        std::make_unique<EncryptedDBClientBase>(std::move(conn), encryptionOptions, collection, cx);
-    return std::move(base);
+    return std::make_shared<EncryptedDBClientBase>(
+        std::move(conn), encryptionOptions, collection, cx);
+}
+
+std::shared_ptr<DBClientBase> createEncryptedDBClientBaseFromExisting(
+    std::shared_ptr<DBClientBase> encConn, std::shared_ptr<DBClientBase> rawConn, JSContext* cx) {
+    auto encConnPtr = dynamic_cast<EncryptedDBClientBase*>(encConn.get());
+    uassert(ErrorCodes::BadValue, "Connection is not a valid encrypted connection", encConnPtr);
+
+    JS::RootedValue encOptsRV(cx);
+    JS::RootedObject kvMongoRO(cx);
+    mozjs::ValueReader(cx, &encOptsRV)
+        .fromBSON(encConnPtr->getEncryptionOptions().toBSON(), nullptr, false);
+    kvMongoRO.set(encConnPtr->getKeyVaultMongo().toObjectOrNull());
+
+    return createEncryptedDBClientBase(rawConn, encOptsRV, kvMongoRO, cx);
 }
 
 DBClientBase* getNestedConnection(DBClientBase* conn) {
@@ -952,7 +984,8 @@ DBClientBase* getNestedConnection(DBClientBase* conn) {
 }
 
 MONGO_INITIALIZER(setCallbacksForEncryptedDBClientBase)(InitializerContext*) {
-    mongo::mozjs::setEncryptedDBClientCallbacks(createEncryptedDBClientBase, getNestedConnection);
+    mongo::mozjs::setEncryptedDBClientCallbacks(
+        createEncryptedDBClientBase, createEncryptedDBClientBaseFromExisting, getNestedConnection);
 }
 
 }  // namespace

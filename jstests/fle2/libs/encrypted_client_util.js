@@ -21,6 +21,14 @@ var EncryptedClient = class {
         // use
         this.useImplicitSharding = !(typeof (ImplicitlyShardAccessCollSettings) === "undefined");
 
+        if (conn.isAutoEncryptionEnabled()) {
+            this._keyVault = conn.getKeyVault();
+            this._edb = conn.getDB(dbName);
+            this._db = undefined;
+            this._admindb = conn.getDB("admin");
+            return;
+        }
+
         const localKMS = {
             key: BinData(
                 0,
@@ -165,21 +173,21 @@ var EncryptedClient = class {
 
         // All our tests use "last" as the key to query on so shard on "last" instead of "_id"
         if (this.useImplicitSharding) {
-            let resShard = this._db.adminCommand({enableSharding: this._db.getName()});
+            let resShard = this._edb.adminCommand({enableSharding: this._edb.getName()});
 
             // enableSharding may only be called once for a database.
             if (resShard.code !== ErrorCodes.AlreadyInitialized) {
                 assert.commandWorked(
-                    resShard, "enabling sharding on the '" + this._db.getName() + "' db failed");
+                    resShard, "enabling sharding on the '" + this._edb.getName() + "' db failed");
             }
 
             let shardCollCmd = {
-                shardCollection: this._db.getName() + "." + name,
+                shardCollection: this._edb.getName() + "." + name,
                 key: {last: "hashed"},
                 collation: {locale: "simple"}
             };
 
-            resShard = this._db.adminCommand(shardCollCmd);
+            resShard = this._edb.adminCommand(shardCollCmd);
 
             jsTestLog("Sharding: " + tojson(shardCollCmd));
         }
@@ -214,7 +222,7 @@ var EncryptedClient = class {
         if (tenantId) {
             Object.extend(listCollCmdObj, {"$tenant": tenantId});
         }
-        const cis = assert.commandWorked(this._db.runCommand(listCollCmdObj));
+        const cis = assert.commandWorked(this._edb.runCommand(listCollCmdObj));
         assert.eq(
             cis.cursor.firstBatch.length, 1, `Expected to find one collection named '${name}'`);
 
@@ -265,7 +273,7 @@ var EncryptedClient = class {
      */
     assertEncryptedCollectionCounts(name, expectedEdc, expectedEsc, expectedEcoc, tenantId) {
         this.assertEncryptedCollectionCountsByObject(
-            this._db, name, expectedEdc, expectedEsc, expectedEcoc, tenantId);
+            this._edb, name, expectedEdc, expectedEsc, expectedEcoc, tenantId);
     }
 
     /**

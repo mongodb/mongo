@@ -106,6 +106,11 @@ function prependTenantIdToDbNameIfApplicable(dbName) {
         return dbName;
     }
 
+    if (extractOriginalDbName(dbName) !== dbName) {
+        // dbName already has a tenantId prefix
+        return dbName;
+    }
+
     let prefix;
     // If running shard split passthroughs, then assign a database to a randomly selected tenant
     if (usingMultipleTenants()) {
@@ -699,8 +704,14 @@ function runCommandRetryOnTenantMigrationErrors(
                 // Store the connection to the recipient so the next commands can be rerouted.
                 const donorConnection = getRoutingConnection(conn);
                 const migrationStateDoc = getOperationStateDocument(donorConnection);
-                setRoutingConnection(
-                    conn, connect(migrationStateDoc.recipientConnectionString).getMongo());
+
+                const otherConn = connect(migrationStateDoc.recipientConnectionString).getMongo();
+                if (conn.getAutoEncryptionOptions() !== undefined) {
+                    otherConn.setAutoEncryption(conn.getAutoEncryptionOptions());
+                    otherConn.toggleAutoEncryption(conn.isAutoEncryptionEnabled());
+                }
+
+                setRoutingConnection(conn, otherConn);
 
                 // After getting a TenantMigrationCommitted error, wait for the python test fixture
                 // to do a dbhash check on the donor and recipient primaries before we retry the
@@ -784,12 +795,19 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     return resObj;
 };
 
-// Override all base methods on the Mongo prototype to try to proxy the call to the underlying
+Mongo.prototype.getDbNameWithTenantPrefix = function(dbName) {
+    return prependTenantIdToDbNameIfApplicable(dbName);
+};
+
+// Override base methods on the Mongo prototype to try to proxy the call to the underlying
 // internal routing connection, if one exists.
 // NOTE: This list is derived from scripting/mozjs/mongo.cpp:62.
 ['auth',
+ 'cleanup',
  'close',
  'compact',
+ 'getAutoEncryptionOptions',
+ 'isAutoEncryptionEnabled',
  'cursorHandleFromId',
  'find',
  'generateDataKey',
@@ -814,6 +832,22 @@ Mongo.prototype.runCommand = function(dbName, cmdObj, options) {
     const $method = Mongo.prototype[methodName];
     Mongo.prototype[methodName] = function() {
         return $method.apply(getRoutingConnection(this), arguments);
+    };
+});
+
+// The following methods are overridden so that the method applies to both
+// the proxy connection and the underlying internal routing connection, if one exists.
+['toggleAutoEncryption',
+ 'unsetAutoEncryption',
+ 'setAutoEncryption',
+].forEach(methodName => {
+    const $method = Mongo.prototype[methodName];
+    Mongo.prototype[methodName] = function() {
+        let rc = getRoutingConnection(this);
+        if (rc !== this) {
+            $method.apply(rc, arguments);
+        }
+        return $method.apply(this, arguments);
     };
 });
 

@@ -80,6 +80,9 @@ selector:
   # This test looks for the presence of a log line that contains a db name. Injecting a tenantId in
   # the requests causes the test to fails due to a mismatch.
   - jstests/core/api//apitest_db_profile_level.js
+  # Queryable encryption test requires an internal connection for the keyvault that does not
+  # inject a $tenant.
+  - jstests/core/queryable_encryption/**/*.js
 
 executor:
   archive:

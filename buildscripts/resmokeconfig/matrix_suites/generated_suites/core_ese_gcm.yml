@@ -35,6 +35,7 @@ matrix_suite: true
 selector:
   exclude_files:
   - jstests/core/txns/**/*.js
+  - jstests/core/queryable_encryption/**/*.js
   exclude_with_any_tags:
   - does_not_support_encrypted_storage_engine
   roots:

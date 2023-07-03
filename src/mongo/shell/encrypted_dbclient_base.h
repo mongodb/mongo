@@ -125,7 +125,7 @@ class EncryptedDBClientBase : public DBClientBase,
 public:
     using DBClientBase::find;
 
-    EncryptedDBClientBase(std::unique_ptr<DBClientBase> conn,
+    EncryptedDBClientBase(std::shared_ptr<DBClientBase> conn,
                           ClientSideFLEOptions encryptionOptions,
                           JS::HandleValue collection,
                           JSContext* cx);
@@ -168,6 +168,11 @@ public:
     using EncryptionCallbacks::trace;
     void trace(JSTracer* trc) final;
 
+    using EncryptionCallbacks::getEncryptionOptions;
+    void getEncryptionOptions(JSContext* cx, JS::CallArgs args) final;
+
+    const ClientSideFLEOptions& getEncryptionOptions() const;
+
     std::unique_ptr<DBClientCursor> find(FindCommandRequest findRequest,
                                          const ReadPreferenceSetting& readPref,
                                          ExhaustMode exhaustMode) final;
@@ -185,6 +190,8 @@ public:
     bool isMongos() const final;
 
     DBClientBase* getRawConnection();
+
+    JS::Value getKeyVaultMongo() const;
 
 #ifdef MONGO_CONFIG_SSL
     const SSLConfiguration* getSSLConfiguration() override;
@@ -284,7 +291,7 @@ private:
     boost::optional<EncryptedFieldConfig> getEncryptedFieldConfig(const NamespaceString& nss);
 
 protected:
-    std::unique_ptr<DBClientBase> _conn;
+    std::shared_ptr<DBClientBase> _conn;
     ClientSideFLEOptions _encryptionOptions;
 
 private:
@@ -296,7 +303,7 @@ private:
 };
 
 using ImplicitEncryptedDBClientCallback =
-    std::unique_ptr<DBClientBase>(std::unique_ptr<DBClientBase> conn,
+    std::shared_ptr<DBClientBase>(std::shared_ptr<DBClientBase> conn,
                                   ClientSideFLEOptions encryptionOptions,
                                   JS::HandleValue collection,
                                   JSContext* cx);

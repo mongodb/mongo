@@ -87,6 +87,9 @@ selector:
   - jstests/core/roles_info.js
   - jstests/core/views/views_all_commands.js
 
+  # Queryable encryption uses internal transactions (which are aborted on fcv upgrade/downgrade)
+  - jstests/core/queryable_encryption/**/*.js
+
 executor:
   archive:
     hooks:
