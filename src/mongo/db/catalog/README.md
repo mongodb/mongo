@@ -1545,8 +1545,6 @@ that checkpoint's timestamp is known as the
 
 ## Recovery To A Stable Timestamp
 
-## Table Ident Resolution
-
 # File-System Backups
 Backups represent a full copy of the data files at a point-in-time. These copies of the data files
 can be used to recover data from a consistent state at an earlier time. This technique is commonly
