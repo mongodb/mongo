@@ -54,7 +54,8 @@ public:
     void onStepDown() override {}
     void onStepUp() override {}
     void shutDown() override;
-    void notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) override {}
+    void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
+                                                const Timestamp& commitTime) override {}
     void waitForCollectionFlush(OperationContext* opCtx, const NamespaceString& nss) override;
     void waitForDatabaseFlush(OperationContext* opCtx, StringData dbName) override;
 

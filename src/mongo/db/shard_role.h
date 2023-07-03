@@ -437,21 +437,6 @@ void restoreTransactionResourcesToOperationContext(
  */
 bool supportsLockFreeRead(OperationContext* opCtx);
 
-/**
- * TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
- * RAII type for letting secondary reads to block behind the PBW lock.
- * Note: Do not add additional usage. This is only temporary for ease of backport.
- */
-struct BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE {
-public:
-    BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx);
-    ~BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE();
-
-private:
-    OperationContext* _opCtx{nullptr};
-    boost::optional<bool> _originalSettings;
-};
-
 namespace shard_role_details {
 class SnapshotAttempt {
 public:

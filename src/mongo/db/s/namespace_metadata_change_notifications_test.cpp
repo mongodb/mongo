@@ -57,15 +57,16 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, WaitForNotify) {
     {
         auto opCtx = getClient()->makeOperationContext();
         opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
-        ASSERT_THROWS_CODE(
-            scopedNotif.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(notifications.get(opCtx.get(), scopedNotif),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
     }
 
-    notifications.notifyChange(kNss);
+    notifications.notifyChange(kNss, {Timestamp(2, 1)});
 
     {
         auto opCtx = getClient()->makeOperationContext();
-        scopedNotif.get(opCtx.get());
+        notifications.get(opCtx.get(), scopedNotif);
     }
 }
 
@@ -77,11 +78,12 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, GiveUpWaitingForNotify) {
 
         auto opCtx = getClient()->makeOperationContext();
         opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
-        ASSERT_THROWS_CODE(
-            scopedNotif.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(notifications.get(opCtx.get(), scopedNotif),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
     }
 
-    notifications.notifyChange(kNss);
+    notifications.notifyChange(kNss, {Timestamp(2, 1)});
 }
 
 TEST_F(NamespaceMetadataChangeNotificationsTest, MoveConstructionWaitForNotify) {
@@ -93,15 +95,98 @@ TEST_F(NamespaceMetadataChangeNotificationsTest, MoveConstructionWaitForNotify) 
     {
         auto opCtx = getClient()->makeOperationContext();
         opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
-        ASSERT_THROWS_CODE(
-            movedScopedNotif.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(notifications.get(opCtx.get(), movedScopedNotif),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
     }
 
-    notifications.notifyChange(kNss);
+    notifications.notifyChange(kNss, {Timestamp(2, 1)});
 
     {
         auto opCtx = getClient()->makeOperationContext();
-        movedScopedNotif.get(opCtx.get());
+        ASSERT_EQ(notifications.get(opCtx.get(), movedScopedNotif), Timestamp(2, 1));
+    }
+}
+
+TEST_F(NamespaceMetadataChangeNotificationsTest, NotifyTwice) {
+    NamespaceMetadataChangeNotifications notifications;
+
+    auto scopedNotif = notifications.createNotification(kNss);
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(notifications.get(opCtx.get(), scopedNotif),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
+    }
+
+    notifications.notifyChange(kNss, {Timestamp(2, 1)});
+    notifications.notifyChange(kNss, {Timestamp(3, 1)});
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_EQUALS(notifications.get(opCtx.get(), scopedNotif), Timestamp(3, 1));
+    }
+}
+
+TEST_F(NamespaceMetadataChangeNotificationsTest, NotifyAndThenWaitAgain) {
+    NamespaceMetadataChangeNotifications notifications;
+
+    auto scopedNotif = notifications.createNotification(kNss);
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(notifications.get(opCtx.get(), scopedNotif),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
+    }
+
+    notifications.notifyChange(kNss, {Timestamp(2, 1)});
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_EQUALS(notifications.get(opCtx.get(), scopedNotif), Timestamp(2, 1));
+        opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(notifications.get(opCtx.get(), scopedNotif),
+                           AssertionException,
+                           ErrorCodes::ExceededTimeLimit);
+    }
+
+    notifications.notifyChange(kNss, {Timestamp(3, 1)});
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_EQUALS(notifications.get(opCtx.get(), scopedNotif), Timestamp(3, 1));
+    }
+}
+
+TEST_F(NamespaceMetadataChangeNotificationsTest, TwoWaiters) {
+    NamespaceMetadataChangeNotifications notifications;
+
+    auto scopedNotif1 = notifications.createNotification(kNss);
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        opCtx->setDeadlineAfterNowBy(Milliseconds{0}, ErrorCodes::ExceededTimeLimit);
+        ASSERT_THROWS_CODE(
+            scopedNotif1.get(opCtx.get()), AssertionException, ErrorCodes::ExceededTimeLimit);
+    }
+
+    notifications.notifyChange(kNss, {Timestamp(2, 1)});
+    auto scopedNotif2 = notifications.createNotification(kNss);
+    notifications.notifyChange(kNss, {Timestamp(3, 1)});
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        ASSERT_EQUALS(notifications.get(opCtx.get(), scopedNotif1), Timestamp(3, 1));
+    }
+
+    {
+        auto opCtx = getClient()->makeOperationContext();
+        scopedNotif2.get(opCtx.get());
+        ASSERT_EQUALS(notifications.get(opCtx.get(), scopedNotif2), Timestamp(3, 1));
     }
 }
 

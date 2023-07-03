@@ -98,7 +98,8 @@ public:
      * Sets any notifications waiting for this version to arrive and invalidates the catalog cache's
      * chunk metadata for collection 'nss' so that the next caller provokes a refresh.
      */
-    void notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) override;
+    void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
+                                                const Timestamp& commitTime) override;
 
     SemiFuture<CollectionAndChangedChunks> getChunksSince(const NamespaceString& nss,
                                                           ChunkVersion version) override;
@@ -464,6 +465,16 @@ private:
     void _updatePersistedDbMetadata(OperationContext* opCtx, StringData dbName);
 
     /**
+     * Sends _flushRoutingTableCacheUpdates to the primary to force it to refresh its routing table
+     * for collection 'nss' and then waits for the refresh to replicate to this node. Returns a
+     * notification that can be used to wait for the refreshing flag to be set to true in the
+     * config.collections entry to provide a consistent view of config.chunks.
+     */
+    NamespaceMetadataChangeNotifications::ScopedNotification
+    _forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
+                                                        const NamespaceString& nss);
+
+    /**
      * Attempts to read the collection and chunk metadata since 'version' from the shard persisted
      * metadata store. Continues to retry reading the metadata until a complete diff is read
      * uninterrupted by concurrent updates.
@@ -473,7 +484,10 @@ private:
      * NamespaceNotFound error means the collection does not exist.
      */
     CollectionAndChangedChunks _getCompletePersistedMetadataForSecondarySinceVersion(
-        OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version);
+        OperationContext* opCtx,
+        NamespaceMetadataChangeNotifications::ScopedNotification&& notif,
+        const NamespaceString& nss,
+        const ChunkVersion& version);
 
     // Loader used by the shard primary to retrieve the authoritative routing metadata from the
     // config server

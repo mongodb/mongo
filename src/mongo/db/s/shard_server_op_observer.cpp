@@ -104,10 +104,11 @@ public:
     CollectionPlacementVersionLogOpHandler(const NamespaceString& nss, bool droppingCollection)
         : _nss(nss), _droppingCollection(droppingCollection) {}
 
-    void commit(OperationContext* opCtx, boost::optional<Timestamp>) override {
+    void commit(OperationContext* opCtx, boost::optional<Timestamp> commitTime) override {
         invariant(opCtx->lockState()->isCollectionLockedForMode(_nss, MODE_IX));
+        invariant(commitTime, "Invalid commit time");
 
-        CatalogCacheLoader::get(opCtx).notifyOfCollectionPlacementVersionUpdate(_nss);
+        CatalogCacheLoader::get(opCtx).notifyOfCollectionRefreshEndMarkerSeen(_nss, *commitTime);
 
         // Force subsequent uses of the namespace to refresh the filtering metadata so they can
         // synchronize with any work happening on the primary (e.g., migration critical section).
@@ -156,6 +157,11 @@ void onConfigDeleteInvalidateCachedCollectionMetadataAndNotify(OperationContext*
     AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
     AutoGetCollection autoColl(opCtx, deletedNss, MODE_IX);
 
+    tassert(7751400,
+            str::stream() << "Untimestamped writes to "
+                          << NamespaceString::kShardConfigCollectionsNamespace.toStringForErrorMsg()
+                          << " are not allowed",
+            opCtx->recoveryUnit()->isTimestamped());
     opCtx->recoveryUnit()->registerChange(std::make_unique<CollectionPlacementVersionLogOpHandler>(
         deletedNss, /* droppingCollection */ true));
 }
@@ -319,6 +325,12 @@ void ShardServerOpObserver::onUpdate(OperationContext* opCtx,
         AllowLockAcquisitionOnTimestampedUnitOfWork allowLockAcquisition(opCtx->lockState());
         AutoGetCollection autoColl(opCtx, updatedNss, MODE_IX);
         if (refreshingFieldNewVal.isBoolean() && !refreshingFieldNewVal.boolean()) {
+            tassert(7751401,
+                    str::stream()
+                        << "Untimestamped writes to "
+                        << NamespaceString::kShardConfigCollectionsNamespace.toStringForErrorMsg()
+                        << " are not allowed",
+                    opCtx->recoveryUnit()->isTimestamped());
             opCtx->recoveryUnit()->registerChange(
                 std::make_unique<CollectionPlacementVersionLogOpHandler>(
                     updatedNss, /* droppingCollection */ false));

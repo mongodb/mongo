@@ -139,9 +139,11 @@ public:
 
     /**
      * Notifies the loader that the persisted collection placement version for 'nss' has been
-     * updated.
+     * updated. `commitTime` represents the commit time of the update to config.collections for
+     * `nss` setting the refreshing flag to false.
      */
-    virtual void notifyOfCollectionPlacementVersionUpdate(const NamespaceString& nss) = 0;
+    virtual void notifyOfCollectionRefreshEndMarkerSeen(const NamespaceString& nss,
+                                                        const Timestamp& commitTime) = 0;
 
     /**
      * Non-blocking call, which returns the chunks changed since the specified version to be

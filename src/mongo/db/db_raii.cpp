@@ -92,11 +92,6 @@ MONGO_FAIL_POINT_DEFINE(reachedAutoGetLockFreeShardConsistencyRetry);
 
 const boost::optional<int> kDoNotChangeProfilingLevel = boost::none;
 
-// TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
-// If set to false, secondary reads should wait behind the PBW lock.
-const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
-    OperationContext::declareDecoration<boost::optional<bool>>();
-
 /**
  * Performs some checks to determine whether the operation is compatible with a lock-free read.
  * Multi-doc transactions are not supported, nor are operations holding an exclusive lock.
@@ -361,8 +356,7 @@ AutoGetCollectionForRead::AutoGetCollectionForRead(OperationContext* opCtx,
     : _callerWasConflicting(opCtx->lockState()->shouldConflictWithSecondaryBatchApplication()),
       _shouldNotConflictWithSecondaryBatchApplicationBlock(
           [&]() -> boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock> {
-              if (allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
-                  opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
+              if (opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
                   return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
                       opCtx->lockState());
               }
@@ -827,7 +821,6 @@ boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>
 makeShouldNotConflictWithSecondaryBatchApplicationBlock(OperationContext* opCtx,
                                                         bool isLockFreeReadSubOperation) {
     if (!isLockFreeReadSubOperation &&
-        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         return boost::optional<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
             opCtx->lockState());
@@ -1221,20 +1214,6 @@ LockMode getLockModeForQuery(OperationContext* opCtx, const NamespaceStringOrUUI
         return MODE_IX;
     }
     return MODE_IS;
-}
-
-BlockSecondaryReadsDuringBatchApplication_DONT_USE::
-    BlockSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx)
-    : _opCtx(opCtx) {
-    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx);
-    allowSecondaryReads->swap(_originalSettings);
-    *allowSecondaryReads = false;
-}
-
-BlockSecondaryReadsDuringBatchApplication_DONT_USE::
-    ~BlockSecondaryReadsDuringBatchApplication_DONT_USE() {
-    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(_opCtx);
-    allowSecondaryReads->swap(_originalSettings);
 }
 
 template class AutoGetCollectionForReadCommandBase<AutoGetCollectionForRead>;

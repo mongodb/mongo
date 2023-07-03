@@ -90,11 +90,6 @@ using TransactionResources = shard_role_details::TransactionResources;
 
 namespace {
 
-// TODO (SERVER-69813): Get rid of this when ShardServerCatalogCacheLoader will be removed.
-// If set to false, secondary reads should wait behind the PBW lock.
-const auto allowSecondaryReadsDuringBatchApplication_DONT_USE =
-    OperationContext::declareDecoration<boost::optional<bool>>();
-
 struct ResolvedNamespaceOrViewAcquisitionRequest {
     // Populated in the first phase of collection(s) acquisition.
     AcquisitionPrerequisites prerequisites;
@@ -489,7 +484,6 @@ ResolvedNamespaceOrViewAcquisitionRequest::LockFreeReadsResources takeGlobalLock
     const std::vector<CollectionOrViewAcquisitionRequest>& acquisitionRequests) {
     std::shared_ptr<ShouldNotConflictWithSecondaryBatchApplicationBlock> skipPBWMLock;
     if (!opCtx->isLockFreeReadsOp() &&
-        allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx).value_or(true) &&
         opCtx->getServiceContext()->getStorageEngine()->supportsReadConcernSnapshot()) {
         skipPBWMLock = std::make_shared<ShouldNotConflictWithSecondaryBatchApplicationBlock>(
             opCtx->lockState());
@@ -514,20 +508,6 @@ std::shared_ptr<const CollectionCatalog> stashConsistentCatalog(
 }
 
 }  // namespace
-
-BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE::
-    BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE(OperationContext* opCtx)
-    : _opCtx(opCtx) {
-    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(opCtx);
-    allowSecondaryReads->swap(_originalSettings);
-    *allowSecondaryReads = false;
-}
-
-BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE::
-    ~BlockAcquisitionsSecondaryReadsDuringBatchApplication_DONT_USE() {
-    auto allowSecondaryReads = &allowSecondaryReadsDuringBatchApplication_DONT_USE(_opCtx);
-    allowSecondaryReads->swap(_originalSettings);
-}
 
 CollectionOrViewAcquisitionRequest CollectionOrViewAcquisitionRequest::fromOpCtx(
     OperationContext* opCtx,

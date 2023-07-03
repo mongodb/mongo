@@ -353,29 +353,6 @@ ShardId getSelfShardId(OperationContext* opCtx) {
 }
 
 /**
- * Sends _flushRoutingTableCacheUpdates to the primary to force it to refresh its routing table for
- * collection 'nss' and then waits for the refresh to replicate to this node.
- */
-void forcePrimaryCollectionRefreshAndWaitForReplication(OperationContext* opCtx,
-                                                        const NamespaceString& nss) {
-    auto selfShard =
-        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, getSelfShardId(opCtx)));
-
-    auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
-        opCtx,
-        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
-        "admin",
-        BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)),
-        Seconds{30},
-        Shard::RetryPolicy::kIdempotent));
-
-    uassertStatusOK(cmdResponse.commandStatus);
-
-    uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
-        opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
-}
-
-/**
  * Sends _flushDatabaseCacheUpdates to the primary to force it to refresh its routing table for
  * database 'dbName' and then waits for the refresh to replicate to this node.
  */
@@ -423,9 +400,9 @@ ShardServerCatalogCacheLoader::~ShardServerCatalogCacheLoader() {
     shutDown();
 }
 
-void ShardServerCatalogCacheLoader::notifyOfCollectionPlacementVersionUpdate(
-    const NamespaceString& nss) {
-    _namespaceNotifications.notifyChange(nss);
+void ShardServerCatalogCacheLoader::notifyOfCollectionRefreshEndMarkerSeen(
+    const NamespaceString& nss, const Timestamp& commitTime) {
+    _namespaceNotifications.notifyChange(nss, commitTime);
 }
 
 void ShardServerCatalogCacheLoader::initializeReplicaSetRole(bool isPrimary) {
@@ -731,7 +708,7 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
     }
 
     Timer t;
-    forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
+    auto nssNotif = _forcePrimaryCollectionRefreshAndWaitForReplication(opCtx, nss);
     LOGV2_FOR_CATALOG_REFRESH(5965800,
                               2,
                               "Cache loader on secondary successfully waited for primary refresh "
@@ -740,9 +717,8 @@ StatusWith<CollectionAndChangedChunks> ShardServerCatalogCacheLoader::_runSecond
                               "duration"_attr = Milliseconds(t.millis()));
 
     // Read the local metadata.
-
     return _getCompletePersistedMetadataForSecondarySinceVersion(
-        opCtx, nss, catalogCacheSinceVersion);
+        opCtx, std::move(nssNotif), nss, catalogCacheSinceVersion);
 }
 
 StatusWith<CollectionAndChangedChunks>
@@ -1370,34 +1346,52 @@ void ShardServerCatalogCacheLoader::_updatePersistedDbMetadata(OperationContext*
                               "db"_attr = dbName.toString());
 }
 
+NamespaceMetadataChangeNotifications::ScopedNotification
+ShardServerCatalogCacheLoader::_forcePrimaryCollectionRefreshAndWaitForReplication(
+    OperationContext* opCtx, const NamespaceString& nss) {
+    auto selfShard =
+        uassertStatusOK(Grid::get(opCtx)->shardRegistry()->getShard(opCtx, getSelfShardId(opCtx)));
+
+    auto notif = _namespaceNotifications.createNotification(nss);
+
+    auto cmdResponse = uassertStatusOK(selfShard->runCommandWithFixedRetryAttempts(
+        opCtx,
+        ReadPreferenceSetting{ReadPreference::PrimaryOnly},
+        "admin",
+        BSON("_flushRoutingTableCacheUpdates" << NamespaceStringUtil::serialize(nss)),
+        Seconds{30},
+        Shard::RetryPolicy::kIdempotent));
+
+    uassertStatusOK(cmdResponse.commandStatus);
+
+    uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+        opCtx, {LogicalTime::fromOperationTime(cmdResponse.response), boost::none}));
+    return notif;
+}
+
 CollectionAndChangedChunks
 ShardServerCatalogCacheLoader::_getCompletePersistedMetadataForSecondarySinceVersion(
-    OperationContext* opCtx, const NamespaceString& nss, const ChunkVersion& version) {
+    OperationContext* opCtx,
+    NamespaceMetadataChangeNotifications::ScopedNotification&& notif,
+    const NamespaceString& nss,
+    const ChunkVersion& version) {
     // Keep trying to load the metadata until we get a complete view without updates being
     // concurrently applied.
     while (true) {
-        // Disallow reading on an older snapshot because this relies on being able to read the
-        // side effects of writes during secondary replication after being signalled from the
-        // CollectionPlacementVersionLogOpHandler.
-        BlockSecondaryReadsDuringBatchApplication_DONT_USE secondaryReadsBlockBehindReplication(
-            opCtx);
-
-        // Taking the PBWM and blocking on admission control can lead to deadlock with prepared
-        // transactions, so have internal refresh operations skip admission control
-        ScopedAdmissionPriorityForLock skipAdmissionControl(opCtx->lockState(),
-                                                            AdmissionContext::Priority::kImmediate);
-
         const auto beginRefreshState = [&]() {
             while (true) {
-                auto notif = _namespaceNotifications.createNotification(nss);
-
                 auto refreshState = uassertStatusOK(getPersistedRefreshFlags(opCtx, nss));
 
                 if (!refreshState.refreshing) {
                     return refreshState;
                 }
 
-                notif.get(opCtx);
+                // Blocking call to wait for the notification, get the most recent value, and
+                // recreate the notification under lock so that we don't miss any notifications.
+                auto notificationTime = _namespaceNotifications.get(opCtx, notif);
+                // Wait until the local lastApplied timestamp is the one from the notification.
+                uassertStatusOK(repl::ReplicationCoordinator::get(opCtx)->waitUntilOpTimeForRead(
+                    opCtx, {LogicalTime(notificationTime), boost::none}));
             }
         }();
 
