@@ -105,7 +105,7 @@ public:
                   const CollectionPtr& coll,
                   StmtId stmtId,
                   const OplogDeleteEntryArgs& args,
-                  OpStateAccumulator* opAccumulator) final;
+                  OpStateAccumulator* opAccumulator = nullptr) final;
 
     void onUnpreparedTransactionCommit(OperationContext* opCtx,
                                        const TransactionOperations& transactionOperations,
