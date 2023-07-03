@@ -278,21 +278,53 @@ void ChunkMap::_updateShardVersionFromDiscardedChunk(const ChunkInfo& chunk) {
     }
 }
 
-void ChunkMap::_updateShardVersionFromUpdateChunk(const ChunkInfo& chunk) {
-    auto [placementVersionIt, created] =
-        _placementVersions.try_emplace(chunk.getShardId(),
-                                       _collectionPlacementVersion.epoch(),
-                                       _collectionPlacementVersion.getTimestamp());
+void ChunkMap::_updateShardVersionFromUpdateChunk(
+    const ChunkInfo& chunk, const ShardPlacementVersionMap& oldPlacementVersions) {
+    const auto& newVersion = chunk.getLastmod();
+    const auto newValidAfter = [&] {
+        auto thisChunkValidAfter = chunk.getHistory().empty()
+            ? Timestamp{0, 0}
+            : chunk.getHistory().front().getValidAfter();
 
-    if (created || placementVersionIt->second.placementVersion.isOlderThan(chunk.getLastmod())) {
-        const auto& newVersion = chunk.getLastmod();
-        // Update shard version with the most recent one from new chunk
-        placementVersionIt->second.placementVersion = newVersion;
-        if (_collectionPlacementVersion.isOlderThan(newVersion)) {
-            _collectionPlacementVersion =
-                ChunkVersion{{newVersion.epoch(), _collectionPlacementVersion.getTimestamp()},
-                             {newVersion.majorVersion(), newVersion.minorVersion()}};
+        auto oldPlacementVersionIt = oldPlacementVersions.find(chunk.getShardId());
+        auto oldShardValidAfter = oldPlacementVersionIt == oldPlacementVersions.end()
+            ? Timestamp{0, 0}
+            : oldPlacementVersionIt->second.validAfter;
+
+        return std::max(thisChunkValidAfter, oldShardValidAfter);
+    }();
+
+
+    // Version for this chunk shard got updated
+    bool versionUpdated{false};
+
+    auto [placementVersionIt, created] =
+        _placementVersions.try_emplace(chunk.getShardId(), newVersion, newValidAfter);
+
+    if (created) {
+        // We just created a new entry in the _placementVersions map with
+        // latest version and lastest valid after
+        versionUpdated = true;
+    } else {
+        // _placementVersions map already contained an entry for this chunk shard
+
+        // Update version for this shard
+        if (placementVersionIt->second.placementVersion.isOlderThan(newVersion)) {
+            placementVersionIt->second.placementVersion = newVersion;
+            versionUpdated = true;
         }
+
+        // Update validAfter for this shard
+        if (newValidAfter > placementVersionIt->second.validAfter) {
+            placementVersionIt->second.validAfter = newValidAfter;
+        }
+    }
+
+    // Update version for the entire collection
+    if (versionUpdated && _collectionPlacementVersion.isOlderThan(newVersion)) {
+        _collectionPlacementVersion =
+            ChunkVersion{static_cast<CollectionGeneration>(_collectionPlacementVersion),
+                         {newVersion.majorVersion(), newVersion.minorVersion()}};
     }
 }
 
@@ -328,7 +360,7 @@ ChunkMap ChunkMap::_makeUpdated(ChunkVector&& updateChunks) const {
     };
 
     const auto processUpdateChunk = [&](std::shared_ptr<ChunkInfo>&& nextChunkPtr) {
-        newMap._updateShardVersionFromUpdateChunk(*nextChunkPtr);
+        newMap._updateShardVersionFromUpdateChunk(*nextChunkPtr, _placementVersions);
         uassert(ErrorCodes::ConflictingOperationInProgress,
                 str::stream() << "Changed chunk " << nextChunkPtr->toString()
                               << " has timestamp different from that of the collection "
@@ -581,9 +613,8 @@ ChunkMap::_overlappingVectorSlotBounds(const std::string& minShardKeyStr,
     return {itMin, itMax};
 }
 
-PlacementVersionTargetingInfo::PlacementVersionTargetingInfo(const OID& epoch,
-                                                             const Timestamp& timestamp)
-    : placementVersion({epoch, timestamp}, {0, 0}) {}
+PlacementVersionTargetingInfo::PlacementVersionTargetingInfo(const CollectionGeneration& generation)
+    : placementVersion(generation, {0, 0}) {}
 
 RoutingTableHistory::RoutingTableHistory(
     NamespaceString nss,
@@ -773,22 +804,15 @@ std::string ChunkManager::toString() const {
     return _rt->optRt ? _rt->optRt->toString() : "UNSHARDED";
 }
 
-bool RoutingTableHistory::compatibleWith(const RoutingTableHistory& other,
-                                         const ShardId& shardName) const {
-    // Return true if the placement version is the same in the two chunk managers
-    // TODO: This doesn't need to be so strong, just major vs
-    return other.getVersion(shardName) == getVersion(shardName);
-}
-
-ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
-                                              bool throwOnStaleShard) const {
+PlacementVersionTargetingInfo RoutingTableHistory::_getVersion(const ShardId& shardName,
+                                                               bool throwOnStaleShard) const {
     auto it = _placementVersions.find(shardName);
     if (it == _placementVersions.end()) {
         // Shards without explicitly tracked placement versions (meaning they have no chunks) always
-        // have a version of (0, 0, epoch, timestamp)
-        const auto collPlacementVersion = _chunkMap.getVersion();
-        return ChunkVersion({collPlacementVersion.epoch(), collPlacementVersion.getTimestamp()},
-                            {0, 0});
+        // have a version of (epoch, timestamp, 0, 0)
+        auto collPlacementVersion = _chunkMap.getVersion();
+        return PlacementVersionTargetingInfo(ChunkVersion(collPlacementVersion, {0, 0}),
+                                             Timestamp(0, 0));
     }
 
     if (throwOnStaleShard && gEnableFinerGrainedCatalogCacheRefresh) {
@@ -797,15 +821,9 @@ ChunkVersion RoutingTableHistory::_getVersion(const ShardId& shardName,
                 !it->second.isStale.load());
     }
 
-    return it->second.placementVersion;
-}
-
-ChunkVersion RoutingTableHistory::getVersion(const ShardId& shardName) const {
-    return _getVersion(shardName, true);
-}
-
-ChunkVersion RoutingTableHistory::getVersionForLogging(const ShardId& shardName) const {
-    return _getVersion(shardName, false);
+    const auto& placementVersionTargetingInfo = it->second;
+    return PlacementVersionTargetingInfo(placementVersionTargetingInfo.placementVersion,
+                                         placementVersionTargetingInfo.validAfter);
 }
 
 std::string RoutingTableHistory::toString() const {
@@ -816,7 +834,8 @@ std::string RoutingTableHistory::toString() const {
 
     sb << "Shard placement versions:\n";
     for (const auto& entry : _placementVersions) {
-        sb << "\t" << entry.first << ": " << entry.second.placementVersion.toString() << '\n';
+        sb << "\t" << entry.first << ": " << entry.second.placementVersion.toString() << " @ "
+           << entry.second.validAfter.toString() << '\n';
     }
 
     return sb.str();
