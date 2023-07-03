@@ -1,6 +1,6 @@
 /**
- * Tests that the _shardsvrDropCollectionIfUUIDNotMatching and
- * _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern command works as expected:
+ * Tests that the _shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern command works as
+ * expected:
  * - Noop in case the collection doesn't exist.
  * - Drop collection if uuid different from the expected.
  * - Keep the collection if the uuid is exactly the expected one.
@@ -50,12 +50,8 @@ function runTests(collName, commandName, writeConcern) {
     assert.neq(null, db.getCollection(collName).findOne({_id: 0}));
 }
 
-// TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
-runTests("coll", "_shardsvrDropCollectionIfUUIDNotMatching", null);
-if (!jsTestOptions().shardMixedBinVersions && jsTestOptions().mongosBinVersion == "latest") {
-    runTests("coll2",
-             "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern",
-             {writeConcern: {w: 'majority'}});
-}
+runTests("coll2",
+         "_shardsvrDropCollectionIfUUIDNotMatchingWithWriteConcern",
+         {writeConcern: {w: 'majority'}});
 
 st.stop();

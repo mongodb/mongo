@@ -54,63 +54,6 @@
 namespace mongo {
 namespace {
 
-// TODO SERVER-74324: deprecate _shardsvrDropCollectionIfUUIDNotMatching after 7.0 is lastLTS.
-class ShardsvrDropCollectionIfUUIDNotMatchingCommand final
-    : public TypedCommand<ShardsvrDropCollectionIfUUIDNotMatchingCommand> {
-public:
-    bool skipApiVersionCheck() const override {
-        /* Internal command (server to server) */
-        return true;
-    }
-
-    AllowedOnSecondary secondaryAllowed(ServiceContext*) const override {
-        return Command::AllowedOnSecondary::kNever;
-    }
-
-    std::string help() const override {
-        return "Internal command aimed to remove stale entries from the local collection catalog.";
-    }
-
-    using Request = ShardsvrDropCollectionIfUUIDNotMatchingRequest;
-
-    class Invocation final : public InvocationBase {
-    public:
-        using InvocationBase::InvocationBase;
-
-        void typedRun(OperationContext* opCtx) {
-            uassertStatusOK(ShardingState::get(opCtx)->canAcceptShardedCommands());
-
-            opCtx->setAlwaysInterruptAtStepDownOrUp_UNSAFE();
-
-            uassertStatusOK(dropCollectionIfUUIDNotMatching(
-                opCtx, ns(), request().getExpectedCollectionUUID()));
-
-            WriteConcernResult ignoreResult;
-            auto latestOpTime = repl::ReplClientInfo::forClient(opCtx->getClient()).getLastOp();
-            uassertStatusOK(waitForWriteConcern(
-                opCtx, latestOpTime, CommandHelpers::kMajorityWriteConcern, &ignoreResult));
-        }
-
-    private:
-        NamespaceString ns() const override {
-            return request().getNamespace();
-        }
-
-        bool supportsWriteConcern() const override {
-            return false;
-        }
-
-        void doCheckAuthorization(OperationContext* opCtx) const override {
-            uassert(ErrorCodes::Unauthorized,
-                    "Unauthorized",
-                    AuthorizationSession::get(opCtx->getClient())
-                        ->isAuthorizedForActionsOnResource(
-                            ResourcePattern::forClusterResource(request().getDbName().tenantId()),
-                            ActionType::dropCollection));
-        }
-    };
-} shardSvrDropCollectionIfUUIDNotMatching;
-
 class ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand final
     : public TypedCommand<ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernCommand> {
 public:

@@ -2345,12 +2345,14 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
                     Grid::get(opCtx.get())->shardRegistry()->getAllShardIds(opCtx.get());
                 const auto& nss = coordinatorDoc.getSourceNss();
                 const auto& notMatchingThisUUID = coordinatorDoc.getReshardingUUID();
-                const auto cmd =
-                    ShardsvrDropCollectionIfUUIDNotMatchingRequest(nss, notMatchingThisUUID);
+                const auto cmd = ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest(
+                    nss, notMatchingThisUUID);
 
-                auto opts = std::make_shared<
-                    async_rpc::AsyncRPCOptions<ShardsvrDropCollectionIfUUIDNotMatchingRequest>>(
-                    cmd, **executor, _ctHolder->getStepdownToken());
+                async_rpc::GenericArgs args;
+                async_rpc::AsyncRPCCommandHelpers::appendMajorityWriteConcern(args);
+                auto opts = std::make_shared<async_rpc::AsyncRPCOptions<
+                    ShardsvrDropCollectionIfUUIDNotMatchingWithWriteConcernRequest>>(
+                    cmd, **executor, _ctHolder->getStepdownToken(), args);
                 _reshardingCoordinatorExternalState->sendCommandToShards(
                     opCtx.get(), opts, allShardIds);
             }
