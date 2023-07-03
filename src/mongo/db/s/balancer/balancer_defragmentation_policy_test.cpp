@@ -435,10 +435,8 @@ TEST_F(BalancerDefragmentationPolicyTest,
         kNss1,
         {ChunkType{
              kUuid1, ChunkRange(kKeyAtMin, kKeyAtTen), kCollectionPlacementVersion, kShardId0},
-         ChunkType{kUuid1,
-                   ChunkRange(BSON("x" << 11), kKeyAtMax),
-                   kCollectionPlacementVersion,
-                   kShardId0}});
+         ChunkType{
+             kUuid1, ChunkRange(kKeyAtTen, kKeyAtMax), kCollectionPlacementVersion, kShardId1}});
     _defragmentationPolicy.startCollectionDefragmentations(operationContext());
     auto nextAction = _defragmentationPolicy.getNextStreamingAction(operationContext());
     DataSizeInfo failingDataSizeAction = stdx::get<DataSizeInfo>(*nextAction);

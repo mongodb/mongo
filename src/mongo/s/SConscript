@@ -663,6 +663,7 @@ env.CppUnitTest(
         'catalog/type_tags_test.cpp',
         'catalog_cache_refresh_test.cpp',
         'catalog_cache_test.cpp',
+        'chunks_test_util.cpp',
         'chunk_manager_query_test.cpp',
         'chunk_map_test.cpp',
         'chunk_test.cpp',
