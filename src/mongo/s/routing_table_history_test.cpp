@@ -75,6 +75,7 @@ namespace mongo {
 using chunks_test_util::assertEqualChunkInfo;
 using chunks_test_util::calculateCollVersion;
 using chunks_test_util::calculateIntermediateShardKey;
+using chunks_test_util::calculateShardsMaxValidAfter;
 using chunks_test_util::calculateShardVersions;
 using chunks_test_util::genChunkVector;
 using chunks_test_util::genRandomChunkVector;
@@ -278,6 +279,17 @@ TEST_F(RoutingTableHistoryTest, RandomCreateBasic) {
     std::set<ShardId> shardIds;
     rt.getAllShardIds(&shardIds);
     ASSERT(expectedShardIds == shardIds);
+
+    // Validate all shard maxValidAfter
+    const auto expectedShardsMaxValidAfter = calculateShardsMaxValidAfter(chunks);
+    const auto expectedMaxValidAfter = [&](const ShardId& shard) {
+        auto it = expectedShardsMaxValidAfter.find(shard);
+        return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
+    };
+    for (const auto& [shardId, _] : expectedShardVersions) {
+        ASSERT_EQ(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId));
+    }
+    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
 }
 
 /*
@@ -296,6 +308,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithMissingChunkFail) {
         // TODO SERVER-77090: stop forcing chunks on different shards
         for (size_t i = 0; i < chunks.size(); i++) {
             chunks[i].setShard(getShardId(i));
+            chunks[i].setHistory({});
         }
     }
 
@@ -321,6 +334,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkGapFail) {
         // TODO SERVER-77090: stop forcing chunks on different shards
         for (size_t i = 0; i < chunks.size(); i++) {
             chunks[i].setShard(getShardId(i));
+            chunks[i].setHistory({});
         }
     }
 
@@ -351,6 +365,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkGapFail) {
         // TODO SERVER-77090: stop forcing chunks on different shards
         for (size_t i = 0; i < chunks.size(); i++) {
             chunks[i].setShard(getShardId(i));
+            chunks[i].setHistory({});
         }
     }
 
@@ -393,6 +408,7 @@ TEST_F(RoutingTableHistoryTest, RandomCreateWithChunkOverlapFail) {
         // TODO SERVER-77090: stop forcing chunks on different shards
         for (size_t i = 0; i < chunks.size(); i++) {
             chunks[i].setShard(getShardId(i));
+            chunks[i].setHistory({});
         }
     }
 
@@ -437,6 +453,7 @@ TEST_F(RoutingTableHistoryTest, RandomUpdateWithChunkOverlapFail) {
         // TODO SERVER-77090: stop forcing chunks on different shards
         for (size_t i = 0; i < chunks.size(); i++) {
             chunks[i].setShard(getShardId(i));
+            chunks[i].setHistory({});
         }
     }
     // Create a new routing table from the randomly generated chunks
@@ -612,6 +629,18 @@ TEST_F(RoutingTableHistoryTest, RandomUpdate) {
     std::set<ShardId> shardIds;
     rt.getAllShardIds(&shardIds);
     ASSERT(expectedShardIds == shardIds);
+
+    // Validate all shard maxValidAfter
+    const auto expectedShardsMaxValidAfter = calculateShardsMaxValidAfter(chunks);
+    const auto expectedMaxValidAfter = [&](const ShardId& shard) {
+        auto it = expectedShardsMaxValidAfter.find(shard);
+        return it != expectedShardsMaxValidAfter.end() ? it->second : Timestamp{0, 0};
+    };
+    for (const auto& [shardId, _] : expectedShardVersions) {
+        ASSERT_EQ(rt.getMaxValidAfter(shardId), expectedMaxValidAfter(shardId))
+            << "For shardid " << shardId;
+    }
+    ASSERT_EQ(rt.getMaxValidAfter(ShardId{"shard-without-chunks"}), (Timestamp{0, 0}));
 }
 
 TEST_F(RoutingTableHistoryTest, TestSplits) {
