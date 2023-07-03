@@ -139,19 +139,21 @@ void RangeDeleterServiceOpObserver::onDelete(OperationContext* opCtx,
                                              StmtId stmtId,
                                              const OplogDeleteEntryArgs& args) {
     if (coll->ns() == NamespaceString::kRangeDeletionNamespace) {
-        const auto& deletedDoc = deletedDocumentDecoration(opCtx);
-
-        auto deletionTask =
-            RangeDeletionTask::parse(IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
-        try {
-            RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
-                                                            deletionTask.getRange());
-        } catch (const DBException& ex) {
-            dassert(ex.code() == ErrorCodes::NotYetInitialized,
-                    str::stream() << "No error different from `NotYetInitialized` is expected "
-                                     "to be propagated to the range deleter observer. Got error: "
-                                  << ex.toStatus());
-        }
+        opCtx->recoveryUnit()->onCommit([deletedDoc = std::move(deletedDocumentDecoration(opCtx))](
+                                            OperationContext* opCtx, boost::optional<Timestamp>) {
+            auto deletionTask = RangeDeletionTask::parse(
+                IDLParserContext("RangeDeleterServiceOpObserver"), deletedDoc);
+            try {
+                RangeDeleterService::get(opCtx)->deregisterTask(deletionTask.getCollectionUuid(),
+                                                                deletionTask.getRange());
+            } catch (const DBException& ex) {
+                dassert(ex.code() == ErrorCodes::NotYetInitialized,
+                        str::stream()
+                            << "No error different from `NotYetInitialized` is expected "
+                               "to be propagated to the range deleter observer. Got error: "
+                            << ex.toStatus());
+            }
+        });
     }
 }
 
