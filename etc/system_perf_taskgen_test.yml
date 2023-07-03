@@ -1844,6 +1844,9 @@ buildvariants:
       build_variant_override: linux-standalone.2022-11
     run_on:
       - "rhel70-perf-single"
+    depends_on: 
+      - name: schedule_global_auto_tasks
+        variant: task_generation
     tasks: 
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
@@ -1911,6 +1914,9 @@ buildvariants:
       build_variant_override: linux-standalone-all-feature-flags.2022-11
     run_on:
       - "rhel70-perf-single"
+    depends_on: 
+      - name: schedule_global_auto_tasks
+        variant: task_generation
     tasks:
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
@@ -2290,6 +2296,9 @@ buildvariants:
       build_variant_override: linux-1-node-replSet.2022-11
     run_on:
       - "rhel70-perf-single"
+    depends_on: 
+      - name: schedule_global_auto_tasks
+        variant: task_generation
     tasks: 
       - name: schedule_patch_auto_tasks
       - name: schedule_variant_auto_tasks
