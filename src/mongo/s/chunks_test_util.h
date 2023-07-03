@@ -79,7 +79,8 @@ std::vector<ChunkType> genChunkVector(const NamespaceString& nss,
                                       size_t numShards);
 
 /*
- * Return a randomly generated vector of chunks.
+ * Return a randomly generated vector of chunks that are properly sorted based on their min value
+ * and cover the full space from [MinKey, MaxKey].
  */
 std::vector<ChunkType> genRandomChunkVector(const NamespaceString& nss,
                                             const OID& epoch,
@@ -87,6 +88,9 @@ std::vector<ChunkType> genRandomChunkVector(const NamespaceString& nss,
                                             size_t minNumChunks = 1);
 
 std::map<ShardId, ChunkVersion> calculateShardVersions(const std::vector<ChunkType>& chunkVector);
+
+std::map<ShardId, Timestamp> calculateShardsMaxValidAfter(
+    const std::vector<ChunkType>& chunkVector);
 
 ChunkVersion calculateCollVersion(const std::map<ShardId, ChunkVersion>& shardVersions);
 

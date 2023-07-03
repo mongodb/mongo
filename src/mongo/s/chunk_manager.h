@@ -49,17 +49,24 @@ class OperationContext;
 class ChunkManager;
 
 struct ShardVersionTargetingInfo {
-    // Indicates whether the shard is stale and thus needs a catalog cache refresh. Is false by
-    // default.
-    AtomicWord<bool> isStale;
+    ShardVersionTargetingInfo(const ShardVersionTargetingInfo& other)
+        : shardVersion(other.shardVersion),
+          validAfter(other.validAfter),
+          isStale(other.isStale.load()) {}
+
+    ShardVersionTargetingInfo(const OID& epoch);
+    ShardVersionTargetingInfo(ChunkVersion shardVersion, Timestamp validAfter)
+        : shardVersion(std::move(shardVersion)), validAfter(std::move(validAfter)) {}
 
     // Max chunk version for the shard.
     ChunkVersion shardVersion;
 
-    ShardVersionTargetingInfo(const OID& epoch);
+    // Max validAfter for the shard, effectively this is the timestamp of the latest placement
+    // change that occurred on a particular shard.
+    Timestamp validAfter;
 
-    ShardVersionTargetingInfo(const ShardVersionTargetingInfo& info)
-        : isStale(info.isStale.load()), shardVersion(info.shardVersion) {}
+    // Indicates whether the shard is stale and thus needs a catalog cache refresh
+    AtomicWord<bool> isStale{false};
 };
 
 // Map from a shard to a struct indicating both the max chunk version on that shard and whether the
@@ -316,14 +323,26 @@ public:
      * Retrieves the shard version for the given shard. Will throw a ShardInvalidatedForTargeting
      * exception if the shard is marked as stale.
      */
-    ChunkVersion getVersion(const ShardId& shardId) const;
+    ChunkVersion getVersion(const ShardId& shardId) const {
+        return _getVersion(shardId, true).shardVersion;
+    }
 
     /**
      * Retrieves the shard version for the given shard. Will not throw if the shard is marked as
      * stale. Only use when logging the given chunk version -- if the caller must execute logic
      * based on the returned version, use getVersion() instead.
      */
-    ChunkVersion getVersionForLogging(const ShardId& shardId) const;
+    ChunkVersion getVersionForLogging(const ShardId& shardId) const {
+        return _getVersion(shardId, false).shardVersion;
+    }
+
+    /**
+     * Retrieves the maximum validAfter timestamp for the given shard. Will throw a
+     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     */
+    Timestamp getMaxValidAfter(const ShardId& shardId) const {
+        return _getVersion(shardId, true).validAfter;
+    }
 
     size_t numChunks() const {
         return _chunkMap.size();
@@ -380,7 +399,7 @@ private:
                         bool unique,
                         ChunkMap chunkMap);
 
-    ChunkVersion _getVersion(const ShardId& shardName, bool throwOnStaleShard) const;
+    ShardVersionTargetingInfo _getVersion(const ShardId& shardId, bool throwOnStaleShard) const;
 
     // The shard versioning mechanism hinges on keeping track of the number of times we reload
     // ChunkManagers.
@@ -451,10 +470,27 @@ public:
         return _rt->getVersion();
     }
 
+    /**
+     * Retrieves the placement version for the given shard. Will throw a
+     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     */
     ChunkVersion getVersion(const ShardId& shardId) const {
         return _rt->getVersion(shardId);
     }
 
+    /**
+     * Retrieves the maximum validAfter timestamp for the given shard. Will throw a
+     * ShardInvalidatedForTargeting exception if the shard is marked as stale.
+     */
+    Timestamp getMaxValidAfter(const ShardId& shardId) const {
+        return _rt->getMaxValidAfter(shardId);
+    }
+
+    /**
+     * Retrieves the placement version for the given shard. Will not throw if the shard is marked as
+     * stale. Only use when logging the given chunk version -- if the caller must execute logic
+     * based on the returned version, use getVersion() instead.
+     */
     ChunkVersion getVersionForLogging(const ShardId& shardId) const {
         return _rt->getVersionForLogging(shardId);
     }
