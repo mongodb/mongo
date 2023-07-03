@@ -1495,7 +1495,6 @@ tasks:
 buildvariants:
   - name: task_generation
     display_name: Task Generation
-    cron: "0 0 1 1 *"  # Every year starting 1/1 at 00:00
     modules: *modules
     expansions:
       platform: linux
