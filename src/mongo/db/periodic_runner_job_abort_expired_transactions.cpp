@@ -61,6 +61,12 @@ Milliseconds getPeriod(const Argument& transactionLifetimeLimitSeconds) {
 
 }  // namespace
 
+// Tracks the number of passes the "abortExpiredTransactions" thread makes to abort expired
+// transactions.
+static Counter64 abortExpiredTransactionsPasses;
+static ServerStatusMetricField<Counter64> dAbortExpiredTransactionsPasses(
+    "abortExpiredTransactions.passes", &abortExpiredTransactionsPasses);
+
 auto PeriodicThreadToAbortExpiredTransactions::get(ServiceContext* serviceContext)
     -> PeriodicThreadToAbortExpiredTransactions& {
     auto& jobContainer = _serviceDecoration(serviceContext);
@@ -109,6 +115,7 @@ void PeriodicThreadToAbortExpiredTransactions::_init(ServiceContext* serviceCont
 
             try {
                 killAllExpiredTransactions(opCtx.get());
+                abortExpiredTransactionsPasses.increment();
             } catch (ExceptionForCat<ErrorCategory::CancellationError>& ex) {
                 LOGV2_DEBUG(4684101, 2, "Periodic job canceled", "{reason}"_attr = ex.reason());
             }
