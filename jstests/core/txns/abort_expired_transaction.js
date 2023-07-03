@@ -35,6 +35,11 @@ try {
     const session = db.getMongo().startSession(sessionOptions);
     const sessionDb = session.getDatabase(testDBName);
 
+    // Number of passes made by the "abortExpiredTransactions" thread before the transaction
+    // expires.
+    const abortExpiredTransactionsPassesPreAbort =
+        db.serverStatus().metrics.abortExpiredTransactions.passes;
+
     let txnNumber = 0;
 
     jsTest.log("Insert a document starting a transaction.");
@@ -65,6 +70,14 @@ try {
         },
         "currentOp reports that the idle transaction still exists, it has not been " +
             "aborted as expected.");
+
+    assert.soon(() => {
+        // For this expired transaction to abort, the "abortExpiredTransactions" thread has to
+        // perform at least one pass.
+        const serverStatus = db.serverStatus();
+        return abortExpiredTransactionsPassesPreAbort <
+            serverStatus.metrics.abortExpiredTransactions.passes;
+    });
 
     jsTest.log(
         "Attempt to do a write in the transaction, which should fail because the transaction " +
