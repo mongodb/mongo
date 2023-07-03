@@ -80,6 +80,12 @@ commands:
         type: bool
         description: "Whether initiate reshardCollection if the shardKey doesn't change."
         optional: true
+      reshardingUUID:
+        type: uuid
+        description: >-
+            "A user-provided identifier used to identify this resharding operation for
+            retryability purposes."
+        optional: true
 
   _configsvrReshardCollection:
     command_name: _configsvrReshardCollection
@@ -123,4 +129,10 @@ commands:
       forceRedistribution:
         type: bool
         description: "Whether initiate reshardCollection if the shardKey doesn't change."
+        optional: true
+      reshardingUUID:
+        type: uuid
+        description: >-
+            "A user-provided identifier used to identify this resharding operation for
+            retryability purposes."
         optional: true

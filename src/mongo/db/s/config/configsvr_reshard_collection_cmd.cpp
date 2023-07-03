@@ -181,6 +181,9 @@ public:
                     ErrorCodes::InvalidOptions,
                     "Resharding improvements is not enabled, reject forceRedistribution parameter",
                     !request().getForceRedistribution().has_value());
+                uassert(ErrorCodes::InvalidOptions,
+                        "Resharding improvements is not enabled, reject reshardingUUID parameter",
+                        !request().getReshardingUUID().has_value());
             }
 
             if (const auto& shardDistribution = request().getShardDistribution()) {
@@ -229,6 +232,9 @@ public:
                                                                    request().getKey());
                     commonMetadata.setStartTime(
                         opCtx->getServiceContext()->getFastClockSource()->now());
+                    if (request().getReshardingUUID()) {
+                        commonMetadata.setUserReshardingUUID(*request().getReshardingUUID());
+                    }
 
                     coordinatorDoc.setCommonReshardingMetadata(std::move(commonMetadata));
                     coordinatorDoc.setZones(request().getZones());

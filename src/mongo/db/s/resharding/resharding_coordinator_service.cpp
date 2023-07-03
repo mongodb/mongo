@@ -314,6 +314,12 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
                             *approxDocumentsToCopy);
                     }
 
+                    if (auto quiescePeriodEnd = coordinatorDoc.getQuiescePeriodEnd()) {
+                        // If the quiescePeriodEnd exists, include it in the update.
+                        setBuilder.append(ReshardingCoordinatorDocument::kQuiescePeriodEndFieldName,
+                                          *quiescePeriodEnd);
+                    }
+
                     buildStateDocumentMetricsForUpdate(setBuilder, nextState, timestamp);
 
                     if (nextState == CoordinatorStateEnum::kPreparingToDonate) {
@@ -345,7 +351,11 @@ void writeToCoordinatorStateNss(OperationContext* opCtx,
         assertNumDocsModifiedMatchesExpected(request, res, *expectedNumModified);
     }
 
-    setMeticsAfterWrite(metrics, nextState, timestamp);
+    // When moving from quiescing to done, we don't have metrics available.
+    invariant(metrics || nextState == CoordinatorStateEnum::kDone);
+    if (metrics) {
+        setMeticsAfterWrite(metrics, nextState, timestamp);
+    }
 }
 
 /**
@@ -449,6 +459,7 @@ BSONObj createReshardingFieldsUpdateForOriginalNss(
 
             return BSON("$set" << setFields);
         }
+        case mongo::CoordinatorStateEnum::kQuiesced:
         case mongo::CoordinatorStateEnum::kDone:
             // Remove 'reshardingFields' from the config.collections entry
             return BSON(
@@ -1002,10 +1013,12 @@ void writeStateTransitionAndCatalogUpdatesThenBumpCollectionPlacementVersions(
             ShardingCatalogClient::kLocalWriteConcern);
 }
 
-void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
-                                             ReshardingMetrics* metrics,
-                                             const ReshardingCoordinatorDocument& coordinatorDoc,
-                                             boost::optional<Status> abortReason) {
+boost::optional<ReshardingCoordinatorDocument>
+removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+    OperationContext* opCtx,
+    ReshardingMetrics* metrics,
+    const ReshardingCoordinatorDocument& coordinatorDoc,
+    boost::optional<Status> abortReason) {
     // If the coordinator needs to abort and isn't in kInitializing, additional collections need to
     // be cleaned up in the final transaction. Otherwise, cleanup for abort and success are the
     // same.
@@ -1014,7 +1027,16 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
     invariant((wasDecisionPersisted && !abortReason) || abortReason);
 
     ReshardingCoordinatorDocument updatedCoordinatorDoc = coordinatorDoc;
-    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
+    // If a user resharding ID was provided, move the coordinator doc to "quiesced" rather than
+    // "done".
+    if (coordinatorDoc.getUserReshardingUUID()) {
+        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kQuiesced);
+        updatedCoordinatorDoc.setQuiescePeriodEnd(
+            opCtx->getServiceContext()->getFastClockSource()->now() +
+            Milliseconds(resharding::gReshardingCoordinatorQuiescePeriodMillis));
+    } else {
+        updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
+    }
     emplaceTruncatedAbortReasonIfExists(updatedCoordinatorDoc, abortReason);
 
     const auto tagsQuery =
@@ -1050,6 +1072,9 @@ void removeCoordinatorDocAndReshardingFields(OperationContext* opCtx,
         ShardingCatalogClient::kLocalWriteConcern);
 
     metrics->onStateTransition(coordinatorDoc.getState(), updatedCoordinatorDoc.getState());
+    return boost::optional<ReshardingCoordinatorDocument>{updatedCoordinatorDoc.getState() ==
+                                                              CoordinatorStateEnum::kQuiesced,
+                                                          std::move(updatedCoordinatorDoc)};
 }
 }  // namespace resharding
 
@@ -1248,6 +1273,25 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
 
     for (const auto& instance : existingInstances) {
         auto typedInstance = checked_cast<const ReshardingCoordinator*>(instance);
+        // Instances which have already completed do not conflict with other instances, unless
+        // their user resharding UUIDs are the same.
+        const bool isUserReshardingUUIDSame =
+            typedInstance->getMetadata().getUserReshardingUUID() ==
+            coordinatorDoc.getUserReshardingUUID();
+        if (!isUserReshardingUUIDSame && typedInstance->getCompletionFuture().isReady()) {
+            LOGV2_DEBUG(7760400,
+                        1,
+                        "Ignoring 'conflict' with completed instance of resharding",
+                        "newNss"_attr = coordinatorDoc.getSourceNss(),
+                        "oldNss"_attr = typedInstance->getMetadata().getSourceNss(),
+                        "newUUID"_attr = coordinatorDoc.getReshardingUUID(),
+                        "oldUUID"_attr = typedInstance->getMetadata().getReshardingUUID());
+            continue;
+        }
+        // For resharding commands with no UUID provided by the user, we will re-connect to an
+        // instance with the same NS and resharding key, if that instance was originally started
+        // with no user-provided UUID. If a UUID is provided by the user, we will connect only
+        // to the original instance.
         const bool isNssSame =
             typedInstance->getMetadata().getSourceNss() == coordinatorDoc.getSourceNss();
         const bool isReshardingKeySame = SimpleBSONObjComparator::kInstance.evaluate(
@@ -1258,14 +1302,21 @@ void ReshardingCoordinatorService::checkIfConflictsWithOtherInstances(
                 str::stream() << "Only one resharding operation is allowed to be active at a "
                                  "time, aborting resharding op for "
                               << coordinatorDoc.getSourceNss().toStringForErrorMsg(),
-                isNssSame && isReshardingKeySame);
+                isUserReshardingUUIDSame && isNssSame && isReshardingKeySame);
+
+        std::string userReshardingIdMsg;
+        if (coordinatorDoc.getUserReshardingUUID()) {
+            userReshardingIdMsg = str::stream()
+                << " and user resharding UUID " << coordinatorDoc.getUserReshardingUUID();
+        }
 
         iasserted(ReshardingCoordinatorServiceConflictingOperationInProgressInfo(
                       typedInstance->shared_from_this()),
                   str::stream() << "Found an active resharding operation for "
                                 << coordinatorDoc.getSourceNss().toStringForErrorMsg()
                                 << " with resharding key "
-                                << coordinatorDoc.getReshardingKey().toString());
+                                << coordinatorDoc.getReshardingKey().toString()
+                                << userReshardingIdMsg);
     }
 }
 
@@ -1281,6 +1332,7 @@ std::shared_ptr<repl::PrimaryOnlyService::Instance> ReshardingCoordinatorService
 
 ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
     std::shared_ptr<executor::ScopedTaskExecutor> executor, const CancellationToken& token) {
+
     return AsyncTry([this] {
                auto nss = getStateDocumentsNS();
 
@@ -1289,15 +1341,30 @@ ExecutorFuture<void> ReshardingCoordinatorService::_rebuildService(
                auto opCtx = opCtxHolder.get();
                DBDirectClient client(opCtx);
                BSONObj result;
-               client.runCommand(
-                   nss.dbName(),
-                   BSON("createIndexes"
-                        << nss.coll().toString() << "indexes"
-                        << BSON_ARRAY(BSON("key" << BSON("active" << 1) << "name"
-                                                 << kReshardingCoordinatorActiveIndexName
-                                                 << "unique" << true))),
-                   result);
-               uassertStatusOK(getStatusFromCommandResult(result));
+               // We don't need a unique index on "active" any more since
+               // checkIfConflictsWithOtherInstances was implemented, and once we allow quiesced
+               // instances it breaks them, so don't create it.
+               //
+               // TODO(SERVER-67712): We create the collection only to make index creation during
+               // downgrade simpler, so we can remove all of this initialization when the flag is
+               // removed.
+               if (!resharding::gFeatureFlagReshardingImprovements.isEnabled(
+                       serverGlobalParams.featureCompatibility)) {
+                   client.runCommand(
+                       nss.dbName(),
+                       BSON("createIndexes"
+                            << nss.coll().toString() << "indexes"
+                            << BSON_ARRAY(BSON("key" << BSON("active" << 1) << "name"
+                                                     << kReshardingCoordinatorActiveIndexName
+                                                     << "unique" << true))),
+                       result);
+                   uassertStatusOK(getStatusFromCommandResult(result));
+               } else {
+                   client.runCommand(nss.dbName(), BSON("create" << nss.coll().toString()), result);
+                   const auto& status = getStatusFromCommandResult(result);
+                   if (status.code() != ErrorCodes::NamespaceExists)
+                       uassertStatusOK(status);
+               }
            })
         .until([token](Status status) { return shouldStopAttemptingToCreateIndex(status, token); })
         .withBackoffBetweenIterations(kExponentialBackoff)
@@ -1309,8 +1376,9 @@ void ReshardingCoordinatorService::abortAllReshardCollection(OperationContext* o
 
     for (auto& instance : getAllInstances(opCtx)) {
         auto reshardingCoordinator = checked_pointer_cast<ReshardingCoordinator>(instance);
-        reshardingCoordinatorFutures.push_back(reshardingCoordinator->getCompletionFuture());
-        reshardingCoordinator->abort();
+        reshardingCoordinatorFutures.push_back(
+            reshardingCoordinator->getQuiescePeriodFinishedFuture());
+        reshardingCoordinator->abort(true /* skip quiesce period */);
     }
 
     for (auto&& future : reshardingCoordinatorFutures) {
@@ -1481,7 +1549,7 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
                 return ExecutorFuture<void>(**executor, status);
             }
 
-            if (_coordinatorDoc.getState() < CoordinatorStateEnum::kPreparingToDonate) {
+            if (_coordinatorDoc.getState() != CoordinatorStateEnum::kPreparingToDonate) {
                 return ExecutorFuture<void>(**executor, status);
             }
 
@@ -1519,7 +1587,23 @@ ExecutorFuture<void> ReshardingCoordinator::_initializeCoordinator(
             // Allow abort to continue except when stepped down.
             _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
 
-            if (_coordinatorDoc.getState() < CoordinatorStateEnum::kPreparingToDonate) {
+            // If we're already quiesced here it means we failed over and need to preserve the
+            // original abort reason.
+            if (_coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
+                _originalReshardingStatus.emplace(Status::OK());
+                auto originalAbortReason = _coordinatorDoc.getAbortReason();
+                if (originalAbortReason) {
+                    _originalReshardingStatus.emplace(
+                        sharding_ddl_util_deserializeErrorStatusFromBSON(
+                            BSON("status" << *originalAbortReason).firstElement()));
+                }
+                const bool isSameKeyResharding = _coordinatorDoc.getForceRedistribution() &&
+                    *_coordinatorDoc.getForceRedistribution();
+                markCompleted(*_originalReshardingStatus, _metrics.get(), isSameKeyResharding);
+                // We must return status here, not _originalReshardingStatus, because the latter
+                // may be Status::OK() and not abort the future flow.
+                return ExecutorFuture<void>(**executor, status);
+            } else if (_coordinatorDoc.getState() < CoordinatorStateEnum::kPreparingToDonate) {
                 return _onAbortCoordinatorOnly(executor, status);
             } else {
                 return _onAbortCoordinatorAndParticipants(executor, status);
@@ -1691,6 +1775,9 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
     }();
 
     if (abortCalled) {
+        if (abortCalled == AbortType::kAbortSkipQuiesce) {
+            _ctHolder->cancelQuiescePeriod();
+        }
         _ctHolder->abort();
     }
 
@@ -1727,7 +1814,52 @@ SemiFuture<void> ReshardingCoordinator::run(std::shared_ptr<executor::ScopedTask
             _coordinatorDoc.setForceRedistribution(false);
             return _runReshardingOp(executor);
         })
+        .onCompletion([this, self = shared_from_this(), executor](Status status) {
+            _cancelableOpCtxFactory.emplace(_ctHolder->getStepdownToken(), _markKilledExecutor);
+            return _quiesce(executor, std::move(status));
+        })
         .semi();
+}
+
+ExecutorFuture<void> ReshardingCoordinator::_quiesce(
+    const std::shared_ptr<executor::ScopedTaskExecutor>& executor, Status status) {
+    if (_coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
+        return (*executor)
+            ->sleepUntil(*_coordinatorDoc.getQuiescePeriodEnd(), _ctHolder->getCancelQuiesceToken())
+            .onCompletion([this, self = shared_from_this(), executor, status](Status sleepStatus) {
+                LOGV2_DEBUG(7760405,
+                            1,
+                            "Resharding coordinator quiesce period done",
+                            "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+                if (!_ctHolder->isSteppingOrShuttingDown()) {
+                    auto opCtx = _cancelableOpCtxFactory->makeOperationContext(&cc());
+                    ReshardingCoordinatorDocument updatedCoordinatorDoc = _coordinatorDoc;
+                    updatedCoordinatorDoc.setState(CoordinatorStateEnum::kDone);
+                    executeMetadataChangesInTxn(
+                        opCtx.get(),
+                        [&updatedCoordinatorDoc](OperationContext* opCtx, TxnNumber txnNumber) {
+                            writeToCoordinatorStateNss(opCtx,
+                                                       nullptr /* metrics have already been freed */
+                                                       ,
+                                                       updatedCoordinatorDoc,
+                                                       txnNumber);
+                        });
+                    LOGV2_DEBUG(7760406,
+                                1,
+                                "Resharding coordinator removed state doc after quiesce",
+                                "reshardingUUID"_attr = _coordinatorDoc.getReshardingUUID());
+                }
+                return status;
+            })
+            .thenRunOn(_coordinatorService->getInstanceCleanupExecutor())
+            .onCompletion([this, self = shared_from_this(), executor, status](Status deleteStatus) {
+                _quiescePeriodFinishedPromise.emplaceValue();
+                return status;
+            });
+    }
+    // No quiesce period is required.
+    _quiescePeriodFinishedPromise.emplaceValue();
+    return ExecutorFuture<void>(**executor, status);
 }
 
 ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
@@ -1753,17 +1885,21 @@ ExecutorFuture<void> ReshardingCoordinator::_runReshardingOp(
 
             {
                 auto lg = stdx::lock_guard(_fulfillmentMutex);
-                if (status.isOK()) {
+                // reportStatus is the status reported back to the caller, which may be
+                // different than the status if we interrupted the future chain because the
+                // resharding was already completed on a previous primary.
+                auto reportStatus = _originalReshardingStatus.value_or(status);
+                if (reportStatus.isOK()) {
                     _completionPromise.emplaceValue();
 
                     if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
                         _coordinatorDocWrittenPromise.emplaceValue();
                     }
                 } else {
-                    _completionPromise.setError(status);
+                    _completionPromise.setError(reportStatus);
 
                     if (!_coordinatorDocWrittenPromise.getFuture().isReady()) {
-                        _coordinatorDocWrittenPromise.setError(status);
+                        _coordinatorDocWrittenPromise.setError(reportStatus);
                     }
                 }
             }
@@ -1825,8 +1961,7 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorOnly(
 
                // The temporary collection and its corresponding entries were never created. Only
                // the coordinator document and reshardingFields require cleanup.
-               resharding::removeCoordinatorDocAndReshardingFields(
-                   opCtx.get(), _metrics.get(), _coordinatorDoc, status);
+               _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(opCtx.get(), status);
                return status;
            })
         .onTransientError([](const Status& retryStatus) {
@@ -1887,14 +2022,18 @@ ExecutorFuture<void> ReshardingCoordinator::_onAbortCoordinatorAndParticipants(
         .then([status] { return status; });
 }
 
-void ReshardingCoordinator::abort() {
+void ReshardingCoordinator::abort(bool skipQuiescePeriod) {
     auto ctHolderInitialized = [&] {
         stdx::lock_guard<Latch> lk(_abortCalledMutex);
-        _abortCalled = true;
+        skipQuiescePeriod = skipQuiescePeriod || _abortCalled == AbortType::kAbortSkipQuiesce;
+        _abortCalled =
+            skipQuiescePeriod ? AbortType::kAbortSkipQuiesce : AbortType::kAbortWithQuiesce;
         return !(_ctHolder == nullptr);
     }();
 
     if (ctHolderInitialized) {
+        if (skipQuiescePeriod)
+            _ctHolder->cancelQuiescePeriod();
         _ctHolder->abort();
     }
 }
@@ -1999,8 +2138,11 @@ void ReshardingCoordinator::_insertCoordDocAndChangeOrigCollEntry() {
             _coordinatorDocWrittenPromise.emplaceValue();
         }
 
-        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kAborting) {
+        if (_coordinatorDoc.getState() == CoordinatorStateEnum::kAborting ||
+            _coordinatorDoc.getState() == CoordinatorStateEnum::kQuiesced) {
             _ctHolder->abort();
+            // Force future chain to enter onError flow
+            uasserted(ErrorCodes::ReshardCollectionAborted, "aborted");
         }
 
         return;
@@ -2366,8 +2508,7 @@ ExecutorFuture<void> ReshardingCoordinator::_awaitAllParticipantShardsDone(
             markCompleted(
                 abortReason ? *abortReason : Status::OK(), _metrics.get(), isSameKeyResharding);
 
-            resharding::removeCoordinatorDocAndReshardingFields(
-                opCtx.get(), _metrics.get(), coordinatorDoc, abortReason);
+            _removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(opCtx.get(), abortReason);
         });
 }
 
@@ -2390,6 +2531,17 @@ void ReshardingCoordinator::_updateCoordinatorDocStateAndCatalogEntries(
 
     // Update in-memory coordinator doc
     installCoordinatorDoc(opCtx.get(), updatedCoordinatorDoc);
+}
+
+void ReshardingCoordinator::_removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+    OperationContext* opCtx, boost::optional<Status> abortReason) {
+    auto optionalDoc = resharding::removeOrQuiesceCoordinatorDocAndRemoveReshardingFields(
+        opCtx, _metrics.get(), _coordinatorDoc, abortReason);
+
+    // Update in-memory coordinator doc if it wasn't deleted.
+    if (optionalDoc) {
+        installCoordinatorDoc(opCtx, *optionalDoc);
+    }
 }
 
 template <typename CommandType>

@@ -4,13 +4,17 @@
 (function() {
 "use strict";
 
+load("jstests/libs/feature_flag_util.js");
 load("jstests/libs/parallel_shell_helpers.js");
 load("jstests/sharding/libs/resharding_test_fixture.js");
 load('jstests/libs/discover_topology.js');
 load('jstests/libs/fail_point_util.js');
 load('jstests/sharding/libs/sharded_transactions_helpers.js');
 
-function runTest(forcePooledConnectionsDropped) {
+// Global variable is used to avoid spinning up a set of servers just to see if the
+// feature flag is enabled.
+let reshardingImprovementsEnabled;
+function runTest({forcePooledConnectionsDropped, withUUID}) {
     const reshardingTest =
         new ReshardingTest({numDonors: 2, numRecipients: 2, reshardInPlace: true});
     reshardingTest.setup();
@@ -28,6 +32,16 @@ function runTest(forcePooledConnectionsDropped) {
     const sourceNamespace = inputCollection.getFullName();
 
     let mongos = inputCollection.getMongo();
+
+    if (reshardingImprovementsEnabled === undefined) {
+        reshardingImprovementsEnabled = FeatureFlagUtil.isEnabled(mongos, "ReshardingImprovements");
+    }
+    if (withUUID && !reshardingImprovementsEnabled) {
+        jsTestLog("Skipping test with UUID since featureFlagReshardingImprovements is not enabled");
+        reshardingTest.tearDown();
+    }
+    jsTestLog("Testing with forcePooledConnectionsDropped: " + forcePooledConnectionsDropped +
+              " withUUID: " + withUUID);
 
     for (let x = 0; x < 1000; x++) {
         assert.commandWorked(inputCollection.insert({oldKey: x, newKey: -1 * x}));
@@ -48,12 +62,14 @@ function runTest(forcePooledConnectionsDropped) {
             const coordinatorDoc =
                 mongos.getCollection("config.reshardingOperations").findOne({ns: sourceNamespace});
 
-            return coordinatorDoc === null || coordinatorDoc.state === "aborting";
+            return coordinatorDoc === null || coordinatorDoc.state === "aborting" ||
+                coordinatorDoc.state === "quiesced";
         });
     }
 
     const recipientShardNames = reshardingTest.recipientShardNames;
     let awaitShell;
+    let reshardingUUID = withUUID ? UUID() : undefined;
     reshardingTest.withReshardingInBackground(
         {
             newShardKeyPattern: {newKey: 1},
@@ -61,6 +77,7 @@ function runTest(forcePooledConnectionsDropped) {
                 {min: {newKey: MinKey}, max: {newKey: 0}, shard: recipientShardNames[0]},
                 {min: {newKey: 0}, max: {newKey: MaxKey}, shard: recipientShardNames[1]},
             ],
+            reshardingUUID: reshardingUUID
         },
         () => {
             // Wait for config server to have started resharding before sending setFCV, otherwise
@@ -149,7 +166,12 @@ function runTest(forcePooledConnectionsDropped) {
 // This test case forces the setFCV command to call dropsConnections while the coordinator is in
 // the process of establishing connections to the participant shards in order to ensure that the
 // resharding operation does not stall.
-runTest(true);
+runTest({forcePooledConnectionsDropped: true});
 
-runTest(false);
+assert(reshardingImprovementsEnabled !== undefined);
+
+// We test with a UUID because we need for setFCV to abort the quiesce period as well, in order
+// to completely clear the config server's state collection.  Because this test takes a while
+// we don't try all combinations of forcePooledCollectionsDropped and withUUID.
+runTest({forcePooledConnectionsDropped: false, withUUID: reshardingImprovementsEnabled});
 })();
