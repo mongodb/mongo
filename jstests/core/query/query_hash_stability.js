@@ -3,6 +3,10 @@
  * across catalog changes.
  * @tags: [
  *   assumes_read_concern_local,
+ *   # This test expects query shapes and plans to stay the same at the beginning and
+ *   # at the end of test run. That's just wrong expectation when chunks are moving
+ *   # randomly across shards.
+ *   assumes_balancer_off,
  *   requires_fcv_51,
  *   # The test expects the plan cache key on a given node to remain stable. However, the plan
  *   # cache key is allowed to change between versions. Therefore, this test cannot run in
