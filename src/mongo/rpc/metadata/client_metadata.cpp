@@ -416,6 +416,10 @@ void ClientMetadata::logClientMetadata(Client* client) const {
         return;
     }
 
+    if (serverGlobalParams.quiet.load()) {
+        return;
+    }
+
     LOGV2(51800,
           "received client metadata from {remote} {client}: {doc}",
           "client metadata",
