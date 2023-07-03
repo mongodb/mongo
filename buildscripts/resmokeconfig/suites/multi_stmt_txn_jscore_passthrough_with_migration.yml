@@ -315,7 +315,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        var testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
         ImplicitlyShardAccessCollSettings.setMode(ImplicitlyShardAccessCollSettings.Modes.kHashedMoveToSingleShard);
         load('jstests/libs/override_methods/enable_sessions.js');

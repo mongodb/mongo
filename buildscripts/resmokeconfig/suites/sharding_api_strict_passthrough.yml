@@ -36,6 +36,6 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = false;
+        globalThis.testingReplication = false;
         load('jstests/libs/override_methods/set_api_strict.js');
       nodb: ''

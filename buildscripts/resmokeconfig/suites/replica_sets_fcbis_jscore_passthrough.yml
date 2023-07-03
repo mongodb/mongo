@@ -48,7 +48,7 @@ executor:
       - BackgroundInitialSync
   config:
     shell_options:
-      eval: "testingReplication = true;"
+      eval: "globalThis.testingReplication = true;"
   hooks:
   - class: BackgroundInitialSync
     n: *run_hook_interval

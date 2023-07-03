@@ -61,7 +61,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load("jstests/libs/override_methods/implicit_wildcard_indexes.js");
   hooks:
   - class: ValidateCollections

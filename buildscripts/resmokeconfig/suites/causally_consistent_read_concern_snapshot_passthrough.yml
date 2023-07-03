@@ -41,7 +41,7 @@ executor:
         TestData:
           defaultReadConcernLevel: snapshot
       eval: >-
-        var testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load("jstests/libs/override_methods/enable_causal_consistency.js");
   hooks:

@@ -55,7 +55,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
         jsTest.authenticate(db.getMongo());
       global_vars:

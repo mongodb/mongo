@@ -50,7 +50,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        var testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/implicitly_shard_accessed_collections.js');
   hooks:
   # We don't execute dbHash or oplog consistency checks since there is only a single replica set

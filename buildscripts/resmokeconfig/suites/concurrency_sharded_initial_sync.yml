@@ -220,7 +220,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load("jstests/libs/override_methods/set_read_preference_secondary.js");
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
       global_vars:

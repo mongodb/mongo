@@ -7,7 +7,7 @@
           # We do not always want all of the eval statements from the base suite so we override
           # the ones we always want
           eval: >-
-            var testingReplication = true;
+            globalThis.testingReplication = true;
             load('jstests/libs/override_methods/set_read_and_write_concerns.js');
 
 - name: causal_consistency
@@ -22,7 +22,7 @@
           # this is not under the eval section on purpose, we want to override this
           # to get rid of causal consistency
           eval: >-
-            var testingReplication = true;
+            globalThis.testingReplication = true;
             load('jstests/libs/override_methods/set_read_and_write_concerns.js');
 
 - name: mongos_passthrough

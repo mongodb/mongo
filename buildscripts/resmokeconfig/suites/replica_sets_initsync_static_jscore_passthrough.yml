@@ -21,7 +21,7 @@ executor:
       - IntermediateInitialSync
   config:
     shell_options:
-      eval: "testingReplication = true;"
+      eval: "globalThis.testingReplication = true;"
   hooks:
   - class: IntermediateInitialSync
     n: *run_hook_interval

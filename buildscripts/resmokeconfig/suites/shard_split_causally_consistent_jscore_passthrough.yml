@@ -119,7 +119,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
         load('jstests/libs/override_methods/enable_causal_consistency.js');
         load('jstests/libs/override_methods/enable_sessions.js');

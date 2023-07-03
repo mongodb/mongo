@@ -16,7 +16,7 @@ executor:
     - ValidateCollections
   config:
     shell_options:
-      eval: testingReplication = true;
+      eval: globalThis.testingReplication = true;
   fixture:
     class: ReplicaSetFixture
     mongod_options:

@@ -37,7 +37,7 @@ executor:
       - PeriodicKillSecondaries
   config:
     shell_options:
-      eval: "testingReplication = true;"
+      eval: "globalThis.testingReplication = true;"
   hooks:
   - class: PeriodicKillSecondaries
   fixture:

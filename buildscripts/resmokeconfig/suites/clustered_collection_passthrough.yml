@@ -84,7 +84,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        var testingReplication = true;
+        globalThis.testingReplication = true;
   fixture:
     class: ReplicaSetFixture
     mongod_options:

@@ -32,7 +32,7 @@ executor:
             wrapCRUDinTransactions: true
       # Enable the transactions passthrough.
       eval: >-
-        var testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/enable_sessions.js');
         load('jstests/libs/override_methods/txn_passthrough_cmd_massage.js');
         load('jstests/libs/override_methods/network_error_and_txn_override.js');

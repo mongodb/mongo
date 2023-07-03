@@ -34,7 +34,7 @@ executor:
       # are bound to the oplog visibility rules. Using causal consistency forces the visibility
       # point to advance to the timestamp of the last write before doing a new read.
       eval: >-
-        var testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/enable_causal_consistency_without_read_pref.js');
   hooks:

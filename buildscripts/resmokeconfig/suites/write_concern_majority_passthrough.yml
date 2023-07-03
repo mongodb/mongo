@@ -46,7 +46,7 @@ executor:
         TestData:
           defaultReadConcernLevel: local
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/set_read_and_write_concerns.js');
         load('jstests/libs/override_methods/set_read_preference_secondary.js');
   hooks:

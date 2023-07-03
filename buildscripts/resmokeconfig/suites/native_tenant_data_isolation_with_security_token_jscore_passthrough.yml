@@ -80,7 +80,7 @@ executor:
   config:
     shell_options:
       eval: |
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/inject_security_token.js');
   hooks:
   # The CheckReplDBHash hook waits until all operations have replicated to and have been applied

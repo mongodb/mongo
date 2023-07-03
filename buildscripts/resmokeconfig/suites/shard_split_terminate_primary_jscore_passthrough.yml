@@ -127,9 +127,9 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/network_error_and_txn_override.js');
-        db = connect(TestData.connectionString);
+        globalThis.db = connect(TestData.connectionString);
         load('jstests/libs/override_methods/inject_tenant_prefix.js');
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/set_read_and_write_concerns.js");
@@ -170,7 +170,7 @@ executor:
   - class: ContinuousShardSplit
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load('jstests/libs/override_methods/network_error_and_txn_override.js');
         load("jstests/libs/override_methods/set_read_and_write_concerns.js");
       global_vars:

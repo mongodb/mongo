@@ -56,7 +56,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load("jstests/libs/override_methods/enable_sessions.js");
         load("jstests/libs/override_methods/retry_writes_at_least_once.js");
       global_vars:

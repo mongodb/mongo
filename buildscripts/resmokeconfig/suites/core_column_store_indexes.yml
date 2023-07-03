@@ -29,7 +29,7 @@ executor:
   config:
     shell_options:
       eval: >-
-        testingReplication = true;
+        globalThis.testingReplication = true;
         load("jstests/libs/override_methods/hide_column_store_indexes_from_get_indexes.js");
   hooks:
   - class: ValidateCollections
