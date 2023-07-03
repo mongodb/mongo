@@ -1829,7 +1829,6 @@ buildvariants:
     display_name: Linux Standalone Schedule 2022-11
     # TODO SERVER-74399 Reduce frequency back to baseline.
     # cron: &linux-standalone-cron "0 0 * * 2,4,6"  # Tuesday, Thursday and Saturday at 00:00
-    cron: &linux-standalone-cron "0 0 * * *"  # Everyday at 00:00
     modules: *modules
     expansions:
       mongodb_setup_release: 2022-11
@@ -1842,6 +1841,7 @@ buildvariants:
       authentication: enabled
       storageEngine: wiredTiger
       compile_variant: "-arm64"
+      build_variant_override: linux-standalone.2022-11
     run_on:
       - "rhel70-perf-single"
     tasks: 
