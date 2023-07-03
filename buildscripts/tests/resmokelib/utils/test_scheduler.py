@@ -12,6 +12,7 @@ def noop():
 
 class TestScheduler(unittest.TestCase):
     """Unit tests for the Scheduler class."""
+
     scheduler = _scheduler.Scheduler
 
     def setUp(self):

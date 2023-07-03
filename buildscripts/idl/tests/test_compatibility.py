@@ -32,6 +32,7 @@
 import unittest
 import sys
 from os import path
+
 sys.path.append(path.dirname(path.dirname(path.abspath(__file__))))
 
 import idl_check_compatibility  # noqa: E402 pylint: disable=wrong-import-position

@@ -16,6 +16,7 @@ import yaml
 import buildscripts.burn_in_tests as under_test
 from buildscripts.ciconfig.evergreen import parse_evergreen_file, VariantTask
 import buildscripts.resmokelib.parser as _parser
+
 _parser.set_run_options()
 
 # pylint: disable=protected-access

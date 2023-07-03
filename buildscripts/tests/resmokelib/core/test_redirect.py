@@ -15,9 +15,10 @@ class TestStdoutRedirect(unittest.TestCase):
     is_windows = os.name == "nt"
 
     def test_process_pipes(self):
-        """Write a string, one word per line into the beginning of a chain of processes. The input
-        will be tee'd into a temporary file and grepped. Verify the contents of the tee'd file and
-        the final output of the grep.
+        """Write a string, one word per line into the beginning of a chain of processes.
+
+        The input will be tee'd into a temporary file and grepped. Verify the contents of
+        the tee'd file and the final output of the grep.
         """
 
         if self.is_windows:

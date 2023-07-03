@@ -1,14 +1,14 @@
 # Linters
 # Note: These versions are checked by python modules in buildscripts/linter/
 GitPython ~= 3.1.31
-mypy ~= 0.942
-pydocstyle == 6.1.1
-pylint == 2.7.2
-structlog ~= 19.2.0
-yamllint == 1.15.0
-yapf == 0.26.0
-evergreen-lint == 0.1.3
-types-setuptools == 57.4.12
-types-requests == 2.26.3
+mypy ~= 1.3.0
+pydocstyle == 6.3.0
+pylint == 2.7.2 # latest is 2.17.4, but that causes pip install requirements to fail
+structlog ~= 23.1.0
+yamllint == 1.32.0
+yapf == 0.26.0 # latest is 0.40.1, but that causes CI failures
+evergreen-lint == 0.1.4
+types-setuptools == 57.4.12 # latest is 68.0.0.0, but that causes pip install requirements to fail
+types-requests == 2.31.0.1
 tqdm
 colorama

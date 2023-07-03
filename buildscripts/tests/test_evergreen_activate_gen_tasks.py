@@ -29,6 +29,7 @@ class MockVariantData():
 def build_mock_evg_api(variant_data_list):
     class VersionPatchedSpec(Version):
         """A patched `Version` with instance properties included for magic mock spec."""
+
         build_variants_map = MagicMock()
 
     mock_version = MagicMock(spec_set=VersionPatchedSpec)

@@ -48,9 +48,13 @@ class TestErrorcodes(unittest.TestCase):
         self.assertEqual(22, next(generator))
 
     def test_generate_next_server_code(self):
-        """ This call to `read_error_codes` technically has no bearing on `get_next_code` when a
+        """
+        Test `generate_next_server_code`.
+
+        This call to `read_error_codes` technically has no bearing on `get_next_code` when a
         `server_ticket` is passed in. But it maybe makes sense for the test to do so in case a
-        future patch changes that relationship."""
+        future patch changes that relationship.
+        """
         _, _, seen = errorcodes.read_error_codes(TESTDATA_DIR + 'generate_next_server_code/')
         print("Seen: " + str(seen))
         generator = errorcodes.get_next_code(seen, server_ticket=12301)

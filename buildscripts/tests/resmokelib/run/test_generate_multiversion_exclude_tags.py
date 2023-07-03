@@ -25,9 +25,7 @@ class TestGenerateExcludeYaml(unittest.TestCase):
         self.assertEqual(actual, expected)
 
     def patch_and_run(self, latest, old, old_bin_version):
-        """
-        Helper to patch and run the test.
-        """
+        """Helper to patch and run the test."""
         mock_multiversion_methods = {
             'get_backports_required_hash_for_shell_version': MagicMock(),
             'get_old_yaml': MagicMock(return_value=old)

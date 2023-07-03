@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Unit test for buildscripts/remote_operations.py.
+"""
+Unit test for buildscripts/remote_operations.py.
 
-   Note - Tests require sshd to be enabled on localhost with paswordless login
-   and can fail otherwise."""
+Note - Tests require sshd to be enabled on localhost with paswordless login
+and can fail otherwise.
+"""
 
 import os
 import shutil

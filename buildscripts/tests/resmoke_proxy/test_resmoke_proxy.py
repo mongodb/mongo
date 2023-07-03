@@ -1,4 +1,4 @@
-"""Unit tests for resmoke_proxy.py"""
+"""Unit tests for resmoke_proxy.py."""
 import unittest
 from unittest.mock import MagicMock
 

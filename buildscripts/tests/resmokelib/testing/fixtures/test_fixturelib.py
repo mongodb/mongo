@@ -1,4 +1,4 @@
-"""Unittest for the resmokelib.testing.fixturelib.utils module"""
+"""Unittest for the resmokelib.testing.fixturelib.utils module."""
 
 import copy
 import unittest

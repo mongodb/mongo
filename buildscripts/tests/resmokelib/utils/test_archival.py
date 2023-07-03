@@ -1,4 +1,4 @@
-""" Unit tests for archival. """
+"""Unit tests for archival."""
 
 import logging
 import os
@@ -15,14 +15,14 @@ _BUCKET = "mongodatafiles"
 
 
 def create_random_file(file_name, num_chars_mb):
-    """ Creates file with random characters, which will have minimal compression. """
+    """Creates file with random characters, which will have minimal compression."""
     with open(file_name, "wb") as fileh:
         for _ in range(num_chars_mb * 1024 * 1024):
             fileh.write(chr(random.randint(0, 255)))
 
 
 class MockS3Client(object):
-    """ Class to mock the S3 client. """
+    """Class to mock the S3 client."""
 
     def __init__(self, logger):
         self.logger = logger
